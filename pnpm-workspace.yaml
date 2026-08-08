@@ -1,4 +1,20 @@
 onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
+  - acorn
+  - acorn-loose
+  - cookie
+  - enhanced-resolve
+  - esbuild
+  - lightningcss
+  - minimizer-webpack-plugin
+  - path-to-regexp
   - prisma
+  - schema-utils
+  - satori
+  - sharp
+  - terser
+  - undici
+  - web-vitals
+  - webpack
+  - workerd
