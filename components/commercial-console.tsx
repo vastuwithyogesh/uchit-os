@@ -1,0 +1,427 @@
+"use client";
+
+import { useMemo, useState } from "react";
+import type {
+  AdvanceVerificationRecord,
+  ClientRecord,
+  CommercialProposalRecord,
+  PaymentRecord,
+  ReportVersionRecord,
+  ReviewCallBookingRecord,
+  VastuCaseRecord
+} from "@/lib/domain";
+import { useSession } from "@/components/session-provider";
+import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
+
+interface CommercialConsoleProps {
+  clients: ClientRecord[];
+  proposals: CommercialProposalRecord[];
+  reviewCallBookings: ReviewCallBookingRecord[];
+  payments: PaymentRecord[];
+  advanceVerifications: AdvanceVerificationRecord[];
+  cases: VastuCaseRecord[];
+  reports: ReportVersionRecord[];
+}
+
+async function postAction(payload: Record<string, unknown>) {
+  const response = await fetch("/api/actions", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.error ?? "Request failed");
+  }
+
+  return result;
+}
+
+export function CommercialConsole({ clients, proposals, reviewCallBookings, payments, advanceVerifications, cases, reports }: CommercialConsoleProps) {
+  const { activeUser } = useSession();
+  const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id ?? "");
+  const [meetingProvider, setMeetingProvider] = useState<ReviewCallBookingRecord["provider"]>("GOOGLE_MEET");
+  const [meetingTime, setMeetingTime] = useState(() => {
+    const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
+    next.setHours(10, 30, 0, 0);
+    return next.toISOString().slice(0, 16);
+  });
+  const [proofAmount, setProofAmount] = useState(MIN_ADVANCE_INR);
+  const [proofFileName, setProofFileName] = useState("");
+  const [proofUrl, setProofUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [message, setMessage] = useState("Use the buttons below to move the commercial flow forward.");
+
+  const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
+  const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id) ?? proposals[0];
+  const activeCase = cases.find((item) => item.clientId === activeClient?.id) ?? cases[0];
+  const activeReport = reports.find((item) => item.caseId === activeCase?.id) ?? reports[0];
+  const activeBooking = reviewCallBookings.find((item) => item.clientId === activeClient?.id) ?? reviewCallBookings[0];
+  const activeVerification = advanceVerifications.find((item) => item.clientId === activeClient?.id) ?? advanceVerifications[0];
+  const activePayments = payments.filter((payment) => payment.clientId === activeClient?.id);
+  const approval = activeCase && activeProposal ? approvalSummary(activeCase, activeProposal, activePayments) : null;
+  const advancePayment = activePayments.find((payment) => payment.proposalId === activeProposal?.id && payment.type === "ADVANCE");
+  const balancePayment = activePayments.find((payment) => payment.caseId === activeCase?.id && payment.type === "BALANCE");
+  const canRelease = activeCase && activeReport && canReleaseOfficialVerdict(activeCase, balancePayment);
+
+  const commercialStatus = useMemo(() => {
+    if (!activeProposal) {
+      return "No proposal is loaded for this client yet.";
+    }
+    return `${activeProposal.status} · ${formatMoney(activeProposal.amountInr)} · minimum advance ${formatMoney(activeProposal.minAdvanceInr)}`;
+  }, [activeProposal]);
+
+  const journeySteps = useMemo(
+    () => [
+      { label: "Proposal ready", done: Boolean(activeProposal), note: activeProposal ? commercialStatus : "Waiting for proposal" },
+      {
+        label: "Call booked",
+        done: Boolean(activeBooking),
+        note: activeBooking ? `${activeBooking.provider} · ${new Date(activeBooking.scheduledAt).toLocaleString()}` : "Pending review-call booking"
+      },
+      {
+        label: "Advance verified",
+        done: Boolean(activeVerification),
+        note: activeVerification ? `${formatMoney(activeVerification.amountInr)} verified` : "Waiting on screenshot proof"
+      },
+      { label: "Case opened", done: Boolean(activeCase), note: activeCase ? activeCase.caseNumber : "Case is still locked" },
+      { label: "Verdict ready", done: Boolean(canRelease), note: canRelease ? "Ready for final release" : "Balance or approvals still pending" }
+    ],
+    [activeBooking, activeCase, activeProposal, activeVerification, canRelease, commercialStatus]
+  );
+
+  async function uploadProof(file: File | null) {
+    if (!file) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      const response = await fetch("/api/payment-proofs", { method: "POST", body: formData });
+      const result = await response.json();
+      if (!response.ok || result.ok === false) {
+        throw new Error(result.error ?? "Upload failed");
+      }
+      setProofFileName(result.proof.fileName);
+      setProofUrl(result.proof.url);
+      setMessage("Advance proof screenshot uploaded.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Upload failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function run(action: Record<string, unknown>, successMessage: string) {
+    if (!activeClient) {
+      return;
+    }
+
+    setBusy(true);
+    try {
+      const result = await postAction({
+        ...action,
+        clientId: activeClient.id,
+        actorRole: activeUser.role
+      });
+
+      setMessage(successMessage);
+      if (result.ok) {
+        window.location.reload();
+      }
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <section className="section-grid" style={{ marginTop: 22 }}>
+      <div className="card span-8">
+        <div className="eyebrow">Commercial workflow</div>
+        <h2>₹51,000 proposal and ₹11,000 advance gate</h2>
+        <p className="subtle">
+          This panel gives us the real approval buttons for the commercial flow, so we can test the Super-Admin lock, the minimum advance rule, and the case gate together.
+        </p>
+        <div className="stepper" style={{ marginTop: 16 }}>
+          {journeySteps.map((step, index) => (
+            <div key={step.label} className={`stepper-item ${step.done ? "done" : ""}`}>
+              <div className={`stepper-dot ${step.done ? "done" : ""}`}>{index + 1}</div>
+              <div className="stepper-copy">
+                <strong>{step.label}</strong>
+                <div className="meta">{step.note}</div>
+              </div>
+            </div>
+          ))}
+        </div>
+        <div className="two-col" style={{ marginTop: 16 }}>
+          <div className="panel">
+            <div className="field">
+              <label>Client</label>
+              <select value={selectedClientId} onChange={(event) => setSelectedClientId(event.target.value)}>
+                {clients.map((client) => (
+                  <option key={client.id} value={client.id}>
+                    {client.displayName}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <div className="list" style={{ marginTop: 14 }}>
+              <div className="list-item">
+                <strong>Proposal</strong>
+                <span className="meta">{commercialStatus}</span>
+              </div>
+              <div className="list-item">
+                <strong>Current approval state</strong>
+                <span className="meta">{approval?.commercialApproved ? "Approved" : "Pending"}</span>
+              </div>
+              <div className="list-item">
+                <strong>Advance gate</strong>
+                <span className="meta">{approval?.advanceApproved ? "Open" : "Closed"}</span>
+              </div>
+              <div className="list-item">
+                <strong>Advance payment</strong>
+                <span className="meta">{advancePayment ? `${advancePayment.status} · ${formatMoney(advancePayment.amountInr)}` : "No advance recorded"}</span>
+              </div>
+              <div className="list-item">
+                <strong>Balance payment</strong>
+                <span className="meta">{balancePayment ? `${balancePayment.status} · ${formatMoney(balancePayment.amountInr)}` : "No balance recorded"}</span>
+              </div>
+              <div className="list-item">
+                <strong>Verdict gate</strong>
+                <span className="meta">{canRelease ? "Unlocked" : "Blocked"}</span>
+              </div>
+            </div>
+          </div>
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <strong>Operator</strong>
+                <div className="meta">
+                  {activeUser.fullName} · {activeUser.role}
+                </div>
+              </div>
+              <span className={`tag ${activeUser.role === "SUPER_ADMIN" ? "good" : "warn"}`}>
+                {activeUser.role === "SUPER_ADMIN" ? "Approval enabled" : "Approval limited"}
+              </span>
+            </div>
+            <div className="pill-row" style={{ marginTop: 12 }}>
+              <span className={`tag ${approval?.commercialApproved ? "good" : "warn"}`}>Proposal {approval?.commercialApproved ? "approved" : "pending"}</span>
+              <span className={`tag ${approval?.advanceApproved ? "good" : "bad"}`}>Advance {approval?.advanceApproved ? "open" : "closed"}</span>
+              <span className={`tag ${activeBooking ? "good" : "bad"}`}>Call {activeBooking ? "booked" : "pending"}</span>
+              <span className={`tag ${activeVerification ? "good" : "bad"}`}>Proof {activeVerification ? "verified" : "pending"}</span>
+            </div>
+            <div className="workflow" style={{ marginTop: 14 }}>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeClient}
+                onClick={() => run({ action: "proposal-create", amountInr: DEFAULT_PROPOSAL_AMOUNT_INR }, "Proposal drafted")}
+              >
+                Create proposal
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeProposal || activeUser.role !== "SUPER_ADMIN"}
+                onClick={() => run({ action: "proposal-approve", proposalId: activeProposal?.id }, "Proposal approved by Super-Admin")}
+              >
+                Approve proposal
+              </button>
+            </div>
+            <div className="workflow" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeProposal}
+                onClick={() => run({ action: "advance-pay", proposalId: activeProposal?.id, amountInr: MIN_ADVANCE_INR }, "Advance payment approved")}
+              >
+                Approve advance
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeCase}
+                onClick={() => run({ action: "balance-pay", caseId: activeCase?.id, amountInr: 40000 }, "Balance payment approved")}
+              >
+                Approve balance
+              </button>
+            </div>
+            <div className="workflow" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeProposal}
+                onClick={() => run({ action: "case-create", clientId: activeClient?.id, proposalId: activeProposal?.id }, "Case created")}
+              >
+                Create case
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeCase}
+                onClick={() => run({ action: "preview-report", caseId: activeCase?.id }, "Preview report generated")}
+              >
+                Generate preview
+              </button>
+            </div>
+            <div className="panel" style={{ marginTop: 14 }}>
+              <div className="panel-head">
+                <div>
+                  <strong>Review call booking</strong>
+                  <div className="meta">Blocks the calendar and prepares the call link.</div>
+                </div>
+                <span className={`tag ${activeBooking ? "good" : "warn"}`}>{activeBooking ? "Booked" : "Pending"}</span>
+              </div>
+              <div className="two-col" style={{ marginTop: 12 }}>
+                <div className="field">
+                  <label>Meeting provider</label>
+                  <select value={meetingProvider} onChange={(event) => setMeetingProvider(event.target.value as ReviewCallBookingRecord["provider"])}>
+                    <option value="GOOGLE_MEET">Google Meet</option>
+                    <option value="ZOOM">Zoom</option>
+                  </select>
+                </div>
+                <div className="field">
+                  <label>Scheduled time</label>
+                  <input type="datetime-local" value={meetingTime} onChange={(event) => setMeetingTime(event.target.value)} />
+                </div>
+              </div>
+              <div className="pill-row" style={{ marginTop: 8 }}>
+                <span className={`tag ${activeBooking ? "good" : "bad"}`}>{activeBooking ? "Calendar blocked" : "Not yet booked"}</span>
+                <span className="pill">{activeBooking?.meetingLink ?? "Meeting link will be generated on booking"}</span>
+              </div>
+              <div className="workflow" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="button-secondary"
+                  disabled={busy || !activeProposal}
+                  onClick={() =>
+                    run(
+                      {
+                        action: "review-call-book",
+                        proposalId: activeProposal?.id,
+                        provider: meetingProvider,
+                        scheduledAt: new Date(meetingTime).toISOString(),
+                        durationMinutes: 30
+                      },
+                      "Review call booked and meeting link generated"
+                    )
+                  }
+                >
+                  Book review call
+                </button>
+              </div>
+            </div>
+            <div className="workflow" style={{ marginTop: 12 }}>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeReport}
+                onClick={() => run({ action: "report-approve", reportId: activeReport?.id }, "Report approved")}
+              >
+                Approve report
+              </button>
+              <button
+                type="button"
+                className="button"
+                disabled={busy || !activeReport}
+                onClick={() => run({ action: "verdict-release", reportId: activeReport?.id }, "Verdict released")}
+              >
+                Release verdict
+              </button>
+            </div>
+            <div className="panel" style={{ marginTop: 14 }}>
+              <div className="panel-head">
+                <div>
+                  <strong>Advance proof verification</strong>
+                  <div className="meta">Upload the reference screenshot, verify the amount, and open the case automatically.</div>
+                </div>
+                <span className={`tag ${activeVerification ? "good" : "warn"}`}>{activeVerification ? activeVerification.status : "Pending"}</span>
+              </div>
+              <div className="two-col" style={{ marginTop: 12 }}>
+                <div className="field">
+                  <label>Advance amount</label>
+                  <input type="number" min={MIN_ADVANCE_INR} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
+                </div>
+                <div className="field">
+                  <label>Reference screenshot</label>
+                  <input type="file" accept="image/*" disabled={busy} onChange={(event) => uploadProof(event.target.files?.[0] ?? null)} />
+                </div>
+              </div>
+              <div className="pill-row" style={{ marginTop: 8 }}>
+                <span className="pill">File {proofFileName || "not uploaded"}</span>
+                <span className="pill">Proof {proofUrl ? "ready" : "waiting"}</span>
+                <span className="pill">Case {activeCase ? activeCase.caseNumber : "will open after verification"}</span>
+              </div>
+              <div className="workflow" style={{ marginTop: 10 }}>
+                <button
+                  type="button"
+                  className="button"
+                  disabled={busy || !activeProposal || !proofUrl}
+                  onClick={() =>
+                    run(
+                      {
+                        action: "advance-proof-verify",
+                        proposalId: activeProposal?.id,
+                        amountInr: proofAmount,
+                        referenceScreenshotUrl: proofUrl,
+                        referenceScreenshotFileName: proofFileName
+                      },
+                      "Advance verified and case opened"
+                    )
+                  }
+                >
+                  Verify advance and open case
+                </button>
+              </div>
+            </div>
+            <div className="footer-note" style={{ marginTop: 12 }}>
+              {message}
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card span-4">
+        <div className="eyebrow">Commercial rules</div>
+        <h2>Approval gates at a glance</h2>
+        <div className="panel" style={{ marginTop: 14, background: "rgba(255,255,255,0.88)" }}>
+          <strong>Current posture</strong>
+          <div className="meta" style={{ marginTop: 6 }}>
+            {activeProposal ? commercialStatus : "Pick a client to inspect the commercial flow."}
+          </div>
+        </div>
+        <div className="list" style={{ marginTop: 14 }}>
+          <div className="list-item">
+            <strong>Default proposal</strong>
+            <span className="meta">{formatMoney(DEFAULT_PROPOSAL_AMOUNT_INR)}</span>
+          </div>
+          <div className="list-item">
+            <strong>Minimum advance</strong>
+            <span className="meta">{formatMoney(MIN_ADVANCE_INR)}</span>
+          </div>
+          <div className="list-item">
+            <strong>Super-Admin approval</strong>
+            <span className="meta">Required for proposal approval</span>
+          </div>
+          <div className="list-item">
+            <strong>Verdict release</strong>
+            <span className="meta">Requires balance approval and two report approvals</span>
+          </div>
+          <div className="list-item">
+            <strong>Review call booking</strong>
+            <span className="meta">Calendar hold + meeting link before the advance step</span>
+          </div>
+          <div className="list-item">
+            <strong>Advance proof</strong>
+            <span className="meta">Requires screenshot upload before case opens</span>
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
