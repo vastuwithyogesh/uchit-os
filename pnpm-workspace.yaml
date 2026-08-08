@@ -2,4 +2,3 @@ onlyBuiltDependencies:
   - '@prisma/client'
   - '@prisma/engines'
   - prisma
-dangerouslyAllowAllBuilds: true
