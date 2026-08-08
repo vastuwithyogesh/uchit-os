@@ -6,6 +6,8 @@ interface Fetcher {
 }
 
 interface Env {
+  DB?: D1Database;
+  R2?: R2Bucket;
   ASSETS: Fetcher;
   IMAGES: {
     input(stream: ReadableStream): {
@@ -23,6 +25,7 @@ interface ExecutionContext {
 
 const worker = {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
+    (globalThis as typeof globalThis & { __uchitEnv?: Env }).__uchitEnv = env;
     const url = new URL(request.url);
     if (url.pathname === "/_vinext/image") {
       const allowedWidths = [...DEFAULT_DEVICE_SIZES, ...DEFAULT_IMAGE_SIZES];

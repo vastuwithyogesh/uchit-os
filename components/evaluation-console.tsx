@@ -1,7 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import type { AppState } from "@/lib/store";
 import type { ReportVersionRecord, UtilityRule } from "@/lib/domain";
+import { buildActionHeaders } from "@/lib/request-helpers";
+import { useSession } from "@/components/session-provider";
 import { isPreviewWatermarked, formatMoney } from "@/lib/workflows";
 
 async function fetchMaster() {
@@ -17,14 +20,48 @@ async function fetchBootstrap() {
   if (!response.ok) {
     throw new Error("Failed to load bootstrap state");
   }
-  return response.json();
+  return response.json() as Promise<AppState>;
+}
+
+async function postAction(payload: Record<string, unknown>, role?: string) {
+  const response = await fetch("/api/actions", {
+    method: "POST",
+    headers: buildActionHeaders(role as never),
+    body: JSON.stringify(payload)
+  });
+
+  const result = await response.json();
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.error ?? "Request failed");
+  }
+  return result;
 }
 
 export function EvaluationConsole() {
+  const { activeUser } = useSession();
   const [rules, setRules] = useState<UtilityRule[]>([]);
-  const [report, setReport] = useState<ReportVersionRecord | null>(null);
+  const [state, setState] = useState<AppState | null>(null);
   const [message, setMessage] = useState("Load the master table to inspect the residential rules.");
   const [busy, setBusy] = useState(false);
+  const [selectedClientId, setSelectedClientId] = useState("");
+  const [snapshotName, setSnapshotName] = useState("Residential tab evaluation");
+  const [shaktiValuesText, setShaktiValuesText] = useState("9,8,8,7,6,9,8,7,6,7,8,9,8,7,6,8");
+
+  const clients = state?.clients ?? [];
+  const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
+  const currentCase = state?.vastuCases?.find((item) => item.clientId === selectedClient?.id);
+  const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
+  const report = (reports.find((item) => item.isPreview) ?? reports[0] ?? null) as ReportVersionRecord | null;
+  const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
+  const shaktiSnapshots = state?.shaktiSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
+  const shaktiValues = useMemo(
+    () =>
+      shaktiValuesText
+        .split(",")
+        .map((value) => Number(value.trim()))
+        .filter((value) => Number.isFinite(value)),
+    [shaktiValuesText]
+  );
 
   const grouped = useMemo(
     () =>
@@ -38,15 +75,29 @@ export function EvaluationConsole() {
     [rules]
   );
 
-  async function refresh() {
+  async function refresh(preferredClientId?: string) {
     setBusy(true);
     try {
       const [master, bootstrap] = await Promise.all([fetchMaster(), fetchBootstrap()]);
       setRules(master.rules);
-      setReport((bootstrap.reportVersions?.[0] as ReportVersionRecord | undefined) ?? null);
-      setMessage(`Loaded ${master.counts.total} utility rules from the CSV and refreshed the report context.`);
+      setState(bootstrap);
+      setSelectedClientId((current) => preferredClientId ?? current ?? bootstrap.clients?.[0]?.id ?? "");
+      setMessage(`Loaded ${master.counts.total} utility rules and refreshed the evaluation state.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function run(action: Record<string, unknown>, successMessage: string) {
+    setBusy(true);
+    try {
+      await postAction(action, activeUser.role);
+      await refresh(selectedClient?.id);
+      setMessage(successMessage);
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Action failed");
     } finally {
       setBusy(false);
     }
@@ -62,18 +113,57 @@ export function EvaluationConsole() {
         <div className="eyebrow">Utility-evaluation master</div>
         <h2>Residential tab CSV</h2>
         <p className="subtle">
-          This view is the source of truth for the GOOD / BAD / OK-OK matrix. It reads the CSV directly so the report template can mirror the same rule set.
+          This view is the source of truth for the GOOD / BAD / OK-OK matrix. It now also lets us save evaluation snapshots against a live case instead of only reading the rule table.
         </p>
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{rules.length}</span>
+            <span className="stat-label">rules loaded</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{grouped.GOOD.length}</span>
+            <span className="stat-label">good verdict zones</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{evaluationSnapshots.length}</span>
+            <span className="stat-label">saved utility snapshots</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{currentCase?.caseNumber ?? "—"}</span>
+            <span className="stat-label">active case context</span>
+          </div>
+        </div>
         <div className="workflow" style={{ marginTop: 14 }}>
-          <button type="button" className="button" onClick={refresh} disabled={busy}>
+          <button type="button" className="button" onClick={() => refresh()} disabled={busy}>
             Reload master table
           </button>
+          <select value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} style={{ minWidth: 220 }}>
+            {clients.map((client) => (
+              <option key={client.id} value={client.id}>
+                {client.displayName}
+              </option>
+            ))}
+          </select>
         </div>
         <div className="pill-row" style={{ marginTop: 14 }}>
           <span className="pill">GOOD {grouped.GOOD.length}</span>
           <span className="pill">BAD {grouped.BAD.length}</span>
           <span className="pill">OK-OK {grouped["OK-OK"].length}</span>
+          <span className="pill">Snapshots {evaluationSnapshots.length}</span>
         </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label>Snapshot name</label>
+          <input value={snapshotName} onChange={(event) => setSnapshotName(event.target.value)} />
+        </div>
+        <button
+          type="button"
+          className="button-secondary"
+          style={{ marginTop: 10 }}
+          disabled={busy || !currentCase}
+          onClick={() => run({ action: "utility-evaluate", caseId: currentCase?.id, snapshotName }, "Utility evaluation snapshot saved.")}
+        >
+          Save utility snapshot
+        </button>
         <div className="list" style={{ marginTop: 14 }}>
           {rules.map((rule) => (
             <div key={rule.id} className="list-item">
@@ -90,8 +180,39 @@ export function EvaluationConsole() {
       </div>
 
       <div className="card span-4">
-        <div className="eyebrow">Report template</div>
-        <h2>Stage-A preview context</h2>
+        <div className="eyebrow">Shakti engine</div>
+        <h2>16-value ranking snapshot</h2>
+        <div className="pill-row" style={{ marginTop: 14 }}>
+          <span className="pill">Current case {currentCase?.caseNumber ?? "Not selected"}</span>
+          <span className="pill">Snapshots {shaktiSnapshots.length}</span>
+        </div>
+        <div className="field" style={{ marginTop: 14 }}>
+          <label>16 values</label>
+          <textarea value={shaktiValuesText} onChange={(event) => setShaktiValuesText(event.target.value)} />
+        </div>
+        <button
+          type="button"
+          className="button-secondary"
+          style={{ marginTop: 10 }}
+          disabled={busy || !currentCase || shaktiValues.length !== 16}
+          onClick={() => run({ action: "shakti-rank", caseId: currentCase?.id, values: shaktiValues }, "Shakti snapshot saved.")}
+        >
+          Save Shakti snapshot
+        </button>
+        <div className="list" style={{ marginTop: 14 }}>
+          <div className="list-item">
+            <strong>Current case</strong>
+            <span className="meta">{currentCase?.caseNumber ?? "No case selected"}</span>
+          </div>
+          <div className="list-item">
+            <strong>Shakti snapshots</strong>
+            <span className="meta">{shaktiSnapshots.length}</span>
+          </div>
+          <div className="list-item">
+            <strong>Expected input</strong>
+            <span className="meta">Exactly 16 values with ±2 tie-break support</span>
+          </div>
+        </div>
         <div className="panel" style={{ marginTop: 14 }}>
           <div className="panel-head">
             <div>
@@ -107,10 +228,6 @@ export function EvaluationConsole() {
           </p>
         </div>
         <div className="list" style={{ marginTop: 14 }}>
-          <div className="list-item">
-            <strong>Preview status</strong>
-            <span className="meta">{report?.status ?? "PAYMENT_BLOCKED"}</span>
-          </div>
           <div className="list-item">
             <strong>Balance gate</strong>
             <span className="meta">Locked until the balance payment is approved</span>

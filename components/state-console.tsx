@@ -80,8 +80,26 @@ export function StateConsole() {
         <div className="eyebrow">State export</div>
         <h2>Full local snapshot</h2>
         <p className="subtle">
-          This is the entire local app state in one JSON block. It’s useful for moving a build snapshot around or restoring the demo after a reset.
+          This is the entire local app state in one JSON block. It is useful for moving a build snapshot around or restoring the demo after a reset.
         </p>
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.counts.clients ?? 0}</span>
+            <span className="stat-label">clients in snapshot</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.counts.vastuCases ?? 0}</span>
+            <span className="stat-label">cases in snapshot</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.counts.reportVersions ?? 0}</span>
+            <span className="stat-label">reports in snapshot</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.integrity.issues.length ?? 0}</span>
+            <span className="stat-label">integrity flags</span>
+          </div>
+        </div>
         <div className="workflow" style={{ marginTop: 14 }}>
           <button type="button" className="button" onClick={refresh} disabled={busy}>
             Export current state

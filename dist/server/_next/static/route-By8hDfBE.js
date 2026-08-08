@@ -1,1 +1,0 @@
-import{n as e}from"./server-C94AHUq9.js";import{_ as t,a as n,c as r,f as i,h as a,l as o,m as s,n as c,t as l}from"./seed-BEWfScaX.js";async function u(){return e.json({clients:l,commercialProposals:c,leadQualifications:n,payments:r,reportVersions:o,timelineEvents:i,utilityRules:s,vastuCases:a,whatsappTemplates:t})}export{u as GET};

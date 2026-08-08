@@ -1,0 +1,1 @@
+function e(e){return{"Content-Type":`application/json`}}export{e as t};

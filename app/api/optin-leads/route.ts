@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { requireRouteActor } from "@/lib/auth";
 import { persistStateToDatabase } from "@/lib/persistence";
 import { importInboundLeads } from "@/lib/workflow-service";
 import { parseInboundLeadCsv } from "@/lib/lead-import";
 import { readOptInLeadRecords } from "@/lib/optin-leads-store";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await requireRouteActor(request, "SETTER");
+  if (!access.ok) {
+    return access.response;
+  }
   const leads = await readOptInLeadRecords();
   return NextResponse.json({
     leads,
@@ -19,6 +24,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const access = await requireRouteActor(request, "SETTER");
+  if (!access.ok) {
+    return access.response;
+  }
   const formData = await request.formData();
   const file = formData.get("file");
 

@@ -5,6 +5,14 @@ import { chartAssetDefinitions, type ChartAssetRecord } from "@/lib/chart-asset-
 
 type ChartAssetPayload = {
   assets: ChartAssetRecord[];
+  definitions: typeof chartAssetDefinitions;
+  summary: {
+    required: number;
+    uploaded: number;
+    pending: number;
+    complete: boolean;
+    missingKeys: string[];
+  };
 };
 
 async function fetchAssets() {
@@ -76,44 +84,93 @@ export function ChartUploadBoard() {
     <section className="section-grid">
       <div className="card span-12">
         <div className="eyebrow">Chart uploads</div>
-        <h2>Drop the team’s image files into each chart slot</h2>
+        <h2>Complete the visual chart library for v1 delivery</h2>
         <p className="subtle">
-          These uploads are stored locally and reused by the app. No chart logic is attached yet; we’re just wiring the image pipeline for v1.
+          These uploads feed the report visuals in v1. The summary below helps us see instantly whether the chart set is complete enough for the team to operate without gaps.
         </p>
-        <button className="button-secondary" type="button" onClick={refresh} disabled={busy} style={{ marginTop: 12 }}>
-          Refresh uploads
-        </button>
+
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.summary.required ?? chartAssetDefinitions.length}</span>
+            <span className="stat-label">required chart slots</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.summary.uploaded ?? 0}</span>
+            <span className="stat-label">uploaded visuals</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.summary.pending ?? chartAssetDefinitions.length}</span>
+            <span className="stat-label">still pending</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.summary.complete ? "Yes" : "No"}</span>
+            <span className="stat-label">asset set complete</span>
+          </div>
+        </div>
+
+        <div className="pill-row" style={{ marginTop: 14 }}>
+          <span className={`tag ${payload?.summary.complete ? "good" : "warn"}`}>{payload?.summary.complete ? "Launch-ready visual set" : "Visual set still incomplete"}</span>
+          <button className="button-secondary" type="button" onClick={refresh} disabled={busy}>
+            Refresh uploads
+          </button>
+        </div>
+
+        {!payload?.summary.complete ? (
+          <div className="panel" style={{ marginTop: 16 }}>
+            <div className="panel-head">
+              <div>
+                <strong>Still missing</strong>
+                <div className="meta">These chart slots still need a source visual before the upload set is complete.</div>
+              </div>
+            </div>
+            <div className="pill-row" style={{ marginTop: 12 }}>
+              {(payload?.summary.missingKeys ?? chartAssetDefinitions.map((definition) => definition.key)).map((key) => (
+                <span key={key} className="pill">
+                  {chartAssetDefinitions.find((definition) => definition.key === key)?.label ?? key}
+                </span>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
         <div className="two-col" style={{ marginTop: 16 }}>
           {chartAssetDefinitions.map((asset) => (
             <div key={asset.key} className="panel">
               <div className="panel-head">
                 <div>
                   <strong>{asset.label}</strong>
-                  <div className="meta">{assetsByKey[asset.key]?.uploadedAt ? `Uploaded ${new Date(assetsByKey[asset.key]!.uploadedAt).toLocaleString()}` : "Waiting for upload"}</div>
+                  <div className="meta">
+                    {assetsByKey[asset.key]?.uploadedAt ? `Uploaded ${new Date(assetsByKey[asset.key]!.uploadedAt).toLocaleString()}` : "Waiting for first upload"}
+                  </div>
                 </div>
                 <span className={`tag ${assetsByKey[asset.key] ? "good" : "warn"}`}>{assetsByKey[asset.key] ? "Ready" : "Pending"}</span>
               </div>
+
               {assetsByKey[asset.key]?.url ? (
                 <img
                   src={assetsByKey[asset.key]!.url}
                   alt={asset.label}
-                  style={{ width: "100%", marginTop: 12, borderRadius: 16, border: "1px solid var(--border)" }}
+                  style={{ width: "100%", marginTop: 12, borderRadius: 16, border: "1px solid var(--line)" }}
                 />
               ) : (
                 <div
                   style={{
                     marginTop: 12,
                     minHeight: 180,
-                    border: "1px dashed var(--border)",
+                    border: "1px dashed var(--line-strong)",
                     borderRadius: 16,
                     display: "grid",
                     placeItems: "center",
-                    color: "var(--muted)"
+                    padding: 20,
+                    color: "var(--muted)",
+                    background: "rgba(255,255,255,0.54)",
+                    textAlign: "center"
                   }}
                 >
                   No image uploaded yet
                 </div>
               )}
+
               <div className="field" style={{ marginTop: 12 }}>
                 <label>Upload image</label>
                 <input
@@ -126,6 +183,7 @@ export function ChartUploadBoard() {
             </div>
           ))}
         </div>
+
         <div className="footer-note">{message}</div>
       </div>
     </section>

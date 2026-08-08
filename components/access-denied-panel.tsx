@@ -1,0 +1,41 @@
+import Link from "next/link";
+import type { UserRole } from "@/lib/domain";
+
+export function AccessDeniedPanel({
+  area,
+  requiredRole,
+  actorRole
+}: {
+  area: string;
+  requiredRole: UserRole;
+  actorRole: UserRole;
+}) {
+  return (
+    <section className="hero-panel access-panel" style={{ marginTop: 22 }}>
+      <div className="eyebrow">Access restricted</div>
+      <h1>{area} needs a higher role.</h1>
+      <p className="lede">
+        Your current role is {actorRole}. This screen is reserved for {requiredRole} and above, so the app is keeping the route visible while protecting the operational data behind it.
+      </p>
+      <div className="pill-row" style={{ marginTop: 16 }}>
+        <span className="pill">Current role {actorRole}</span>
+        <span className="pill">Required role {requiredRole}</span>
+        <span className="pill">Protected operational view</span>
+      </div>
+      <div className="panel access-panel-card" style={{ marginTop: 18 }}>
+        <strong>What you can do next</strong>
+        <div className="meta" style={{ marginTop: 8 }}>
+          Return to the overview, continue working in the CRM, or switch roles in local workspace mode if you are testing access before publish.
+        </div>
+      </div>
+      <div className="hero-actions">
+        <Link href="/" className="button">
+          Return to overview
+        </Link>
+        <Link href="/crm" className="button-secondary">
+          Open CRM workbench
+        </Link>
+      </div>
+    </section>
+  );
+}

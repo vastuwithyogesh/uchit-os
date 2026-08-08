@@ -1,25 +1,41 @@
 import { NextResponse } from "next/server";
-import { readFile, writeFile } from "node:fs/promises";
-import { join } from "node:path";
+import { requireRouteActor } from "@/lib/auth";
+import { chartAssetDefinitions } from "@/lib/chart-asset-definitions";
 import {
   buildChartFileName,
-  ensureChartUploadDir,
   findChartDefinition,
-  makeChartAssetUrl,
   readChartAssetManifest,
   sanitizeFileName,
-  writeChartAssetManifest
+  writeChartAssetManifest,
+  saveChartAssetUpload,
+  makeChartAssetUrl
 } from "@/lib/chart-assets.server";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await requireRouteActor(request, "CONSULTANT");
+  if (!access.ok) {
+    return access.response;
+  }
   const assets = await readChartAssetManifest();
+  const uploadedKeys = new Set(assets.map((asset) => asset.key));
   return NextResponse.json({
     assets,
-    definitions: assets.length ? undefined : undefined
+    definitions: chartAssetDefinitions,
+    summary: {
+      required: chartAssetDefinitions.length,
+      uploaded: assets.length,
+      pending: chartAssetDefinitions.length - assets.length,
+      complete: chartAssetDefinitions.length > 0 && assets.length === chartAssetDefinitions.length,
+      missingKeys: chartAssetDefinitions.filter((definition) => !uploadedKeys.has(definition.key)).map((definition) => definition.key)
+    }
   });
 }
 
 export async function POST(request: Request) {
+  const access = await requireRouteActor(request, "CONSULTANT");
+  if (!access.ok) {
+    return access.response;
+  }
   const formData = await request.formData();
   const key = String(formData.get("key") ?? "");
   const file = formData.get("file");
@@ -32,12 +48,9 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Missing chart image file." }, { status: 400 });
   }
 
-  const uploadDir = await ensureChartUploadDir();
   const safeName = sanitizeFileName(file.name || `${key}.png`);
   const fileName = buildChartFileName(key as never, safeName);
-  const buffer = Buffer.from(await file.arrayBuffer());
-  const filePath = join(uploadDir, fileName);
-  await writeFile(filePath, buffer);
+  await saveChartAssetUpload(fileName, new Uint8Array(await file.arrayBuffer()));
 
   const assets = await readChartAssetManifest();
   const existing = assets.filter((asset) => asset.key !== key);

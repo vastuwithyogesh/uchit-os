@@ -25,7 +25,7 @@ export function BootstrapConsole() {
   const { activeUser } = useSession();
   const [state, setState] = useState<AppState | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Load the bootstrap state to begin");
+  const [message, setMessage] = useState("Load the current state to begin.");
 
   const counts = useMemo(() => {
     if (!state) {
@@ -77,23 +77,43 @@ export function BootstrapConsole() {
     <section className="section-grid">
       <div className="card span-8">
         <div className="eyebrow">Bootstrap control room</div>
-        <h2>Push the seeded demo into persistence, then reload it</h2>
+        <h2>Sync the seeded workflow into persistence, then reload it</h2>
         <p className="subtle">
-          This is the fastest way to keep the local app and the database in step while we build the real CRM, approval, and report flows.
+          This is the fastest way to keep the working application state and persistence layer aligned while the CRM, approval, and report flows are being verified.
         </p>
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{state?.clients.length ?? 0}</span>
+            <span className="stat-label">clients loaded</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{state?.commercialProposals.length ?? 0}</span>
+            <span className="stat-label">proposals loaded</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{state?.vastuCases.length ?? 0}</span>
+            <span className="stat-label">cases loaded</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{state?.timelineEvents.length ?? 0}</span>
+            <span className="stat-label">timeline events loaded</span>
+          </div>
+        </div>
         <div className="hero-actions" style={{ marginTop: 16 }}>
           <button className="button" type="button" onClick={refresh} disabled={busy}>
             Load current state
           </button>
           <button className="button-secondary" type="button" onClick={sync} disabled={busy}>
-            Sync demo to database
+            Sync state to persistence
           </button>
         </div>
         <div className="panel" style={{ marginTop: 18 }}>
           <div className="panel-head">
             <div>
               <strong>Operator</strong>
-              <div className="meta">{activeUser.fullName} · {activeUser.role}</div>
+              <div className="meta">
+                {activeUser.fullName} · {activeUser.role}
+              </div>
             </div>
           </div>
           <div className="footer-note">{message}</div>

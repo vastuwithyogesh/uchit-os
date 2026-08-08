@@ -1,7 +1,12 @@
 import { NextResponse } from "next/server";
+import { requireRouteActor } from "@/lib/auth";
 import { savePaymentProofUpload } from "@/lib/payment-proof-assets.server";
 
 export async function POST(request: Request) {
+  const access = await requireRouteActor(request, "SETTER");
+  if (!access.ok) {
+    return access.response;
+  }
   const formData = await request.formData();
   const file = formData.get("file");
 

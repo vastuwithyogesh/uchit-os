@@ -1,11 +1,20 @@
 import { NextResponse } from "next/server";
+import { requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await requireRouteActor(request, "SETTER");
+  if (!access.ok) {
+    return access.response;
+  }
   return NextResponse.json(await loadStateFromPersistence());
 }
 
-export async function POST() {
+export async function POST(request: Request) {
+  const access = await requireRouteActor(request, "ADMIN");
+  if (!access.ok) {
+    return access.response;
+  }
   await persistStateToDatabase();
   const state = await loadStateFromPersistence();
 

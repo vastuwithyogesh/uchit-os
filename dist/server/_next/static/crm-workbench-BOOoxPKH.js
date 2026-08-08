@@ -1,1 +1,0 @@
-import{t as e}from"./rsc-IpN1JHG9.js";var t=e(()=>{throw Error(`Unexpectedly client reference export 'CrmWorkbench' is called on server`)},`03359cad6fdf`,`CrmWorkbench`);export{t};

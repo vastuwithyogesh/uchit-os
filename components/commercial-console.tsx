@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import type {
   AdvanceVerificationRecord,
   ClientRecord,
@@ -10,8 +10,11 @@ import type {
   ReviewCallBookingRecord,
   VastuCaseRecord
 } from "@/lib/domain";
+import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
-import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
+import { canApproveReport, canReleaseVerdict } from "@/lib/permissions";
+import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
+import { buildActionHeaders } from "@/lib/request-helpers";
 
 interface CommercialConsoleProps {
   clients: ClientRecord[];
@@ -23,10 +26,18 @@ interface CommercialConsoleProps {
   reports: ReportVersionRecord[];
 }
 
-async function postAction(payload: Record<string, unknown>) {
+async function fetchState() {
+  const response = await fetch("/api/bootstrap", { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error("Failed to load commercial state");
+  }
+  return response.json() as Promise<AppState>;
+}
+
+async function postAction(payload: Record<string, unknown>, role?: string) {
   const response = await fetch("/api/actions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildActionHeaders(role as never),
     body: JSON.stringify(payload)
   });
 
@@ -38,9 +49,10 @@ async function postAction(payload: Record<string, unknown>) {
   return result;
 }
 
-export function CommercialConsole({ clients, proposals, reviewCallBookings, payments, advanceVerifications, cases, reports }: CommercialConsoleProps) {
+export function CommercialConsole(props: CommercialConsoleProps) {
   const { activeUser } = useSession();
-  const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id ?? "");
+  const [liveState, setLiveState] = useState<AppState | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState(props.clients[0]?.id ?? "");
   const [meetingProvider, setMeetingProvider] = useState<ReviewCallBookingRecord["provider"]>("GOOGLE_MEET");
   const [meetingTime, setMeetingTime] = useState(() => {
     const next = new Date(Date.now() + 24 * 60 * 60 * 1000);
@@ -50,20 +62,50 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
   const [proofAmount, setProofAmount] = useState(MIN_ADVANCE_INR);
   const [proofFileName, setProofFileName] = useState("");
   const [proofUrl, setProofUrl] = useState("");
+  const [balanceProofAmount, setBalanceProofAmount] = useState(40000);
+  const [balanceProofFileName, setBalanceProofFileName] = useState("");
+  const [balanceProofUrl, setBalanceProofUrl] = useState("");
+  const [reviewOutcomeNote, setReviewOutcomeNote] = useState("Client attended the review call and is ready for the next step.");
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Use the buttons below to move the commercial flow forward.");
+  const [message, setMessage] = useState("Use the controls below to move the commercial flow forward.");
+
+  const clients = liveState?.clients ?? props.clients;
+  const proposals = liveState?.commercialProposals ?? props.proposals;
+  const reviewCallBookings = liveState?.reviewCallBookings ?? props.reviewCallBookings;
+  const payments = liveState?.payments ?? props.payments;
+  const advanceVerifications = liveState?.advanceVerifications ?? props.advanceVerifications;
+  const cases = liveState?.vastuCases ?? props.cases;
+  const reports = liveState?.reportVersions ?? props.reports;
 
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id) ?? proposals[0];
   const activeCase = cases.find((item) => item.clientId === activeClient?.id) ?? cases[0];
-  const activeReport = reports.find((item) => item.caseId === activeCase?.id) ?? reports[0];
+  const activeReport =
+    reports.find((item) => item.caseId === activeCase?.id && !item.isPreview) ??
+    reports.find((item) => item.caseId === activeCase?.id) ??
+    reports[0];
   const activeBooking = reviewCallBookings.find((item) => item.clientId === activeClient?.id) ?? reviewCallBookings[0];
   const activeVerification = advanceVerifications.find((item) => item.clientId === activeClient?.id) ?? advanceVerifications[0];
   const activePayments = payments.filter((payment) => payment.clientId === activeClient?.id);
   const approval = activeCase && activeProposal ? approvalSummary(activeCase, activeProposal, activePayments) : null;
   const advancePayment = activePayments.find((payment) => payment.proposalId === activeProposal?.id && payment.type === "ADVANCE");
   const balancePayment = activePayments.find((payment) => payment.caseId === activeCase?.id && payment.type === "BALANCE");
-  const canRelease = activeCase && activeReport && canReleaseOfficialVerdict(activeCase, balancePayment);
+  const approvalCount = activeReport?.isPreview ? 0 : activeReport?.approvals?.length ?? 0;
+  const canPrepareFinalReport = Boolean(
+    activeCase &&
+      activeCase.balanceApproved &&
+      activeCase.fullPaymentApproved &&
+      balancePayment?.status === "APPROVED"
+  );
+  const verdictReadyByState = Boolean(
+    activeCase &&
+      activeReport &&
+      !activeReport.isPreview &&
+      approvalCount >= 2 &&
+      canReleaseOfficialVerdict(activeCase, balancePayment)
+  );
+  const canRelease = Boolean(activeCase && activeReport && canReleaseOfficialVerdict(activeCase, balancePayment));
+  const caseGateOpen = Boolean(activeProposal && canCreateCase(activeProposal, advancePayment));
 
   const commercialStatus = useMemo(() => {
     if (!activeProposal) {
@@ -91,7 +133,47 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
     [activeBooking, activeCase, activeProposal, activeVerification, canRelease, commercialStatus]
   );
 
-  async function uploadProof(file: File | null) {
+  const blockers = [
+    !activeProposal ? "Create the proposal first." : null,
+    activeProposal && activeProposal.status !== "APPROVED" ? "The proposal still needs Super-Admin approval." : null,
+    activeProposal && !activeBooking ? "Book the review call before collecting the advance." : null,
+    activeProposal && !activeVerification ? "Verify the advance screenshot to open the case automatically." : null,
+    activeProposal && !caseGateOpen ? "Advance exists, but it does not yet clear the minimum gate." : null,
+    activeCase && !balancePayment ? "Balance payment is not recorded yet." : null,
+    activeCase && !canPrepareFinalReport ? "Balance approval still blocks the final report." : null,
+    activeReport && !activeReport.isPreview && approvalCount < 2 ? "Two report approvals are still required." : null,
+    activeReport && !activeReport.isPreview && !verdictReadyByState ? "Verdict release is still blocked by payment or approval gates." : null
+  ].filter(Boolean) as string[];
+
+  const nextAction = (() => {
+    if (!activeProposal) return "Create the proposal for this client.";
+    if (activeProposal.status !== "APPROVED") return "Get the proposal approved by a Super-Admin.";
+    if (!activeBooking) return "Book the review call and send the meeting link.";
+    if (!activeVerification) return "Upload and verify the advance screenshot.";
+    if (!activeCase) return "Open the case now that the advance rule is satisfied.";
+    if (!balancePayment) return "Collect and verify the balance payment.";
+    if (!canPrepareFinalReport) return "Finish balance approval to unlock the final report.";
+    if (!activeReport || activeReport.isPreview) return "Prepare the final report.";
+    if (approvalCount < 2) return "Collect the remaining report approvals.";
+    if (!verdictReadyByState) return "Clear the remaining release blockers.";
+    return "All gates are clear. The verdict can now be released.";
+  })();
+
+  async function refresh(preferredClientId?: string) {
+    setBusy(true);
+    try {
+      const nextState = await fetchState();
+      setLiveState(nextState);
+      setSelectedClientId((current) => preferredClientId ?? current ?? nextState.clients[0]?.id ?? "");
+      setMessage("Commercial state refreshed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Refresh failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function uploadProof(kind: "advance" | "balance", file: File | null) {
     if (!file) {
       return;
     }
@@ -105,9 +187,15 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
       if (!response.ok || result.ok === false) {
         throw new Error(result.error ?? "Upload failed");
       }
-      setProofFileName(result.proof.fileName);
-      setProofUrl(result.proof.url);
-      setMessage("Advance proof screenshot uploaded.");
+      if (kind === "advance") {
+        setProofFileName(result.proof.fileName);
+        setProofUrl(result.proof.url);
+        setMessage("Advance proof screenshot uploaded.");
+      } else {
+        setBalanceProofFileName(result.proof.fileName);
+        setBalanceProofUrl(result.proof.url);
+        setMessage("Balance proof screenshot uploaded.");
+      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");
     } finally {
@@ -122,16 +210,9 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
 
     setBusy(true);
     try {
-      const result = await postAction({
-        ...action,
-        clientId: activeClient.id,
-        actorRole: activeUser.role
-      });
-
+      await postAction({ ...action, clientId: activeClient.id }, activeUser.role);
+      await refresh(activeClient.id);
       setMessage(successMessage);
-      if (result.ok) {
-        window.location.reload();
-      }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Action failed");
     } finally {
@@ -139,14 +220,36 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
     }
   }
 
+  useEffect(() => {
+    refresh().catch(() => undefined);
+  }, []);
+
   return (
     <section className="section-grid" style={{ marginTop: 22 }}>
       <div className="card span-8">
         <div className="eyebrow">Commercial workflow</div>
         <h2>₹51,000 proposal and ₹11,000 advance gate</h2>
         <p className="subtle">
-          This panel gives us the real approval buttons for the commercial flow, so we can test the Super-Admin lock, the minimum advance rule, and the case gate together.
+          This panel now handles the real commercial chain: proposal approval, call booking, proof verification, case opening, balance clearance, and the final release gate.
         </p>
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{activeProposal ? formatMoney(activeProposal.amountInr) : "—"}</span>
+            <span className="stat-label">proposal amount</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{activeBooking ? activeBooking.status : "Pending"}</span>
+            <span className="stat-label">review call state</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{caseGateOpen ? "Open" : "Held"}</span>
+            <span className="stat-label">case opening gate</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{verdictReadyByState ? "Ready" : "Blocked"}</span>
+            <span className="stat-label">verdict release gate</span>
+          </div>
+        </div>
         <div className="stepper" style={{ marginTop: 16 }}>
           {journeySteps.map((step, index) => (
             <div key={step.label} className={`stepper-item ${step.done ? "done" : ""}`}>
@@ -193,21 +296,20 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
               </div>
               <div className="list-item">
                 <strong>Verdict gate</strong>
-                <span className="meta">{canRelease ? "Unlocked" : "Blocked"}</span>
+                <span className="meta">{verdictReadyByState ? "Unlocked" : "Blocked"}</span>
               </div>
             </div>
           </div>
           <div className="panel">
             <div className="panel-head">
               <div>
-                <strong>Operator</strong>
-                <div className="meta">
-                  {activeUser.fullName} · {activeUser.role}
-                </div>
+                <strong>Next commercial move</strong>
+                <div className="meta">{activeClient?.displayName ?? "No client selected"}</div>
               </div>
-              <span className={`tag ${activeUser.role === "SUPER_ADMIN" ? "good" : "warn"}`}>
-                {activeUser.role === "SUPER_ADMIN" ? "Approval enabled" : "Approval limited"}
-              </span>
+              <span className={`tag ${blockers.length ? "warn" : "good"}`}>{blockers.length ? "Action needed" : "Clear"}</span>
+            </div>
+            <div className="footer-note" style={{ marginTop: 12 }}>
+              {nextAction}
             </div>
             <div className="pill-row" style={{ marginTop: 12 }}>
               <span className={`tag ${approval?.commercialApproved ? "good" : "warn"}`}>Proposal {approval?.commercialApproved ? "approved" : "pending"}</span>
@@ -216,6 +318,9 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
               <span className={`tag ${activeVerification ? "good" : "bad"}`}>Proof {activeVerification ? "verified" : "pending"}</span>
             </div>
             <div className="workflow" style={{ marginTop: 14 }}>
+              <button type="button" className="button-secondary" disabled={busy} onClick={() => refresh(activeClient?.id)}>
+                Refresh state
+              </button>
               <button
                 type="button"
                 className="button-secondary"
@@ -227,7 +332,7 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
               <button
                 type="button"
                 className="button-secondary"
-                disabled={busy || !activeProposal || activeUser.role !== "SUPER_ADMIN"}
+                disabled={busy || !activeProposal || activeUser.role !== "SUPER_ADMIN" || activeProposal.status === "APPROVED"}
                 onClick={() => run({ action: "proposal-approve", proposalId: activeProposal?.id }, "Proposal approved by Super-Admin")}
               >
                 Approve proposal
@@ -255,7 +360,7 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
               <button
                 type="button"
                 className="button-secondary"
-                disabled={busy || !activeProposal}
+                disabled={busy || !activeProposal || !caseGateOpen || Boolean(activeCase)}
                 onClick={() => run({ action: "case-create", clientId: activeClient?.id, proposalId: activeProposal?.id }, "Case created")}
               >
                 Create case
@@ -269,58 +374,19 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
                 Generate preview
               </button>
             </div>
-            <div className="panel" style={{ marginTop: 14 }}>
-              <div className="panel-head">
-                <div>
-                  <strong>Review call booking</strong>
-                  <div className="meta">Blocks the calendar and prepares the call link.</div>
-                </div>
-                <span className={`tag ${activeBooking ? "good" : "warn"}`}>{activeBooking ? "Booked" : "Pending"}</span>
-              </div>
-              <div className="two-col" style={{ marginTop: 12 }}>
-                <div className="field">
-                  <label>Meeting provider</label>
-                  <select value={meetingProvider} onChange={(event) => setMeetingProvider(event.target.value as ReviewCallBookingRecord["provider"])}>
-                    <option value="GOOGLE_MEET">Google Meet</option>
-                    <option value="ZOOM">Zoom</option>
-                  </select>
-                </div>
-                <div className="field">
-                  <label>Scheduled time</label>
-                  <input type="datetime-local" value={meetingTime} onChange={(event) => setMeetingTime(event.target.value)} />
-                </div>
-              </div>
-              <div className="pill-row" style={{ marginTop: 8 }}>
-                <span className={`tag ${activeBooking ? "good" : "bad"}`}>{activeBooking ? "Calendar blocked" : "Not yet booked"}</span>
-                <span className="pill">{activeBooking?.meetingLink ?? "Meeting link will be generated on booking"}</span>
-              </div>
-              <div className="workflow" style={{ marginTop: 10 }}>
-                <button
-                  type="button"
-                  className="button-secondary"
-                  disabled={busy || !activeProposal}
-                  onClick={() =>
-                    run(
-                      {
-                        action: "review-call-book",
-                        proposalId: activeProposal?.id,
-                        provider: meetingProvider,
-                        scheduledAt: new Date(meetingTime).toISOString(),
-                        durationMinutes: 30
-                      },
-                      "Review call booked and meeting link generated"
-                    )
-                  }
-                >
-                  Book review call
-                </button>
-              </div>
-            </div>
             <div className="workflow" style={{ marginTop: 12 }}>
               <button
                 type="button"
                 className="button-secondary"
-                disabled={busy || !activeReport}
+                disabled={busy || !activeCase || !canPrepareFinalReport}
+                onClick={() => run({ action: "final-report-prepare", caseId: activeCase?.id }, "Final report prepared")}
+              >
+                Prepare final report
+              </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeReport || activeReport.isPreview || !canApproveReport(activeUser)}
                 onClick={() => run({ action: "report-approve", reportId: activeReport?.id }, "Report approved")}
               >
                 Approve report
@@ -328,60 +394,179 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
               <button
                 type="button"
                 className="button"
-                disabled={busy || !activeReport}
+                disabled={busy || !activeReport || activeReport.isPreview || !verdictReadyByState || !canReleaseVerdict(activeUser)}
                 onClick={() => run({ action: "verdict-release", reportId: activeReport?.id }, "Verdict released")}
               >
                 Release verdict
               </button>
             </div>
-            <div className="panel" style={{ marginTop: 14 }}>
-              <div className="panel-head">
-                <div>
-                  <strong>Advance proof verification</strong>
-                  <div className="meta">Upload the reference screenshot, verify the amount, and open the case automatically.</div>
-                </div>
-                <span className={`tag ${activeVerification ? "good" : "warn"}`}>{activeVerification ? activeVerification.status : "Pending"}</span>
-              </div>
-              <div className="two-col" style={{ marginTop: 12 }}>
-                <div className="field">
-                  <label>Advance amount</label>
-                  <input type="number" min={MIN_ADVANCE_INR} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
-                </div>
-                <div className="field">
-                  <label>Reference screenshot</label>
-                  <input type="file" accept="image/*" disabled={busy} onChange={(event) => uploadProof(event.target.files?.[0] ?? null)} />
-                </div>
-              </div>
-              <div className="pill-row" style={{ marginTop: 8 }}>
-                <span className="pill">File {proofFileName || "not uploaded"}</span>
-                <span className="pill">Proof {proofUrl ? "ready" : "waiting"}</span>
-                <span className="pill">Case {activeCase ? activeCase.caseNumber : "will open after verification"}</span>
-              </div>
-              <div className="workflow" style={{ marginTop: 10 }}>
-                <button
-                  type="button"
-                  className="button"
-                  disabled={busy || !activeProposal || !proofUrl}
-                  onClick={() =>
-                    run(
-                      {
-                        action: "advance-proof-verify",
-                        proposalId: activeProposal?.id,
-                        amountInr: proofAmount,
-                        referenceScreenshotUrl: proofUrl,
-                        referenceScreenshotFileName: proofFileName
-                      },
-                      "Advance verified and case opened"
-                    )
-                  }
-                >
-                  Verify advance and open case
-                </button>
-              </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="card span-4">
+        <div className="eyebrow">Review call and proof flow</div>
+        <h2>Booking and verification</h2>
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Review call booking</strong>
+              <div className="meta">Blocks the calendar and prepares the meeting link.</div>
             </div>
-            <div className="footer-note" style={{ marginTop: 12 }}>
-              {message}
+            <span className={`tag ${activeBooking ? "good" : "warn"}`}>{activeBooking ? "Booked" : "Pending"}</span>
+          </div>
+          <div className="two-col" style={{ marginTop: 12 }}>
+            <div className="field">
+              <label>Meeting provider</label>
+              <select value={meetingProvider} onChange={(event) => setMeetingProvider(event.target.value as ReviewCallBookingRecord["provider"])}>
+                <option value="GOOGLE_MEET">Google Meet</option>
+                <option value="ZOOM">Zoom</option>
+              </select>
             </div>
+            <div className="field">
+              <label>Scheduled time</label>
+              <input type="datetime-local" value={meetingTime} onChange={(event) => setMeetingTime(event.target.value)} />
+            </div>
+          </div>
+          <div className="pill-row" style={{ marginTop: 8 }}>
+            <span className={`tag ${activeBooking ? "good" : "bad"}`}>{activeBooking ? "Calendar blocked" : "Not yet booked"}</span>
+            <span className="pill">Status {activeBooking?.status ?? "Not booked"}</span>
+            <span className="pill">{activeBooking?.meetingLink ?? "Meeting link will be generated on booking"}</span>
+          </div>
+          <div className="field" style={{ marginTop: 10 }}>
+            <label>Call outcome note</label>
+            <textarea value={reviewOutcomeNote} onChange={(event) => setReviewOutcomeNote(event.target.value)} />
+          </div>
+          <div className="workflow" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={busy || !activeProposal}
+              onClick={() =>
+                run(
+                  {
+                    action: "review-call-book",
+                    proposalId: activeProposal?.id,
+                    provider: meetingProvider,
+                    scheduledAt: new Date(meetingTime).toISOString(),
+                    durationMinutes: 30
+                  },
+                  "Review call booked and meeting link generated"
+                )
+              }
+            >
+              Book review call
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={busy || !activeBooking}
+              onClick={() =>
+                run(
+                  {
+                    action: "review-call-complete",
+                    bookingId: activeBooking?.id,
+                    outcome: "COMPLETED",
+                    note: reviewOutcomeNote
+                  },
+                  "Review call marked completed"
+                )
+              }
+            >
+              Mark completed
+            </button>
+          </div>
+        </div>
+
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Advance proof verification</strong>
+              <div className="meta">Upload the reference screenshot, verify the amount, and open the case automatically.</div>
+            </div>
+            <span className={`tag ${activeVerification ? "good" : "warn"}`}>{activeVerification ? activeVerification.status : "Pending"}</span>
+          </div>
+          <div className="two-col" style={{ marginTop: 12 }}>
+            <div className="field">
+              <label>Advance amount</label>
+              <input type="number" min={MIN_ADVANCE_INR} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
+            </div>
+            <div className="field">
+              <label>Reference screenshot</label>
+              <input type="file" accept="image/*" disabled={busy} onChange={(event) => uploadProof("advance", event.target.files?.[0] ?? null)} />
+            </div>
+          </div>
+          <div className="pill-row" style={{ marginTop: 8 }}>
+            <span className="pill">File {proofFileName || activeVerification?.referenceScreenshotFileName || "not uploaded"}</span>
+            <span className="pill">Proof {proofUrl || activeVerification?.referenceScreenshotUrl ? "ready" : "waiting"}</span>
+            <span className="pill">Case {activeCase ? activeCase.caseNumber : "will open after verification"}</span>
+          </div>
+          <div className="workflow" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="button"
+              disabled={busy || !activeProposal || !(proofUrl || activeVerification?.referenceScreenshotUrl)}
+              onClick={() =>
+                run(
+                  {
+                    action: "advance-proof-verify",
+                    proposalId: activeProposal?.id,
+                    amountInr: proofAmount,
+                    referenceScreenshotUrl: proofUrl || activeVerification?.referenceScreenshotUrl,
+                    referenceScreenshotFileName: proofFileName || activeVerification?.referenceScreenshotFileName
+                  },
+                  "Advance verified and case opened"
+                )
+              }
+            >
+              Verify advance and open case
+            </button>
+          </div>
+        </div>
+
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Balance proof verification</strong>
+              <div className="meta">Upload the balance screenshot, verify the amount, and unlock the final report flow.</div>
+            </div>
+            <span className={`tag ${balancePayment?.verifiedAt ? "good" : "warn"}`}>{balancePayment?.verifiedAt ? "Verified" : "Pending"}</span>
+          </div>
+          <div className="two-col" style={{ marginTop: 12 }}>
+            <div className="field">
+              <label>Balance amount</label>
+              <input type="number" min={1} value={balanceProofAmount} onChange={(event) => setBalanceProofAmount(Number(event.target.value))} />
+            </div>
+            <div className="field">
+              <label>Reference screenshot</label>
+              <input type="file" accept="image/*" disabled={busy} onChange={(event) => uploadProof("balance", event.target.files?.[0] ?? null)} />
+            </div>
+          </div>
+          <div className="pill-row" style={{ marginTop: 8 }}>
+            <span className="pill">File {balanceProofFileName || balancePayment?.referenceScreenshotFileName || "not uploaded"}</span>
+            <span className="pill">Proof {balanceProofUrl || balancePayment?.referenceScreenshotUrl ? "ready" : "waiting"}</span>
+            <span className="pill">Final report {canPrepareFinalReport ? "unlocked" : "locked"}</span>
+          </div>
+          <div className="workflow" style={{ marginTop: 10 }}>
+            <button
+              type="button"
+              className="button"
+              disabled={busy || !activeCase || !(balanceProofUrl || balancePayment?.referenceScreenshotUrl)}
+              onClick={() =>
+                run(
+                  {
+                    action: "balance-proof-verify",
+                    caseId: activeCase?.id,
+                    amountInr: balanceProofAmount,
+                    referenceScreenshotUrl: balanceProofUrl || balancePayment?.referenceScreenshotUrl,
+                    referenceScreenshotFileName: balanceProofFileName || balancePayment?.referenceScreenshotFileName
+                  },
+                  "Balance verified and final report flow unlocked"
+                )
+              }
+            >
+              Verify balance proof
+            </button>
           </div>
         </div>
       </div>
@@ -414,12 +599,42 @@ export function CommercialConsole({ clients, proposals, reviewCallBookings, paym
           </div>
           <div className="list-item">
             <strong>Review call booking</strong>
-            <span className="meta">Calendar hold + meeting link before the advance step</span>
+            <span className="meta">Calendar hold and meeting link before the advance step</span>
           </div>
           <div className="list-item">
             <strong>Advance proof</strong>
             <span className="meta">Requires screenshot upload before case opens</span>
           </div>
+          <div className="list-item">
+            <strong>Balance proof</strong>
+            <span className="meta">Use screenshot verification to unlock the final report flow</span>
+          </div>
+        </div>
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Current blockers</strong>
+              <div className="meta">What still needs attention for this client</div>
+            </div>
+          </div>
+          <div className="list" style={{ marginTop: 12 }}>
+            {blockers.length ? (
+              blockers.map((blocker) => (
+                <div key={blocker} className="list-item">
+                  <strong>Pending</strong>
+                  <span className="meta">{blocker}</span>
+                </div>
+              ))
+            ) : (
+              <div className="list-item">
+                <strong>No blockers</strong>
+                <span className="meta">This client is commercially clear through verdict release.</span>
+              </div>
+            )}
+          </div>
+        </div>
+        <div className="footer-note" style={{ marginTop: 12 }}>
+          {message}
         </div>
       </div>
     </section>

@@ -500,7 +500,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
 
       <section className="card span-4">
         <div className="eyebrow">Commercial gate</div>
-        <h3>Rs 51,000 default package</h3>
+        <h3>₹51,000 default package</h3>
         <div className="list">
           <div className="list-item">
             <strong>Minimum advance</strong>
@@ -533,7 +533,9 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
             <div className="workflow-index">2</div>
             <div>
               <strong>Case creation</strong>
-              <div className="meta">{activeCase?.caseNumber} · {activeCase?.status}</div>
+              <div className="meta">
+                {activeCase?.caseNumber ? `${activeCase.caseNumber} · ${activeCase.status}` : "Case not opened yet"}
+              </div>
             </div>
             <span className={`tag ${activeCase?.status === "VERDICT_RELEASED" ? "good" : "neutral"}`}>{activeCase?.orientationLocked ? "Locked" : "Draft"}</span>
           </div>

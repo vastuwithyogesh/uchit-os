@@ -2,6 +2,7 @@ import "server-only";
 
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
+import { getRuntimeEnv } from "@/lib/runtime-env";
 
 export type LocalConnectionSettings = {
   databaseUrl: string;
@@ -18,10 +19,55 @@ const defaultSettings: LocalConnectionSettings = {
   supabaseUrl: "",
   supabaseAnonKey: "",
   supabaseServiceRoleKey: "",
-  appUrl: "http://localhost:3000"
+  appUrl: "http://localhost:3003"
 };
 
 const settingsPath = join(process.cwd(), "data", "local-settings.json");
+
+async function readSettingsFromD1(): Promise<LocalConnectionSettings | null> {
+  const env = getRuntimeEnv();
+  if (!env.DB) {
+    return null;
+  }
+
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS local_settings (
+      id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `).run();
+
+  const row = await env.DB.prepare("SELECT payload FROM local_settings WHERE id = ?").bind("current").first<{ payload: string }>();
+  if (!row?.payload) {
+    return null;
+  }
+
+  return JSON.parse(row.payload) as LocalConnectionSettings;
+}
+
+async function writeSettingsToD1(settings: LocalConnectionSettings) {
+  const env = getRuntimeEnv();
+  if (!env.DB) {
+    return null;
+  }
+
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS local_settings (
+      id TEXT PRIMARY KEY,
+      payload TEXT NOT NULL,
+      updated_at TEXT NOT NULL
+    )
+  `).run();
+
+  await env.DB.prepare("DELETE FROM local_settings WHERE id = ?").bind("current").run();
+  await env.DB.prepare("INSERT INTO local_settings (id, payload, updated_at) VALUES (?, ?, ?)").bind(
+    "current",
+    JSON.stringify(settings),
+    new Date().toISOString()
+  ).run();
+  return settings;
+}
 
 export function readLocalConnectionSettings(): LocalConnectionSettings {
   if (!existsSync(settingsPath)) {
@@ -68,4 +114,17 @@ export function getMergedConnectionSettings() {
     supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || local.supabaseServiceRoleKey,
     appUrl: process.env.NEXT_PUBLIC_APP_URL || local.appUrl
   };
+}
+
+export async function readPersistentConnectionSettings() {
+  return (await readSettingsFromD1()) ?? readLocalConnectionSettings();
+}
+
+export async function writePersistentConnectionSettings(settings: LocalConnectionSettings) {
+  const wrote = await writeSettingsToD1(settings);
+  if (wrote) {
+    return wrote;
+  }
+
+  return writeLocalConnectionSettings(settings);
 }

@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveActor } from "@/lib/auth";
+import { resolveRequestActor } from "@/lib/auth";
 import { persistStateToDatabase } from "@/lib/persistence";
 import {
   canApproveCommercialProposal,
@@ -10,6 +10,8 @@ import {
   canTriggerDeliverables
 } from "@/lib/permissions";
 import {
+  addFloorEvidence,
+  addFloorWorkspace,
   approveAdvancePayment,
   approveBalancePayment,
   approveCommercialProposal,
@@ -20,14 +22,19 @@ import {
   createWhatsAppTemplate,
   createVastuCase,
   bookReviewCall,
+  completeReviewCall,
   generatePreviewReport,
   getClientSnapshot,
   lockOrientation,
+  markFloorWorkspaceReady,
+  prepareFinalReport,
   rankShaktiValues,
   recordShaktiSnapshot,
   recordLeadQualification,
   recordClientOutreachSend,
+  updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
+  verifyBalanceProof,
   qualifyInboundLead,
   releaseVerdict,
   resetDemoData,
@@ -39,7 +46,7 @@ import {
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
-  const actor = resolveActor(body.actorRole);
+  const actor = await resolveRequestActor(request.headers, body.actorRole);
 
   function deny(message: string) {
     return NextResponse.json({ ok: false, error: message }, { status: 403 });
@@ -66,6 +73,15 @@ export async function POST(request: Request) {
           return deny("This role cannot qualify inbound leads.");
         }
         response = { ok: true, result: qualifyInboundLead(body.leadId, actor) };
+        break;
+      case "lead-status-set":
+        if (!canTriggerDeliverables(actor)) {
+          return deny("This role cannot triage inbound leads.");
+        }
+        response = {
+          ok: true,
+          lead: updateInboundLeadStatus(body.leadId, body.status, actor, typeof body.note === "string" ? body.note : undefined)
+        };
         break;
       case "proposal-create":
         if (!canTriggerDeliverables(actor)) {
@@ -102,6 +118,20 @@ export async function POST(request: Request) {
           })
         };
         break;
+      case "review-call-complete":
+        if (!canTriggerDeliverables(actor)) {
+          return deny("This role cannot complete review calls.");
+        }
+        response = {
+          ok: true,
+          booking: await completeReviewCall({
+            bookingId: body.bookingId,
+            outcome: body.outcome === "CANCELLED" ? "CANCELLED" : "COMPLETED",
+            actor,
+            note: typeof body.note === "string" ? body.note : undefined
+          })
+        };
+        break;
       case "proposal-approve":
         if (!canApproveCommercialProposal(actor)) {
           return deny("Only a Super-Admin can approve the commercial proposal.");
@@ -119,6 +149,24 @@ export async function POST(request: Request) {
           return deny("This role cannot lock floor workspaces.");
         }
         response = { ok: true, result: lockOrientation(body.caseId, body.reason, actor) };
+        break;
+      case "floor-create":
+        if (!canEditFloorWorkspaces(actor)) {
+          return deny("This role cannot create floor workspaces.");
+        }
+        response = { ok: true, floor: addFloorWorkspace(body.caseId, body.floorLabel, actor) };
+        break;
+      case "floor-evidence-add":
+        if (!canEditFloorWorkspaces(actor)) {
+          return deny("This role cannot add floor evidence.");
+        }
+        response = { ok: true, floor: addFloorEvidence(body.floorId, body.fileName, actor) };
+        break;
+      case "floor-ready":
+        if (!canEditFloorWorkspaces(actor)) {
+          return deny("This role cannot mark floor workspaces ready.");
+        }
+        response = { ok: true, floor: markFloorWorkspaceReady(body.floorId, actor) };
         break;
       case "advance-pay":
         if (!canTriggerDeliverables(actor)) {
@@ -148,11 +196,33 @@ export async function POST(request: Request) {
         }
         response = { ok: true, payment: approveBalancePayment(body.clientId, body.caseId, body.amountInr, actor) };
         break;
+      case "balance-proof-verify":
+        if (!canTriggerDeliverables(actor)) {
+          return deny("This role cannot verify balance proof.");
+        }
+        response = {
+          ok: true,
+          result: verifyBalanceProof({
+            clientId: body.clientId,
+            caseId: body.caseId,
+            amountInr: Number(body.amountInr ?? 0),
+            referenceScreenshotUrl: String(body.referenceScreenshotUrl ?? ""),
+            referenceScreenshotFileName: String(body.referenceScreenshotFileName ?? ""),
+            actor
+          })
+        };
+        break;
       case "preview-report":
         if (!canEditFloorWorkspaces(actor)) {
           return deny("This role cannot generate report previews.");
         }
         response = { ok: true, report: generatePreviewReport(body.caseId) };
+        break;
+      case "final-report-prepare":
+        if (!canEditFloorWorkspaces(actor)) {
+          return deny("This role cannot prepare final reports.");
+        }
+        response = { ok: true, report: prepareFinalReport(body.caseId, actor) };
         break;
       case "report-approve":
         if (!canApproveReport(actor)) {

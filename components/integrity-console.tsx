@@ -5,6 +5,11 @@ import { useEffect, useState } from "react";
 type IntegrityPayload = {
   ok: boolean;
   issueCount: number;
+  runtime: {
+    d1Configured: boolean;
+    r2Configured: boolean;
+    staffAssignments: number;
+  };
   counts: Record<string, number>;
   issues: Array<{
     area: string;
@@ -51,12 +56,33 @@ export function IntegrityConsole() {
         <p className="subtle">
           This pass checks that the current state has the expected links between clients, proposals, payments, cases, reports, snapshots, and logs.
         </p>
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.ok ? "OK" : "Check"}</span>
+            <span className="stat-label">overall integrity state</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.issueCount ?? 0}</span>
+            <span className="stat-label">issues found</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.counts.reportVersions ?? 0}</span>
+            <span className="stat-label">reports scanned</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{(payload?.counts.evaluationSnapshots ?? 0) + (payload?.counts.shaktiSnapshots ?? 0)}</span>
+            <span className="stat-label">snapshots scanned</span>
+          </div>
+        </div>
         <button className="button" type="button" onClick={refresh} disabled={busy} style={{ marginTop: 12 }}>
           Refresh integrity
         </button>
         <div className="pill-row" style={{ marginTop: 14 }}>
           <span className="pill">Status {payload?.ok ? "OK" : "Needs attention"}</span>
           <span className="pill">Issues {payload?.issueCount ?? 0}</span>
+          <span className="pill">D1 {payload?.runtime.d1Configured ? "On" : "Off"}</span>
+          <span className="pill">R2 {payload?.runtime.r2Configured ? "On" : "Off"}</span>
+          <span className="pill">Staff roles {payload?.runtime.staffAssignments ?? 0}</span>
           <span className="pill">Reports {payload?.counts.reportVersions ?? 0}</span>
           <span className="pill">Snapshots {(payload?.counts.evaluationSnapshots ?? 0) + (payload?.counts.shaktiSnapshots ?? 0)}</span>
         </div>

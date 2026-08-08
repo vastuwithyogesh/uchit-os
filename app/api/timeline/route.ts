@@ -1,8 +1,13 @@
 import { NextResponse } from "next/server";
+import { requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { buildPermanentTimeline } from "@/lib/workflows";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await requireRouteActor(request, "SETTER");
+  if (!access.ok) {
+    return access.response;
+  }
   const state = await loadStateFromPersistence();
   const events = buildPermanentTimeline(state.timelineEvents);
 

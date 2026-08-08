@@ -1,10 +1,19 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/session-provider";
 import { canManageTemplates } from "@/lib/permissions";
 import { rolePermissions } from "@/lib/auth";
+import { buildActionHeaders } from "@/lib/request-helpers";
+import type { UserRole } from "@/lib/domain";
 import type { AppState } from "@/lib/store";
+
+type StaffRoleAssignment = {
+  email: string;
+  role: UserRole;
+  fullName: string;
+  updatedAt: string;
+};
 
 async function fetchState() {
   const response = await fetch("/api/bootstrap", { cache: "no-store" });
@@ -14,10 +23,35 @@ async function fetchState() {
   return response.json();
 }
 
-async function postAction(payload: Record<string, unknown>) {
+async function fetchStaffRoles(role?: string) {
+  const response = await fetch("/api/staff-roles", {
+    cache: "no-store",
+    headers: buildActionHeaders(role)
+  });
+  const result = await response.json();
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.error ?? "Failed to load staff roles");
+  }
+  return result as { ok: true; assignments: StaffRoleAssignment[] };
+}
+
+async function saveStaffRoleAssignment(payload: { email: string; role: UserRole; fullName: string }, role?: string) {
+  const response = await fetch("/api/staff-roles", {
+    method: "POST",
+    headers: buildActionHeaders(role),
+    body: JSON.stringify(payload)
+  });
+  const result = await response.json();
+  if (!response.ok || result.ok === false) {
+    throw new Error(result.error ?? "Failed to save staff role");
+  }
+  return result as { ok: true; assignments: StaffRoleAssignment[] };
+}
+
+async function postAction(payload: Record<string, unknown>, role?: string) {
   const response = await fetch("/api/actions", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: buildActionHeaders(role),
     body: JSON.stringify(payload)
   });
 
@@ -31,14 +65,20 @@ async function postAction(payload: Record<string, unknown>) {
 export function AdminConsole() {
   const { activeUser } = useSession();
   const [state, setState] = useState<AppState | null>(null);
+  const [assignments, setAssignments] = useState<StaffRoleAssignment[]>([]);
   const [message, setMessage] = useState("Load admin state to start");
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState({
     slug: "qualification-reminder",
     title: "Qualification reminder",
     category: "Lead",
-    body: "Hi {{client_name}}, we’re ready for your short qualification call.",
+    body: "Hi {{client_name}}, we are ready for your short qualification call.",
     variables: "client_name,setter_name"
+  });
+  const [staffDraft, setStaffDraft] = useState({
+    email: "",
+    fullName: "",
+    role: "SETTER" as UserRole
   });
 
   const templates = state?.whatsappTemplates ?? [];
@@ -55,7 +95,9 @@ export function AdminConsole() {
   async function refresh() {
     setBusy(true);
     try {
-      setState(await fetchState());
+      const [nextState, nextAssignments] = await Promise.all([fetchState(), fetchStaffRoles(activeUser.role)]);
+      setState(nextState);
+      setAssignments(nextAssignments.assignments);
       setMessage("Admin state refreshed");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
@@ -67,7 +109,7 @@ export function AdminConsole() {
   async function run(action: Record<string, unknown>) {
     setBusy(true);
     try {
-      const result = await postAction({ ...action, actorRole: activeUser.role });
+      const result = await postAction(action, activeUser.role);
       setState(await fetchState());
       setMessage(JSON.stringify(result).slice(0, 160));
     } catch (error) {
@@ -77,12 +119,53 @@ export function AdminConsole() {
     }
   }
 
+  async function saveAssignment() {
+    setBusy(true);
+    try {
+      const result = await saveStaffRoleAssignment(staffDraft, activeUser.role);
+      setAssignments(result.assignments);
+      setStaffDraft({
+        email: "",
+        fullName: "",
+        role: "SETTER"
+      });
+      setMessage("Staff role assignment updated");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Assignment update failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  useEffect(() => {
+    void refresh();
+  }, []);
+
   return (
     <section className="section-grid">
       <div className="card span-7">
         <div className="eyebrow">Template admin</div>
         <h2>WhatsApp templates</h2>
-        <p className="subtle">This gives us a local control panel for template lifecycle without waiting for the cloud backend.</p>
+        <p className="subtle">This keeps outbound template control and role governance in one place.</p>
+
+        <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{templates.length}</span>
+            <span className="stat-label">templates loaded</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{activeTemplates.length}</span>
+            <span className="stat-label">templates active</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{logs.length}</span>
+            <span className="stat-label">send logs captured</span>
+          </div>
+          <div className="stat-card">
+            <span className="stat-value">{assignments.length}</span>
+            <span className="stat-label">staff mappings</span>
+          </div>
+        </div>
 
         <div className="pill-row" style={{ marginTop: 14 }}>
           <span className="pill">Templates {templates.length}</span>
@@ -176,7 +259,7 @@ export function AdminConsole() {
           <div className="panel-head">
             <div>
               <strong>Recent send log</strong>
-              <div className="meta">Latest outbound templates captured in the local CRM</div>
+              <div className="meta">Latest outbound templates captured in the CRM</div>
             </div>
           </div>
           <div className="list" style={{ marginTop: 12 }}>
@@ -200,7 +283,7 @@ export function AdminConsole() {
       <div className="card span-5">
         <div className="eyebrow">Role matrix</div>
         <h2>Permission coverage</h2>
-        <p className="subtle">This mirrors the local role session picker and makes it easy to see what each role can touch.</p>
+        <p className="subtle">Permissions are visible here, and signed-in staff can now be mapped to roles on the server.</p>
         <div className="list" style={{ marginTop: 14 }}>
           {userRows.map(([role, permissions]) => (
             <div key={role} className="list-item">
@@ -209,6 +292,51 @@ export function AdminConsole() {
             </div>
           ))}
         </div>
+
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Staff role assignments</strong>
+              <div className="meta">These mappings drive production role resolution for signed-in staff.</div>
+            </div>
+          </div>
+          <div className="list" style={{ marginTop: 12 }}>
+            {assignments.map((assignment) => (
+              <div key={assignment.email} className="list-item">
+                <strong>{assignment.fullName}</strong>
+                <span className="meta">
+                  {assignment.email} · {assignment.role}
+                </span>
+              </div>
+            ))}
+            {!assignments.length ? <span className="meta">No staff role assignments loaded yet.</span> : null}
+          </div>
+          <div className="field" style={{ marginTop: 14 }}>
+            <label>Staff email</label>
+            <input value={staffDraft.email} onChange={(event) => setStaffDraft((current) => ({ ...current, email: event.target.value }))} placeholder="name@uchitvastu.in" />
+          </div>
+          <div className="field">
+            <label>Full name</label>
+            <input value={staffDraft.fullName} onChange={(event) => setStaffDraft((current) => ({ ...current, fullName: event.target.value }))} placeholder="Team member name" />
+          </div>
+          <div className="field">
+            <label>Role</label>
+            <select value={staffDraft.role} onChange={(event) => setStaffDraft((current) => ({ ...current, role: event.target.value as UserRole }))}>
+              {(["SETTER", "CONSULTANT", "ADMIN", "SUPER_ADMIN"] as UserRole[]).map((role) => (
+                <option key={role} value={role}>
+                  {role}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button className="button" type="button" disabled={busy || activeUser.role !== "SUPER_ADMIN"} onClick={saveAssignment}>
+            Save staff role
+          </button>
+          <div className="footer-note" style={{ marginTop: 10 }}>
+            {activeUser.role === "SUPER_ADMIN" ? "Live role assignment editing is enabled for your account." : "Only Super-Admin can change staff role assignments."}
+          </div>
+        </div>
+
         <div className="footer-note">{message}</div>
         <button className="button-secondary" type="button" onClick={refresh} disabled={busy} style={{ marginTop: 12 }}>
           Refresh admin state

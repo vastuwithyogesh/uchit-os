@@ -1,0 +1,1 @@
+import{g as e,m as t,n,o as r,p as i,s as a,u as o,v as s,x as c,y as l}from"./auth-ColFi1I5.js";import{n as u}from"./server-B9ZOT4Md.js";async function d(d){let f=await n(d,`ADMIN`);return f.ok?u.json({clients:r,commercialProposals:a,leadQualifications:o,payments:i,reportVersions:t,timelineEvents:e,utilityRules:s,vastuCases:l,whatsappTemplates:c}):f.response}export{d as GET};

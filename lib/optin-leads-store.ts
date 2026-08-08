@@ -2,6 +2,7 @@ import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { join } from "node:path";
 import type { InboundLeadRecord } from "@/lib/domain";
+import { getRuntimeEnv } from "@/lib/runtime-env";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone } from "@/lib/lead-import";
 
 const filePath = join(process.cwd(), "data", "optin-leads.json");
@@ -64,11 +65,77 @@ function hydrateLead(record: Partial<InboundLeadRecord>, index: number): Inbound
     duplicateCount: typeof record.duplicateCount === "number" ? record.duplicateCount : 0,
     isReturningLead: Boolean(record.isReturningLead),
     qualifiedAt: record.qualifiedAt,
-    convertedClientId: record.convertedClientId,
+    convertedClientId: record.convertedClientId
   };
 }
 
+async function readFromD1(): Promise<InboundLeadRecord[] | null> {
+  const env = getRuntimeEnv();
+  if (!env.DB) {
+    return null;
+  }
+
+  await env.DB.prepare(`
+    CREATE TABLE IF NOT EXISTS optin_leads (
+      id TEXT PRIMARY KEY,
+      identity_key TEXT NOT NULL UNIQUE,
+      unique_client_id TEXT NOT NULL,
+      payload TEXT NOT NULL,
+      imported_at TEXT NOT NULL,
+      last_seen_at TEXT NOT NULL
+    )
+  `).run();
+
+  const result = await env.DB.prepare("SELECT payload FROM optin_leads ORDER BY last_seen_at DESC").all<{ payload: string }>();
+  return (result.results ?? []).map((row, index) => hydrateLead(JSON.parse(row.payload) as Partial<InboundLeadRecord>, index));
+}
+
+async function writeToD1(records: InboundLeadRecord[]) {
+  const env = getRuntimeEnv();
+  if (!env.DB) {
+    return null;
+  }
+
+  await env.DB.batch([
+    env.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS optin_leads (
+        id TEXT PRIMARY KEY,
+        identity_key TEXT NOT NULL UNIQUE,
+        unique_client_id TEXT NOT NULL,
+        payload TEXT NOT NULL,
+        imported_at TEXT NOT NULL,
+        last_seen_at TEXT NOT NULL
+      )
+    `),
+    env.DB.prepare("DELETE FROM optin_leads")
+  ]);
+
+  if (records.length > 0) {
+    await env.DB.batch(
+      records.map((record) =>
+        env.DB.prepare(
+          "INSERT INTO optin_leads (id, identity_key, unique_client_id, payload, imported_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)"
+        ).bind(
+          record.id,
+          record.identityKey,
+          record.uniqueClientId,
+          JSON.stringify(record),
+          record.importedAt,
+          record.lastSeenAt
+        )
+      )
+    );
+  }
+
+  return records;
+}
+
 export async function readOptInLeadRecords(): Promise<InboundLeadRecord[]> {
+  const fromDb = await readFromD1();
+  if (fromDb) {
+    return fromDb;
+  }
+
   await ensureFileExists();
   const raw = await readFile(filePath, "utf8");
   const parsed = JSON.parse(raw) as Array<Partial<InboundLeadRecord>>;
@@ -76,6 +143,11 @@ export async function readOptInLeadRecords(): Promise<InboundLeadRecord[]> {
 }
 
 export async function writeOptInLeadRecords(records: InboundLeadRecord[]) {
+  const wroteToDb = await writeToD1(records);
+  if (wroteToDb) {
+    return wroteToDb;
+  }
+
   await ensureFileExists();
   await writeFile(filePath, JSON.stringify(records, null, 2), "utf8");
   return records;

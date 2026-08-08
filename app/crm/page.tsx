@@ -1,10 +1,22 @@
+import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { CrmWorkbench } from "@/components/crm-workbench";
 import { CommercialConsole } from "@/components/commercial-console";
 import { LeadInboxConsole } from "@/components/lead-inbox-console";
 import { SiteHeader } from "@/components/site-header";
+import { requirePageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 
 export default async function CrmPage() {
+  const access = await requirePageAccess("SETTER");
+  if (!access.allowed) {
+    return (
+      <main className="page-shell">
+        <SiteHeader title="CRM Workbench" subtitle="Lead flow, approvals, and workspace control" />
+        <AccessDeniedPanel area="CRM workbench" requiredRole="SETTER" actorRole={access.actor.role} />
+      </main>
+    );
+  }
+
   const state = await loadStateFromPersistence();
 
   return (
@@ -12,7 +24,7 @@ export default async function CrmPage() {
       <SiteHeader title="CRM Workbench" subtitle="Lead flow, approvals, and workspace control" />
 
       <section className="hero-panel" style={{ marginTop: 22 }}>
-        <div className="eyebrow">Interactive demo</div>
+        <div className="eyebrow">Lead operations</div>
         <h1>Import website opt-in leads, filter them, and qualify the right ones into the CRM.</h1>
         <p className="lede">
           This page is now centered on the real intake flow: download the CSV from your website dashboard, upload it here, filter the rows, and qualify the leads that are ready.
@@ -41,7 +53,7 @@ export default async function CrmPage() {
               <strong>Current operating snapshot</strong>
               <div className="meta">This is the live state the team is working from right now.</div>
             </div>
-            <span className="tag neutral">Local CRM</span>
+            <span className="tag neutral">CRM workbench</span>
           </div>
           <div className="pill-row" style={{ marginTop: 12 }}>
             <span className="pill">Leads {state.leadQualifications.length}</span>

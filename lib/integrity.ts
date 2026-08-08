@@ -6,7 +6,14 @@ export type IntegrityIssue = {
   severity: "info" | "warn" | "error";
 };
 
-export function inspectIntegrity(state: AppState) {
+export function inspectIntegrity(
+  state: AppState,
+  runtime?: {
+    d1Configured?: boolean;
+    r2Configured?: boolean;
+    staffAssignments?: number;
+  }
+) {
   const issues: IntegrityIssue[] = [];
 
   const clientIds = new Set(state.clients.map((client) => client.id));
@@ -132,6 +139,18 @@ export function inspectIntegrity(state: AppState) {
   for (const [key, count] of Object.entries(duplicateUtilityRules)) {
     if (count > 1) {
       issues.push({ area: "Utility rules", message: `Duplicate rule key ${key} appears ${count} times.`, severity: "warn" });
+    }
+  }
+
+  if (runtime) {
+    if (!runtime.d1Configured) {
+      issues.push({ area: "Runtime", message: "D1 storage binding is not configured, so durable structured storage is unavailable.", severity: "warn" });
+    }
+    if (!runtime.r2Configured) {
+      issues.push({ area: "Runtime", message: "R2 storage binding is not configured, so upload storage will fall back to local-only behavior.", severity: "warn" });
+    }
+    if ((runtime.staffAssignments ?? 0) === 0) {
+      issues.push({ area: "Staff roles", message: "No server-side staff role assignments are configured yet.", severity: "warn" });
     }
   }
 

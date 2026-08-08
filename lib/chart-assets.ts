@@ -1,6 +1,7 @@
 import { readFile, writeFile, mkdir, access } from "node:fs/promises";
 import { constants as fsConstants } from "node:fs";
 import { join, extname } from "node:path";
+import { getRuntimeEnv } from "@/lib/runtime-env";
 
 export const chartAssetDefinitions = [
   { key: "location", label: "Location chart" },
@@ -51,6 +52,16 @@ export async function ensureChartUploadDir() {
   return uploadDir;
 }
 
+async function saveChartAssetToR2(fileName: string, bytes: Uint8Array) {
+  const env = getRuntimeEnv();
+  if (!env.R2) {
+    return null;
+  }
+
+  await env.R2.put(`chart-assets/${fileName}`, bytes);
+  return `/chart-assets/${fileName}`;
+}
+
 export function findChartDefinition(key: string) {
   return chartAssetDefinitions.find((item) => item.key === key);
 }
@@ -66,4 +77,16 @@ export function sanitizeFileName(fileName: string) {
 export function buildChartFileName(key: ChartAssetKey, originalName: string) {
   const ext = extname(originalName) || ".png";
   return `${key}-${Date.now()}${ext}`;
+}
+
+export async function saveChartAssetUpload(fileName: string, bytes: Uint8Array) {
+  const r2Url = await saveChartAssetToR2(fileName, bytes);
+  if (r2Url) {
+    return { fileName, url: r2Url };
+  }
+
+  const dir = await ensureChartUploadDir();
+  const filePath = join(dir, fileName);
+  await writeFile(filePath, bytes);
+  return { fileName, url: makeChartAssetUrl(fileName) };
 }

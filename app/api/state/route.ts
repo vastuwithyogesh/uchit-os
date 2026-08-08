@@ -1,10 +1,15 @@
 import { NextResponse } from "next/server";
+import { requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 import { inspectIntegrity } from "@/lib/integrity";
 import { setAppState } from "@/lib/store";
 import type { AppState } from "@/lib/store";
 
-export async function GET() {
+export async function GET(request: Request) {
+  const access = await requireRouteActor(request, "ADMIN");
+  if (!access.ok) {
+    return access.response;
+  }
   const state = await loadStateFromPersistence();
   const integrity = inspectIntegrity(state);
 
@@ -32,6 +37,10 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  const access = await requireRouteActor(request, "SUPER_ADMIN");
+  if (!access.ok) {
+    return access.response;
+  }
   const body = await request.json().catch(() => ({}));
   const nextState = body.state as AppState | undefined;
 

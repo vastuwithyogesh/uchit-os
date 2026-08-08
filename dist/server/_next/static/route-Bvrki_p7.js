@@ -1,1 +1,0 @@
-import{n as e}from"./server-C94AHUq9.js";async function t(){return e.json({ok:!0,settings:{mode:`local-first`,database:`disabled`,supabase:`disabled`},result:{database:{configured:!1,reachable:!1,error:`Database connector disabled in the deploy bundle`},supabase:{configured:!1,reachable:!1,error:`Supabase connector disabled in the deploy bundle`}}})}export{t as POST};

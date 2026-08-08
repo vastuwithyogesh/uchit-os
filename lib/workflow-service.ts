@@ -4,6 +4,7 @@ import {
   CommercialProposalRecord,
   ClientRecord,
   EvaluationSnapshotRecord,
+  InboundLeadStatus,
   InboundLeadRecord,
   FloorWorkspaceRecord,
   LeadQualificationRecord,
@@ -295,6 +296,42 @@ export function qualifyInboundLead(inboundLeadId: string, actor: AppUser) {
   return { lead: inboundLead, client, qualification };
 }
 
+export function updateInboundLeadStatus(inboundLeadId: string, status: InboundLeadStatus, actor: AppUser, note?: string) {
+  const state = getAppState();
+  const inboundLead = state.optInLeads.find((item) => item.id === inboundLeadId);
+  if (!inboundLead) {
+    throw new Error("Inbound lead not found.");
+  }
+
+  inboundLead.status = status;
+  if (note) {
+    inboundLead.notes = [inboundLead.notes, note].filter(Boolean).join(" | ");
+  }
+
+  const existingClient = state.clients.find((client) => client.id === inboundLead.uniqueClientId);
+  if (existingClient) {
+    existingClient.stage =
+      status === "QUALIFIED"
+        ? "QUALIFIED"
+        : status === "DISQUALIFIED"
+          ? "DISQUALIFIED"
+          : status === "FILTERED"
+            ? "QUALIFYING"
+            : "NEW";
+  }
+
+  void writeOptInLeadRecords(state.optInLeads);
+  appendTimeline(
+    inboundLead.uniqueClientId,
+    `Lead marked ${status.toLowerCase()}`,
+    note ? `Lead status changed to ${status}. ${note}` : `Lead status changed to ${status}.`,
+    "Lead",
+    actor.role
+  );
+
+  return inboundLead;
+}
+
 export function createCommercialProposal(clientId: string, amountInr = DEFAULT_PROPOSAL_AMOUNT_INR) {
   const state = getAppState();
   const proposal: CommercialProposalRecord = {
@@ -344,6 +381,32 @@ export async function bookReviewCall(input: {
     input.clientId,
     "Review call booked",
     `Calendar held for ${input.scheduledAt}. Meeting link generated: ${booking.meetingLink}`,
+    "Booking",
+    input.actor.role
+  );
+  return booking;
+}
+
+export async function completeReviewCall(input: {
+  bookingId: string;
+  outcome: "COMPLETED" | "CANCELLED";
+  actor: AppUser;
+  note?: string;
+}) {
+  const state = getAppState();
+  const booking = state.reviewCallBookings.find((item) => item.id === input.bookingId);
+  if (!booking) {
+    throw new Error("Review call booking not found.");
+  }
+
+  booking.status = input.outcome;
+  await writeReviewCallBookingRecords(state.reviewCallBookings);
+  appendTimeline(
+    booking.clientId,
+    input.outcome === "COMPLETED" ? "Review call completed" : "Review call cancelled",
+    input.note
+      ? `${input.note} Meeting link: ${booking.meetingLink}`
+      : `Booking updated to ${input.outcome}. Meeting link: ${booking.meetingLink}`,
     "Booking",
     input.actor.role
   );
@@ -482,8 +545,98 @@ export function createVastuCase(clientId: string, proposalId: string) {
   } satisfies (typeof state.vastuCases)[number];
 
   state.vastuCases.unshift(nextCase);
+  const primaryFloor: FloorWorkspaceRecord = {
+    id: nextId("floor"),
+    caseId: nextCase.id,
+    floorLabel: "Ground floor",
+    status: "DRAFT",
+    locked: false,
+    evidenceUploads: []
+  };
+
+  state.floorWorkspaces.unshift(primaryFloor);
   appendTimeline(clientId, "Case created", `Case ${caseNumber} opened after advance approval.`, "Case", "ADMIN");
   return nextCase;
+}
+
+export function addFloorWorkspace(caseId: string, floorLabel: string, actor: AppUser) {
+  const state = getAppState();
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) {
+    throw new Error("Case not found.");
+  }
+
+  const normalizedLabel = String(floorLabel ?? "").trim();
+  if (!normalizedLabel) {
+    throw new Error("Floor label is required.");
+  }
+
+  const existing = state.floorWorkspaces.find(
+    (workspace) => workspace.caseId === caseId && workspace.floorLabel.toLowerCase() === normalizedLabel.toLowerCase()
+  );
+  if (existing) {
+    return existing;
+  }
+
+  const workspace: FloorWorkspaceRecord = {
+    id: nextId("floor"),
+    caseId,
+    floorLabel: normalizedLabel,
+    status: "DRAFT",
+    locked: false,
+    evidenceUploads: []
+  };
+
+  state.floorWorkspaces.unshift(workspace);
+  caseRecord.status = caseRecord.orientationLocked ? caseRecord.status : "FLOOR_WORKSPACE_ACTIVE";
+  appendTimeline(caseRecord.clientId, "Floor workspace created", `${normalizedLabel} added to the case workspace.`, "Workspace", actor.role);
+  return workspace;
+}
+
+export function addFloorEvidence(floorId: string, fileName: string, actor: AppUser) {
+  const state = getAppState();
+  const workspace = state.floorWorkspaces.find((item) => item.id === floorId);
+  if (!workspace) {
+    throw new Error("Floor workspace not found.");
+  }
+
+  const caseRecord = state.vastuCases.find((item) => item.id === workspace.caseId);
+  if (!caseRecord) {
+    throw new Error("Case not found.");
+  }
+
+  const normalizedFileName = String(fileName ?? "").trim();
+  if (!normalizedFileName) {
+    throw new Error("Evidence file name is required.");
+  }
+
+  if (!workspace.evidenceUploads.includes(normalizedFileName)) {
+    workspace.evidenceUploads.push(normalizedFileName);
+  }
+
+  appendTimeline(caseRecord.clientId, "Evidence added", `${normalizedFileName} attached to ${workspace.floorLabel}.`, "Workspace", actor.role);
+  return workspace;
+}
+
+export function markFloorWorkspaceReady(floorId: string, actor: AppUser) {
+  const state = getAppState();
+  const workspace = state.floorWorkspaces.find((item) => item.id === floorId);
+  if (!workspace) {
+    throw new Error("Floor workspace not found.");
+  }
+
+  const caseRecord = state.vastuCases.find((item) => item.id === workspace.caseId);
+  if (!caseRecord) {
+    throw new Error("Case not found.");
+  }
+
+  workspace.status = workspace.locked ? "LOCKED" : "READY_FOR_REVIEW";
+  if (!caseRecord.orientationLocked) {
+    caseRecord.status = "FLOOR_WORKSPACE_ACTIVE";
+  }
+
+  appendTimeline(caseRecord.clientId, "Floor marked ready", `${workspace.floorLabel} is ready for consultant review.`, "Workspace", actor.role);
+  return workspace;
 }
 
 export function lockOrientation(caseId: string, reason: string, actor: AppUser) {
@@ -536,6 +689,38 @@ export function approveBalancePayment(clientId: string, caseId: string, amountIn
   return payment;
 }
 
+export function verifyBalanceProof(input: {
+  clientId: string;
+  caseId: string;
+  amountInr: number;
+  referenceScreenshotUrl: string;
+  referenceScreenshotFileName: string;
+  actor: AppUser;
+}) {
+  const state = getAppState();
+  const caseRecord = state.vastuCases.find((item) => item.id === input.caseId);
+  if (!caseRecord) {
+    throw new Error("Case not found.");
+  }
+
+  const payment = approveBalancePayment(input.clientId, input.caseId, input.amountInr, input.actor);
+  payment.referenceScreenshotUrl = input.referenceScreenshotUrl;
+  payment.referenceScreenshotFileName = input.referenceScreenshotFileName;
+  payment.verifiedBy = input.actor.fullName;
+  payment.verifiedAt = nowIso();
+  payment.verificationNote = "Balance reference screenshot uploaded and checked before unlocking the final report flow.";
+
+  appendTimeline(
+    input.clientId,
+    "Balance proof verified",
+    `${formatMoney(input.amountInr)} balance verified from ${input.referenceScreenshotFileName}. Final report flow is now unlocked.`,
+    "Payments",
+    input.actor.role
+  );
+
+  return { payment, caseRecord };
+}
+
 export function generatePreviewReport(caseId: string) {
   const state = getAppState();
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
@@ -546,20 +731,64 @@ export function generatePreviewReport(caseId: string) {
     throw new Error("Cannot generate a preview for a released verdict.");
   }
 
-  const report: ReportVersionRecord = {
-    id: nextId("report"),
-    caseId,
-    versionLabel: "Stage-A Preview",
-    isPreview: true,
-    status: "PAYMENT_BLOCKED",
-    watermarkText: "Preview only. Balance pending.",
-    approvals: []
-  };
+  const existingPreview = state.reportVersions.find((item) => item.caseId === caseId && item.isPreview);
+  const report =
+    existingPreview ??
+    ({
+      id: nextId("report"),
+      caseId,
+      versionLabel: "Stage-A Preview",
+      isPreview: true,
+      status: "PAYMENT_BLOCKED",
+      watermarkText: "Preview only. Balance pending.",
+      approvals: []
+    } satisfies ReportVersionRecord);
 
-  state.reportVersions.unshift(report);
+  report.status = caseRecord.balanceApproved ? "READY_FOR_APPROVAL" : "PAYMENT_BLOCKED";
+  report.watermarkText = caseRecord.balanceApproved ? undefined : "Preview only. Balance pending.";
+  report.approvals = [];
+
+  if (!existingPreview) {
+    state.reportVersions.unshift(report);
+  }
   caseRecord.reportStatus = "PAYMENT_BLOCKED";
 
   appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", "CONSULTANT");
+  return report;
+}
+
+export function prepareFinalReport(caseId: string, actor: AppUser) {
+  const state = getAppState();
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) {
+    throw new Error("Case not found.");
+  }
+  if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
+    throw new Error("Final report can only be prepared after the balance is approved.");
+  }
+
+  const existing = state.reportVersions.find((item) => item.caseId === caseId && !item.isPreview);
+  const report =
+    existing ??
+    ({
+      id: nextId("report"),
+      caseId,
+      versionLabel: "Official Verdict Report",
+      isPreview: false,
+      status: "READY_FOR_APPROVAL",
+      approvals: []
+    } satisfies ReportVersionRecord);
+
+  report.status = "READY_FOR_APPROVAL";
+  report.watermarkText = undefined;
+
+  if (!existing) {
+    state.reportVersions.unshift(report);
+  }
+
+  caseRecord.reportStatus = "READY_FOR_APPROVAL";
+  caseRecord.status = "REPORT_APPROVAL_PENDING";
+  appendTimeline(caseRecord.clientId, "Final report prepared", `Official verdict report prepared by ${actor.fullName}.`, "Reports", actor.role);
   return report;
 }
 
@@ -625,16 +854,20 @@ export function approveReport(reportId: string, actor: AppUser) {
   if (!caseRecord) {
     throw new Error("Case not found.");
   }
-  if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
-    throw new Error("Balance approval is required before the report can be approved.");
+  if (report.isPreview) {
+    throw new Error("Preview reports cannot be approved as final verdict reports.");
   }
-  if (report.isPreview === false && report.status !== "READY_FOR_APPROVAL" && report.status !== "PAYMENT_BLOCKED") {
+  if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
+    throw new Error("Balance approval is required before the final report can be approved.");
+  }
+  if (report.status !== "READY_FOR_APPROVAL" && report.status !== "APPROVED") {
     throw new Error("Report is not in an approvable state.");
   }
 
-  report.status = "APPROVED";
   report.approvals = Array.from(new Set([...(report.approvals ?? []), actor.id]));
+  report.status = "APPROVED";
   caseRecord.reportStatus = "APPROVED";
+  caseRecord.status = (report.approvals ?? []).length >= 2 ? "REPORT_APPROVED" : "REPORT_APPROVAL_PENDING";
 
   appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor.role);
   return report;
