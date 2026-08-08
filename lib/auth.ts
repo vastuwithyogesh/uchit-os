@@ -36,6 +36,32 @@ export function getUserByRole(role: UserRole) {
   return users.find((user) => user.role === role) ?? users[0];
 }
 
+function resolveAuthenticatedDisplayName(headers: Headers, fallback: string) {
+  const fullNameHeader = headers.get("oai-authenticated-user-full-name");
+
+  if (!fullNameHeader) {
+    return fallback;
+  }
+
+  try {
+    return decodeURIComponent(fullNameHeader);
+  } catch {
+    return fallback;
+  }
+}
+
+function hydrateAuthenticatedActor(baseUser: AppUser, headers: Headers) {
+  const authenticatedUserId = headers.get("oai-authenticated-user-id");
+  const authenticatedEmail = headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
+
+  return {
+    ...baseUser,
+    id: authenticatedUserId ?? baseUser.id,
+    email: authenticatedEmail ?? baseUser.email,
+    fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail ?? baseUser.fullName)
+  } satisfies AppUser;
+}
+
 async function getRoleForAuthenticatedEmail(email: string) {
   const env = getRuntimeEnv();
   if (!env.DB) {
@@ -73,6 +99,16 @@ async function ensureStaffRoleAssignmentsTable() {
   return env.DB;
 }
 
+async function hasStoredStaffRoleAssignments() {
+  const db = await ensureStaffRoleAssignmentsTable();
+  if (!db) {
+    return false;
+  }
+
+  const row = await db.prepare("SELECT COUNT(*) as count FROM staff_role_assignments").first<{ count: number }>();
+  return Number(row?.count ?? 0) > 0;
+}
+
 export function resolveActor(role?: string | null) {
   if (role && roles.includes(role as UserRole)) {
     return getUserByRole(role as UserRole);
@@ -84,7 +120,6 @@ export function resolveActor(role?: string | null) {
 export async function resolveRequestActor(headers: Headers, demoRole?: string | null) {
   const authenticatedUserId = headers.get("oai-authenticated-user-id");
   const authenticatedEmail = headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
-  const fullNameHeader = headers.get("oai-authenticated-user-full-name");
   const isDev = process.env.NODE_ENV !== "production";
   const host = headers.get("host")?.toLowerCase() ?? "";
   const isLocalHostRequest =
@@ -101,32 +136,28 @@ export async function resolveRequestActor(headers: Headers, demoRole?: string | 
     });
 
     if (matchedUser) {
-      return matchedUser;
+      return hydrateAuthenticatedActor(matchedUser, headers);
     }
 
     const mappedRole = authenticatedEmail ? await getRoleForAuthenticatedEmail(authenticatedEmail) : null;
     if (mappedRole) {
-      const mappedUser = getUserByRole(mappedRole);
-      return {
-        ...mappedUser,
-        id: authenticatedUserId ?? mappedUser.id,
-        email: authenticatedEmail ?? mappedUser.email,
-        fullName: mappedUser.fullName
-      };
+      return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);
     }
 
-    let displayName = authenticatedEmail || getUserByRole("CLIENT").fullName;
-    try {
-      displayName = fullNameHeader ? decodeURIComponent(fullNameHeader) : displayName;
-    } catch {
-      displayName = authenticatedEmail || getUserByRole("CLIENT").fullName;
+    if (authenticatedEmail && !(await hasStoredStaffRoleAssignments())) {
+      await upsertStaffRoleAssignment({
+        email: authenticatedEmail,
+        role: "SUPER_ADMIN",
+        fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail)
+      });
+      return hydrateAuthenticatedActor(getUserByRole("SUPER_ADMIN"), headers);
     }
 
     return {
       ...getUserByRole("CLIENT"),
       id: authenticatedUserId ?? `auth_${authenticatedEmail ?? "visitor"}`,
       email: authenticatedEmail ?? getUserByRole("CLIENT").email,
-      fullName: displayName
+      fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail ?? getUserByRole("CLIENT").fullName)
     };
   }
 
@@ -158,7 +189,7 @@ export async function listStaffRoleAssignments(): Promise<StaffRoleAssignment[]>
     .prepare("SELECT email, role, full_name, updated_at FROM staff_role_assignments ORDER BY updated_at DESC, email ASC")
     .all<{ email: string; role: UserRole; full_name: string; updated_at: string }>();
 
-  const stored = (result.results ?? []).map((row) => ({
+  const stored = (result.results ?? []).map((row: { email: string; role: UserRole; full_name: string; updated_at: string }) => ({
     email: row.email,
     role: row.role,
     fullName: row.full_name,
