@@ -56,6 +56,9 @@ export function WorkflowConsole() {
   const evaluationSnapshots = state?.evaluationSnapshots.filter((item) => item.caseId === caseRecord?.id) ?? [];
   const shaktiSnapshots = state?.shaktiSnapshots.filter((item) => item.caseId === caseRecord?.id) ?? [];
   const timeline = state?.timelineEvents.filter((item) => item.clientId === selectedClient?.id).slice(0, 6) ?? [];
+  const latestEvaluationSnapshot = evaluationSnapshots[0];
+  const latestShaktiSnapshot = shaktiSnapshots[0];
+  const latestShaktiVerdict = latestShaktiSnapshot?.rankedVerdicts[0];
 
   const shaktiValues = useMemo(
     () =>
@@ -112,6 +115,41 @@ export function WorkflowConsole() {
     if (!verdictReadyByState) return "Clear the remaining verdict blockers before release.";
     return "All release gates are clear. The verdict can now be released.";
   })();
+
+  const verdictDossier = [
+    {
+      label: "Preview report",
+      value: previewReport ? previewReport.status : "Missing",
+      note: previewReport ? (previewReport.watermarkText ? "Watermarked until balance is approved" : "No watermark needed") : "Generate the Stage-A preview first",
+      tone: previewReport ? ("good" as const) : ("warn" as const)
+    },
+    {
+      label: "Final report",
+      value: finalReport ? finalReport.status : "Missing",
+      note: finalReport ? `${finalReport.approvals.length} approvals recorded` : "Prepare after balance approval",
+      tone: finalReport ? ("good" as const) : ("warn" as const)
+    },
+    {
+      label: "Evaluation snapshot",
+      value: latestEvaluationSnapshot ? latestEvaluationSnapshot.snapshotName : "Missing",
+      note: latestEvaluationSnapshot ? `${latestEvaluationSnapshot.generatedMatrix.length} matrix rows captured from ${latestEvaluationSnapshot.sourceVersion}` : "Save the utility snapshot for this case",
+      tone: latestEvaluationSnapshot ? ("good" as const) : ("warn" as const)
+    },
+    {
+      label: "Shakti snapshot",
+      value: latestShaktiSnapshot ? "Saved" : "Missing",
+      note: latestShaktiSnapshot
+        ? `${latestShaktiSnapshot.inputValues.length} inputs · ${latestShaktiSnapshot.tieBreakUsed ? "tie-break used" : "unique ranking"}`
+        : "Save the 16-value ranking for this case",
+      tone: latestShaktiSnapshot ? ("good" as const) : ("warn" as const)
+    },
+    {
+      label: "Verdict lock",
+      value: verdictReadyByState ? "Open" : "Held",
+      note: verdictReadyByState ? "Payment and approval gates are clear" : "Still waiting on balance or report approvals",
+      tone: verdictReadyByState ? ("good" as const) : ("warn" as const)
+    }
+  ];
 
   async function refresh(preferredClientId?: string) {
     setBusy(true);
@@ -279,6 +317,37 @@ export function WorkflowConsole() {
         </div>
         <div className="footer-note" style={{ marginTop: 12 }}>
           {verdictReadyByState ? "All payment and approval gates are clear." : "Use the blocker list below to move this case toward release."}
+        </div>
+      </div>
+
+      <div className="card span-4">
+        <div className="eyebrow">Verdict dossier</div>
+        <h3>One glance at the release packet</h3>
+        <p className="subtle" style={{ marginTop: 8 }}>
+          This card keeps the report chain readable for the team: preview, final report, utility evaluation, Shakti ranking, and the final lock state.
+        </p>
+        <div className="list" style={{ marginTop: 14 }}>
+          {verdictDossier.map((item) => (
+            <div key={item.label} className="list-item">
+              <strong>{item.label}</strong>
+              <span className={`tag ${item.tone}`}>{item.value}</span>
+              <span className="meta">{item.note}</span>
+            </div>
+          ))}
+        </div>
+        <div className="workflow" style={{ marginTop: 12 }}>
+          <a href="/evaluation" className="button-secondary">
+            Open evaluation
+          </a>
+          <a href="/reports" className="button-secondary">
+            Open report flow
+          </a>
+        </div>
+        <div className="panel" style={{ marginTop: 14 }}>
+          <strong>Latest Shakti ranking</strong>
+          <div className="meta" style={{ marginTop: 6 }}>
+            {latestShaktiVerdict ? `${latestShaktiVerdict.element} leading at ${latestShaktiVerdict.score}` : "No ranking saved yet"}
+          </div>
         </div>
       </div>
 
