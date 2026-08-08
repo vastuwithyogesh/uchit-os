@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { requireRouteActor } from "@/lib/auth";
+import { readPaymentProofManifest } from "@/lib/payment-proof-assets.server";
 import { loadStateFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 import { inspectIntegrity } from "@/lib/integrity";
 import { setAppState } from "@/lib/store";
@@ -11,7 +12,8 @@ export async function GET(request: Request) {
     return access.response;
   }
   const state = await loadStateFromPersistence();
-  const integrity = inspectIntegrity(state);
+  const paymentProofAssets = await readPaymentProofManifest();
+  const integrity = inspectIntegrity(state, undefined, paymentProofAssets);
 
   return NextResponse.json({
     state,
@@ -29,6 +31,7 @@ export async function GET(request: Request) {
       evaluationSnapshots: state.evaluationSnapshots.length,
       shaktiSnapshots: state.shaktiSnapshots.length,
       timelineEvents: state.timelineEvents.length,
+      paymentProofAssets: paymentProofAssets.length,
       utilityRules: state.utilityRules.length,
       whatsappTemplates: state.whatsappTemplates.length,
       whatsappLogs: state.whatsappLogs.length
@@ -48,7 +51,8 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Missing state payload." }, { status: 400 });
   }
 
-  const integrity = inspectIntegrity(nextState);
+  const paymentProofAssets = await readPaymentProofManifest();
+  const integrity = inspectIntegrity(nextState, undefined, paymentProofAssets);
   if (!integrity.ok && !body.force) {
     return NextResponse.json(
       {
@@ -79,6 +83,7 @@ export async function POST(request: Request) {
       evaluationSnapshots: nextState.evaluationSnapshots.length,
       shaktiSnapshots: nextState.shaktiSnapshots.length,
       timelineEvents: nextState.timelineEvents.length,
+      paymentProofAssets: paymentProofAssets.length,
       utilityRules: nextState.utilityRules.length,
       whatsappTemplates: nextState.whatsappTemplates.length,
       whatsappLogs: nextState.whatsappLogs.length

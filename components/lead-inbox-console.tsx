@@ -5,6 +5,7 @@ import { useSession } from "@/components/session-provider";
 import type { CommercialProposalRecord, InboundLeadRecord, LeadQualificationRecord, ReviewCallBookingRecord } from "@/lib/domain";
 import { canTriggerDeliverables } from "@/lib/permissions";
 import { buildActionHeaders } from "@/lib/request-helpers";
+import { formatShortDate } from "@/lib/format";
 
 type LeadInboxPayload = {
   leads: InboundLeadRecord[];
@@ -13,7 +14,6 @@ type LeadInboxPayload = {
     qualified: number;
     new: number;
     filtered: number;
-    duplicates: number;
   };
 };
 
@@ -51,7 +51,7 @@ function formatLeadDate(value: string) {
   }
 
   const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
+  return Number.isNaN(parsed.getTime()) ? value : formatShortDate(parsed.toISOString());
 }
 
 function getLeadNextAction(input: {
@@ -289,7 +289,7 @@ export function LeadInboxConsole({
         <div className="eyebrow">Lead inbox</div>
         <h2>Website opt-in CSV to filtered CRM queue</h2>
         <p className="subtle">
-          Upload the CSV you download from your website dashboard. The inbox keeps the original CSV dates for first seen and last seen, tracks returning submissions, and lets the team filter or qualify each lead.
+          Upload the CSV you download from your website dashboard. The inbox keeps the original CSV dates for first seen and last seen, shows whether a lead is returning, and keeps the submission count visible while the full repeat history stays in the timeline.
         </p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
@@ -299,10 +299,6 @@ export function LeadInboxConsole({
           <div className="stat-card">
             <span className="stat-value">{payload?.counts.qualified ?? 0}</span>
             <span className="stat-label">qualified in inbox</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{payload?.counts.duplicates ?? 0}</span>
-            <span className="stat-label">marked duplicates</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{returningLeadCount}</span>
@@ -377,7 +373,6 @@ export function LeadInboxConsole({
           <span className="pill">New {payload?.counts.new ?? 0}</span>
           <span className="pill">Qualified {payload?.counts.qualified ?? 0}</span>
           <span className="pill">Filtered {payload?.counts.filtered ?? 0}</span>
-          <span className="pill">Duplicates {payload?.counts.duplicates ?? 0}</span>
         </div>
         <div className="two-col" style={{ marginTop: 14 }}>
           <div className="field">
@@ -438,11 +433,9 @@ export function LeadInboxConsole({
                   <span className="pill">Score {lead.score}</span>
                   <span className="pill">{lead.source}</span>
                   <span className="pill">Client ID {lead.uniqueClientId}</span>
-                  <span className="pill">First seen {formatLeadDate(lead.firstSeenAt)}</span>
                   <span className="pill">Last seen {formatLeadDate(lead.lastSeenAt)}</span>
                   <span className="pill">Submissions {lead.submissionCount}</span>
-                  <span className="pill">Duplicates {lead.duplicateCount}</span>
-                  <span className="pill">{lead.isReturningLead ? "Returning lead" : "First-time lead"}</span>
+                  <span className="pill">{lead.isReturningLead ? "Returning lead: Yes" : "Returning lead: No"}</span>
                   <span className="pill">{qualification ? `Converted to ${qualification.clientId}` : "Not yet converted"}</span>
                   <span className="pill">{proposal ? `Proposal ${proposal.status}` : "No proposal yet"}</span>
                   <span className="pill">{booking ? `Review call ${booking.status}` : "No review call yet"}</span>

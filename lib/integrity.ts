@@ -12,7 +12,14 @@ export function inspectIntegrity(
     d1Configured?: boolean;
     r2Configured?: boolean;
     staffAssignments?: number;
-  }
+  },
+  paymentProofAssets?: Array<{
+    key: string;
+    label: string;
+    fileName: string;
+    url: string;
+    uploadedAt: string;
+  }>
 ) {
   const issues: IntegrityIssue[] = [];
 
@@ -127,6 +134,28 @@ export function inspectIntegrity(
     }
     if (!templateIds.has(log.templateId)) {
       issues.push({ area: "WhatsApp logs", message: `Log ${log.id} points to missing template ${log.templateId}.`, severity: "error" });
+    }
+  }
+
+  if (paymentProofAssets) {
+    const proofKeys = new Set(paymentProofAssets.map((asset) => asset.key));
+    const hasAdvanceProof = proofKeys.has("advance-proof");
+    const hasBalanceProof = proofKeys.has("balance-proof");
+
+    if (state.payments.some((payment) => payment.type === "ADVANCE" && payment.status === "APPROVED") && !hasAdvanceProof) {
+      issues.push({
+        area: "Payment proofs",
+        message: "An approved advance payment exists, but no advance proof image is uploaded.",
+        severity: "warn"
+      });
+    }
+
+    if (state.payments.some((payment) => payment.type === "BALANCE" && payment.status === "APPROVED") && !hasBalanceProof) {
+      issues.push({
+        area: "Payment proofs",
+        message: "An approved balance payment exists, but no balance proof image is uploaded.",
+        severity: "warn"
+      });
     }
   }
 

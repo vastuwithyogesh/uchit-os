@@ -16,7 +16,25 @@ async function ensureManifestExists() {
   }
 }
 
+function mapChartAssetRecord(record: Record<string, unknown>): ChartAssetRecord {
+  return {
+    key: String(record.key ?? ""),
+    label: String(record.label ?? ""),
+    fileName: String(record.fileName ?? record.file_name ?? ""),
+    url: String(record.url ?? ""),
+    uploadedAt: String(record.uploadedAt ?? record.uploaded_at ?? new Date().toISOString())
+  };
+}
+
 export async function readChartAssetManifest(): Promise<ChartAssetRecord[]> {
+  try {
+    await access(manifestPath, fsConstants.F_OK);
+    const raw = await readFile(manifestPath, "utf8");
+    return (JSON.parse(raw) as Record<string, unknown>[]).map(mapChartAssetRecord);
+  } catch {
+    // Fall back to the database store if the local manifest is absent.
+  }
+
   const env = getRuntimeEnv();
   if (env.DB) {
     await env.DB.prepare(`
@@ -28,12 +46,12 @@ export async function readChartAssetManifest(): Promise<ChartAssetRecord[]> {
         uploaded_at TEXT NOT NULL
       )
     `).run();
-    const result = await env.DB.prepare("SELECT key, label, file_name, url, uploaded_at FROM chart_assets ORDER BY uploaded_at DESC").all<ChartAssetRecord>();
-    return result.results ?? [];
+    const result = await env.DB.prepare("SELECT key, label, file_name, url, uploaded_at FROM chart_assets ORDER BY uploaded_at DESC").all<Record<string, unknown>>();
+    return (result.results ?? []).map(mapChartAssetRecord);
   }
   await ensureManifestExists();
   const raw = await readFile(manifestPath, "utf8");
-  return JSON.parse(raw) as ChartAssetRecord[];
+  return (JSON.parse(raw) as Record<string, unknown>[]).map(mapChartAssetRecord);
 }
 
 export async function writeChartAssetManifest(records: ChartAssetRecord[]) {
@@ -64,7 +82,6 @@ export async function writeChartAssetManifest(records: ChartAssetRecord[]) {
         )
       );
     }
-    return records;
   }
   await ensureManifestExists();
   await writeFile(manifestPath, JSON.stringify(records, null, 2), "utf8");

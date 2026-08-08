@@ -1,5 +1,6 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { SiteHeader } from "@/components/site-header";
+import { formatTimeStamp } from "@/lib/format";
 import { requirePageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 
@@ -20,7 +21,7 @@ export default async function HomePage() {
   const latestCase = state.vastuCases[0];
   const latestFinalReport = state.reportVersions.find((report) => !report.isPreview);
   const qualifiedLeads = state.optInLeads.filter((lead) => lead.status === "QUALIFIED").length;
-  const duplicateLeads = state.optInLeads.filter((lead) => lead.status === "DUPLICATE").length;
+  const returningLeads = state.optInLeads.filter((lead) => lead.isReturningLead).length;
   const activeCases = state.vastuCases.filter((caseItem) => caseItem.status !== "VERDICT_RELEASED").length;
   const releasedVerdicts = state.reportVersions.filter((report) => report.status === "RELEASED").length;
   const pendingReports = state.reportVersions.filter((report) => report.status !== "RELEASED").length;
@@ -30,7 +31,7 @@ export default async function HomePage() {
 
   const readinessChecklist = [
     {
-      label: "Lead intake and duplicate tracking",
+      label: "Lead intake and return history",
       done: state.optInLeads.length > 0,
       note: `${state.optInLeads.length} imported website opt-in lead${state.optInLeads.length === 1 ? "" : "s"}`
     },
@@ -65,7 +66,7 @@ export default async function HomePage() {
           <div className="eyebrow">Operational overview</div>
           <h1>Run lead intake, approvals, case work, and verdict release from one live operating dashboard.</h1>
           <p className="lede">
-            This overview now reflects the real working state of the app on Saturday, August 8, 2026. It brings the core systems together: website lead imports, duplicate tracking, review-call flow, payment proof checks, case creation, evaluation, reports, and the permanent client timeline.
+            This overview now reflects the real working state of the app on Saturday, August 8, 2026. It brings the core systems together: website lead imports, return-history tracking, review-call flow, payment proof checks, case creation, evaluation, reports, and the permanent client timeline.
           </p>
           <div className="hero-actions">
             <a href="/crm" className="button">
@@ -117,7 +118,7 @@ export default async function HomePage() {
             <div className="pill-row" style={{ marginTop: 14 }}>
               <span className="pill">Latest case {latestCase?.caseNumber ?? "none yet"}</span>
               <span className="pill">Pending reports {pendingReports}</span>
-              <span className="pill">Duplicate leads {duplicateLeads}</span>
+              <span className="pill">Returning leads {returningLeads}</span>
               <span className="pill">Final report {latestFinalReport?.status ?? "not prepared"}</span>
             </div>
           </div>
@@ -150,6 +151,10 @@ export default async function HomePage() {
             <a href="/ops" className="list-item">
               <strong>Ops console</strong>
               <span className="meta">Open cases, manage floors, lock orientation, save evaluations, and move operations forward.</span>
+            </a>
+            <a href="/payment-proofs" className="list-item">
+              <strong>Payment proofs</strong>
+              <span className="meta">Upload advance and balance screenshots so the commercial gates can move cleanly.</span>
             </a>
             <a href="/reports" className="list-item">
               <strong>Report flow</strong>
@@ -190,7 +195,7 @@ export default async function HomePage() {
                   <header>
                     <div>
                       <strong>{event.headline}</strong>
-                      <div className="meta">{new Date(event.happenedAt).toLocaleString()}</div>
+                      <div className="meta">{formatTimeStamp(event.happenedAt)}</div>
                     </div>
                     <span className="tag neutral">{event.category}</span>
                   </header>

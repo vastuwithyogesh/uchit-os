@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { listStaffRoleAssignments, requireRouteActor, resolveRequestActor } from "@/lib/auth";
+import { readPaymentProofManifest } from "@/lib/payment-proof-assets.server";
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { getRuntimeEnv } from "@/lib/runtime-env";
 
@@ -12,6 +13,7 @@ export async function GET(request: Request) {
   const env = getRuntimeEnv();
   const actor = await resolveRequestActor(request.headers);
   const staffAssignments = await listStaffRoleAssignments();
+  const paymentProofAssets = await readPaymentProofManifest();
 
   return NextResponse.json({
     runtime: {
@@ -50,13 +52,15 @@ export async function GET(request: Request) {
       evaluationSnapshots: state.evaluationSnapshots.length,
       shaktiSnapshots: state.shaktiSnapshots.length,
       timelineEvents: state.timelineEvents.length,
-      utilityRules: state.utilityRules.length
+      utilityRules: state.utilityRules.length,
+      paymentProofAssets: paymentProofAssets.length
     },
     latestReviewCallBookings: state.reviewCallBookings.slice(0, 5),
     latestPayments: state.payments.slice(0, 5),
     latestAdvanceVerifications: state.advanceVerifications.slice(0, 5),
     latestEvaluationSnapshots: state.evaluationSnapshots.slice(0, 5),
     latestShaktiSnapshots: state.shaktiSnapshots.slice(0, 5),
-    latestReports: state.reportVersions.slice(0, 5)
+    latestReports: state.reportVersions.slice(0, 5),
+    latestPaymentProofAssets: paymentProofAssets.slice(0, 5)
   });
 }

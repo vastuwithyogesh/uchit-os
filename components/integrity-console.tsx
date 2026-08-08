@@ -11,6 +11,13 @@ type IntegrityPayload = {
     staffAssignments: number;
   };
   counts: Record<string, number>;
+  latestPaymentProofAssets: Array<{
+    key: string;
+    label: string;
+    fileName: string;
+    url: string;
+    uploadedAt: string;
+  }>;
   issues: Array<{
     area: string;
     message: string;
@@ -73,6 +80,10 @@ export function IntegrityConsole() {
             <span className="stat-value">{(payload?.counts.evaluationSnapshots ?? 0) + (payload?.counts.shaktiSnapshots ?? 0)}</span>
             <span className="stat-label">snapshots scanned</span>
           </div>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.counts.paymentProofAssets ?? 0}</span>
+            <span className="stat-label">proof uploads scanned</span>
+          </div>
         </div>
         <button className="button" type="button" onClick={refresh} disabled={busy} style={{ marginTop: 12 }}>
           Refresh integrity
@@ -85,6 +96,35 @@ export function IntegrityConsole() {
           <span className="pill">Staff roles {payload?.runtime.staffAssignments ?? 0}</span>
           <span className="pill">Reports {payload?.counts.reportVersions ?? 0}</span>
           <span className="pill">Snapshots {(payload?.counts.evaluationSnapshots ?? 0) + (payload?.counts.shaktiSnapshots ?? 0)}</span>
+          <span className="pill">Proof uploads {payload?.counts.paymentProofAssets ?? 0}</span>
+        </div>
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Latest proof uploads</strong>
+              <div className="meta">Advance and balance screenshots now count as part of integrity</div>
+            </div>
+          </div>
+          <div className="list" style={{ marginTop: 12 }}>
+            {payload?.latestPaymentProofAssets.length ? (
+              payload.latestPaymentProofAssets.map((asset) => (
+                <div key={asset.key} className="list-item">
+                  <strong>{asset.label}</strong>
+                  <span className="meta">
+                    {asset.fileName} · {new Date(asset.uploadedAt).toLocaleString()}
+                  </span>
+                  <a href={asset.url} className="pill" target="_blank" rel="noreferrer">
+                    Open proof
+                  </a>
+                </div>
+              ))
+            ) : (
+              <div className="list-item">
+                <strong>No proof uploads yet</strong>
+                <span className="meta">Upload advance or balance proof to include them here</span>
+              </div>
+            )}
+          </div>
         </div>
         <div className="list" style={{ marginTop: 16 }}>
           {payload?.issues.map((issue, index) => (

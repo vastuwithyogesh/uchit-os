@@ -43,6 +43,7 @@ export function ReportConsole() {
   const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
   const previewReport = reports.find((item) => item.isPreview);
   const finalReport = reports.find((item) => !item.isPreview);
+  const reportHistory = reports;
   const approvalCount = finalReport?.approvals?.length ?? 0;
   const canApproveCurrentReport = Boolean(finalReport) && canApproveReport(activeUser);
   const balancePayment = state?.payments?.find((payment) => payment.caseId === currentCase?.id && payment.type === "BALANCE");
@@ -79,6 +80,18 @@ export function ReportConsole() {
     if (!verdictReadyByState) return "Clear the remaining verdict blockers.";
     return "All report gates are clear. The verdict can now be released.";
   })();
+
+  const releaseChecklist = [
+    { label: "Preview exists", done: Boolean(previewReport), note: previewReport ? previewReport.status : "Generate the Stage-A preview first" },
+    {
+      label: "Balance approved",
+      done: Boolean(currentCase?.balanceApproved && currentCase?.fullPaymentApproved && balancePayment?.status === "APPROVED"),
+      note: currentCase?.balanceApproved ? "Balance is cleared" : "Balance is still pending"
+    },
+    { label: "Final report prepared", done: Boolean(finalReport), note: finalReport ? finalReport.status : "Prepare the official report" },
+    { label: "Two approvals logged", done: approvalCount >= 2, note: `${approvalCount} / 2 approvals` },
+    { label: "Release role allowed", done: canReleaseVerdict(activeUser), note: canReleaseVerdict(activeUser) ? "Role permitted" : "Admin or Super-Admin needed" }
+  ];
 
   async function refresh(preferredClientId?: string) {
     setBusy(true);
@@ -237,6 +250,37 @@ export function ReportConsole() {
             </div>
           </div>
         </div>
+
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Report archive</strong>
+              <div className="meta">This client’s current preview and official report trail</div>
+            </div>
+          </div>
+          <div className="list" style={{ marginTop: 12 }}>
+            {reportHistory.length ? (
+              reportHistory.map((report) => (
+                <div key={report.id} className="list-item">
+                  <strong>{report.versionLabel}</strong>
+                  <span className="meta">
+                    {report.isPreview ? "Preview" : "Official"} · {report.status}
+                  </span>
+                  <div className="pill-row">
+                    <span className={`tag ${report.isPreview ? "warn" : "good"}`}>{report.isPreview ? "Watermarked lane" : "Verdict lane"}</span>
+                    <span className="pill">{report.approvals.length} approvals</span>
+                    {report.watermarkText ? <span className="pill">{report.watermarkText}</span> : null}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div className="list-item">
+                <strong>No reports for this client yet</strong>
+                <span className="meta">Generate the preview to start the archive</span>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
 
       <div className="card span-4">
@@ -249,22 +293,13 @@ export function ReportConsole() {
           </div>
         </div>
         <div className="list" style={{ marginTop: 14 }}>
-          <div className="list-item">
-            <strong>Preview</strong>
-            <span className="meta">Can be generated before balance, but stays watermarked</span>
-          </div>
-          <div className="list-item">
-            <strong>Final report</strong>
-            <span className="meta">Can only be prepared after balance approval</span>
-          </div>
-          <div className="list-item">
-            <strong>Approvals</strong>
-            <span className="meta">Two sign-offs required for verdict release</span>
-          </div>
-          <div className="list-item">
-            <strong>Release role</strong>
-            <span className="meta">Admin or Super-Admin</span>
-          </div>
+          {releaseChecklist.map((item) => (
+            <div key={item.label} className="list-item">
+              <strong>{item.label}</strong>
+              <span className={`tag ${item.done ? "good" : "warn"}`}>{item.done ? "Done" : "Pending"}</span>
+              <span className="meta">{item.note}</span>
+            </div>
+          ))}
         </div>
         {blockerReasons.length > 0 ? (
           <div className="footer-note" style={{ marginTop: 12 }}>

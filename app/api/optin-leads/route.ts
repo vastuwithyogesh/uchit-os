@@ -17,8 +17,7 @@ export async function GET(request: Request) {
       total: leads.length,
       qualified: leads.filter((lead) => lead.status === "QUALIFIED").length,
       new: leads.filter((lead) => lead.submissionCount === 1).length,
-      filtered: leads.filter((lead) => lead.status === "FILTERED").length,
-      duplicates: leads.filter((lead) => lead.duplicateCount > 0 || lead.isReturningLead).length
+      filtered: leads.filter((lead) => lead.status === "FILTERED").length
     }
   });
 }
@@ -45,7 +44,6 @@ export async function POST(request: Request) {
     imported: result.created.length + result.updated.length,
     created: result.created.length,
     updated: result.updated.length,
-    duplicates: result.updated.length,
     leads: result.leads
   });
 }

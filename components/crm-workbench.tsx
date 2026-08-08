@@ -112,7 +112,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
       {
         label: "Review call",
         value: bookingEvent ? "booked" : "pending",
-        note: bookingEvent ? `${bookingEvent.category} · ${new Date(bookingEvent.happenedAt).toLocaleDateString()}` : "Calendar not held yet"
+        note: bookingEvent ? `${bookingEvent.category} · ${formatTimeStamp(bookingEvent.happenedAt)}` : "Calendar not held yet"
       },
       {
         label: "Commercial",
@@ -215,17 +215,16 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
       return;
     }
 
-    if (channel === "email") {
-      const mailto = new URL(`mailto:${clientEmail || ""}`);
-      mailto.searchParams.set("subject", step.subject);
-      mailto.searchParams.set("body", step.emailBody);
-      window.open(mailto.toString(), "_blank", "noopener,noreferrer");
-      return;
+    const draftText =
+      channel === "email"
+        ? `Subject: ${step.subject}\nTo: ${clientEmail || "n/a"}\n\n${step.emailBody}`
+        : `To: ${clientPhoneDigits || "n/a"}\n\n${step.whatsappBody}`;
+
+    if (typeof navigator !== "undefined" && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(draftText).catch(() => undefined);
     }
 
-    const text = encodeURIComponent(step.whatsappBody);
-    const phoneTarget = clientPhoneDigits ? `https://wa.me/${clientPhoneDigits}?text=${text}` : `https://wa.me/?text=${text}`;
-    window.open(phoneTarget, "_blank", "noopener,noreferrer");
+    setWorkflowMessage(`${channel === "email" ? "Email" : "WhatsApp"} draft prepared for ${step.title}.`);
   }
 
   function sendOutreach(channel: "email" | "whatsapp", step: (typeof outreachSteps)[number]) {
@@ -617,6 +616,9 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
           <strong>Next recommended step</strong>
           <div className="meta" style={{ marginTop: 6 }}>
             {nextRecommendedStep}
+          </div>
+          <div className="meta" style={{ marginTop: 6 }}>
+            {workflowMessage}
           </div>
         </div>
         <div className="list" style={{ marginTop: 14 }}>

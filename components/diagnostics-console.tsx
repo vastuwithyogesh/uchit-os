@@ -26,6 +26,13 @@ type DiagnosticsPayload = {
     timelineReady: boolean;
   };
   counts: Record<string, number>;
+  latestPaymentProofAssets: Array<{
+    key: string;
+    label: string;
+    fileName: string;
+    url: string;
+    uploadedAt: string;
+  }>;
   latestPayments: Array<{
     id: string;
     clientId: string;
@@ -209,6 +216,7 @@ export function DiagnosticsConsole() {
           <span className="pill">Reports {payload?.counts.reportVersions ?? 0}</span>
           <span className="pill">Bookings {payload?.counts.reviewCallBookings ?? 0}</span>
           <span className="pill">Proof checks {payload?.counts.advanceVerifications ?? 0}</span>
+          <span className="pill">Proof uploads {payload?.counts.paymentProofAssets ?? 0}</span>
           <span className="pill">Evaluation snapshots {payload?.counts.evaluationSnapshots ?? 0}</span>
           <span className="pill">Shakti snapshots {payload?.counts.shaktiSnapshots ?? 0}</span>
           <span className="pill">Timeline events {payload?.counts.timelineEvents ?? 0}</span>
@@ -453,6 +461,35 @@ export function DiagnosticsConsole() {
                 <div className="list-item">
                   <strong>No advance checks yet</strong>
                   <span className="meta">Upload a proof screenshot to create one</span>
+                </div>
+              )}
+            </div>
+          </div>
+
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <strong>Latest payment proof uploads</strong>
+                <div className="meta">Advance and balance images uploaded for the commercial lane</div>
+              </div>
+            </div>
+            <div className="list" style={{ marginTop: 12 }}>
+              {payload?.latestPaymentProofAssets.length ? (
+                payload.latestPaymentProofAssets.map((asset) => (
+                  <div key={asset.key} className="list-item">
+                    <strong>{asset.label}</strong>
+                    <span className="meta">
+                      {asset.fileName} · {new Date(asset.uploadedAt).toLocaleString()}
+                    </span>
+                    <a href={asset.url} className="pill" target="_blank" rel="noreferrer">
+                      Open proof
+                    </a>
+                  </div>
+                ))
+              ) : (
+                <div className="list-item">
+                  <strong>No proof uploads yet</strong>
+                  <span className="meta">Upload advance or balance proof to create the record</span>
                 </div>
               )}
             </div>

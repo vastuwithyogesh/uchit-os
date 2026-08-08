@@ -1,5 +1,6 @@
 export function formatTimeStamp(value: string) {
   return new Intl.DateTimeFormat("en-IN", {
+    timeZone: "Asia/Kolkata",
     dateStyle: "medium",
     timeStyle: "short",
     hour12: true
@@ -7,7 +8,7 @@ export function formatTimeStamp(value: string) {
 }
 
 export function formatShortDate(value: string) {
-  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium" }).format(new Date(value));
+  return new Intl.DateTimeFormat("en-IN", { dateStyle: "medium", timeZone: "Asia/Kolkata" }).format(new Date(value));
 }
 
 export function ellipsize(value: string, maxLength = 84) {

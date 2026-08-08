@@ -1,0 +1,1 @@
+function e(e){return new Intl.DateTimeFormat(`en-IN`,{timeZone:`Asia/Kolkata`,dateStyle:`medium`,timeStyle:`short`,hour12:!0}).format(new Date(e))}function t(e){return new Intl.DateTimeFormat(`en-IN`,{dateStyle:`medium`,timeZone:`Asia/Kolkata`}).format(new Date(e))}export{e as n,t};

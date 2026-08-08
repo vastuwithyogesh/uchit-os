@@ -12,9 +12,11 @@ import type {
 } from "@/lib/domain";
 import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
+import { formatTimeStamp } from "@/lib/format";
 import { canApproveReport, canReleaseVerdict } from "@/lib/permissions";
 import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
 import { buildActionHeaders } from "@/lib/request-helpers";
+import { prepareImageUpload } from "@/lib/image-upload";
 
 interface CommercialConsoleProps {
   clients: ClientRecord[];
@@ -120,7 +122,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
       {
         label: "Call booked",
         done: Boolean(activeBooking),
-        note: activeBooking ? `${activeBooking.provider} · ${new Date(activeBooking.scheduledAt).toLocaleString()}` : "Pending review-call booking"
+        note: activeBooking ? `${activeBooking.provider} · ${formatTimeStamp(activeBooking.scheduledAt)}` : "Pending review-call booking"
       },
       {
         label: "Advance verified",
@@ -180,8 +182,10 @@ export function CommercialConsole(props: CommercialConsoleProps) {
 
     setBusy(true);
     try {
+      const prepared = await prepareImageUpload(file);
       const formData = new FormData();
-      formData.append("file", file);
+      formData.append("key", kind === "advance" ? "advance-proof" : "balance-proof");
+      formData.append("file", prepared.file);
       const response = await fetch("/api/payment-proofs", { method: "POST", body: formData });
       const result = await response.json();
       if (!response.ok || result.ok === false) {
@@ -190,11 +194,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
       if (kind === "advance") {
         setProofFileName(result.proof.fileName);
         setProofUrl(result.proof.url);
-        setMessage("Advance proof screenshot uploaded.");
+        setMessage(prepared.compressed ? "Advance proof screenshot uploaded after trimming the file." : "Advance proof screenshot uploaded.");
       } else {
         setBalanceProofFileName(result.proof.fileName);
         setBalanceProofUrl(result.proof.url);
-        setMessage("Balance proof screenshot uploaded.");
+        setMessage(prepared.compressed ? "Balance proof screenshot uploaded after trimming the file." : "Balance proof screenshot uploaded.");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");

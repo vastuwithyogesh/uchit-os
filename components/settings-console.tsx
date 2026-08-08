@@ -101,6 +101,8 @@ export function SettingsConsole() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Load the saved workspace profile to begin.");
   const [testResult, setTestResult] = useState<SettingsTestPayload | null>(null);
+  const configuredCount = Object.values(status).filter(Boolean).length;
+  const trackedCount = Object.keys(status).length;
 
   useEffect(() => {
     void refresh();
@@ -160,6 +162,15 @@ export function SettingsConsole() {
     }
   }
 
+  async function copyEnvBlock() {
+    try {
+      await navigator.clipboard.writeText(envSnippet);
+      setMessage("Env block copied to clipboard");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Copy failed");
+    }
+  }
+
   function updateField<K extends keyof LocalConnectionSettings>(key: K, value: string) {
     setSettings((current) => ({ ...current, [key]: value }));
   }
@@ -172,11 +183,11 @@ export function SettingsConsole() {
         <p className="subtle">These values are saved for this workspace and used when environment variables are not already present.</p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
-            <span className="stat-value">{Object.values(status).filter(Boolean).length}</span>
+            <span className="stat-value">{configuredCount}</span>
             <span className="stat-label">configured values</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{Object.keys(status).length}</span>
+            <span className="stat-value">{trackedCount}</span>
             <span className="stat-label">tracked keys</span>
           </div>
           <div className="stat-card">
@@ -224,6 +235,9 @@ export function SettingsConsole() {
               <button className="button-secondary" type="button" onClick={runTest} disabled={busy}>
                 Test readiness
               </button>
+              <button className="button-secondary" type="button" onClick={copyEnvBlock} disabled={busy}>
+                Copy env block
+              </button>
             </div>
           </div>
 
@@ -269,6 +283,14 @@ export function SettingsConsole() {
                   <strong>Staff roles</strong>
                   <span className={`tag ${testResult.result.staffRoles.configured ? "good" : "warn"}`}>{testResult.result.staffRoles.count} mapped</span>
                   <span className="meta">{testResult.result.staffRoles.error ?? "Server-side role mapping is available."}</span>
+                </div>
+                <div className="list-item">
+                  <strong>Connection profile</strong>
+                  <span className={`tag ${Object.values(testResult.result.connectionProfile.configuredKeys).every(Boolean) ? "good" : "warn"}`}>
+                    {Object.values(testResult.result.connectionProfile.configuredKeys).filter(Boolean).length} /{" "}
+                    {Object.keys(testResult.result.connectionProfile.configuredKeys).length}
+                  </span>
+                  <span className="meta">{testResult.result.connectionProfile.error ?? "Profile is ready to reuse."}</span>
                 </div>
               </div>
             ) : null}

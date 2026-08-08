@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { chartAssetDefinitions, type ChartAssetRecord } from "@/lib/chart-asset-definitions";
+import { prepareImageUpload } from "@/lib/image-upload";
 
 type ChartAssetPayload = {
   assets: ChartAssetRecord[];
@@ -27,10 +28,18 @@ export function ChartUploadBoard() {
   const [payload, setPayload] = useState<ChartAssetPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Upload the team’s chart images here.");
+  const [selectedFiles, setSelectedFiles] = useState<Record<string, File | null>>({});
 
   const assetsByKey = useMemo(
+    () => Object.fromEntries((payload?.assets ?? []).map((asset) => [asset.key, asset])) as Record<string, ChartAssetRecord | undefined>,
+    [payload]
+  );
+
+  const missingLabels = useMemo(
     () =>
-      Object.fromEntries((payload?.assets ?? []).map((asset) => [asset.key, asset])) as Record<string, ChartAssetRecord | undefined>,
+      (payload?.summary.missingKeys ?? chartAssetDefinitions.map((definition) => definition.key)).map(
+        (key) => chartAssetDefinitions.find((definition) => definition.key === key)?.label ?? key
+      ),
     [payload]
   );
 
@@ -48,14 +57,16 @@ export function ChartUploadBoard() {
 
   async function uploadAsset(key: string, file: File | null) {
     if (!file) {
+      setMessage("Choose an image file first.");
       return;
     }
 
     setBusy(true);
     try {
+      const prepared = await prepareImageUpload(file);
       const formData = new FormData();
       formData.append("key", key);
-      formData.append("file", file);
+      formData.append("file", prepared.file);
 
       const response = await fetch("/api/chart-assets", {
         method: "POST",
@@ -67,7 +78,8 @@ export function ChartUploadBoard() {
         throw new Error(result.error ?? "Upload failed");
       }
 
-      setMessage(`Uploaded ${result.asset.label}.`);
+      setSelectedFiles((current) => ({ ...current, [key]: null }));
+      setMessage(prepared.compressed ? `Uploaded ${result.asset.label} after trimming the image.` : `Uploaded ${result.asset.label}.`);
       await refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");
@@ -86,7 +98,7 @@ export function ChartUploadBoard() {
         <div className="eyebrow">Chart uploads</div>
         <h2>Complete the visual chart library for v1 delivery</h2>
         <p className="subtle">
-          These uploads feed the report visuals in v1. The summary below helps us see instantly whether the chart set is complete enough for the team to operate without gaps.
+          These uploads feed the report visuals in v1. The summary below keeps the chart set honest and makes it obvious which images still need to be supplied.
         </p>
 
         <div className="stat-grid" style={{ marginTop: 18 }}>
@@ -115,73 +127,77 @@ export function ChartUploadBoard() {
           </button>
         </div>
 
-        {!payload?.summary.complete ? (
-          <div className="panel" style={{ marginTop: 16 }}>
+        <div className="two-col" style={{ marginTop: 16 }}>
+          <div className="panel">
             <div className="panel-head">
               <div>
-                <strong>Still missing</strong>
-                <div className="meta">These chart slots still need a source visual before the upload set is complete.</div>
+                <strong>Upload checklist</strong>
+                <div className="meta">One image per slot. Replace any chart at any time and the readiness count updates immediately.</div>
               </div>
             </div>
-            <div className="pill-row" style={{ marginTop: 12 }}>
-              {(payload?.summary.missingKeys ?? chartAssetDefinitions.map((definition) => definition.key)).map((key) => (
-                <span key={key} className="pill">
-                  {chartAssetDefinitions.find((definition) => definition.key === key)?.label ?? key}
-                </span>
-              ))}
+            <div className="list" style={{ marginTop: 14 }}>
+              {chartAssetDefinitions.map((definition) => {
+                const asset = assetsByKey[definition.key];
+                const file = selectedFiles[definition.key];
+                return (
+                  <div key={definition.key} className="list-item">
+                    <strong>{definition.label}</strong>
+                    <span className={`tag ${asset ? "good" : "warn"}`}>{asset ? "Uploaded" : "Waiting"}</span>
+                    <span className="meta">{asset ? new Date(asset.uploadedAt).toLocaleString() : "No image on file yet"}</span>
+                    <div className="workflow" style={{ marginTop: 8 }}>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        disabled={busy}
+                        onChange={(event) => setSelectedFiles((current) => ({ ...current, [definition.key]: event.target.files?.[0] ?? null }))}
+                      />
+                      <button
+                        type="button"
+                        className="button-secondary"
+                        disabled={busy || !file}
+                        onClick={() => uploadAsset(definition.key, file ?? null)}
+                      >
+                        {asset ? "Replace image" : "Upload image"}
+                      </button>
+                    </div>
+                    {file ? <span className="pill">Selected: {file.name}</span> : null}
+                  </div>
+                );
+              })}
             </div>
           </div>
-        ) : null}
 
-        <div className="two-col" style={{ marginTop: 16 }}>
-          {chartAssetDefinitions.map((asset) => (
-            <div key={asset.key} className="panel">
-              <div className="panel-head">
-                <div>
-                  <strong>{asset.label}</strong>
-                  <div className="meta">
-                    {assetsByKey[asset.key]?.uploadedAt ? `Uploaded ${new Date(assetsByKey[asset.key]!.uploadedAt).toLocaleString()}` : "Waiting for first upload"}
-                  </div>
-                </div>
-                <span className={`tag ${assetsByKey[asset.key] ? "good" : "warn"}`}>{assetsByKey[asset.key] ? "Ready" : "Pending"}</span>
-              </div>
-
-              {assetsByKey[asset.key]?.url ? (
-                <img
-                  src={assetsByKey[asset.key]!.url}
-                  alt={asset.label}
-                  style={{ width: "100%", marginTop: 12, borderRadius: 16, border: "1px solid var(--line)" }}
-                />
-              ) : (
-                <div
-                  style={{
-                    marginTop: 12,
-                    minHeight: 180,
-                    border: "1px dashed var(--line-strong)",
-                    borderRadius: 16,
-                    display: "grid",
-                    placeItems: "center",
-                    padding: 20,
-                    color: "var(--muted)",
-                    background: "rgba(255,255,255,0.54)",
-                    textAlign: "center"
-                  }}
-                >
-                  No image uploaded yet
-                </div>
-              )}
-
-              <div className="field" style={{ marginTop: 12 }}>
-                <label>Upload image</label>
-                <input
-                  type="file"
-                  accept="image/*"
-                  onChange={(event) => uploadAsset(asset.key, event.target.files?.[0] ?? null)}
-                  disabled={busy}
-                />
+          <div className="panel">
+            <div className="panel-head">
+              <div>
+                <strong>Asset gallery</strong>
+                <div className="meta">Current uploads are shown here so the team can spot gaps quickly.</div>
               </div>
             </div>
-          ))}
+            <div className="list" style={{ marginTop: 14 }}>
+              {chartAssetDefinitions.map((asset) => {
+                const current = assetsByKey[asset.key];
+                return (
+                  <div key={asset.key} className="list-item">
+                    <strong>{asset.label}</strong>
+                    <span className={`tag ${current ? "good" : "warn"}`}>{current ? "Ready" : "Pending"}</span>
+                    <span className="meta">{current ? current.fileName : "No image uploaded yet"}</span>
+                    {current?.url ? (
+                      <a href={current.url} className="pill" target="_blank" rel="noreferrer">
+                        Open image
+                      </a>
+                    ) : null}
+                  </div>
+                );
+              })}
+            </div>
+            <div className="panel" style={{ marginTop: 14 }}>
+              <strong>Still missing</strong>
+              <div className="pill-row" style={{ marginTop: 10 }}>
+                {missingLabels.length ? missingLabels.map((label) => <span key={label} className="pill">{label}</span>) : <span className="pill">Nothing missing</span>}
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="footer-note">{message}</div>

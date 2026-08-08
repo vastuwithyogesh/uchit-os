@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 type StatePayload = {
   state: Record<string, unknown>;
@@ -36,14 +36,15 @@ export function StateConsole() {
   const [payload, setPayload] = useState<StatePayload | null>(null);
   const [message, setMessage] = useState("Load the current state export or import a snapshot.");
   const [busy, setBusy] = useState(false);
-  const [rawState, setRawState] = useState("");
+  const [importText, setImportText] = useState("");
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
 
   async function refresh() {
     setBusy(true);
     try {
       const nextPayload = await fetchState();
       setPayload(nextPayload);
-      setRawState(JSON.stringify(nextPayload.state, null, 2));
+      setImportText(JSON.stringify(nextPayload.state, null, 2));
       setMessage("Current state exported.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
@@ -53,14 +54,15 @@ export function StateConsole() {
   }
 
   async function runImport() {
-    if (!payload) {
-      setMessage("Export the state first.");
+    if (!importText.trim()) {
+      setMessage("Paste a snapshot or load a JSON file first.");
       return;
     }
 
     setBusy(true);
     try {
-      const result = await importState(payload.state);
+      const nextState = JSON.parse(importText) as Record<string, unknown>;
+      const result = await importState(nextState);
       setMessage(result.integrity.ok ? "State imported cleanly." : "State imported with warnings.");
       await refresh();
     } catch (error) {
@@ -68,6 +70,32 @@ export function StateConsole() {
     } finally {
       setBusy(false);
     }
+  }
+
+  function downloadSnapshot() {
+    if (!payload?.state) {
+      setMessage("Export the state first.");
+      return;
+    }
+
+    const blob = new Blob([JSON.stringify(payload.state, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = url;
+    anchor.download = `uchit-vastu-state-${new Date().toISOString().slice(0, 10)}.json`;
+    anchor.click();
+    URL.revokeObjectURL(url);
+    setMessage("Snapshot download started.");
+  }
+
+  async function importFromFile(file?: File | null) {
+    if (!file) {
+      return;
+    }
+
+    const text = await file.text();
+    setImportText(text);
+    setMessage("Snapshot loaded from file. Review it, then restore it.");
   }
 
   useEffect(() => {
@@ -104,14 +132,30 @@ export function StateConsole() {
           <button type="button" className="button" onClick={refresh} disabled={busy}>
             Export current state
           </button>
-          <button type="button" className="button-secondary" onClick={runImport} disabled={busy || !payload}>
-            Re-import current snapshot
+          <button type="button" className="button-secondary" onClick={downloadSnapshot} disabled={busy || !payload}>
+            Download snapshot
+          </button>
+          <button type="button" className="button-secondary" onClick={() => fileInputRef.current?.click()} disabled={busy}>
+            Load JSON file
+          </button>
+          <button type="button" className="button-secondary" onClick={runImport} disabled={busy || !importText.trim()}>
+            Restore snapshot
           </button>
         </div>
         <div className="field" style={{ marginTop: 16 }}>
           <label>Snapshot JSON</label>
-          <textarea readOnly value={rawState} rows={18} />
+          <textarea value={importText} onChange={(event) => setImportText(event.target.value)} rows={18} />
         </div>
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept="application/json"
+          style={{ display: "none" }}
+          onChange={(event) => {
+            void importFromFile(event.target.files?.[0]);
+            event.currentTarget.value = "";
+          }}
+        />
       </div>
 
       <div className="card span-4">

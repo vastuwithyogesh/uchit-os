@@ -1,6 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { UtilityRule } from "@/lib/domain";
+import { utilityRules as seedUtilityRules } from "@/lib/seed";
 
 function parseCsvLine(line: string) {
   const values: string[] = [];
@@ -57,15 +58,34 @@ export function parseUtilityRulesCsv(csvText: string): UtilityRule[] {
 }
 
 export async function readResidentialUtilityRules() {
-  const filePath = join(process.cwd(), "data", "residential-tab.csv");
-  const csvText = await readFile(filePath, "utf8");
-  return parseUtilityRulesCsv(csvText);
+  const candidatePaths = [
+    join(process.cwd(), "data", "residential-tab.csv"),
+    join(process.cwd(), "outputs", "uchit-vastu", "data", "residential-tab.csv")
+  ];
+
+  for (const filePath of candidatePaths) {
+    try {
+      const csvText = await readFile(filePath, "utf8");
+      const parsedRules = parseUtilityRulesCsv(csvText);
+      if (parsedRules.length > 0) {
+        return parsedRules;
+      }
+    } catch {
+      // Try the next location before falling back to the seeded master table.
+    }
+  }
+
+  return structuredClone(seedUtilityRules);
 }
 
 export function groupUtilityRulesByVerdict(rules: UtilityRule[]) {
   return rules.reduce<Record<UtilityRule["verdict"], UtilityRule[]>>(
     (groups, rule) => {
-      groups[rule.verdict].push(rule);
+      if (rule.verdict === "GOOD" || rule.verdict === "BAD" || rule.verdict === "OK-OK") {
+        groups[rule.verdict].push(rule);
+      } else {
+        groups["OK-OK"].push(rule);
+      }
       return groups;
     },
     { GOOD: [], BAD: [], "OK-OK": [] }
