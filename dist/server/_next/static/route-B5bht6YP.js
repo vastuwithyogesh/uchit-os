@@ -1,0 +1,1 @@
+import{n as e}from"./server-C94AHUq9.js";import{t}from"./persistence-DDBKIgDv.js";import{r as n}from"./workflows-sgBtKVLp.js";async function r(){let r=await t(),i=n(r.timelineEvents);return e.json({events:i,countsByClient:r.clients.map(e=>({clientId:e.id,clientName:e.displayName,totalEvents:i.filter(t=>t.clientId===e.id).length})),totalEvents:i.length})}export{r as GET};

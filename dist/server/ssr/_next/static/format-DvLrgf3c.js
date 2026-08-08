@@ -1,0 +1,1 @@
+function e(e){return new Intl.DateTimeFormat(`en-IN`,{dateStyle:`medium`,timeStyle:`short`,hour12:!0}).format(new Date(e))}export{e as t};

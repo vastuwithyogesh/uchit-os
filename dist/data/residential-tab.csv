@@ -1,4 +1,0 @@
-tabName,zoneCode,description,verdict,confidence
-Residential,Z01,Main door opens into an auspicious circulation line,GOOD,92
-Residential,Z02,Kitchen sits under a conflict axis and needs correction,BAD,81
-Residential,Z03,Storage and utility alignment is acceptable but not ideal,OK-OK,74

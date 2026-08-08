@@ -9,7 +9,7 @@ const serverWrapperPath = join(distDir, "server", "index.js");
 const prismaSourceDir = join(projectDir, "node_modules", ".prisma");
 const prismaClientSourceDir = join(projectDir, "node_modules", "@prisma", "client");
 
-const topLevelExcludes = new Set(["dist", "node_modules", ".git", ".next", "site-archive.tar.gz"]);
+const topLevelExcludes = new Set(["dist", "node_modules", ".git", ".next", "site-archive.tar", "site-archive.tar.gz"]);
 
 async function copyIfExists(source, destination, options = {}) {
   try {
@@ -60,7 +60,7 @@ async function main() {
     await cp(join(projectDir, entry.name), join(distDir, entry.name), { recursive: true });
   }
 
-  await run("pnpm.cmd", ["install", "--prod", "--ignore-scripts", "--frozen-lockfile"], distDir);
+  await run("pnpm.cmd", ["install", "--prod", "--ignore-scripts", "--no-frozen-lockfile", "--node-linker=hoisted"], distDir);
   await copyIfExists(prismaSourceDir, join(distDir, "node_modules", ".prisma"), { dereference: true });
   await copyIfExists(prismaClientSourceDir, join(distDir, "node_modules", "@prisma", "client"), { dereference: true });
 

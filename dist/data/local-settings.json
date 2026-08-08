@@ -1,8 +1,0 @@
-{
-  "databaseUrl": "",
-  "directUrl": "",
-  "supabaseUrl": "",
-  "supabaseAnonKey": "",
-  "supabaseServiceRoleKey": "",
-  "appUrl": "http://localhost:3000"
-}

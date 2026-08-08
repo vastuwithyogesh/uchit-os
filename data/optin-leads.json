@@ -24,10 +24,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -55,10 +55,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -86,10 +86,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -117,10 +117,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -148,10 +148,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -179,10 +179,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -210,10 +210,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -241,10 +241,10 @@
     "notes": "",
     "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 2,
-    "duplicateCount": 1,
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 4,
+    "duplicateCount": 3,
     "isReturningLead": true
   },
   {
@@ -270,13 +270,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307119_1",
@@ -301,13 +301,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307119_2",
@@ -332,13 +332,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307119_3",
@@ -363,13 +363,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_5",
@@ -394,13 +394,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_7",
@@ -425,13 +425,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_10",
@@ -456,13 +456,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_11",
@@ -487,13 +487,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_12",
@@ -518,13 +518,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_13",
@@ -549,13 +549,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_14",
@@ -580,13 +580,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_15",
@@ -611,13 +611,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_16",
@@ -642,13 +642,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_17",
@@ -673,13 +673,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_19",
@@ -704,13 +704,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_20",
@@ -735,13 +735,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_21",
@@ -766,13 +766,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_22",
@@ -797,13 +797,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_23",
@@ -828,13 +828,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_24",
@@ -859,13 +859,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_25",
@@ -890,13 +890,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_26",
@@ -921,13 +921,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_27",
@@ -952,13 +952,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_28",
@@ -983,13 +983,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_29",
@@ -1014,13 +1014,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_30",
@@ -1045,13 +1045,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_31",
@@ -1076,13 +1076,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_32",
@@ -1107,13 +1107,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_34",
@@ -1138,13 +1138,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_36",
@@ -1169,13 +1169,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_37",
@@ -1200,13 +1200,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_38",
@@ -1231,13 +1231,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_39",
@@ -1262,13 +1262,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_40",
@@ -1293,13 +1293,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_41",
@@ -1324,13 +1324,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_42",
@@ -1355,13 +1355,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_43",
@@ -1386,13 +1386,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_44",
@@ -1417,13 +1417,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_45",
@@ -1448,13 +1448,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_46",
@@ -1479,13 +1479,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307120_47",
@@ -1510,13 +1510,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_48",
@@ -1541,13 +1541,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_49",
@@ -1572,13 +1572,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_50",
@@ -1603,13 +1603,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_52",
@@ -1634,13 +1634,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_53",
@@ -1665,13 +1665,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_54",
@@ -1696,13 +1696,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_55",
@@ -1727,13 +1727,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_56",
@@ -1758,13 +1758,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_59",
@@ -1789,13 +1789,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_60",
@@ -1820,13 +1820,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_61",
@@ -1851,13 +1851,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_62",
@@ -1882,13 +1882,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_63",
@@ -1913,13 +1913,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_64",
@@ -1944,13 +1944,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_65",
@@ -1975,13 +1975,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_66",
@@ -2006,13 +2006,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_67",
@@ -2037,13 +2037,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_68",
@@ -2068,13 +2068,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_69",
@@ -2099,13 +2099,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_70",
@@ -2130,13 +2130,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_71",
@@ -2161,13 +2161,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_73",
@@ -2192,13 +2192,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_74",
@@ -2223,13 +2223,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_75",
@@ -2254,13 +2254,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_76",
@@ -2285,13 +2285,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_77",
@@ -2316,13 +2316,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_78",
@@ -2347,13 +2347,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_81",
@@ -2378,13 +2378,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_82",
@@ -2409,13 +2409,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_83",
@@ -2440,13 +2440,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_84",
@@ -2471,13 +2471,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_85",
@@ -2502,13 +2502,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_86",
@@ -2533,13 +2533,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_87",
@@ -2564,13 +2564,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_88",
@@ -2595,13 +2595,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_89",
@@ -2626,13 +2626,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_90",
@@ -2657,13 +2657,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_91",
@@ -2688,13 +2688,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_92",
@@ -2719,13 +2719,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_93",
@@ -2750,13 +2750,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_94",
@@ -2781,13 +2781,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_95",
@@ -2812,13 +2812,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_98",
@@ -2843,13 +2843,13 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   },
   {
     "id": "inbound_1786177307121_99",
@@ -2874,12 +2874,12 @@
     "score": 60,
     "message": "",
     "notes": "",
-    "status": "NEW",
+    "status": "DUPLICATE",
     "importedAt": "2026-08-08T08:21:47.119Z",
-    "firstSeenAt": "2026-08-08T08:21:47.119Z",
-    "lastSeenAt": "2026-08-08T08:21:47.119Z",
-    "submissionCount": 1,
-    "duplicateCount": 0,
-    "isReturningLead": false
+    "firstSeenAt": "2026-08-08",
+    "lastSeenAt": "2026-08-08",
+    "submissionCount": 2,
+    "duplicateCount": 1,
+    "isReturningLead": true
   }
 ]
