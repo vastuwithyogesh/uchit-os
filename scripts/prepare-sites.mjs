@@ -5,7 +5,7 @@ const projectDir = process.cwd();
 const distDir = join(projectDir, "dist");
 const serverWrapperPath = join(distDir, "server", "index.js");
 
-const topLevelExcludes = new Set(["dist", "node_modules", ".git"]);
+const topLevelExcludes = new Set(["dist", "node_modules", ".git", "site-archive.tar.gz"]);
 
 async function main() {
   await rm(distDir, { recursive: true, force: true });

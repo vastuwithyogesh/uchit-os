@@ -58,7 +58,7 @@ export function IntegrityConsole() {
           <span className="pill">Status {payload?.ok ? "OK" : "Needs attention"}</span>
           <span className="pill">Issues {payload?.issueCount ?? 0}</span>
           <span className="pill">Reports {payload?.counts.reportVersions ?? 0}</span>
-          <span className="pill">Snapshots {payload?.counts.evaluationSnapshots ?? 0 + (payload?.counts.shaktiSnapshots ?? 0)}</span>
+          <span className="pill">Snapshots {(payload?.counts.evaluationSnapshots ?? 0) + (payload?.counts.shaktiSnapshots ?? 0)}</span>
         </div>
         <div className="list" style={{ marginTop: 16 }}>
           {payload?.issues.map((issue, index) => (

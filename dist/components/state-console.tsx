@@ -101,6 +101,8 @@ export function StateConsole() {
         <h2>Integrity and counts</h2>
         <div className="pill-row" style={{ marginTop: 14 }}>
           <span className="pill">Clients {payload?.counts.clients ?? 0}</span>
+          <span className="pill">Bookings {payload?.counts.reviewCallBookings ?? 0}</span>
+          <span className="pill">Proof checks {payload?.counts.advanceVerifications ?? 0}</span>
           <span className="pill">Cases {payload?.counts.vastuCases ?? 0}</span>
           <span className="pill">Reports {payload?.counts.reportVersions ?? 0}</span>
           <span className="pill">Issues {payload?.integrity.issues.length ?? 0}</span>

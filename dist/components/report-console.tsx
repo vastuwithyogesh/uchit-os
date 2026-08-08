@@ -4,7 +4,7 @@ import { useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
 import { canApproveReport, canReleaseVerdict } from "@/lib/permissions";
-import { canReleaseOfficialVerdict, isPreviewWatermarked, formatMoney } from "@/lib/workflows";
+import { isPreviewWatermarked, formatMoney } from "@/lib/workflows";
 
 async function fetchState() {
   const response = await fetch("/api/bootstrap", { cache: "no-store" });
@@ -44,7 +44,14 @@ export function ReportConsole() {
   const approvalCount = currentReport?.approvals?.length ?? 0;
   const canApproveCurrentReport = Boolean(currentReport) && canApproveReport(activeUser);
   const balancePayment = state?.payments?.find((payment) => payment.caseId === currentCase?.id && payment.type === "BALANCE");
-  const verdictReadyByState = Boolean(currentCase && currentReport && currentCase.balanceApproved && currentCase.fullPaymentApproved && balancePayment?.status === "APPROVED" && approvalCount >= 2);
+  const verdictReadyByState = Boolean(
+    currentCase &&
+      currentReport &&
+      currentCase.balanceApproved &&
+      currentCase.fullPaymentApproved &&
+      balancePayment?.status === "APPROVED" &&
+      approvalCount >= 2
+  );
   const canReleaseCurrentVerdict = Boolean(currentReport) && canReleaseVerdict(activeUser) && verdictReadyByState;
   const watermarkActive = Boolean(currentReport && isPreviewWatermarked(currentReport));
   const blockerReasons = [
@@ -120,11 +127,11 @@ export function ReportConsole() {
             <label>Client</label>
             <select value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)}>
               {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.displayName}
-              </option>
-            ))}
-          </select>
+                <option key={client.id} value={client.id}>
+                  {client.displayName}
+                </option>
+              ))}
+            </select>
           </div>
           <div className="workflow" style={{ marginTop: 14 }}>
             <button
@@ -187,6 +194,10 @@ export function ReportConsole() {
               <div className="list-item">
                 <strong>Preview state</strong>
                 <span className="meta">{currentReport ? (watermarkActive ? "Watermarked preview" : "Official report") : "No report selected"}</span>
+              </div>
+              <div className="list-item">
+                <strong>Approval gate</strong>
+                <span className="meta">{approvalCount >= 2 ? "Two approvals recorded" : "Waiting on a second approval"}</span>
               </div>
               <div className="list-item">
                 <strong>Approval count</strong>
