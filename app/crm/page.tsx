@@ -65,7 +65,11 @@ export default async function CrmPage() {
         </div>
       </section>
 
-      <LeadInboxConsole leadQualifications={state.leadQualifications} />
+      <LeadInboxConsole
+        leadQualifications={state.leadQualifications}
+        proposals={state.commercialProposals}
+        reviewCallBookings={state.reviewCallBookings}
+      />
 
       <CrmWorkbench
         clients={state.clients}

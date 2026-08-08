@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useSession } from "@/components/session-provider";
+import type { CommercialProposalRecord, InboundLeadRecord, LeadQualificationRecord, ReviewCallBookingRecord } from "@/lib/domain";
 import { canTriggerDeliverables } from "@/lib/permissions";
 import { buildActionHeaders } from "@/lib/request-helpers";
-import type { InboundLeadRecord, LeadQualificationRecord } from "@/lib/domain";
 
 type LeadInboxPayload = {
   leads: InboundLeadRecord[];
@@ -54,13 +54,73 @@ function formatLeadDate(value: string) {
   return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleDateString();
 }
 
-export function LeadInboxConsole({ leadQualifications }: { leadQualifications: LeadQualificationRecord[] }) {
+function getLeadNextAction(input: {
+  lead: InboundLeadRecord;
+  qualification?: LeadQualificationRecord;
+  proposal?: CommercialProposalRecord;
+  booking?: ReviewCallBookingRecord;
+}) {
+  const { lead, qualification, proposal, booking } = input;
+
+  if (lead.status === "QUALIFIED") {
+    if (!qualification) {
+      return { label: "Check qualification record", tone: "warn" as const };
+    }
+    if (!proposal) {
+      return { label: "Create proposal next", tone: "good" as const };
+    }
+    if (!booking) {
+      return { label: "Book review call", tone: "good" as const };
+    }
+    if (booking.status === "BOOKED") {
+      return { label: "Review call booked", tone: "neutral" as const };
+    }
+    return { label: "Continue CRM handoff", tone: "neutral" as const };
+  }
+
+  if (lead.status === "DUPLICATE") {
+    return { label: "Check existing client history", tone: "warn" as const };
+  }
+
+  if (lead.status === "FILTERED") {
+    return { label: "Hold for later follow-up", tone: "neutral" as const };
+  }
+
+  if (lead.status === "DISQUALIFIED") {
+    return { label: "Closed for now", tone: "bad" as const };
+  }
+
+  if (lead.isReturningLead) {
+    return { label: "Review refill quickly", tone: "warn" as const };
+  }
+
+  if (lead.score >= 80) {
+    return { label: "Qualify now", tone: "good" as const };
+  }
+
+  if (lead.score >= 60) {
+    return { label: "Review and filter", tone: "warn" as const };
+  }
+
+  return { label: "Filter or disqualify", tone: "bad" as const };
+}
+
+export function LeadInboxConsole({
+  leadQualifications,
+  proposals,
+  reviewCallBookings
+}: {
+  leadQualifications: LeadQualificationRecord[];
+  proposals: CommercialProposalRecord[];
+  reviewCallBookings: ReviewCallBookingRecord[];
+}) {
   const { activeUser } = useSession();
   const [payload, setPayload] = useState<LeadInboxPayload | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Upload the CSV export from your website dashboard.");
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<InboundLeadRecord["status"] | "ALL">("ALL");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<string[]>([]);
 
   async function refresh() {
     setBusy(true);
@@ -123,6 +183,28 @@ export function LeadInboxConsole({ leadQualifications }: { leadQualifications: L
     }
   }
 
+  async function runBulkAction(actionLabel: string, operation: (leadId: string) => Promise<void>) {
+    if (!selectedLeadIds.length) {
+      setMessage("Select at least one lead first.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      for (const leadId of selectedLeadIds) {
+        await operation(leadId);
+      }
+      const processedCount = selectedLeadIds.length;
+      setSelectedLeadIds([]);
+      setMessage(`${actionLabel} completed for ${processedCount} lead${processedCount === 1 ? "" : "s"}.`);
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : `${actionLabel} failed`);
+    } finally {
+      setBusy(false);
+    }
+  }
+
   const visibleLeads = useMemo(() => {
     const leads = payload?.leads ?? [];
     return leads.filter((lead) => {
@@ -139,6 +221,19 @@ export function LeadInboxConsole({ leadQualifications }: { leadQualifications: L
   }, [payload, query, statusFilter]);
 
   const returningLeadCount = useMemo(() => (payload?.leads ?? []).filter((lead) => lead.isReturningLead).length, [payload]);
+  const hotLeadCount = useMemo(() => visibleLeads.filter((lead) => lead.status === "NEW" && lead.score >= 80).length, [visibleLeads]);
+  const selectedVisibleCount = useMemo(
+    () => visibleLeads.filter((lead) => selectedLeadIds.includes(lead.id)).length,
+    [selectedLeadIds, visibleLeads]
+  );
+
+  function toggleLeadSelection(leadId: string, checked: boolean) {
+    setSelectedLeadIds((current) => (checked ? Array.from(new Set([...current, leadId])) : current.filter((id) => id !== leadId)));
+  }
+
+  function selectVisibleLeads() {
+    setSelectedLeadIds(Array.from(new Set(visibleLeads.map((lead) => lead.id))));
+  }
 
   useEffect(() => {
     refresh().catch(() => undefined);
@@ -169,12 +264,69 @@ export function LeadInboxConsole({ leadQualifications }: { leadQualifications: L
             <span className="stat-value">{returningLeadCount}</span>
             <span className="stat-label">returning submissions</span>
           </div>
+          <div className="stat-card">
+            <span className="stat-value">{hotLeadCount}</span>
+            <span className="stat-label">high-priority new leads</span>
+          </div>
         </div>
         <div className="workflow" style={{ marginTop: 14 }}>
           <input type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => uploadCsv(event.target.files?.[0] ?? null)} />
           <button type="button" className="button-secondary" disabled={busy} onClick={refresh}>
             Refresh inbox
           </button>
+        </div>
+        <div className="panel" style={{ marginTop: 14 }}>
+          <div className="panel-head">
+            <div>
+              <strong>Bulk queue actions</strong>
+              <div className="meta">Filter the queue, select the visible set, and process the batch in one pass.</div>
+            </div>
+            <span className="pill">Selected {selectedVisibleCount}</span>
+          </div>
+          <div className="workflow" style={{ marginTop: 12 }}>
+            <button type="button" className="button-secondary" disabled={busy || !visibleLeads.length} onClick={selectVisibleLeads}>
+              Select visible
+            </button>
+            <button type="button" className="button-secondary" disabled={busy || !selectedLeadIds.length} onClick={() => setSelectedLeadIds([])}>
+              Clear selection
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={busy || !canTriggerDeliverables(activeUser) || !selectedLeadIds.length}
+              onClick={() =>
+                runBulkAction("Bulk qualify", async (leadId) => {
+                  await postAction({ action: "lead-qualify", leadId }, activeUser.role);
+                }).catch(() => undefined)
+              }
+            >
+              Bulk qualify
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={busy || !canTriggerDeliverables(activeUser) || !selectedLeadIds.length}
+              onClick={() =>
+                runBulkAction("Bulk filter", async (leadId) => {
+                  await postAction({ action: "lead-status-set", leadId, status: "FILTERED" }, activeUser.role);
+                }).catch(() => undefined)
+              }
+            >
+              Bulk filter
+            </button>
+            <button
+              type="button"
+              className="button-secondary"
+              disabled={busy || !canTriggerDeliverables(activeUser) || !selectedLeadIds.length}
+              onClick={() =>
+                runBulkAction("Bulk disqualify", async (leadId) => {
+                  await postAction({ action: "lead-status-set", leadId, status: "DISQUALIFIED" }, activeUser.role);
+                }).catch(() => undefined)
+              }
+            >
+              Bulk disqualify
+            </button>
+          </div>
         </div>
         <div className="pill-row" style={{ marginTop: 14 }}>
           <span className="pill">Total {payload?.counts.total ?? 0}</span>
@@ -207,18 +359,36 @@ export function LeadInboxConsole({ leadQualifications }: { leadQualifications: L
         <div className="list" style={{ marginTop: 16 }}>
           {visibleLeads.map((lead) => {
             const qualification = leadQualifications.find((item) => item.clientId === lead.convertedClientId);
+            const proposal = proposals.find((item) => item.clientId === lead.convertedClientId);
+            const booking = reviewCallBookings.find((item) => item.clientId === lead.convertedClientId);
+            const nextAction = getLeadNextAction({ lead, qualification, proposal, booking });
+
             return (
               <div key={lead.id} className="panel">
                 <div className="panel-head">
-                  <div>
-                    <strong>{lead.fullName}</strong>
-                    <div className="meta">
-                      {lead.email} · {lead.phone} · {lead.city}
+                  <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
+                    <input
+                      type="checkbox"
+                      aria-label={`Select ${lead.fullName}`}
+                      checked={selectedLeadIds.includes(lead.id)}
+                      onChange={(event) => toggleLeadSelection(lead.id, event.target.checked)}
+                      disabled={busy}
+                    />
+                    <div>
+                      <strong>{lead.fullName}</strong>
+                      <div className="meta">
+                        {lead.email} · {lead.phone} · {lead.city}
+                      </div>
                     </div>
                   </div>
-                  <span className={`tag ${lead.status === "QUALIFIED" ? "good" : lead.status === "FILTERED" ? "warn" : lead.status === "DISQUALIFIED" ? "bad" : "neutral"}`}>
-                    {lead.status}
-                  </span>
+                  <div style={{ display: "flex", gap: 8, flexWrap: "wrap", justifyContent: "flex-end" }}>
+                    <span className={`tag ${nextAction.tone === "good" ? "good" : nextAction.tone === "bad" ? "bad" : nextAction.tone === "warn" ? "warn" : "neutral"}`}>
+                      {nextAction.label}
+                    </span>
+                    <span className={`tag ${lead.status === "QUALIFIED" ? "good" : lead.status === "FILTERED" ? "warn" : lead.status === "DISQUALIFIED" ? "bad" : "neutral"}`}>
+                      {lead.status}
+                    </span>
+                  </div>
                 </div>
                 <div className="pill-row" style={{ marginTop: 10 }}>
                   <span className="pill">Score {lead.score}</span>
@@ -230,6 +400,8 @@ export function LeadInboxConsole({ leadQualifications }: { leadQualifications: L
                   <span className="pill">Duplicates {lead.duplicateCount}</span>
                   <span className="pill">{lead.isReturningLead ? "Returning lead" : "First-time lead"}</span>
                   <span className="pill">{qualification ? `Converted to ${qualification.clientId}` : "Not yet converted"}</span>
+                  <span className="pill">{proposal ? `Proposal ${proposal.status}` : "No proposal yet"}</span>
+                  <span className="pill">{booking ? `Review call ${booking.status}` : "No review call yet"}</span>
                 </div>
                 <p className="subtle" style={{ marginTop: 10 }}>
                   {lead.message || lead.notes || "No lead note supplied."}
