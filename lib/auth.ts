@@ -36,6 +36,8 @@ export function getUserByRole(role: UserRole) {
   return users.find((user) => user.role === role) ?? users[0];
 }
 
+const initialOwnerEmails = new Set(["iyogesh2020@gmail.com"]);
+
 function resolveAuthenticatedDisplayName(headers: Headers, fallback: string) {
   const fullNameHeader = headers.get("oai-authenticated-user-full-name");
 
@@ -144,7 +146,7 @@ export async function resolveRequestActor(headers: Headers, demoRole?: string | 
       return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);
     }
 
-    if (authenticatedEmail && !(await hasStoredStaffRoleAssignments())) {
+    if (authenticatedEmail && initialOwnerEmails.has(authenticatedEmail) && !(await hasStoredStaffRoleAssignments())) {
       await upsertStaffRoleAssignment({
         email: authenticatedEmail,
         role: "SUPER_ADMIN",

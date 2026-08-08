@@ -1,1 +1,0 @@
-import{_ as e,r as t}from"./auth-Dm3JGFs8.js";import{n}from"./server-DdCr_ZVJ.js";async function r(r){let i=await t(r.headers),a=new URL(r.url).hostname===`localhost`;return n.json({ok:!0,actor:i,availableUsers:a?e:[i],isLocalDemo:a})}export{r as GET};
