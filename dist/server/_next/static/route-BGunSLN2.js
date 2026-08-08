@@ -1,1 +1,0 @@
-import{_ as e,r as t}from"./auth-0YZ6roOX.js";import{n}from"./server-8frZIRGT.js";async function r(r){let i=await t(r.headers),a=new URL(r.url).hostname===`localhost`;return n.json({ok:!0,actor:i,availableUsers:a?e:[i],isLocalDemo:a})}export{r as GET};

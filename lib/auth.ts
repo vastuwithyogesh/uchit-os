@@ -146,7 +146,7 @@ export async function resolveRequestActor(headers: Headers, demoRole?: string | 
       return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);
     }
 
-    if (authenticatedEmail && initialOwnerEmails.has(authenticatedEmail) && !(await hasStoredStaffRoleAssignments())) {
+    if (authenticatedEmail && initialOwnerEmails.has(authenticatedEmail)) {
       await upsertStaffRoleAssignment({
         email: authenticatedEmail,
         role: "SUPER_ADMIN",
