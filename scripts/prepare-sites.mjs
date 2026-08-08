@@ -5,7 +5,18 @@ const projectDir = process.cwd();
 const distDir = join(projectDir, "dist");
 const serverWrapperPath = join(distDir, "server", "index.js");
 
-const topLevelExcludes = new Set(["dist", "node_modules", ".git", "site-archive.tar.gz"]);
+const topLevelExcludes = new Set(["dist", "node_modules", ".git", ".next", "site-archive.tar.gz"]);
+
+async function copyIfExists(source, destination, options = {}) {
+  try {
+    await cp(source, destination, { recursive: true, ...options });
+  } catch (error) {
+    if (error && typeof error === "object" && "code" in error && error.code === "ENOENT") {
+      return;
+    }
+    throw error;
+  }
+}
 
 async function main() {
   await rm(distDir, { recursive: true, force: true });
@@ -19,6 +30,8 @@ async function main() {
 
     await cp(join(projectDir, entry.name), join(distDir, entry.name), { recursive: true });
   }
+
+  await copyIfExists(join(projectDir, "node_modules"), join(distDir, "node_modules"), { dereference: true });
 
   await mkdir(join(distDir, "server"), { recursive: true });
   await writeFile(
