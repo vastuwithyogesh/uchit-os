@@ -1,0 +1,298 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum UserRole {
+  CLIENT
+  SETTER
+  CONSULTANT
+  ADMIN
+  SUPER_ADMIN
+}
+
+enum LeadStage {
+  NEW
+  QUALIFYING
+  QUALIFIED
+  DISQUALIFIED
+  CONVERTED
+}
+
+enum CommercialProposalStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+}
+
+enum PaymentType {
+  ADVANCE
+  BALANCE
+  ADDON
+}
+
+enum PaymentStatus {
+  PENDING
+  APPROVED
+  FAILED
+  REFUNDED
+}
+
+enum VastuCaseStatus {
+  AWAITING_ADVANCE
+  CASE_CREATED
+  FLOOR_WORKSPACE_ACTIVE
+  ORIENTATION_LOCKED
+  STAGE_A_READY
+  BALANCE_PENDING
+  FULL_PAYMENT_APPROVED
+  REPORT_APPROVAL_PENDING
+  REPORT_APPROVED
+  VERDICT_RELEASED
+  RECTIFICATION
+}
+
+enum FloorStatus {
+  DRAFT
+  NEEDS_REGENERATION
+  READY_FOR_REVIEW
+  LOCKED
+}
+
+enum ReportStatus {
+  DRAFT
+  PREVIEW_BLOCKED
+  PAYMENT_BLOCKED
+  READY_FOR_APPROVAL
+  APPROVED
+  RELEASED
+}
+
+model User {
+  id        String   @id @default(cuid())
+  email     String   @unique
+  fullName  String
+  role      UserRole
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  assignedClients Client[] @relation("ClientAssignedSetter")
+  proposalsReviewed CommercialProposal[] @relation("ProposalReviewedBy")
+  reportApprovals ReportApproval[] @relation("ReportApprovedBy")
+}
+
+model Client {
+  id              String   @id @default(cuid())
+  displayName     String
+  email           String?
+  phone           String?
+  city           String?
+  source         String?
+  assignedSetterId String?
+  assignedSetter  User?    @relation("ClientAssignedSetter", fields: [assignedSetterId], references: [id])
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  leadQualifications LeadQualification[]
+  commercialProposals CommercialProposal[]
+  payments          Payment[]
+  vastuCases        VastuCase[]
+  timelineEvents    ClientTimelineEvent[]
+  whatsappLogs      WhatsAppTemplateLog[]
+}
+
+model LeadQualification {
+  id               String    @id @default(cuid())
+  clientId         String
+  client           Client    @relation(fields: [clientId], references: [id])
+  stage            LeadStage
+  score            Int
+  notes            String    @db.Text
+  conversationalForm Json?
+  qualificationCallDueAt DateTime?
+  qualificationCallCompletedAt DateTime?
+  deliverableTriggeredAt DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+}
+
+model CommercialProposal {
+  id                 String   @id @default(cuid())
+  clientId           String
+  client             Client   @relation(fields: [clientId], references: [id])
+  amountInr          Int      @default(51000)
+  minAdvanceInr      Int      @default(11000)
+  status             CommercialProposalStatus @default(DRAFT)
+  reviewerId         String?
+  reviewer           User?    @relation("ProposalReviewedBy", fields: [reviewerId], references: [id])
+  superAdminApprovedAt DateTime?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+  payments           Payment[] @relation("ProposalPayments")
+  vastuCase          VastuCase? @relation("ProposalCase")
+}
+
+model Payment {
+  id              String       @id @default(cuid())
+  clientId        String
+  client          Client       @relation(fields: [clientId], references: [id])
+  proposalId      String?
+  proposal        CommercialProposal? @relation("ProposalPayments", fields: [proposalId], references: [id])
+  caseId          String?
+  vastuCase       VastuCase?   @relation("CasePayments", fields: [caseId], references: [id])
+  type            PaymentType
+  amountInr       Int
+  status          PaymentStatus @default(PENDING)
+  approvedAt      DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+}
+
+model VastuCase {
+  id               String        @id @default(cuid())
+  caseNumber       String        @unique
+  clientId         String
+  client           Client        @relation(fields: [clientId], references: [id])
+  proposalId       String?       @unique
+  proposal         CommercialProposal? @relation("ProposalCase", fields: [proposalId], references: [id])
+  status           VastuCaseStatus
+  reportStatus     ReportStatus  @default(DRAFT)
+  orientationLocked Boolean      @default(false)
+  balanceApproved   Boolean      @default(false)
+  fullPaymentApproved Boolean    @default(false)
+  createdAt        DateTime      @default(now())
+  updatedAt        DateTime      @updatedAt
+
+  floorWorkspaces   FloorWorkspace[]
+  reportVersions    ReportVersion[]
+  evaluationSnapshots EvaluationSnapshot[]
+  shaktiSnapshots   ShaktiSnapshot[]
+  payments          Payment[]     @relation("CasePayments")
+}
+
+model FloorWorkspace {
+  id               String      @id @default(cuid())
+  caseId           String
+  vastuCase        VastuCase   @relation(fields: [caseId], references: [id])
+  floorLabel       String
+  status           FloorStatus @default(DRAFT)
+  locked           Boolean     @default(false)
+  regenerationReason String?
+  evidenceUploads  String[]
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+}
+
+model ReportVersion {
+  id               String      @id @default(cuid())
+  caseId           String
+  vastuCase        VastuCase   @relation(fields: [caseId], references: [id])
+  versionLabel     String
+  isPreview        Boolean     @default(false)
+  status           ReportStatus
+  watermarkText    String?
+  createdAt        DateTime    @default(now())
+  approvedAt       DateTime?
+  approvals        ReportApproval[]
+}
+
+model ReportApproval {
+  id               String      @id @default(cuid())
+  reportVersionId  String
+  reportVersion    ReportVersion @relation(fields: [reportVersionId], references: [id])
+  approverId       String
+  approver         User        @relation("ReportApprovedBy", fields: [approverId], references: [id])
+  createdAt        DateTime    @default(now())
+}
+
+model EvaluationSnapshot {
+  id               String      @id @default(cuid())
+  caseId           String
+  vastuCase        VastuCase   @relation(fields: [caseId], references: [id])
+  snapshotName     String
+  sourceVersion    String
+  generatedMatrix  Json
+  createdAt        DateTime    @default(now())
+}
+
+model Mapping32D {
+  id               String      @id @default(cuid())
+  code             String      @unique
+  label            String
+  element          String
+  direction        String
+  weight           Int
+}
+
+model Mapping16D {
+  id               String      @id @default(cuid())
+  code             String      @unique
+  label            String
+  pairCode         String
+  weight           Int
+}
+
+model UtilityRule {
+  id               String      @id @default(cuid())
+  tabName          String
+  zoneCode         String
+  description      String
+  verdict          String
+  confidence       Int
+  sourceCsvRow     Int
+  createdAt        DateTime    @default(now())
+
+  @@unique([tabName, zoneCode])
+}
+
+model ShaktiSnapshot {
+  id               String      @id @default(cuid())
+  caseId           String
+  vastuCase        VastuCase   @relation(fields: [caseId], references: [id])
+  inputValues      Json
+  elementAverages  Json
+  rankedVerdicts   Json
+  tieBreakUsed     Boolean     @default(false)
+  createdAt        DateTime    @default(now())
+}
+
+model ClientTimelineEvent {
+  id               String      @id @default(cuid())
+  clientId         String
+  client           Client      @relation(fields: [clientId], references: [id])
+  category         String
+  headline         String
+  details          String      @db.Text
+  happenedAt       DateTime
+  actorRole        UserRole?
+  createdAt        DateTime    @default(now())
+}
+
+model WhatsAppTemplate {
+  id               String      @id @default(cuid())
+  slug             String      @unique
+  title            String
+  category         String
+  body             String      @db.Text
+  variables        Json
+  active           Boolean     @default(true)
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  logs             WhatsAppTemplateLog[]
+}
+
+model WhatsAppTemplateLog {
+  id               String      @id @default(cuid())
+  clientId         String
+  client           Client      @relation(fields: [clientId], references: [id])
+  templateId       String
+  template         WhatsAppTemplate @relation(fields: [templateId], references: [id])
+  recipientPhone   String
+  status           String
+  sentAt           DateTime    @default(now())
+}
