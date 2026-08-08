@@ -2,18 +2,18 @@
 
 import { useMemo, useState } from "react";
 import {
-  AppUser,
   ClientRecord,
   CommercialProposalRecord,
   FloorWorkspaceRecord,
   LeadQualificationRecord,
   PaymentRecord,
   ReportVersionRecord,
+  UserRole,
   UtilityRule,
   VastuCaseRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { users } from "@/lib/seed";
+import { useSession } from "@/components/session-provider";
 import {
   DEFAULT_PROPOSAL_AMOUNT_INR,
   MIN_ADVANCE_INR,
@@ -28,6 +28,7 @@ import {
   rankShakti
 } from "@/lib/workflows";
 import { formatTimeStamp } from "@/lib/format";
+import { buildActionHeaders } from "@/lib/request-helpers";
 
 interface CrmWorkbenchProps {
   clients: ClientRecord[];
@@ -51,8 +52,9 @@ interface CrmWorkbenchProps {
 
 export function CrmWorkbench(props: CrmWorkbenchProps) {
   const { clients, leads, proposals, payments, cases, floors, reports, utilityRules, templates, timeline } = props;
+  const { activeUser, availableUsers, isLocalDemo } = useSession();
   const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id ?? "");
-  const [selectedRole, setSelectedRole] = useState<AppUser["role"]>("SUPER_ADMIN");
+  const [selectedRole, setSelectedRole] = useState<UserRole>("SUPER_ADMIN");
   const [conversationStep, setConversationStep] = useState(0);
   const [intakeQuestionIndex, setIntakeQuestionIndex] = useState(0);
   const [intakeAnswers, setIntakeAnswers] = useState([
@@ -68,6 +70,8 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
   const [workflowMessage, setWorkflowMessage] = useState("Use the commercial gate actions to move the case forward.");
   const [busy, setBusy] = useState(false);
   const [manualInputs, setManualInputs] = useState<number[]>([9, 8, 8, 7, 6, 9, 8, 7, 6, 7, 8, 9, 8, 7, 6, 8]);
+  const actorRole = isLocalDemo ? selectedRole : activeUser.role;
+  const actingUser = isLocalDemo ? availableUsers.find((user) => user.role === selectedRole) ?? activeUser : activeUser;
 
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const activeLead = leads.find((lead) => lead.clientId === activeClient?.id) ?? leads[0];
@@ -280,10 +284,10 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
     try {
       const response = await fetch("/api/actions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildActionHeaders(isLocalDemo ? selectedRole : undefined),
         body: JSON.stringify({
           action: "lead",
-          actorRole: selectedRole,
+          actorRole: isLocalDemo ? selectedRole : undefined,
           clientId: activeClient.id,
           score: intakeScore,
           notes: intakeNotes,
@@ -317,11 +321,11 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
     try {
       const response = await fetch("/api/actions", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: buildActionHeaders(isLocalDemo ? selectedRole : undefined),
         body: JSON.stringify({
           ...action,
           clientId: activeClient.id,
-          actorRole: selectedRole
+          actorRole: isLocalDemo ? selectedRole : undefined
         })
       });
 
@@ -458,17 +462,32 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
 
           <div className="panel">
             <div className="field">
-              <label>Setter role view</label>
-              <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as AppUser["role"])}>
-                {users.map((user) => (
-                  <option key={user.role} value={user.role}>
-                    {user.role}
-                  </option>
-                ))}
-              </select>
+              <label>{isLocalDemo ? "Setter role view" : "Signed-in actor"}</label>
+              {isLocalDemo ? (
+                <select value={selectedRole} onChange={(event) => setSelectedRole(event.target.value as UserRole)}>
+                  {availableUsers.map((user) => (
+                    <option key={user.role} value={user.role}>
+                      {user.role}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <div className="panel" style={{ marginTop: 8 }}>
+                  <strong>{actingUser.fullName}</strong>
+                  <div className="meta">
+                    {actingUser.role} · {actingUser.email}
+                  </div>
+                </div>
+              )}
             </div>
             <p className="subtle" style={{ marginTop: 12 }}>
-              {describeApprovalPath({ id: "demo", fullName: "Demo", email: "demo@example.com", role: selectedRole, color: "#000" })}
+              {describeApprovalPath({
+                id: actingUser.id,
+                fullName: actingUser.fullName,
+                email: actingUser.email,
+                role: actorRole,
+                color: actingUser.color
+              })}
             </p>
             <div className="workflow" style={{ marginTop: 12 }}>
               <button type="button" className="button-secondary" onClick={() => setConversationStep((step) => Math.max(0, step - 1))}>
@@ -512,7 +531,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
           </div>
           <div className="list-item">
             <strong>Commercial approval</strong>
-            <span className={`tag ${selectedRole === "SUPER_ADMIN" ? "good" : "warn"}`}>{selectedRole === "SUPER_ADMIN" ? "Allowed" : "Blocked"}</span>
+            <span className={`tag ${actorRole === "SUPER_ADMIN" ? "good" : "warn"}`}>{actorRole === "SUPER_ADMIN" ? "Allowed" : "Blocked"}</span>
           </div>
         </div>
       </section>
