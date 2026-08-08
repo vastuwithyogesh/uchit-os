@@ -183,6 +183,50 @@ export function LeadInboxConsole({
     }
   }
 
+  async function createProposalForLead(lead: InboundLeadRecord) {
+    const clientId = lead.convertedClientId ?? lead.uniqueClientId;
+    setBusy(true);
+    try {
+      await postAction({ action: "proposal-create", clientId, amountInr: 51000 }, activeUser.role);
+      setMessage(`Proposal created for ${lead.fullName}.`);
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Proposal creation failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function bookReviewCallForLead(lead: InboundLeadRecord) {
+    const clientId = lead.convertedClientId ?? lead.uniqueClientId;
+    const proposal = proposals.find((item) => item.clientId === clientId);
+    if (!proposal) {
+      setMessage("Create the proposal first so the review call can be booked.");
+      return;
+    }
+
+    setBusy(true);
+    try {
+      await postAction(
+        {
+          action: "review-call-book",
+          clientId,
+          proposalId: proposal.id,
+          provider: "GOOGLE_MEET",
+          scheduledAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(),
+          durationMinutes: 30
+        },
+        activeUser.role
+      );
+      setMessage(`Review call booked for ${lead.fullName}.`);
+      await refresh();
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Review call booking failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
   async function runBulkAction(actionLabel: string, operation: (leadId: string) => Promise<void>) {
     if (!selectedLeadIds.length) {
       setMessage("Select at least one lead first.");
@@ -441,6 +485,24 @@ export function LeadInboxConsole({
                     onClick={() => setLeadStatus(lead.id, "NEW", "reset to new")}
                   >
                     Reset to new
+                  </button>
+                </div>
+                <div className="workflow" style={{ marginTop: 10 }}>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    disabled={busy || !canTriggerDeliverables(activeUser) || Boolean(proposals.find((item) => item.clientId === (lead.convertedClientId ?? lead.uniqueClientId)))}
+                    onClick={() => createProposalForLead(lead)}
+                  >
+                    Create proposal
+                  </button>
+                  <button
+                    type="button"
+                    className="button-secondary"
+                    disabled={busy || !canTriggerDeliverables(activeUser) || !proposals.find((item) => item.clientId === (lead.convertedClientId ?? lead.uniqueClientId))}
+                    onClick={() => bookReviewCallForLead(lead)}
+                  >
+                    Book review call
                   </button>
                 </div>
               </div>
