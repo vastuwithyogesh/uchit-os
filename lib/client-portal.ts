@@ -1,6 +1,7 @@
 import type { AppUser, ClientRecord, VastuCaseStatus } from "@/lib/domain";
 import type { AppState } from "@/lib/store";
 import { getActiveCaseForClient } from "@/lib/service-framework";
+import { getClientSafeDeliveryMilestones } from "@/lib/workflow-service";
 
 export class ClientAccountUnlinkedError extends Error {
   readonly code = "CLIENT_ACCOUNT_UNLINKED";
@@ -100,6 +101,7 @@ export function buildClientPortalView(state: AppState, actor: AppUser) {
           ? `/api/client/reports/${encodeURIComponent(item.id)}`
           : null
       })),
+    deliveryMilestones: currentCase ? getClientSafeDeliveryMilestones(state, currentCase.id) : [],
     timeline: state.timelineEvents
       .filter((item) => item.clientId === client.id)
       .sort((a, b) => new Date(b.happenedAt).getTime() - new Date(a.happenedAt).getTime())

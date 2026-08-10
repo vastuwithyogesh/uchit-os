@@ -12,7 +12,7 @@ function fixture() {
     commercialProposals: [], reviewCallBookings: [], payments: [], advanceVerifications: [],
     vastuCases: [{ id: "case-1", caseNumber: "UV-1", clientId: "client-1", proposalId: "proposal-1", status: "ORIENTATION_LOCKED", reportStatus: "DRAFT", orientationLocked: true, balanceApproved: false, fullPaymentApproved: false, serviceType: "EXISTING_SPACE", canonicalStage: "EVALUATE", serviceTemplateVersion: "uchit-service/v2", scopeVersion: "scope/v1", currentDrawing: { versionLabel: "Plan A", verifiedAt: "2026-01-01", superseded: false } }],
     floorWorkspaces: [{ id: "floor-1", caseId: "case-1", floorLabel: "Ground floor", status: "LOCKED", locked: true, evidenceUploads: ["plan.png"] }],
-    assessmentObservations: [], recommendations: [], implementationTasks: [], caseDocuments: [],
+    assessmentObservations: [], recommendations: [], implementationTasks: [], caseDocuments: [], deliveryMilestones: [],
     reportVersions: [],
     evaluationSnapshots: [{ id: "eval-1", caseId: "case-1", snapshotName: "Evaluation", sourceVersion: "rules/v1", generatedMatrix: [{ code: "N", verdict: "GOOD", confidence: 90 }] }],
     mapping32D: [], mapping16D: [], utilityRules: [], shaktiSnapshots: [], timelineEvents: [], optInLeads: [], whatsappTemplates: [], whatsappLogs: []
@@ -40,6 +40,29 @@ test("v2 report integrity fails closed when any rendered mutable input changes",
     if (mutate === mutations[3]) isolated.vastuCases[0].currentDrawing.versionLabel = "Plan B";
     assert.equal(await artifactStillMatches(isolated, isolatedReport), false);
   }
+});
+
+test("v2 freezes only completed pre-delivery summaries and ignores post-delivery operations", async () => {
+  const state = fixture();
+  const report = { id: "report-v2-delivery", caseId: "case-1", versionLabel: "Final", isPreview: false, status: "READY_FOR_APPROVAL", approvals: [] };
+  const audit = { actorId: "internal-actor", actorName: "Internal owner", actorRole: "CONSULTANT", at: "2026-01-02T00:00:00.000Z" };
+  state.vastuCases[0].serviceType = "NEW_CONSTRUCTION";
+  state.deliveryMilestones.push({ id: "delivery-pre", caseId: "case-1", caseRevisionNumber: 1, serviceType: "NEW_CONSTRUCTION", kind: "REVIEW_ROUND", sequence: 1, roundLabel: "Design review", title: "Plan coordinated", status: "COMPLETED", completedAt: "2026-01-02T00:00:00.000Z", ownerRole: "ARCHITECT", ownerName: "Internal owner", drawingRef: { caseDocumentId: "private-doc-id", version: 2 }, observationSummary: "Rooms coordinated.", actionSummary: "Use plan version 2.", reason: "PRIVATE REASON", blocker: false, evidenceRefs: ["case-file-private"], idempotencyKey: "private-key", version: 1, created: audit, updated: audit });
+  state.deliveryMilestones.push({ ...state.deliveryMilestones[0], id: "delivery-post", kind: "CONSTRUCTION_CHECKPOINT", title: "Site follow-up", status: "BLOCKED", reason: "PRIVATE SITE NOTE", sequence: 1 });
+  const baseline = await sha256Hex(canonicalReportPayload(state, report));
+  const serialized = JSON.stringify(canonicalReportPayload(state, report));
+  assert.match(serialized, /Plan coordinated/);
+  assert.match(serialized, /Rooms coordinated/);
+  assert.doesNotMatch(serialized, /PRIVATE REASON|PRIVATE SITE NOTE|case-file-private|private-key|internal-actor|Internal owner|private-doc-id|Site follow-up/);
+  const html = renderPrintableReport(state, report);
+  assert.match(html, /Completed pre-delivery reviews/);
+  assert.match(html, /Plan coordinated/);
+  assert.doesNotMatch(html, /PRIVATE REASON|PRIVATE SITE NOTE|case-file-private|Internal owner|Site follow-up/);
+  state.deliveryMilestones[1].status = "COMPLETED";
+  state.deliveryMilestones[1].title = "Changed after delivery";
+  assert.equal(await sha256Hex(canonicalReportPayload(state, report)), baseline);
+  state.deliveryMilestones[0].actionSummary = "Changed frozen summary";
+  assert.notEqual(await sha256Hex(canonicalReportPayload(state, report)), baseline);
 });
 
 test("v2 includes only verified current document summaries and no private document metadata", async () => {

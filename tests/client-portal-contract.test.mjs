@@ -17,6 +17,7 @@ test("portal projection returns no payment proof bytes or internal evaluation de
   assert.doesNotMatch(projection, /referenceScreenshot|generatedMatrix|inputValues|approvalEvidence/);
   assert.match(projection, /item\.clientId === client\.id/);
   assert.match(projection, /item\.status === "RELEASED"/);
+  assert.match(projection, /deliveryMilestones: currentCase \? getClientSafeDeliveryMilestones/);
 });
 
 test("client report route checks ownership, release state and immutable integrity", () => {

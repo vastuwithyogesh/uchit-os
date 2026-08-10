@@ -17,7 +17,7 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { alignmentStatuses, attentionClasses, canonicalServiceStages, caseDocumentTypes, decisionPriorities, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
+import { alignmentStatuses, attentionClasses, canonicalServiceStages, caseDocumentTypes, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { MIN_ADVANCE_INR, DEFAULT_PROPOSAL_AMOUNT_INR, canCreateCase, generateUtilityEvaluation, lockWorkspace, qualifyLead, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
@@ -36,7 +36,7 @@ import {
 } from "@/lib/evaluation-provenance";
 import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
-import { assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
+import { assertCaseFileEvidenceRefs, assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -88,13 +88,13 @@ function boundedRefs(value: unknown, label: string) {
   return refs;
 }
 
-function assessmentContext(caseIdValue: unknown) {
+function assessmentContext(caseIdValue: unknown, allowArtifact = false) {
   const state = getAppState();
   const caseId = boundedRequiredString(caseIdValue, "Case ID");
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) throw new Error("Case not found.");
   if (getActiveCaseForClient(state, caseRecord.clientId)?.id !== caseId) throw new WorkflowConflictError("This is not the active case revision. Open the latest revision before recording assessment work.");
-  if (state.reportVersions.some((item) => item.caseId === caseId && item.artifact)) throw new WorkflowConflictError("Assessment work is locked by an immutable report. Start formal rectification to continue.");
+  if (!allowArtifact && state.reportVersions.some((item) => item.caseId === caseId && item.artifact)) throw new WorkflowConflictError("Assessment work is locked by an immutable report. Start formal rectification to continue.");
   return { state, caseRecord, caseId, serviceType: normalizeCaseService(caseRecord).serviceType, revisionNumber: caseRecord.revisionNumber ?? 1 };
 }
 
@@ -180,6 +180,75 @@ export async function upsertCaseDocument(input: Record<string, unknown> & { acto
   caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, existing ? "Case document review updated" : "Case document received", `${input.actor.fullName} recorded ${assetType} ${versionLabel} as ${revisionStatus}.`, "Documents", input.actor);
   return next;
+}
+
+const milestoneKindsByService: Record<VastuServiceType, readonly DeliveryMilestoneKind[]> = {
+  NEW_CONSTRUCTION: ["REVIEW_ROUND", "FINAL_COMPLIANCE_CHECK", "CONSTRUCTION_CHECKPOINT"],
+  EXISTING_SPACE: ["CLARIFICATION", "FOLLOW_UP", "OPTIONAL_VERIFICATION"]
+};
+const preDeliveryMilestoneKinds = new Set<DeliveryMilestoneKind>(["REVIEW_ROUND", "FINAL_COMPLIANCE_CHECK"]);
+const drawingReviewKinds = new Set<DeliveryMilestoneKind>(["REVIEW_ROUND", "FINAL_COMPLIANCE_CHECK", "CONSTRUCTION_CHECKPOINT"]);
+
+function optionalMilestoneDate(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 40 || Number.isNaN(Date.parse(value))) throw new Error(`${label} must be a valid date.`);
+  return new Date(value).toISOString();
+}
+
+export async function upsertDeliveryMilestone(input: Record<string, unknown> & { actor: AppUser }) {
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId, true);
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.deliveryMilestones.find((item) => item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.idempotencyKey === idempotencyKey);
+  if (retry) return retry;
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Delivery milestone ID");
+  const existing = recordId ? state.deliveryMilestones.find((item) => item.id === recordId && item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType) : undefined;
+  if (recordId && !existing) throw new Error("Delivery milestone not found on this case revision.");
+  const kind = enumValue(input.kind, deliveryMilestoneKinds, "delivery milestone kind") as DeliveryMilestoneKind;
+  if (!milestoneKindsByService[serviceType].includes(kind)) throw new Error("This milestone kind does not belong to the active case service.");
+  if (preDeliveryMilestoneKinds.has(kind) && state.reportVersions.some((item) => item.caseId === caseId && item.artifact)) throw new WorkflowConflictError("Pre-delivery reviews are frozen by the immutable report. Use an allowed post-delivery checkpoint or formal rectification.");
+  if (!Number.isInteger(input.sequence) || Number(input.sequence) < 1 || Number(input.sequence) > 1000) throw new Error("Sequence must be a whole number from 1 to 1000.");
+  const sequence = Number(input.sequence);
+  if (state.deliveryMilestones.some((item) => item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.id !== existing?.id && item.kind === kind && item.sequence === sequence)) throw new WorkflowConflictError("That sequence already exists for this milestone kind.");
+  const status = enumValue(input.status, deliveryMilestoneStatuses, "delivery milestone status") as DeliveryMilestoneStatus;
+  const reason = input.reason === undefined || input.reason === "" ? undefined : boundedRequiredString(input.reason, "Milestone reason", 1000);
+  if ((status === "BLOCKED" || status === "DEFERRED") && !reason) throw new Error(`${status === "BLOCKED" ? "Blocked" : "Deferred"} milestones require a reason.`);
+  if (status === "COMPLETED" && state.deliveryMilestones.some((item) => item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.kind === kind && item.id !== existing?.id && item.sequence < sequence && item.status !== "COMPLETED" && item.status !== "DEFERRED")) throw new WorkflowConflictError("Complete or defer earlier milestones of this kind before completing this sequence.");
+  const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references");
+  if (existing && existing.evidenceRefs.some((reference) => !evidenceRefs.includes(reference))) throw new WorkflowConflictError("Milestone evidence is immutable and append-only; existing references cannot be removed or replaced.");
+  if (status === "COMPLETED" && evidenceRefs.length === 0) throw new Error("Completed milestones require protected evidence.");
+  await assertCaseFileEvidenceRefs(evidenceRefs, { caseId, caseRevisionNumber: revisionNumber, serviceType });
+  let drawingRef: { caseDocumentId: string; version: number } | undefined;
+  if (input.drawingRef !== undefined && input.drawingRef !== null) {
+    if (typeof input.drawingRef !== "object" || Array.isArray(input.drawingRef)) throw new Error("Drawing reference must identify a case document and version.");
+    const value = input.drawingRef as Record<string, unknown>;
+    if (Object.keys(value).some((key) => !["caseDocumentId", "version"].includes(key))) throw new Error("Unknown drawing reference field.");
+    const caseDocumentId = boundedRequiredString(value.caseDocumentId, "Drawing document ID");
+    if (!Number.isInteger(value.version) || Number(value.version) < 1) throw new Error("Drawing document version must be a positive whole number.");
+    const document = state.caseDocuments.find((item) => item.id === caseDocumentId && item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType);
+    if (!document || document.version !== value.version || document.assetType !== "ARCHITECTURAL_DRAWING" || !document.isCurrent || document.revisionStatus !== "VERIFIED" || !document.verified || document.blocker || document.discrepancy) throw new WorkflowConflictError("Drawing reference must be the current verified architectural drawing without blockers or discrepancies.");
+    drawingRef = { caseDocumentId, version: Number(value.version) };
+  }
+  if (serviceType === "NEW_CONSTRUCTION" && drawingReviewKinds.has(kind) && !drawingRef) throw new Error("New-construction reviews and checkpoints require the current verified drawing reference.");
+  const stamp = audit(input.actor);
+  const next = { id: existing?.id ?? nextId("delivery"), caseId, caseRevisionNumber: revisionNumber, serviceType, kind, sequence, roundLabel: boundedRequiredString(input.roundLabel, "Round label", 120), title: boundedRequiredString(input.title, "Milestone title", 180), status, dueDate: optionalMilestoneDate(input.dueDate, "Due date"), completedAt: status === "COMPLETED" ? (existing?.completedAt ?? stamp.at) : undefined, ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), drawingRef, observationSummary: input.observationSummary === undefined || input.observationSummary === "" ? undefined : boundedRequiredString(input.observationSummary, "Observation summary", 2000), actionSummary: input.actionSummary === undefined || input.actionSummary === "" ? undefined : boundedRequiredString(input.actionSummary, "Action summary", 2000), reason, blocker: status === "BLOCKED", evidenceRefs, idempotencyKey, version: (existing?.version ?? 0) + 1, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, next); else state.deliveryMilestones.unshift(next);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, existing ? "Delivery milestone updated" : "Delivery milestone planned", `${input.actor.fullName} recorded ${next.title} as ${status}; next owner ${next.ownerName}.`, "Delivery", input.actor);
+  return next;
+}
+
+export function getClientSafeDeliveryMilestones(state: ReturnType<typeof getAppState>, caseId: string) {
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) return [];
+  const revisionNumber = caseRecord.revisionNumber ?? 1;
+  const serviceType = normalizeCaseService(caseRecord).serviceType;
+  return state.deliveryMilestones.filter((item) => item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && !preDeliveryMilestoneKinds.has(item.kind)).map((item) => ({
+    title: item.title,
+    status: item.status,
+    dueDate: item.dueDate,
+    nextStep: item.status === "COMPLETED" ? "This checkpoint is complete." : item.status === "BLOCKED" ? "Our team will contact you when the next step is ready." : item.status === "DEFERRED" ? "This checkpoint is paused until it is needed." : "Our team is working on this checkpoint."
+  })).sort((left, right) => (left.dueDate ?? "").localeCompare(right.dueDate ?? "") || left.title.localeCompare(right.title));
 }
 
 export function configureCaseService(input: {

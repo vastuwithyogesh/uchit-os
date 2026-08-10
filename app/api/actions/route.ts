@@ -43,6 +43,7 @@ import {
   upsertRecommendation,
   upsertImplementationTask,
   upsertCaseDocument,
+  upsertDeliveryMilestone,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -58,7 +59,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert"]);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert"]);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
       "assessment-recommendation-upsert": ["recordId", "title", "rationale", "recommendedAction", "decisionPriority", "attentionClass", "implementationHorizon", "level", "observationIds", "evidenceRefs"],
       "assessment-implementation-upsert": ["recordId", "recommendationId", "title", "notes", "status", "implementationHorizon", "ownerRole", "ownerName", "evidenceRefs"]
       ,"case-document-upsert": ["recordId", "assetType", "floorLabel", "versionLabel", "documentDate", "isCurrent", "evidenceRef", "discrepancy", "blocker", "reviewObservation", "requiredChange", "preferredAlternative", "acceptableAlternative", "ownerRole", "ownerName", "revisionStatus"]
+      ,"delivery-milestone-upsert": ["recordId", "kind", "sequence", "roundLabel", "title", "status", "dueDate", "ownerRole", "ownerName", "drawingRef", "observationSummary", "actionSummary", "reason", "evidenceRefs"]
     };
     if (assessmentAllowedFields[action]) {
       const allowed = new Set(["action", "actorRole", "caseId", "idempotencyKey", "expectedRecordVersion", "expectedRevision", ...assessmentAllowedFields[action]]);
@@ -234,6 +236,10 @@ export async function POST(request: Request) {
       case "case-document-upsert":
         if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record and verify case documents.");
         response = { ok: true, document: await upsertCaseDocument({ ...body, actor }) };
+        break;
+      case "delivery-milestone-upsert":
+        if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can manage service delivery milestones.");
+        response = { ok: true, milestone: await upsertDeliveryMilestone({ ...body, actor }) };
         break;
       case "floor-create":
         if (!canEditFloorWorkspaces(actor)) {

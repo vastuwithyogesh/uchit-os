@@ -9,8 +9,8 @@
       "_record-BdkTR7AP.js"
     ]
   },
-  "_app-rsc-cache-busting-O4kumS-v.js": {
-    "file": "_next/static/chunks/app-rsc-cache-busting-O4kumS-v.js",
+  "_app-rsc-cache-busting-CbcBecia.js": {
+    "file": "_next/static/chunks/app-rsc-cache-busting-CbcBecia.js",
     "name": "app-rsc-cache-busting",
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
@@ -99,7 +99,7 @@
     "name": "workflows"
   },
   "components/admin-console.tsx": {
-    "file": "_next/static/chunks/admin-console-CgCVITAY.js",
+    "file": "_next/static/chunks/admin-console-CBhiQWsC.js",
     "name": "admin-console",
     "src": "components/admin-console.tsx",
     "isDynamicEntry": true,
@@ -112,7 +112,7 @@
     ]
   },
   "components/assessment-action-plan.tsx": {
-    "file": "_next/static/chunks/assessment-action-plan-DLsgJIst.js",
+    "file": "_next/static/chunks/assessment-action-plan-D2_aInnp.js",
     "name": "assessment-action-plan",
     "src": "components/assessment-action-plan.tsx",
     "isDynamicEntry": true,
@@ -125,7 +125,7 @@
     ]
   },
   "components/bootstrap-console.tsx": {
-    "file": "_next/static/chunks/bootstrap-console-BKWrrCyl.js",
+    "file": "_next/static/chunks/bootstrap-console-BYvm8h9a.js",
     "name": "bootstrap-console",
     "src": "components/bootstrap-console.tsx",
     "isDynamicEntry": true,
@@ -136,7 +136,7 @@
     ]
   },
   "components/case-master-console.tsx": {
-    "file": "_next/static/chunks/case-master-console-Di5Y4_PK.js",
+    "file": "_next/static/chunks/case-master-console-Dx3ez0E2.js",
     "name": "case-master-console",
     "src": "components/case-master-console.tsx",
     "isDynamicEntry": true,
@@ -149,7 +149,7 @@
     ]
   },
   "components/case-workspace.tsx": {
-    "file": "_next/static/chunks/case-workspace-BX7OYjQq.js",
+    "file": "_next/static/chunks/case-workspace-BP4KPQC6.js",
     "name": "case-workspace",
     "src": "components/case-workspace.tsx",
     "isDynamicEntry": true,
@@ -191,7 +191,7 @@
     ]
   },
   "components/commercial-console.tsx": {
-    "file": "_next/static/chunks/commercial-console-Cshedr5A.js",
+    "file": "_next/static/chunks/commercial-console-CR40ooNT.js",
     "name": "commercial-console",
     "src": "components/commercial-console.tsx",
     "isDynamicEntry": true,
@@ -208,7 +208,7 @@
     ]
   },
   "components/crm-workbench.tsx": {
-    "file": "_next/static/chunks/crm-workbench-BybSpA8b.js",
+    "file": "_next/static/chunks/crm-workbench-BmL6BK6B.js",
     "name": "crm-workbench",
     "src": "components/crm-workbench.tsx",
     "isDynamicEntry": true,
@@ -222,8 +222,21 @@
       "_framework-BaE7mD_r.js"
     ]
   },
+  "components/delivery-console.tsx": {
+    "file": "_next/static/chunks/delivery-console-Bi3uN1pM.js",
+    "name": "delivery-console",
+    "src": "components/delivery-console.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-C60lm6uB.js",
+      "components/session-provider.tsx",
+      "_request-helpers-BzARIuTP.js",
+      "_service-framework-D11CNl0A.js",
+      "_framework-BaE7mD_r.js"
+    ]
+  },
   "components/diagnostics-console.tsx": {
-    "file": "_next/static/chunks/diagnostics-console-C9G6f7sj.js",
+    "file": "_next/static/chunks/diagnostics-console-Bn3D8e6h.js",
     "name": "diagnostics-console",
     "src": "components/diagnostics-console.tsx",
     "isDynamicEntry": true,
@@ -235,7 +248,7 @@
     ]
   },
   "components/evaluation-console.tsx": {
-    "file": "_next/static/chunks/evaluation-console-Duf_Fw6x.js",
+    "file": "_next/static/chunks/evaluation-console-BhLV2FMb.js",
     "name": "evaluation-console",
     "src": "components/evaluation-console.tsx",
     "isDynamicEntry": true,
@@ -249,7 +262,7 @@
     ]
   },
   "components/files-drawings-console.tsx": {
-    "file": "_next/static/chunks/files-drawings-console-Jett9psd.js",
+    "file": "_next/static/chunks/files-drawings-console-CRIpQXOr.js",
     "name": "files-drawings-console",
     "src": "components/files-drawings-console.tsx",
     "isDynamicEntry": true,
@@ -262,7 +275,7 @@
     ]
   },
   "components/integrity-console.tsx": {
-    "file": "_next/static/chunks/integrity-console-CGn6jvwD.js",
+    "file": "_next/static/chunks/integrity-console-DA6Kutdw.js",
     "name": "integrity-console",
     "src": "components/integrity-console.tsx",
     "isDynamicEntry": true,
@@ -272,7 +285,7 @@
     ]
   },
   "components/lead-inbox-console.tsx": {
-    "file": "_next/static/chunks/lead-inbox-console-B_TcHnip.js",
+    "file": "_next/static/chunks/lead-inbox-console-DoufKDjm.js",
     "name": "lead-inbox-console",
     "src": "components/lead-inbox-console.tsx",
     "isDynamicEntry": true,
@@ -286,7 +299,7 @@
     ]
   },
   "components/payment-proof-console.tsx": {
-    "file": "_next/static/chunks/payment-proof-console-Cx8ZL2sH.js",
+    "file": "_next/static/chunks/payment-proof-console-DFh0lZi4.js",
     "name": "payment-proof-console",
     "src": "components/payment-proof-console.tsx",
     "isDynamicEntry": true,
@@ -297,7 +310,7 @@
     ]
   },
   "components/report-console.tsx": {
-    "file": "_next/static/chunks/report-console-CZJsAlGJ.js",
+    "file": "_next/static/chunks/report-console-CxRhecK_.js",
     "name": "report-console",
     "src": "components/report-console.tsx",
     "isDynamicEntry": true,
@@ -312,7 +325,7 @@
     ]
   },
   "components/session-provider.tsx": {
-    "file": "_next/static/chunks/session-provider-FisFdDSW.js",
+    "file": "_next/static/chunks/session-provider-DLxiRIKl.js",
     "name": "session-provider",
     "src": "components/session-provider.tsx",
     "isDynamicEntry": true,
@@ -322,7 +335,7 @@
     ]
   },
   "components/settings-console.tsx": {
-    "file": "_next/static/chunks/settings-console-BSUI3eWH.js",
+    "file": "_next/static/chunks/settings-console-DsCCD102.js",
     "name": "settings-console",
     "src": "components/settings-console.tsx",
     "isDynamicEntry": true,
@@ -333,7 +346,7 @@
     ]
   },
   "components/site-header.tsx": {
-    "file": "_next/static/chunks/site-header-Bm5VY5Fn.js",
+    "file": "_next/static/chunks/site-header-CaNf82no.js",
     "name": "site-header",
     "src": "components/site-header.tsx",
     "isDynamicEntry": true,
@@ -345,7 +358,7 @@
     ]
   },
   "components/state-console.tsx": {
-    "file": "_next/static/chunks/state-console-BJyE6Dqq.js",
+    "file": "_next/static/chunks/state-console-CxTMzuRH.js",
     "name": "state-console",
     "src": "components/state-console.tsx",
     "isDynamicEntry": true,
@@ -355,7 +368,7 @@
     ]
   },
   "components/timeline-console.tsx": {
-    "file": "_next/static/chunks/timeline-console-Bi86-n89.js",
+    "file": "_next/static/chunks/timeline-console-DD3l-XVN.js",
     "name": "timeline-console",
     "src": "components/timeline-console.tsx",
     "isDynamicEntry": true,
@@ -366,7 +379,7 @@
     ]
   },
   "components/workflow-console.tsx": {
-    "file": "_next/static/chunks/workflow-console-txh8fAid.js",
+    "file": "_next/static/chunks/workflow-console-C5SXEAT_.js",
     "name": "workflow-console",
     "src": "components/workflow-console.tsx",
     "isDynamicEntry": true,
@@ -381,7 +394,7 @@
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js": {
-    "file": "_next/static/chunks/hybrid-client-route-owner-Cyl3Fpme.js",
+    "file": "_next/static/chunks/hybrid-client-route-owner-C34Iglqn.js",
     "name": "hybrid-client-route-owner",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js",
     "isDynamicEntry": true,
@@ -392,7 +405,7 @@
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "_next/static/chunks/layout-segment-context-Bcza7zss.js",
+    "file": "_next/static/chunks/layout-segment-context-gg9Yx46p.js",
     "name": "layout-segment-context",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -404,7 +417,7 @@
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js": {
-    "file": "_next/static/chunks/link-DGiyN4Ps.js",
+    "file": "_next/static/chunks/link-CE88ql8o.js",
     "name": "link",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -421,13 +434,13 @@
       "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js",
       "virtual:vinext-app-browser-entry",
       "_app-elements-Drg5O4vw.js",
-      "_app-rsc-cache-busting-O4kumS-v.js",
+      "_app-rsc-cache-busting-CbcBecia.js",
       "_app-rsc-render-mode-IDJu5NEE.js",
       "_headers-CeAbe3am.js"
     ]
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "_next/static/chunks/index-CpnwEkpn.js",
+    "file": "_next/static/chunks/index-DVJ0I5Fa.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
@@ -435,7 +448,7 @@
       "_rolldown-runtime-C60lm6uB.js",
       "_framework-BaE7mD_r.js",
       "_app-elements-Drg5O4vw.js",
-      "_app-rsc-cache-busting-O4kumS-v.js",
+      "_app-rsc-cache-busting-CbcBecia.js",
       "_headers-CeAbe3am.js",
       "_navigation-errors-wvgRKjB-.js",
       "_hash-D0ldriCF.js",
@@ -452,6 +465,7 @@
       "components/admin-console.tsx",
       "virtual:vinext-app-browser-entry",
       "components/assessment-action-plan.tsx",
+      "components/delivery-console.tsx",
       "components/workflow-console.tsx",
       "components/evaluation-console.tsx",
       "components/diagnostics-console.tsx",

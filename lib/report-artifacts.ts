@@ -75,6 +75,25 @@ export function buildVerifiedDocumentComposition(state: AppState, caseRecord: Ap
   });
 }
 
+export function buildPreDeliveryMilestoneComposition(state: AppState, caseRecord: AppState["vastuCases"][number] | undefined) {
+  if (!caseRecord) return [];
+  const revisionNumber = caseRecord.revisionNumber ?? 1;
+  const serviceType = caseRecord.serviceType;
+  return (state.deliveryMilestones ?? []).filter((item) =>
+    item.caseId === caseRecord.id && item.caseRevisionNumber === revisionNumber && (!serviceType || item.serviceType === serviceType) &&
+    (item.kind === "REVIEW_ROUND" || item.kind === "FINAL_COMPLIANCE_CHECK") && item.status === "COMPLETED"
+  ).map((item) => ({
+    kind: item.kind,
+    sequence: item.sequence,
+    roundLabel: item.roundLabel,
+    title: item.title,
+    completedAt: item.completedAt ?? null,
+    observationSummary: item.observationSummary ?? null,
+    actionSummary: item.actionSummary ?? null,
+    drawingVersion: item.drawingRef?.version ?? null
+  })).sort((left, right) => left.kind < right.kind ? -1 : left.kind > right.kind ? 1 : left.sequence - right.sequence || (left.title < right.title ? -1 : left.title > right.title ? 1 : 0));
+}
+
 export function buildReportComposition(state: AppState, report: ReportVersionRecord) {
   const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
   const client = state.clients.find((item) => item.id === caseRecord?.clientId);
@@ -96,6 +115,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
   }));
   const assessment = buildClientSafeAssessmentComposition(state, caseRecord);
   const verifiedDocuments = buildVerifiedDocumentComposition(state, caseRecord);
+  const preDeliveryMilestones = buildPreDeliveryMilestoneComposition(state, caseRecord);
   return {
     report: { id: report.id, caseId: report.caseId, versionLabel: report.versionLabel, isPreview: report.isPreview },
     case: caseRecord ? {
@@ -115,6 +135,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
     shakti: shakti ?? null,
     assessment,
     verifiedDocuments,
+    preDeliveryMilestones,
     templateVersion: REPORT_TEMPLATE_VERSION,
     watermark: report.isPreview ? PREVIEW_WATERMARK : null
   };

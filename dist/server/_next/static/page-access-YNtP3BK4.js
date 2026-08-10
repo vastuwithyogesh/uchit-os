@@ -1,1 +1,0 @@
-import{l as e}from"./headers-vasxVCva.js";import{L as t,o as n}from"./auth-Dc_XfOFn.js";function r(e,n){return t.indexOf(e)>=t.indexOf(n)}async function i(t){let i=await n(await e());return{actor:i,allowed:r(i.role,t)}}export{i as t};

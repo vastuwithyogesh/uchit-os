@@ -283,6 +283,21 @@ export interface CaseDocumentRecord {
   idempotencyKey: string; version: number; received: AssessmentAudit; verified?: AssessmentAudit; updated: AssessmentAudit;
 }
 
+export const deliveryMilestoneKinds = ["REVIEW_ROUND", "FINAL_COMPLIANCE_CHECK", "CONSTRUCTION_CHECKPOINT", "CLARIFICATION", "FOLLOW_UP", "OPTIONAL_VERIFICATION"] as const;
+export type DeliveryMilestoneKind = (typeof deliveryMilestoneKinds)[number];
+export const deliveryMilestoneStatuses = ["PLANNED", "READY", "IN_PROGRESS", "BLOCKED", "COMPLETED", "DEFERRED"] as const;
+export type DeliveryMilestoneStatus = (typeof deliveryMilestoneStatuses)[number];
+export interface DeliveryMilestone {
+  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+  kind: DeliveryMilestoneKind; sequence: number; roundLabel: string; title: string;
+  status: DeliveryMilestoneStatus; dueDate?: string; completedAt?: string;
+  ownerRole: ResponsibilityRole; ownerName: string;
+  drawingRef?: { caseDocumentId: string; version: number };
+  observationSummary?: string; actionSummary?: string; reason?: string; blocker: boolean;
+  evidenceRefs: readonly string[]; idempotencyKey: string; version: number;
+  created: AssessmentAudit; updated: AssessmentAudit;
+}
+
 export interface FloorWorkspaceRecord {
   id: string;
   caseId: string;

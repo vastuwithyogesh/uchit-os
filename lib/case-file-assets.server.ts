@@ -91,6 +91,17 @@ export async function assertCaseFileEvidenceScope(evidenceRef: string, scope: Ca
   if (!row) throw new Error("Evidence reference does not resolve to an immutable file in this case revision and floor.");
 }
 
+export async function assertCaseFileEvidenceRefs(evidenceRefs: readonly string[], scope: Omit<CaseFileScope, "floorLabel">) {
+  const { DB, R2 } = getRuntimeEnv();
+  if (!DB || !R2) throw new Error("Protected case-file storage is not configured.");
+  await migrateD1(DB);
+  for (const evidenceRef of evidenceRefs) {
+    const row = await DB.prepare("SELECT id FROM case_file_assets WHERE evidence_ref = ? AND case_id = ? AND case_revision_number = ? AND service_type = ? AND status = 'IMMUTABLE'")
+      .bind(evidenceRef, scope.caseId, scope.caseRevisionNumber, scope.serviceType).first<{ id: string }>();
+    if (!row) throw new Error("Evidence reference does not resolve to an immutable file in this case revision.");
+  }
+}
+
 export async function readCaseFile(assetId: string, scope: CaseFileScope) {
   const { DB, R2 } = getRuntimeEnv();
   if (!DB || !R2 || !/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(assetId)) return null;
