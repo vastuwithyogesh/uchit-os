@@ -659,6 +659,22 @@ h3,
   list-style: none;
 }
 
+.nav-more-current {
+  color: var(--text);
+}
+
+.nav-more-chevron {
+  width: 9px;
+  height: 9px;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: translateY(-2px) rotate(45deg);
+}
+
+.nav-more[open] .nav-more-chevron {
+  transform: translateY(2px) rotate(225deg);
+}
+
 .nav-more summary::-webkit-details-marker {
   display: none;
 }
@@ -689,6 +705,12 @@ h3,
 .nav-more-menu a {
   justify-content: flex-start;
   border-radius: 8px;
+}
+
+.nav-more-heading {
+  grid-column: 1 / -1;
+  padding: 8px 12px 4px;
+  color: var(--text);
 }
 
 .signed-in-name {
@@ -831,12 +853,29 @@ h3,
     width: 100%;
   }
 
+  .nav-more[open] > summary {
+    position: fixed;
+    top: max(22px, env(safe-area-inset-top));
+    right: 24px;
+    z-index: 1001;
+    width: auto;
+    background: var(--bg-soft);
+    border-color: var(--line-strong);
+  }
+
   .nav-more-menu {
     position: fixed;
-    inset: auto 14px 14px;
-    grid-template-columns: 1fr;
+    inset: 12px 12px max(12px, env(safe-area-inset-bottom));
+    z-index: 1000;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    align-content: start;
     width: auto;
-    max-height: 70vh;
+    max-height: none;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    padding: max(14px, env(safe-area-inset-top)) 12px max(14px, env(safe-area-inset-bottom));
+    border-color: var(--line-strong);
+    background: var(--panel);
   }
 
   .header-session,
@@ -1446,6 +1485,14 @@ input[type="file"] {
 @media (max-width: 560px) {
   .page-shell {
     padding-inline: 10px;
+  }
+
+  .nav-more-menu {
+    grid-template-columns: 1fr;
+  }
+
+  .nav-more-current {
+    display: none;
   }
 
   .workspace-toolbar,
