@@ -36,6 +36,7 @@ export function ReportConsole() {
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Load the live state to inspect report versions.");
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [approvalComment, setApprovalComment] = useState("Reviewed against the evaluation snapshot and report layout.");
 
   const clients = state?.clients ?? [];
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
@@ -180,7 +181,7 @@ export function ReportConsole() {
               type="button"
               className="button-secondary"
               disabled={busy || !canApproveCurrentReport}
-              onClick={() => run({ action: "report-approve", reportId: finalReport?.id }, "Final report approved")}
+              onClick={() => run({ action: "report-approve", reportId: finalReport?.id, comment: approvalComment }, "Final report approved")}
             >
               Approve final report
             </button>
@@ -193,6 +194,12 @@ export function ReportConsole() {
               Release verdict
             </button>
           </div>
+          {finalReport ? (
+            <div style={{ marginTop: 14 }}>
+              <label htmlFor="approval-comment"><strong>Approval note</strong></label>
+              <textarea id="approval-comment" value={approvalComment} onChange={(event) => setApprovalComment(event.target.value)} rows={3} style={{ width: "100%", marginTop: 6 }} />
+            </div>
+          ) : null}
         </div>
         <div className="two-col" style={{ marginTop: 16 }}>
           <div className="panel">
@@ -269,8 +276,11 @@ export function ReportConsole() {
                   <div className="pill-row">
                     <span className={`tag ${report.isPreview ? "warn" : "good"}`}>{report.isPreview ? "Watermarked lane" : "Verdict lane"}</span>
                     <span className="pill">{report.approvals.length} approvals</span>
+                    {report.artifact ? <a className="button-secondary" href={report.artifact.downloadPath} target="_blank" rel="noreferrer">Open printable report</a> : <span className="pill">Legacy record</span>}
                     {report.watermarkText ? <span className="pill">{report.watermarkText}</span> : null}
                   </div>
+                  {report.artifact ? <span className="meta">SHA-256 {report.artifact.contentHash.slice(0, 16)}… · {report.artifact.templateVersion}</span> : null}
+                  {(report.approvalEvidence ?? []).map((approval) => <span className="meta" key={`${report.id}-${approval.actorId}`}>{approval.actorName} ({approval.actorRole}) · {new Date(approval.approvedAt).toLocaleString("en-IN")} · {approval.comment}</span>)}
                 </div>
               ))
             ) : (

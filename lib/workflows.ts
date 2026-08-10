@@ -1,4 +1,4 @@
-import {
+import type {
   AppUser,
   CommercialProposalRecord,
   FloorWorkspaceRecord,
@@ -10,7 +10,8 @@ import {
   TimelineEvent,
   UtilityRule,
   VastuCaseRecord
-} from "@/lib/domain";
+} from "./domain.ts";
+import { validateShaktiInputs } from "./evaluation-provenance.ts";
 
 export const MIN_ADVANCE_INR = 11000;
 export const DEFAULT_PROPOSAL_AMOUNT_INR = 51000;
@@ -78,9 +79,7 @@ export const elementGroups = ["Air", "Fire", "Water", "Earth", "Space"] as const
 export type ElementGroup = (typeof elementGroups)[number];
 
 export function rankShakti(inputs: number[]) {
-  if (inputs.length !== 16) {
-    throw new Error("Shakti engine expects exactly 16 values.");
-  }
+  inputs = validateShaktiInputs(inputs);
 
   const grouped: Record<ElementGroup, number[]> = {
     Air: [inputs[0], inputs[5], inputs[10]],

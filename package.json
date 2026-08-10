@@ -12,6 +12,8 @@
     "test:security": "node --test tests/security-controls.test.mjs",
     "lint": "tsc --noEmit",
     "test:persistence": "node --experimental-strip-types --test lib/persistence-merge.test.ts",
+    "test:payment-migration": "node --experimental-strip-types --test lib/payment-proof-migration.test.ts",
+    "test:evaluation": "node --experimental-strip-types --test lib/evaluation-provenance.test.ts",
     "db:generate": "prisma generate",
     "db:studio": "prisma studio",
     "db:migrate": "prisma migrate dev",

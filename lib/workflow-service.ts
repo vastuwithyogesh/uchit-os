@@ -24,6 +24,15 @@ import { formatMoney } from "@/lib/workflows";
 import { writeOptInLeadRecords } from "@/lib/optin-leads-store";
 import { writeReviewCallBookingRecords } from "@/lib/review-call-bookings-store";
 import { writeAdvanceVerificationRecords } from "@/lib/advance-verifications-store";
+import {
+  deterministicContentHash,
+  SHAKTI_ALGORITHM_VERSION,
+  SHAKTI_MAPPING_VERSION,
+  SHAKTI_ROUNDING_VERSION,
+  UTILITY_EVALUATION_ALGORITHM_VERSION,
+  UTILITY_RULESET_FORMAT_VERSION,
+  validateShaktiInputs
+} from "@/lib/evaluation-provenance";
 
 function nextId(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -721,7 +730,7 @@ export function verifyBalanceProof(input: {
   return { payment, caseRecord };
 }
 
-export function generatePreviewReport(caseId: string) {
+export async function generatePreviewReport(caseId: string, actor: AppUser) {
   const state = getAppState();
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) {
@@ -731,10 +740,7 @@ export function generatePreviewReport(caseId: string) {
     throw new Error("Cannot generate a preview for a released verdict.");
   }
 
-  const existingPreview = state.reportVersions.find((item) => item.caseId === caseId && item.isPreview);
-  const report =
-    existingPreview ??
-    ({
+  const report: ReportVersionRecord = {
       id: nextId("report"),
       caseId,
       versionLabel: "Stage-A Preview",
@@ -742,22 +748,18 @@ export function generatePreviewReport(caseId: string) {
       status: "PAYMENT_BLOCKED",
       watermarkText: "Preview only. Balance pending.",
       approvals: []
-    } satisfies ReportVersionRecord);
-
-  report.status = caseRecord.balanceApproved ? "READY_FOR_APPROVAL" : "PAYMENT_BLOCKED";
-  report.watermarkText = caseRecord.balanceApproved ? undefined : "Preview only. Balance pending.";
-  report.approvals = [];
-
-  if (!existingPreview) {
-    state.reportVersions.unshift(report);
-  }
+    } satisfies ReportVersionRecord;
+  const { createArtifactManifest, PREVIEW_WATERMARK } = await import("@/lib/report-artifacts");
+  report.watermarkText = PREVIEW_WATERMARK;
+  report.artifact = await createArtifactManifest(state, report, actor);
+  state.reportVersions.unshift(report);
   caseRecord.reportStatus = "PAYMENT_BLOCKED";
 
   appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", "CONSULTANT");
   return report;
 }
 
-export function prepareFinalReport(caseId: string, actor: AppUser) {
+export async function prepareFinalReport(caseId: string, actor: AppUser) {
   const state = getAppState();
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) {
@@ -767,24 +769,21 @@ export function prepareFinalReport(caseId: string, actor: AppUser) {
     throw new Error("Final report can only be prepared after the balance is approved.");
   }
 
-  const existing = state.reportVersions.find((item) => item.caseId === caseId && !item.isPreview);
-  const report =
-    existing ??
-    ({
+  const existing = state.reportVersions.find((item) => item.caseId === caseId && !item.isPreview && item.status !== "RELEASED");
+  if (existing?.artifact?.immutable) {
+    throw new Error("This report version is immutable. Create a new revision instead of changing it.");
+  }
+  const report: ReportVersionRecord = {
       id: nextId("report"),
       caseId,
       versionLabel: "Official Verdict Report",
       isPreview: false,
       status: "READY_FOR_APPROVAL",
       approvals: []
-    } satisfies ReportVersionRecord);
-
-  report.status = "READY_FOR_APPROVAL";
-  report.watermarkText = undefined;
-
-  if (!existing) {
-    state.reportVersions.unshift(report);
-  }
+    } satisfies ReportVersionRecord;
+  const { createArtifactManifest } = await import("@/lib/report-artifacts");
+  report.artifact = await createArtifactManifest(state, report, actor);
+  state.reportVersions.unshift(report);
 
   caseRecord.reportStatus = "READY_FOR_APPROVAL";
   caseRecord.status = "REPORT_APPROVAL_PENDING";
@@ -800,21 +799,52 @@ export function createEvaluationSnapshot(caseId: string, snapshotName = "Residen
   }
 
   const selectedZoneCodes = zoneCodes?.length ? zoneCodes : state.utilityRules.map((rule) => rule.zoneCode);
+  const caseInputs = {
+    caseId: caseRecord.id,
+    caseStatus: caseRecord.status,
+    orientationLocked: caseRecord.orientationLocked,
+    floors: state.floorWorkspaces
+      .filter((floor) => floor.caseId === caseId)
+      .map(({ id, floorLabel, status, locked }) => ({ id, floorLabel, status, locked }))
+      .sort((left, right) => left.id.localeCompare(right.id))
+  };
   const generatedMatrix = generateUtilityEvaluation(
     state.utilityRules,
     selectedZoneCodes.map((zoneCode) => ({ zoneCode }))
   ).map((entry) => ({
     code: entry.zoneCode,
     verdict: entry.verdict,
-    confidence: entry.confidence
+    confidence: entry.confidence,
+    ...(state.utilityRules.find((rule) => rule.zoneCode === entry.zoneCode)?.id
+      ? { ruleId: state.utilityRules.find((rule) => rule.zoneCode === entry.zoneCode)!.id }
+      : {})
   }));
+  const selectedRuleIds = generatedMatrix.flatMap((entry) => (entry.ruleId ? [entry.ruleId] : []));
+  const sourceContentHash = deterministicContentHash(state.utilityRules.map((rule) => ({
+    confidence: rule.confidence,
+    description: rule.description,
+    id: rule.id,
+    sourceCsvRow: rule.sourceCsvRow,
+    tabName: rule.tabName,
+    verdict: rule.verdict,
+    zoneCode: rule.zoneCode
+  })));
 
   const snapshot: EvaluationSnapshotRecord = {
     id: nextId("eval"),
     caseId,
     snapshotName,
     sourceVersion: "residential-tab.csv",
-    generatedMatrix
+    generatedMatrix,
+    provenance: {
+      inputHash: deterministicContentHash({ caseInputs, selectedZoneCodes, sourceContentHash }),
+      outputHash: deterministicContentHash(generatedMatrix),
+      sourceContentHash,
+      ruleSetFormatVersion: UTILITY_RULESET_FORMAT_VERSION,
+      algorithmVersion: UTILITY_EVALUATION_ALGORITHM_VERSION,
+      caseInputs,
+      selectedRuleIds
+    }
   };
 
   state.evaluationSnapshots.unshift(snapshot);
@@ -829,14 +859,33 @@ export function recordShaktiSnapshot(caseId: string, values: number[]) {
     throw new Error("Case not found.");
   }
 
-  const ranking = rankShakti(values);
+  const inputValues = validateShaktiInputs(values);
+  const ranking = rankShakti(inputValues);
+  const caseInputs = {
+    caseId: caseRecord.id,
+    caseStatus: caseRecord.status,
+    orientationLocked: caseRecord.orientationLocked,
+    floors: state.floorWorkspaces
+      .filter((floor) => floor.caseId === caseId)
+      .map(({ id, floorLabel, status, locked }) => ({ id, floorLabel, status, locked }))
+      .sort((left, right) => left.id.localeCompare(right.id))
+  };
+  const output = { elementAverages: ranking.averages, rankedVerdicts: ranking.ranked, tieBreakUsed: ranking.tieBreakUsed };
   const snapshot: ShaktiSnapshotRecord = {
     id: nextId("shakti"),
     caseId,
-    inputValues: values,
+    inputValues,
     elementAverages: ranking.averages,
     rankedVerdicts: ranking.ranked,
-    tieBreakUsed: ranking.tieBreakUsed
+    tieBreakUsed: ranking.tieBreakUsed,
+    provenance: {
+      inputHash: deterministicContentHash({ caseInputs, inputValues }),
+      outputHash: deterministicContentHash(output),
+      algorithmVersion: SHAKTI_ALGORITHM_VERSION,
+      mappingVersion: SHAKTI_MAPPING_VERSION,
+      roundingVersion: SHAKTI_ROUNDING_VERSION,
+      caseInputs
+    }
   };
 
   state.shaktiSnapshots.unshift(snapshot);
@@ -844,7 +893,7 @@ export function recordShaktiSnapshot(caseId: string, values: number[]) {
   return snapshot;
 }
 
-export function approveReport(reportId: string, actor: AppUser) {
+export function approveReport(reportId: string, actor: AppUser, comment = "Reviewed and approved") {
   const state = getAppState();
   const report = state.reportVersions.find((item) => item.id === reportId);
   if (!report) {
@@ -863,10 +912,16 @@ export function approveReport(reportId: string, actor: AppUser) {
   if (report.status !== "READY_FOR_APPROVAL" && report.status !== "APPROVED") {
     throw new Error("Report is not in an approvable state.");
   }
+  if (!report.artifact?.immutable) throw new Error("This legacy report has no immutable artifact and cannot receive new approvals.");
+  if (report.artifact.createdBy.id === actor.id) throw new Error("The report creator cannot approve their own report.");
+  if (report.approvalEvidence?.some((item) => item.actorId === actor.id) || report.approvals.includes(actor.id)) throw new Error("This person has already approved this report version.");
+  const cleanComment = comment.trim();
+  if (cleanComment.length < 3) throw new Error("Approval comment must explain the review decision.");
 
   report.approvals = Array.from(new Set([...(report.approvals ?? []), actor.id]));
-  report.status = "APPROVED";
-  caseRecord.reportStatus = "APPROVED";
+  report.approvalEvidence = [...(report.approvalEvidence ?? []), { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, approvedAt: nowIso(), comment: cleanComment, artifactHash: report.artifact.contentHash }];
+  report.status = report.approvals.length >= 2 ? "APPROVED" : "READY_FOR_APPROVAL";
+  caseRecord.reportStatus = report.status;
   caseRecord.status = (report.approvals ?? []).length >= 2 ? "REPORT_APPROVED" : "REPORT_APPROVAL_PENDING";
 
   appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor.role);
@@ -892,6 +947,9 @@ export function releaseVerdict(reportId: string, actor: AppUser) {
   if ((report.approvals ?? []).length < 2) {
     throw new Error("Verdict release requires two report approvals.");
   }
+  if (!report.artifact?.immutable || (report.approvalEvidence?.length ?? 0) < 2) throw new Error("Verdict release requires two evidenced approvals on an immutable artifact.");
+  if (new Set(report.approvalEvidence?.map((item) => item.actorId)).size < 2) throw new Error("Verdict release requires two distinct approvers.");
+  if (report.approvalEvidence?.some((item) => item.actorId === report.artifact?.createdBy.id || item.artifactHash !== report.artifact?.contentHash)) throw new Error("Approval evidence does not match the immutable artifact.");
 
   caseRecord.status = "VERDICT_RELEASED";
   caseRecord.reportStatus = "RELEASED";

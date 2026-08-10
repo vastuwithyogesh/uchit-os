@@ -185,6 +185,31 @@ export interface ReportVersionRecord {
   status: ReportStatus;
   watermarkText?: string;
   approvals: string[];
+  /** Structured evidence is additive so legacy snapshots with approvals[] remain readable. */
+  approvalEvidence?: ReportApprovalEvidence[];
+  artifact?: ReportArtifactManifest;
+}
+
+export interface ReportApprovalEvidence {
+  actorId: string;
+  actorName: string;
+  actorRole: UserRole;
+  approvedAt: string;
+  comment: string;
+  artifactHash: string;
+}
+
+export interface ReportArtifactManifest {
+  schemaVersion: "report-artifact/v1";
+  mediaType: "text/html";
+  createdAt: string;
+  createdBy: { id: string; name: string; role: UserRole };
+  templateVersion: string;
+  evaluationSnapshotId?: string;
+  shaktiSnapshotId?: string;
+  contentHash: string;
+  immutable: true;
+  downloadPath: string;
 }
 
 export interface EvaluationSnapshotRecord {
@@ -192,7 +217,27 @@ export interface EvaluationSnapshotRecord {
   caseId: string;
   snapshotName: string;
   sourceVersion: string;
-  generatedMatrix: Array<{ code: string; verdict: string; confidence: number }>;
+  generatedMatrix: Array<{ code: string; verdict: string; confidence: number; ruleId?: string }>;
+  provenance?: EvaluationProvenance;
+}
+
+export interface EvaluationCaseInputs {
+  caseId: string;
+  caseStatus: VastuCaseStatus;
+  orientationLocked: boolean;
+  floors: Array<{ id: string; floorLabel: string; status: FloorStatus; locked: boolean }>;
+}
+
+export interface EvaluationProvenance {
+  inputHash: string;
+  outputHash: string;
+  sourceContentHash?: string;
+  ruleSetFormatVersion?: string;
+  algorithmVersion: string;
+  mappingVersion?: string;
+  roundingVersion?: string;
+  caseInputs: EvaluationCaseInputs;
+  selectedRuleIds?: string[];
 }
 
 export interface MappingEntry32D {
@@ -227,6 +272,7 @@ export interface ShaktiSnapshotRecord {
   elementAverages: Record<string, number>;
   rankedVerdicts: Array<{ element: string; score: number }>;
   tieBreakUsed: boolean;
+  provenance?: EvaluationProvenance;
 }
 
 export interface TimelineEvent {

@@ -1,4 +1,4 @@
-import {
+import type {
   AppUser,
   ClientRecord,
   CommercialProposalRecord,
@@ -15,7 +15,7 @@ import {
   VastuCaseRecord,
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
-} from "@/lib/domain";
+} from "./domain.ts";
 
 export const currentUser: AppUser = {
   id: "user_super_1",

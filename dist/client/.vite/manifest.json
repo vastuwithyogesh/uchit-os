@@ -9,8 +9,8 @@
       "_record-BdkTR7AP.js"
     ]
   },
-  "_app-rsc-cache-busting-HXuG5AwI.js": {
-    "file": "_next/static/chunks/app-rsc-cache-busting-HXuG5AwI.js",
+  "_app-rsc-cache-busting-WhCYHNZg.js": {
+    "file": "_next/static/chunks/app-rsc-cache-busting-WhCYHNZg.js",
     "name": "app-rsc-cache-busting",
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
@@ -31,8 +31,8 @@
     "file": "_next/static/chunks/deployment-id-DFhHa9wO.js",
     "name": "deployment-id"
   },
-  "_format-Kl4yFmxq.js": {
-    "file": "_next/static/chunks/format-Kl4yFmxq.js",
+  "_format-ShHiIMNA.js": {
+    "file": "_next/static/chunks/format-ShHiIMNA.js",
     "name": "format"
   },
   "_framework-BaE7mD_r.js": {
@@ -54,8 +54,8 @@
       "_protocol-headers-URL33uU5.js"
     ]
   },
-  "_image-upload-Ckyyd3fd.js": {
-    "file": "_next/static/chunks/image-upload-Ckyyd3fd.js",
+  "_image-upload-DsWPZSw2.js": {
+    "file": "_next/static/chunks/image-upload-DsWPZSw2.js",
     "name": "image-upload"
   },
   "_navigation-errors-wvgRKjB-.js": {
@@ -74,8 +74,8 @@
     "file": "_next/static/chunks/protocol-headers-URL33uU5.js",
     "name": "protocol-headers"
   },
-  "_query-DWplBm1o.js": {
-    "file": "_next/static/chunks/query-DWplBm1o.js",
+  "_query-BOKKfU-n.js": {
+    "file": "_next/static/chunks/query-BOKKfU-n.js",
     "name": "query"
   },
   "_record-BdkTR7AP.js": {
@@ -90,8 +90,8 @@
     "file": "_next/static/chunks/rolldown-runtime-C60lm6uB.js",
     "name": "rolldown-runtime"
   },
-  "_workflows-uqd3IFnk.js": {
-    "file": "_next/static/chunks/workflows-uqd3IFnk.js",
+  "_workflows-CTmrQ4-_.js": {
+    "file": "_next/static/chunks/workflows-CTmrQ4-_.js",
     "name": "workflows"
   },
   "components/admin-console.tsx": {
@@ -128,8 +128,19 @@
       "_framework-BaE7mD_r.js"
     ]
   },
+  "components/case-workspace.tsx": {
+    "file": "_next/static/chunks/case-workspace-DP9Hi_Gi.js",
+    "name": "case-workspace",
+    "src": "components/case-workspace.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-C60lm6uB.js",
+      "_framework-BaE7mD_r.js",
+      "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js"
+    ]
+  },
   "components/chart-asset-board.tsx": {
-    "file": "_next/static/chunks/chart-asset-board-Cg0l2mza.js",
+    "file": "_next/static/chunks/chart-asset-board-BsyIn8Ac.js",
     "name": "chart-asset-board",
     "src": "components/chart-asset-board.tsx",
     "isDynamicEntry": true,
@@ -139,48 +150,58 @@
     ]
   },
   "components/chart-upload-board.tsx": {
-    "file": "_next/static/chunks/chart-upload-board-6K3hr2k4.js",
+    "file": "_next/static/chunks/chart-upload-board-WY1kO-mS.js",
     "name": "chart-upload-board",
     "src": "components/chart-upload-board.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
-      "_image-upload-Ckyyd3fd.js",
+      "_image-upload-DsWPZSw2.js",
+      "_framework-BaE7mD_r.js"
+    ]
+  },
+  "components/client-portal.tsx": {
+    "file": "_next/static/chunks/client-portal-BOZYghMR.js",
+    "name": "client-portal",
+    "src": "components/client-portal.tsx",
+    "isDynamicEntry": true,
+    "imports": [
+      "_rolldown-runtime-C60lm6uB.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/commercial-console.tsx": {
-    "file": "_next/static/chunks/commercial-console-BOkNs13o.js",
+    "file": "_next/static/chunks/commercial-console-CJ7k5H0U.js",
     "name": "commercial-console",
     "src": "components/commercial-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
-      "_format-Kl4yFmxq.js",
-      "_image-upload-Ckyyd3fd.js",
+      "_workflows-CTmrQ4-_.js",
+      "_format-ShHiIMNA.js",
+      "_image-upload-DsWPZSw2.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
-      "_workflows-uqd3IFnk.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/crm-workbench.tsx": {
-    "file": "_next/static/chunks/crm-workbench-BAWjCcAJ.js",
+    "file": "_next/static/chunks/crm-workbench-0OH7z6bz.js",
     "name": "crm-workbench",
     "src": "components/crm-workbench.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
-      "_format-Kl4yFmxq.js",
+      "_workflows-CTmrQ4-_.js",
+      "_format-ShHiIMNA.js",
       "_request-helpers-BzARIuTP.js",
-      "_workflows-uqd3IFnk.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/diagnostics-console.tsx": {
-    "file": "_next/static/chunks/diagnostics-console-BUV9Pj_w.js",
+    "file": "_next/static/chunks/diagnostics-console-DoZBUP5e.js",
     "name": "diagnostics-console",
     "src": "components/diagnostics-console.tsx",
     "isDynamicEntry": true,
@@ -192,20 +213,20 @@
     ]
   },
   "components/evaluation-console.tsx": {
-    "file": "_next/static/chunks/evaluation-console-DGOm8YAd.js",
+    "file": "_next/static/chunks/evaluation-console-DzmsgVwz.js",
     "name": "evaluation-console",
     "src": "components/evaluation-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
+      "_workflows-CTmrQ4-_.js",
       "_request-helpers-BzARIuTP.js",
-      "_workflows-uqd3IFnk.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/integrity-console.tsx": {
-    "file": "_next/static/chunks/integrity-console-Bbx9uu_0.js",
+    "file": "_next/static/chunks/integrity-console-qz-WZiy7.js",
     "name": "integrity-console",
     "src": "components/integrity-console.tsx",
     "isDynamicEntry": true,
@@ -215,41 +236,41 @@
     ]
   },
   "components/lead-inbox-console.tsx": {
-    "file": "_next/static/chunks/lead-inbox-console-BnOcIZHj.js",
+    "file": "_next/static/chunks/lead-inbox-console-CiH5hUeZ.js",
     "name": "lead-inbox-console",
     "src": "components/lead-inbox-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
-      "_format-Kl4yFmxq.js",
+      "_format-ShHiIMNA.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/payment-proof-console.tsx": {
-    "file": "_next/static/chunks/payment-proof-console-DzQ7pjah.js",
+    "file": "_next/static/chunks/payment-proof-console-V09O_3L4.js",
     "name": "payment-proof-console",
     "src": "components/payment-proof-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
-      "_image-upload-Ckyyd3fd.js",
+      "_image-upload-DsWPZSw2.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/report-console.tsx": {
-    "file": "_next/static/chunks/report-console-DmzHHpZs.js",
+    "file": "_next/static/chunks/report-console-B6i8Q0Ya.js",
     "name": "report-console",
     "src": "components/report-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
+      "_workflows-CTmrQ4-_.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
-      "_workflows-uqd3IFnk.js",
       "_framework-BaE7mD_r.js"
     ]
   },
@@ -264,7 +285,7 @@
     ]
   },
   "components/settings-console.tsx": {
-    "file": "_next/static/chunks/settings-console-2BkYhY8u.js",
+    "file": "_next/static/chunks/settings-console-CrHIwFBR.js",
     "name": "settings-console",
     "src": "components/settings-console.tsx",
     "isDynamicEntry": true,
@@ -275,7 +296,7 @@
     ]
   },
   "components/site-header.tsx": {
-    "file": "_next/static/chunks/site-header-qW3CXPUL.js",
+    "file": "_next/static/chunks/site-header-DqjC5DNH.js",
     "name": "site-header",
     "src": "components/site-header.tsx",
     "isDynamicEntry": true,
@@ -287,7 +308,7 @@
     ]
   },
   "components/state-console.tsx": {
-    "file": "_next/static/chunks/state-console-jDVxPm-g.js",
+    "file": "_next/static/chunks/state-console-CiABnCm4.js",
     "name": "state-console",
     "src": "components/state-console.tsx",
     "isDynamicEntry": true,
@@ -297,43 +318,43 @@
     ]
   },
   "components/timeline-console.tsx": {
-    "file": "_next/static/chunks/timeline-console-Cbon-M29.js",
+    "file": "_next/static/chunks/timeline-console-B2YiRyNz.js",
     "name": "timeline-console",
     "src": "components/timeline-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
-      "_format-Kl4yFmxq.js",
+      "_format-ShHiIMNA.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/workflow-console.tsx": {
-    "file": "_next/static/chunks/workflow-console-BgSV6eR_.js",
+    "file": "_next/static/chunks/workflow-console-B_V4-ZW3.js",
     "name": "workflow-console",
     "src": "components/workflow-console.tsx",
     "isDynamicEntry": true,
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
+      "_workflows-CTmrQ4-_.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
-      "_workflows-uqd3IFnk.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js": {
-    "file": "_next/static/chunks/hybrid-client-route-owner-yzQqpIuA.js",
+    "file": "_next/static/chunks/hybrid-client-route-owner-RxFYJIR9.js",
     "name": "hybrid-client-route-owner",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js",
     "isDynamicEntry": true,
     "imports": [
       "virtual:vinext-app-browser-entry",
       "_protocol-headers-URL33uU5.js",
-      "_query-DWplBm1o.js"
+      "_query-BOKKfU-n.js"
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "_next/static/chunks/layout-segment-context-B9jc-mAm.js",
+    "file": "_next/static/chunks/layout-segment-context-DQGDZzAn.js",
     "name": "layout-segment-context",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -345,7 +366,7 @@
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js": {
-    "file": "_next/static/chunks/link-BQwXZngG.js",
+    "file": "_next/static/chunks/link-Dkuv0ZRP.js",
     "name": "link",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -355,20 +376,20 @@
       "_framework-BaE7mD_r.js",
       "_deployment-id-DFhHa9wO.js",
       "_protocol-headers-URL33uU5.js",
-      "_query-DWplBm1o.js",
+      "_query-BOKKfU-n.js",
       "_record-BdkTR7AP.js"
     ],
     "dynamicImports": [
       "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js",
       "virtual:vinext-app-browser-entry",
       "_app-elements-Drg5O4vw.js",
-      "_app-rsc-cache-busting-HXuG5AwI.js",
+      "_app-rsc-cache-busting-WhCYHNZg.js",
       "_app-rsc-render-mode-IDJu5NEE.js",
       "_headers-CeAbe3am.js"
     ]
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "_next/static/chunks/index-Dc96mVYs.js",
+    "file": "_next/static/chunks/index-Clr9rvis.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
@@ -376,7 +397,7 @@
       "_rolldown-runtime-C60lm6uB.js",
       "_framework-BaE7mD_r.js",
       "_app-elements-Drg5O4vw.js",
-      "_app-rsc-cache-busting-HXuG5AwI.js",
+      "_app-rsc-cache-busting-WhCYHNZg.js",
       "_headers-CeAbe3am.js",
       "_navigation-errors-wvgRKjB-.js",
       "_hash-D0ldriCF.js",
@@ -396,6 +417,7 @@
       "components/evaluation-console.tsx",
       "components/diagnostics-console.tsx",
       "components/site-header.tsx",
+      "components/case-workspace.tsx",
       "components/payment-proof-console.tsx",
       "components/session-provider.tsx",
       "components/timeline-console.tsx",
@@ -404,6 +426,7 @@
       "components/bootstrap-console.tsx",
       "components/settings-console.tsx",
       "components/chart-asset-board.tsx",
+      "components/client-portal.tsx",
       "components/case-master-console.tsx",
       "components/chart-upload-board.tsx"
     ]

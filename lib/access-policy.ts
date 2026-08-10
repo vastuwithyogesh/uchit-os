@@ -8,7 +8,9 @@ export type PageAccessRule = {
 };
 
 export const pageAccessRules: PageAccessRule[] = [
+  { href: "/client", label: "My Vastu journey", minimumRole: "CLIENT" },
   { href: "/", label: "Overview", minimumRole: "SETTER" },
+  { href: "/workspace", label: "Case workspace", minimumRole: "SETTER" },
   { href: "/crm", label: "CRM workbench", minimumRole: "SETTER" },
   { href: "/timeline", label: "Timeline", minimumRole: "SETTER" },
   { href: "/ops", label: "Ops", minimumRole: "CONSULTANT" },
@@ -30,5 +32,9 @@ export function canRoleAccess(role: UserRole, minimumRole: UserRole) {
 }
 
 export function getAccessiblePageRules(role: UserRole) {
-  return pageAccessRules.filter((item) => canRoleAccess(role, item.minimumRole));
+  if (role === "CLIENT") {
+    return pageAccessRules.filter((item) => item.href === "/client");
+  }
+
+  return pageAccessRules.filter((item) => item.href !== "/client" && canRoleAccess(role, item.minimumRole));
 }

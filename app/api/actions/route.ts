@@ -219,19 +219,19 @@ export async function POST(request: Request) {
         if (!canEditFloorWorkspaces(actor)) {
           return deny("This role cannot generate report previews.");
         }
-        response = { ok: true, report: generatePreviewReport(body.caseId) };
+        response = { ok: true, report: await generatePreviewReport(body.caseId, actor) };
         break;
       case "final-report-prepare":
         if (!canEditFloorWorkspaces(actor)) {
           return deny("This role cannot prepare final reports.");
         }
-        response = { ok: true, report: prepareFinalReport(body.caseId, actor) };
+        response = { ok: true, report: await prepareFinalReport(body.caseId, actor) };
         break;
       case "report-approve":
         if (!canApproveReport(actor)) {
           return deny("This role cannot approve reports.");
         }
-        response = { ok: true, report: approveReport(body.reportId, actor) };
+        response = { ok: true, report: approveReport(body.reportId, actor, typeof body.comment === "string" ? body.comment : undefined) };
         break;
       case "verdict-release":
         if (!canReleaseVerdict(actor)) {

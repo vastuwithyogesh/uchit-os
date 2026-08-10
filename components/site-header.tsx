@@ -44,7 +44,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
           <>
             <div className="header-session-copy">
               <div className="pill">Signed in as {activeUser.fullName}</div>
-              <div className="pill">{isLocalDemo ? "Local demo role mode" : "Verified staff session"}</div>
+              <div className="pill">{isLocalDemo ? "Local demo role mode" : activeUser.role === "CLIENT" ? "Verified client session" : "Verified staff session"}</div>
             </div>
             <RoleSwitcher />
           </>
