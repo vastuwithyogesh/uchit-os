@@ -17,32 +17,23 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase,
     title: {
-      default: "Uchit Vastu Workspace",
-      template: "%s | Uchit Vastu"
+      default: "Uchit Vastu India Workspace",
+      template: "%s | Uchit Vastu India"
     },
     description:
-      "A simple, secure workspace for Uchit Vastu cases, evaluations, payments and reports.",
+      "A simple, secure workspace for Uchit Vastu India cases, evaluations, payments and reports.",
     openGraph: {
-      title: "Uchit Vastu Client CRM + Evaluation Engine",
+      title: "Uchit Vastu India Workspace",
       description:
-        "Lead intake, commercial approvals, payment gates, case operations, and verdict release in one controlled operating flow.",
+        "Clear, structured and confidential case work from first review to final report.",
       type: "website",
-      url: metadataBase,
-      images: [
-        {
-          url: new URL("/og.png", metadataBase).toString(),
-          width: 1536,
-          height: 1024,
-          alt: "Uchit Vastu Client CRM and Evaluation Engine overview"
-        }
-      ]
+      url: metadataBase
     },
     twitter: {
-      card: "summary_large_image",
-      title: "Uchit Vastu Client CRM + Evaluation Engine",
+      card: "summary",
+      title: "Uchit Vastu India Workspace",
       description:
-        "Role-aware lead intake, approvals, case operations, report flow, and verdict release in one dashboard.",
-      images: [new URL("/og.png", metadataBase).toString()]
+        "Clear, structured and confidential case work from first review to final report."
     }
   };
 }

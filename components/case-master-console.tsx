@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
+import { canonicalStageLabel, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 
 type ChartAssetSummaryPayload = {
   summary: {
@@ -64,6 +65,8 @@ export function CaseMasterConsole() {
   const payments = state?.payments.filter((item) => item.clientId === selectedClient?.id) ?? [];
   const reports = state?.reportVersions.filter((item) => item.caseId === caseRecord?.id) ?? [];
   const timeline = state?.timelineEvents.filter((item) => item.clientId === selectedClient?.id) ?? [];
+  const service = caseRecord ? normalizeCaseService(caseRecord) : null;
+  const serviceReadiness = caseRecord ? getServiceReadiness(caseRecord) : null;
 
   const snapshotChecklist = useMemo(
     () => [
@@ -146,6 +149,30 @@ export function CaseMasterConsole() {
             </div>
           ))}
         </div>
+      </div>
+
+      <div className="card span-12">
+        <div className="eyebrow">Service setup</div>
+        <h3>{service ? serviceTypeLabel(service.serviceType) : "Open the case to choose a service"}</h3>
+        {service && serviceReadiness ? (
+          <>
+            <p className="subtle">Current stage: <strong>{canonicalStageLabel(service.canonicalStage)}</strong>. Inputs ready: {serviceReadiness.completed} of {serviceReadiness.total}.</p>
+            <div className="pill-row" aria-label="Service versions">
+              <span className="pill">Service template {service.serviceTemplateVersion}</span>
+              <span className="pill">Scope {service.scopeVersion}</span>
+              {caseRecord?.currentDrawing?.versionLabel ? <span className="pill">Drawing {caseRecord.currentDrawing.versionLabel}</span> : null}
+            </div>
+            <div className="list" style={{ marginTop: 14 }}>
+              {serviceReadiness.checklist.map((item) => (
+                <div className="list-item" key={item.key}>
+                  <strong>{item.label}</strong>
+                  <span className={`tag ${item.ready ? "good" : "warn"}`}>{item.ready ? "Ready" : "Needed"}</span>
+                  <span className="meta">{item.ready ? "Confirmed for this case" : item.guidance}</span>
+                </div>
+              ))}
+            </div>
+          </>
+        ) : <p className="subtle">Service details and the correct readiness checklist appear after the advance is approved and the case is opened.</p>}
       </div>
 
       <div className="card span-4">

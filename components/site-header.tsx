@@ -19,10 +19,13 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
   return (
     <header className="topbar">
       <div className="brand">
-        <div className="brand-mark" aria-hidden="true" />
-        <div className="brand-copy">
-          <div>{title}</div>
-          <div className="meta">{subtitle}</div>
+        <Link className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/workspace"} aria-label="Uchit Vastu India home">
+          <span className="brand-name">UCHIT</span>
+          <span className="brand-descriptor">VASTU INDIA</span>
+        </Link>
+        <div className="brand-context">
+          <strong>{title}</strong>
+          <span className="meta">{subtitle}</span>
         </div>
       </div>
       <nav className="nav" aria-label="Main navigation">

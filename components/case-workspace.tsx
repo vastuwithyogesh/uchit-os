@@ -75,6 +75,13 @@ export function CaseWorkspace({ items }: { items: CaseWorkspaceItem[] }) {
               <div><h2>{item.clientName}</h2><p>{item.caseNumber ?? "Case not opened"} · {item.city || "City not added"}</p></div>
               <span className={`tag ${item.sla === "OVERDUE" ? "bad" : item.sla === "DUE_SOON" ? "warn" : item.sla === "ON_TRACK" ? "good" : "neutral"}`}>{item.slaLabel}</span>
             </div>
+            {item.serviceType ? (
+              <div className="pill-row" aria-label={`Service progress for ${item.clientName}`}>
+                <span className="pill">Service: {item.serviceType}</span>
+                <span className="pill">Stage: {item.canonicalStage}</span>
+                <span className="pill">Information: {item.readiness}</span>
+              </div>
+            ) : null}
             <dl className="workspace-details">
               <div><dt>Where things stand</dt><dd>{item.stage}</dd></div>
               <div><dt>What is waiting</dt><dd>{item.blocker}</dd></div>
@@ -90,7 +97,7 @@ export function CaseWorkspace({ items }: { items: CaseWorkspaceItem[] }) {
             </div>
             <details>
               <summary>Show task details</summary>
-              <p className="meta">Next action: {item.nextAction} · Blocked by: {item.blocker} · Responsible role: {item.ownerRole.toLowerCase()} · Status: {item.stage} · Timing: {item.slaLabel}</p>
+              <p className="meta">Next action: {item.nextAction} · Blocked by: {item.blocker} · Responsible role: {item.ownerRole.toLowerCase()} · Internal status: {item.stage} · Timing: {item.slaLabel}</p>
             </details>
           </article>
         ))}

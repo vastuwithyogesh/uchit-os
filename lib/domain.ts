@@ -31,6 +31,34 @@ export const caseStatuses = [
 ] as const;
 export type VastuCaseStatus = (typeof caseStatuses)[number];
 
+export const serviceTypes = ["EXISTING_SPACE", "NEW_CONSTRUCTION"] as const;
+export type VastuServiceType = (typeof serviceTypes)[number];
+
+export const canonicalServiceStages = ["UNDERSTAND", "VERIFY", "MAP", "EVALUATE", "PRIORITISE", "RECOMMEND", "IMPLEMENT"] as const;
+export type CanonicalServiceStage = (typeof canonicalServiceStages)[number];
+
+export interface CaseInputReadiness {
+  floorPlans?: boolean;
+  siteLocation?: boolean;
+  visualRecord?: boolean;
+  currentUse?: boolean;
+  clientPriorities?: boolean;
+  plotMeasurements?: boolean;
+  boundaryDrawing?: boolean;
+  developmentControls?: boolean;
+  projectBrief?: boolean;
+  projectTeam?: boolean;
+  constructionSchedule?: boolean;
+}
+
+export interface CaseDrawingReference {
+  versionLabel: string;
+  receivedAt?: string;
+  verifiedAt?: string;
+  discrepancy?: string;
+  superseded?: boolean;
+}
+
 export const floorStatuses = ["DRAFT", "NEEDS_REGENERATION", "READY_FOR_REVIEW", "LOCKED"] as const;
 export type FloorStatus = (typeof floorStatuses)[number];
 
@@ -165,6 +193,13 @@ export interface VastuCaseRecord {
   orientationLocked: boolean;
   balanceApproved: boolean;
   fullPaymentApproved: boolean;
+  /** Additive service metadata; legacy snapshots normalize safely to existing-space v1. */
+  serviceType?: VastuServiceType;
+  canonicalStage?: CanonicalServiceStage;
+  serviceTemplateVersion?: string;
+  scopeVersion?: string;
+  inputReadiness?: CaseInputReadiness;
+  currentDrawing?: CaseDrawingReference;
 }
 
 export interface FloorWorkspaceRecord {

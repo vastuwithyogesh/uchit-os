@@ -1,5 +1,6 @@
 import type { AppUser, UserRole, VastuCaseStatus } from "@/lib/domain";
 import { users } from "@/lib/seed";
+import { canonicalStageLabel, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 import type { AppState } from "@/lib/store";
 
 export type CaseWorkspaceItem = {
@@ -8,6 +9,9 @@ export type CaseWorkspaceItem = {
   city: string;
   caseId?: string;
   caseNumber?: string;
+  serviceType?: string;
+  canonicalStage?: string;
+  readiness?: string;
   stage: string;
   blocker: string;
   nextAction: string;
@@ -73,6 +77,8 @@ export function buildCaseWorkspaceProjection(state: AppState, actor: AppUser, as
       }
 
       const guide = caseGuidance[caseRecord.status];
+      const service = normalizeCaseService(caseRecord);
+      const readiness = getServiceReadiness(caseRecord);
       const latestEvent = state.timelineEvents
         .filter((event) => event.clientId === client.id)
         .sort((a, b) => new Date(b.happenedAt).getTime() - new Date(a.happenedAt).getTime())[0];
@@ -89,6 +95,9 @@ export function buildCaseWorkspaceProjection(state: AppState, actor: AppUser, as
         city: client.city,
         caseId: caseRecord.id,
         caseNumber: caseRecord.caseNumber,
+        serviceType: serviceTypeLabel(service.serviceType),
+        canonicalStage: canonicalStageLabel(service.canonicalStage),
+        readiness: `${readiness.completed} of ${readiness.total} inputs ready`,
         stage: guide.stage,
         blocker: guide.blocker,
         nextAction: guide.nextAction,

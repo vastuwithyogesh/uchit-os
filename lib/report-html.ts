@@ -1,10 +1,17 @@
 import type { AppState } from "@/lib/store";
 import type { ReportVersionRecord } from "@/lib/domain";
-import { PREVIEW_WATERMARK } from "@/lib/report-artifacts";
+import { LEGACY_REPORT_TEMPLATE_VERSION, PREVIEW_WATERMARK } from "./report-artifacts.ts";
 
 const escapeHtml = (value: unknown) => String(value ?? "").replace(/[&<>"']/g, (character) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[character]!);
+const missing = (label: string) => `<div class="missing"><strong>${escapeHtml(label)}</strong><br>Not recorded for this report version.</div>`;
 
-export function renderPrintableReport(state: AppState, report: ReportVersionRecord) {
+function qualificationAnswer(state: AppState, clientId: string | undefined, patterns: RegExp[]) {
+  const qualification = state.leadQualifications.find((item) => item.clientId === clientId);
+  const answer = qualification?.conversationalForm.find((item) => patterns.some((pattern) => pattern.test(item.label)))?.answer?.trim();
+  return answer || undefined;
+}
+
+function renderLegacyPrintableReport(state: AppState, report: ReportVersionRecord) {
   const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
   const client = state.clients.find((item) => item.id === caseRecord?.clientId);
   const evaluation = report.artifact?.evaluationSnapshotId
@@ -15,4 +22,45 @@ export function renderPrintableReport(state: AppState, report: ReportVersionReco
   return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(report.versionLabel)}</title><style>
   @page{size:A4;margin:16mm}*{box-sizing:border-box}body{font:14px/1.5 Arial,sans-serif;color:#263029;margin:0}header{border-bottom:3px solid #9a6b32;padding-bottom:14px;margin-bottom:24px}h1{margin:0;color:#244a36}small{color:#68756d}table{width:100%;border-collapse:collapse;margin-top:22px}th,td{padding:10px;border:1px solid #d9dfda;text-align:left}th{background:#f2f5f2}.watermark{position:fixed;inset:42% 0 auto;transform:rotate(-25deg);font-size:54px;font-weight:800;color:rgba(154,55,32,.14);text-align:center;z-index:-1}.evidence{margin-top:28px;padding:12px;background:#f7f7f4;overflow-wrap:anywhere}@media print{button{display:none}}
   </style></head><body>${watermark}<header><h1>Uchit Vastu · ${escapeHtml(report.versionLabel)}</h1><small>${escapeHtml(caseRecord?.caseNumber)} · ${escapeHtml(client?.displayName)} · ${escapeHtml(client?.city)}</small></header><h2>Evaluation summary</h2><table><thead><tr><th>Zone</th><th>Verdict</th><th>Confidence</th></tr></thead><tbody>${rows}</tbody></table><div class="evidence"><strong>Artifact evidence</strong><br>Report ID: ${escapeHtml(report.id)}<br>Template: ${escapeHtml(report.artifact?.templateVersion)}<br>SHA-256: ${escapeHtml(report.artifact?.contentHash)}</div><button onclick="window.print()">Download / Print PDF</button></body></html>`;
+}
+
+function renderV2PrintableReport(state: AppState, report: ReportVersionRecord) {
+  const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
+  const client = state.clients.find((item) => item.id === caseRecord?.clientId);
+  const floors = state.floorWorkspaces.filter((item) => item.caseId === report.caseId);
+  const evaluation = report.artifact?.evaluationSnapshotId
+    ? state.evaluationSnapshots.find((item) => item.id === report.artifact?.evaluationSnapshotId)
+    : state.evaluationSnapshots.find((item) => item.caseId === report.caseId);
+  const shakti = report.artifact?.shaktiSnapshotId
+    ? state.shaktiSnapshots.find((item) => item.id === report.artifact?.shaktiSnapshotId)
+    : state.shaktiSnapshots.find((item) => item.caseId === report.caseId);
+  const objective = qualificationAnswer(state, client?.id, [/main challenge/i, /desired outcome/i, /requirement/i]);
+  const propertyType = qualificationAnswer(state, client?.id, [/property type/i]);
+  const propertyStatus = qualificationAnswer(state, client?.id, [/property status/i, /construction stage/i, /project stage/i]);
+  const isNewConstruction = caseRecord?.serviceType === "NEW_CONSTRUCTION" || (!caseRecord?.serviceType && Boolean(propertyStatus && /planned|construction|concept|design development|plot/i.test(propertyStatus)));
+  const serviceName = isNewConstruction ? "New Construction Planning & Design Coordination" : propertyType || propertyStatus ? "Existing Space Audit & Optimisation" : "Service type not recorded";
+  const rows = evaluation?.generatedMatrix.map((entry) => `<tr><td>${escapeHtml(entry.code)}</td><td>${escapeHtml(entry.verdict)}</td><td>${entry.confidence}%</td></tr>`).join("") || `<tr><td colspan="3">No findings snapshot is attached to this report version.</td></tr>`;
+  const inputs = floors.length
+    ? floors.map((floor) => `<li><strong>${escapeHtml(floor.floorLabel)}</strong>: ${floor.locked ? "verified and locked" : "not yet locked"}; ${floor.evidenceUploads.length} supporting file(s) recorded.</li>`).join("")
+    : "";
+  const watermark = report.isPreview ? `<div class="watermark">${PREVIEW_WATERMARK}</div>` : "";
+
+  return `<!doctype html><html><head><meta charset="utf-8"><title>${escapeHtml(report.versionLabel)}</title><style>
+  @page{size:A4;margin:16mm}*{box-sizing:border-box}body{font:14px/1.55 Arial,sans-serif;color:#242624;margin:0}header{border-bottom:3px solid #a77a32;padding-bottom:14px;margin-bottom:24px}h1{margin:0;color:#171817;font-size:28px}h2{margin:28px 0 10px;color:#2d3b32;font-size:19px;page-break-after:avoid}h3{margin:16px 0 6px;font-size:15px}small,.muted{color:#68706b}.lead{font-size:16px}.summary,.missing,.notice,.evidence{padding:12px 14px;border:1px solid #ddd7ca;background:#faf8f2;margin:10px 0}.missing{border-style:dashed;color:#646862}.notice{border-left:4px solid #a77a32}table{width:100%;border-collapse:collapse;margin-top:12px;page-break-inside:auto}tr{page-break-inside:avoid}th,td{padding:9px;border:1px solid #d9dfda;text-align:left;vertical-align:top}th{background:#f2f3ef}ol,ul{padding-left:22px}.watermark{position:fixed;inset:42% 0 auto;transform:rotate(-25deg);font-size:54px;font-weight:800;color:rgba(154,55,32,.14);text-align:center;z-index:-1}.evidence{margin-top:28px;overflow-wrap:anywhere;font-size:12px}button{margin-top:20px;padding:10px 14px}@media print{button{display:none}}
+  </style></head><body>${watermark}<header><h1>Uchit Vastu India · ${escapeHtml(report.versionLabel)}</h1><small>${escapeHtml(caseRecord?.caseNumber || "Case number not recorded")} · ${escapeHtml(client?.displayName || "Client not recorded")} · ${escapeHtml(client?.city || "Location not recorded")}</small></header>
+  <section><h2>1. Executive summary and client objective</h2><p class="lead">${objective ? escapeHtml(objective) : "The client objective was not recorded in the structured intake available to this report version."}</p><div class="summary"><strong>Service</strong><br>${escapeHtml(serviceName)}</div></section>
+  <section><h2>2. Agreed scope and verified inputs</h2><p><strong>Property type:</strong> ${escapeHtml(propertyType || "Not recorded")}<br><strong>Property or project stage:</strong> ${escapeHtml(propertyStatus || "Not recorded")}<br><strong>Scope version:</strong> ${escapeHtml(caseRecord?.scopeVersion || "Not recorded")}<br><strong>Orientation:</strong> ${caseRecord?.orientationLocked ? "Verified and locked" : "Not recorded as verified"}<br><strong>Current drawing:</strong> ${escapeHtml(caseRecord?.currentDrawing?.versionLabel || "Not recorded")}${caseRecord?.currentDrawing?.superseded ? " (superseded; do not use for implementation)" : ""}${caseRecord?.currentDrawing?.discrepancy ? ` — discrepancy: ${escapeHtml(caseRecord.currentDrawing.discrepancy)}` : ""}</p>${inputs ? `<h3>Floor records</h3><ul>${inputs}</ul>` : missing("Floor plans, drawing versions, and supporting inputs")}${missing("Agreed assumptions, exclusions, and commercial scope")}</section>
+  <section><h2>3. Method and version</h2><p>This assessment follows the canonical Uchit seven-stage method:</p><ol><li>Understand</li><li>Verify</li><li>Map</li><li>Evaluate</li><li>Prioritise</li><li>Recommend</li><li>Implement</li></ol><p><strong>Current service stage:</strong> ${escapeHtml(caseRecord?.canonicalStage || "Not recorded")}<br><strong>Service template:</strong> ${escapeHtml(caseRecord?.serviceTemplateVersion || "Not recorded")}<br><strong>Evaluation source:</strong> ${escapeHtml(evaluation?.sourceVersion || "Not recorded")}<br><strong>Algorithm:</strong> ${escapeHtml(evaluation?.provenance?.algorithmVersion || "Not recorded")}<br><strong>Report template:</strong> ${escapeHtml(report.artifact?.templateVersion || "Not recorded")}</p></section>
+  <section><h2>4. Findings and evidence-backed report card</h2><table><thead><tr><th>Area / zone</th><th>Finding</th><th>Confidence</th></tr></thead><tbody>${rows}</tbody></table><p class="muted">Findings are categorical and traceable to the attached evaluation snapshot. This report does not invent a numerical Vastu score.</p></section>
+  <section><h2>5. Annotated recommendations and alternatives</h2>${missing("Annotated recommendations, acceptable alternatives, and drawing references")}</section>
+  <section><h2>6. Prioritised implementation plan</h2>${missing("Action owner, feasibility, implementation horizon, and target date")}</section>
+  <section><h2>7. Responsibilities, limitations, and professional disclaimer</h2><div class="notice"><strong>Professional boundaries</strong><p>Uchit Vastu India provides Vastu assessment, prioritised recommendations, and agreed implementation guidance. Architectural design, structural safety, building services, statutory approvals, and regulated work remain the responsibility of appropriately qualified professionals.</p><p>Recommendations depend on the accuracy and completeness of the plans, measurements, photographs, and information supplied or verified within the agreed scope. Any civil, structural, electrical, fire-safety, medical, or regulated change must be reviewed and approved by the relevant qualified professional.</p><p>This report does not guarantee financial, medical, personal, relationship, or business outcomes. It is intended to support clear, practical decisions without fear-based claims or compulsory products.</p></div></section>
+  <section><h2>8. Appendices</h2>${shakti ? `<p><strong>Element analysis:</strong> A versioned technical snapshot is attached to this report record.</p>` : missing("Optional element analysis")}${missing("Space use and placement guide")}</section>
+  <div class="evidence"><strong>Artifact evidence</strong><br>Report ID: ${escapeHtml(report.id)}<br>Template: ${escapeHtml(report.artifact?.templateVersion)}<br>SHA-256: ${escapeHtml(report.artifact?.contentHash)}<br>This evidence identifies the immutable report inputs approved for release.</div><button onclick="window.print()">Download / Print PDF</button></body></html>`;
+}
+
+export function renderPrintableReport(state: AppState, report: ReportVersionRecord) {
+  return report.artifact?.templateVersion === LEGACY_REPORT_TEMPLATE_VERSION
+    ? renderLegacyPrintableReport(state, report)
+    : renderV2PrintableReport(state, report);
 }
