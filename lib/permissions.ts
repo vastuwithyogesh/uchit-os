@@ -25,7 +25,7 @@ export function canEvaluateCases(user: AppUser) {
 }
 
 export function canVerifyPayments(user: AppUser) {
-  return user.role === "CONSULTANT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+  return user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 }
 
 export function canReadClientSnapshots(user: AppUser) {

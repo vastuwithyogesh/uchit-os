@@ -16,8 +16,6 @@ import {
 import {
   addFloorEvidence,
   addFloorWorkspace,
-  approveAdvancePayment,
-  approveBalancePayment,
   approveCommercialProposal,
   approveReport,
   bookQualificationCall,
@@ -92,6 +90,15 @@ export async function POST(request: Request) {
       const allowed = new Set(["action", "actorRole", "caseId", "idempotencyKey", "expectedRecordVersion", "expectedRevision", ...assessmentAllowedFields[action]]);
       const unknown = Object.keys(body).find((key) => !allowed.has(key));
       if (unknown) return NextResponse.json({ ok: false, error: `Unknown assessment field: ${unknown}.` }, { status: 400 });
+    }
+    const paymentAllowedFields: Record<string, string[]> = {
+      "advance-proof-verify": ["action", "actorRole", "clientId", "proposalId", "amountInr", "proofId"],
+      "balance-proof-verify": ["action", "actorRole", "clientId", "caseId", "amountInr", "proofId"]
+    };
+    if (paymentAllowedFields[action]) {
+      const allowed = new Set(paymentAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown payment field: ${unknown}.` }, { status: 400 });
     }
 
     switch (action) {
@@ -178,10 +185,10 @@ export async function POST(request: Request) {
         response = { ok: true, proposal: approveCommercialProposal(body.proposalId, actor) };
         break;
       case "case-create":
-        if (!canTriggerDeliverables(actor)) {
-          return deny("This role cannot create cases.");
+        if (!canVerifyPayments(actor)) {
+          return deny("Only an independent payment verifier can create a case after scoped advance proof is approved.");
         }
-        response = { ok: true, caseRecord: createVastuCase(body.clientId, body.proposalId) };
+        response = { ok: true, caseRecord: createVastuCase(body.clientId, body.proposalId, actor) };
         break;
       case "orientation-lock":
         if (!canEditFloorWorkspaces(actor)) {
@@ -263,8 +270,7 @@ export async function POST(request: Request) {
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot approve payments.");
         }
-        response = { ok: true, payment: approveAdvancePayment(body.clientId, body.proposalId, body.amountInr, actor) };
-        break;
+        return NextResponse.json({ ok: false, error: "Upload and independently verify scoped advance proof before approving payment." }, { status: 409 });
       case "advance-proof-verify":
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot verify advance proof.");
@@ -275,8 +281,7 @@ export async function POST(request: Request) {
             clientId: body.clientId,
             proposalId: body.proposalId,
             amountInr: Number(body.amountInr ?? 0),
-            referenceScreenshotUrl: String(body.referenceScreenshotUrl ?? ""),
-            referenceScreenshotFileName: String(body.referenceScreenshotFileName ?? ""),
+            proofId: String(body.proofId ?? ""),
             actor
           })
         };
@@ -285,20 +290,18 @@ export async function POST(request: Request) {
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot approve payments.");
         }
-        response = { ok: true, payment: approveBalancePayment(body.clientId, body.caseId, body.amountInr, actor) };
-        break;
+        return NextResponse.json({ ok: false, error: "Upload and independently verify scoped balance proof before approving payment." }, { status: 409 });
       case "balance-proof-verify":
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot verify balance proof.");
         }
         response = {
           ok: true,
-          result: verifyBalanceProof({
+          result: await verifyBalanceProof({
             clientId: body.clientId,
             caseId: body.caseId,
             amountInr: Number(body.amountInr ?? 0),
-            referenceScreenshotUrl: String(body.referenceScreenshotUrl ?? ""),
-            referenceScreenshotFileName: String(body.referenceScreenshotFileName ?? ""),
+            proofId: String(body.proofId ?? ""),
             actor
           })
         };

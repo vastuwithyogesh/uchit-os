@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { listStaffRoleAssignments, requireRouteActor } from "@/lib/auth";
-import { readPaymentProofManifest } from "@/lib/payment-proof-assets.server";
+import { readPaymentProofManifest, toPublicPaymentProofRecord } from "@/lib/payment-proof-assets.server";
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { inspectIntegrity } from "@/lib/integrity";
 import { getRuntimeEnv } from "@/lib/runtime-env";
@@ -40,6 +40,6 @@ export async function GET(request: Request) {
       timelineEvents: state.timelineEvents.length
     },
     issues: summary.issues,
-    latestPaymentProofAssets: paymentProofAssets.slice(0, 5)
+    latestPaymentProofAssets: paymentProofAssets.slice(0, 5).map(toPublicPaymentProofRecord)
   });
 }

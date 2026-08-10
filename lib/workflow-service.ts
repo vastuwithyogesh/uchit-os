@@ -24,7 +24,6 @@ import { getAppState, resetAppState } from "@/lib/store";
 import { formatMoney } from "@/lib/workflows";
 import { writeOptInLeadRecords } from "@/lib/optin-leads-store";
 import { writeReviewCallBookingRecords } from "@/lib/review-call-bookings-store";
-import { writeAdvanceVerificationRecords } from "@/lib/advance-verifications-store";
 import {
   deterministicContentHash,
   SHAKTI_ALGORITHM_VERSION,
@@ -37,6 +36,7 @@ import {
 import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
 import { assertCaseFileEvidenceRefs, assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
+import { readPaymentProofForVerification } from "@/lib/payment-proof-assets.server";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -813,6 +813,16 @@ export function approveAdvancePayment(clientId: string, proposalId: string, amou
   if (proposal.status !== "APPROVED") {
     throw new Error("The commercial proposal must be approved before the advance can be accepted.");
   }
+  if (proposal.clientId !== clientId) throw new Error("The proposal does not belong to this client.");
+  if (!Number.isSafeInteger(proposal.minAdvanceInr) || proposal.minAdvanceInr < 1 || proposal.minAdvanceInr > proposal.amountInr) {
+    throw new WorkflowConflictError("The approved proposal has an invalid minimum advance and must be corrected before payment verification.");
+  }
+  if (!Number.isSafeInteger(amountInr) || amountInr < proposal.minAdvanceInr || amountInr > proposal.amountInr) {
+    throw new Error(`Advance amount must be between ${formatMoney(proposal.minAdvanceInr)} and the approved proposal amount.`);
+  }
+  if (state.payments.some((payment) => payment.clientId === clientId && payment.proposalId === proposalId && payment.type === "ADVANCE" && payment.status === "APPROVED")) {
+    throw new WorkflowConflictError("An approved advance already exists for this proposal.");
+  }
 
   const payment: PaymentRecord = {
     id: nextId("payment"),
@@ -820,12 +830,12 @@ export function approveAdvancePayment(clientId: string, proposalId: string, amou
     proposalId,
     type: "ADVANCE",
     amountInr,
-    status: amountInr >= MIN_ADVANCE_INR ? "APPROVED" : "PENDING",
-    approvedAt: amountInr >= MIN_ADVANCE_INR ? new Date().toISOString() : undefined
+    status: "APPROVED",
+    approvedAt: new Date().toISOString()
   };
 
   state.payments.unshift(payment);
-  appendTimeline(clientId, "Advance payment recorded", `${formatMoney(amountInr)} advance marked ${payment.status}.`, "Payments", reviewer.role);
+  appendTimeline(clientId, "Advance payment recorded", `${formatMoney(amountInr)} advance marked ${payment.status}.`, "Payments", reviewer);
   return payment;
 }
 
@@ -833,8 +843,7 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   clientId: string;
   proposalId: string;
   amountInr: number;
-  referenceScreenshotUrl: string;
-  referenceScreenshotFileName: string;
+  proofId: string;
   actor: AppUser;
 }) {
   const state = getAppState();
@@ -845,62 +854,89 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   if (proposal.status !== "APPROVED") {
     throw new Error("The commercial proposal must be approved before advance proof can be verified.");
   }
+  if (proposal.clientId !== input.clientId) throw new Error("The proposal does not belong to this client.");
+
+  const proof = await readPaymentProofForVerification(input.proofId, {
+    key: "advance-proof",
+    clientId: input.clientId,
+    proposalId: input.proposalId
+  });
+  if (!proof?.id) throw new Error("Choose an uploaded advance proof for this client and proposal.");
+  if (proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  const existingVerification = state.advanceVerifications.find((item) => item.clientId === input.clientId && item.proposalId === input.proposalId);
+  if (existingVerification?.proofAssetId === proof.id) {
+    const existingPayment = state.payments.find((item) => item.id === existingVerification.paymentId);
+    if (!existingPayment) throw new WorkflowConflictError("The verified advance is missing its payment record and must be repaired before continuing.");
+    return {
+      payment: existingPayment,
+      verification: existingVerification,
+      caseRecord: existingVerification.caseId ? state.vastuCases.find((item) => item.id === existingVerification.caseId) : undefined
+    };
+  }
+  if (existingVerification) throw new WorkflowConflictError("This proposal already has a different verified advance proof.");
 
   const payment = approveAdvancePayment(input.clientId, input.proposalId, input.amountInr, input.actor);
-  payment.referenceScreenshotUrl = input.referenceScreenshotUrl;
-  payment.referenceScreenshotFileName = input.referenceScreenshotFileName;
+  payment.proofAssetId = proof.id;
+  payment.referenceScreenshotUrl = proof.url;
+  payment.referenceScreenshotFileName = proof.fileName;
   payment.verifiedBy = input.actor.fullName;
   payment.verifiedAt = nowIso();
-  payment.verificationNote = "Reference screenshot uploaded and checked against the advance amount.";
+  payment.verificationNote = "Scoped receipt uploaded and checked against the approved advance amount.";
 
   const verification: AdvanceVerificationRecord = {
     id: nextId("advver"),
     clientId: input.clientId,
     proposalId: input.proposalId,
     amountInr: input.amountInr,
-    referenceScreenshotUrl: input.referenceScreenshotUrl,
-    referenceScreenshotFileName: input.referenceScreenshotFileName,
+    referenceScreenshotUrl: proof.url,
+    referenceScreenshotFileName: proof.fileName,
     verifiedBy: input.actor.fullName,
     verifiedAt: payment.verifiedAt!,
     paymentId: payment.id,
+    proofAssetId: proof.id,
     status: "VERIFIED"
   };
 
   state.advanceVerifications.unshift(verification);
-  await writeAdvanceVerificationRecords(state.advanceVerifications);
 
   let caseRecord = state.vastuCases.find((item) => item.clientId === input.clientId && item.proposalId === input.proposalId);
   if (!caseRecord) {
     try {
-      caseRecord = createVastuCase(input.clientId, input.proposalId);
+      caseRecord = createVastuCase(input.clientId, input.proposalId, input.actor);
       verification.caseId = caseRecord.id;
       verification.status = "CASE_OPENED";
-      appendTimeline(input.clientId, "Advance verified and case opened", `Reference screenshot checked. Case ${caseRecord.caseNumber} opened automatically.`, "Payments", input.actor.role);
+      appendTimeline(input.clientId, "Advance verified and case opened", `Scoped receipt checked. Case ${caseRecord.caseNumber} opened automatically.`, "Payments", input.actor);
     } catch (error) {
-      appendTimeline(input.clientId, "Advance verified", "Advance was checked, but automatic case opening could not complete.", "Payments", input.actor.role);
+      appendTimeline(input.clientId, "Advance verified", "Advance was checked, but automatic case opening could not complete.", "Payments", input.actor);
     }
   } else {
     verification.caseId = caseRecord.id;
     verification.status = "CASE_OPENED";
-    appendTimeline(input.clientId, "Advance verified", `Reference screenshot checked for case ${caseRecord.caseNumber}.`, "Payments", input.actor.role);
+    appendTimeline(input.clientId, "Advance verified", `Scoped receipt checked for case ${caseRecord.caseNumber}.`, "Payments", input.actor);
   }
 
   return { payment, verification, caseRecord };
 }
 
-export function createVastuCase(clientId: string, proposalId: string) {
+export function createVastuCase(clientId: string, proposalId: string, actor: AppUser) {
   const state = getAppState();
   const proposal = state.commercialProposals.find((item) => item.id === proposalId);
   if (!proposal) {
     throw new Error("Proposal not found.");
   }
+  if (proposal.clientId !== clientId) throw new Error("The proposal does not belong to this client.");
 
-  const advance = state.payments.find((payment) => payment.clientId === clientId && payment.proposalId === proposalId && payment.type === "ADVANCE");
+  const advance = state.payments.find((payment) => payment.clientId === clientId
+    && payment.proposalId === proposalId
+    && payment.type === "ADVANCE"
+    && payment.status === "APPROVED"
+    && Boolean(payment.proofAssetId));
   if (!canCreateCase(proposal, advance)) {
     throw new Error("Advance approval is required before the case can be created.");
   }
 
-  const record = state.vastuCases.find((item) => item.clientId === clientId && item.proposalId === proposalId);
+  const activeRecord = getActiveCaseForClient(state, clientId);
+  const record = activeRecord?.proposalId === proposalId ? activeRecord : state.vastuCases.find((item) => item.clientId === clientId && item.proposalId === proposalId);
   if (record) {
     return record;
   }
@@ -929,7 +965,7 @@ export function createVastuCase(clientId: string, proposalId: string) {
   };
 
   state.floorWorkspaces.unshift(primaryFloor);
-  appendTimeline(clientId, "Case created", `Case ${caseNumber} opened after advance approval.`, "Case", "ADMIN");
+  appendTimeline(clientId, "Case created", `Case ${caseNumber} opened after scoped advance proof approval.`, "Case", actor);
   return nextCase;
 }
 
@@ -1042,6 +1078,21 @@ export function approveBalancePayment(clientId: string, caseId: string, amountIn
   if (caseRecord.status === "VERDICT_RELEASED") {
     throw new Error("The verdict has already been released for this case.");
   }
+  if (caseRecord.clientId !== clientId) throw new Error("The case does not belong to this client.");
+  const activeCase = getActiveCaseForClient(state, clientId);
+  if (activeCase?.id !== caseId) throw new WorkflowConflictError("Balance proof must be verified against the active case revision.");
+  const proposal = state.commercialProposals.find((item) => item.id === caseRecord.proposalId && item.clientId === clientId);
+  if (!proposal) throw new Error("The approved proposal for this case was not found.");
+  const approvedAdvance = state.payments
+    .filter((item) => item.clientId === clientId && item.proposalId === proposal.id && item.type === "ADVANCE" && item.status === "APPROVED")
+    .reduce((total, item) => total + item.amountInr, 0);
+  const expectedBalance = Math.max(0, proposal.amountInr - approvedAdvance);
+  if (!Number.isSafeInteger(amountInr) || amountInr !== expectedBalance || expectedBalance <= 0) {
+    throw new Error(`Balance amount must exactly match the remaining approved proposal balance of ${formatMoney(expectedBalance)}.`);
+  }
+  if (state.payments.some((item) => item.clientId === clientId && item.caseId === caseId && item.type === "BALANCE" && item.status === "APPROVED")) {
+    throw new WorkflowConflictError("An approved balance already exists for this case.");
+  }
 
   const payment: PaymentRecord = {
     id: nextId("payment"),
@@ -1059,16 +1110,15 @@ export function approveBalancePayment(clientId: string, caseId: string, amountIn
   caseRecord.status = "FULL_PAYMENT_APPROVED";
   caseRecord.reportStatus = "READY_FOR_APPROVAL";
 
-  appendTimeline(clientId, "Balance approved", `${formatMoney(amountInr)} balance cleared.`, "Payments", reviewer.role);
+  appendTimeline(clientId, "Balance approved", `${formatMoney(amountInr)} balance cleared.`, "Payments", reviewer);
   return payment;
 }
 
-export function verifyBalanceProof(input: {
+export async function verifyBalanceProof(input: {
   clientId: string;
   caseId: string;
   amountInr: number;
-  referenceScreenshotUrl: string;
-  referenceScreenshotFileName: string;
+  proofId: string;
   actor: AppUser;
 }) {
   const state = getAppState();
@@ -1077,19 +1127,31 @@ export function verifyBalanceProof(input: {
     throw new Error("Case not found.");
   }
 
+  const proof = await readPaymentProofForVerification(input.proofId, {
+    key: "balance-proof",
+    clientId: input.clientId,
+    caseId: input.caseId
+  });
+  if (!proof?.id) throw new Error("Choose an uploaded balance proof for this client and active case.");
+  if (proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  const existingPayment = state.payments.find((item) => item.clientId === input.clientId && item.caseId === input.caseId && item.type === "BALANCE" && item.status === "APPROVED");
+  if (existingPayment?.proofAssetId === proof.id) return { payment: existingPayment, caseRecord };
+  if (existingPayment) throw new WorkflowConflictError("This case already has a different verified balance proof.");
+
   const payment = approveBalancePayment(input.clientId, input.caseId, input.amountInr, input.actor);
-  payment.referenceScreenshotUrl = input.referenceScreenshotUrl;
-  payment.referenceScreenshotFileName = input.referenceScreenshotFileName;
+  payment.proofAssetId = proof.id;
+  payment.referenceScreenshotUrl = proof.url;
+  payment.referenceScreenshotFileName = proof.fileName;
   payment.verifiedBy = input.actor.fullName;
   payment.verifiedAt = nowIso();
-  payment.verificationNote = "Balance reference screenshot uploaded and checked before unlocking the final report flow.";
+  payment.verificationNote = "Scoped balance receipt uploaded and checked before unlocking the final report flow.";
 
   appendTimeline(
     input.clientId,
     "Balance proof verified",
-    `${formatMoney(input.amountInr)} balance verified from ${input.referenceScreenshotFileName}. Final report flow is now unlocked.`,
+    `${formatMoney(input.amountInr)} balance verified from ${proof.fileName}. Final report flow is now unlocked.`,
     "Payments",
-    input.actor.role
+    input.actor
   );
 
   return { payment, caseRecord };
@@ -1120,7 +1182,7 @@ export async function generatePreviewReport(caseId: string, actor: AppUser) {
   state.reportVersions.unshift(report);
   caseRecord.reportStatus = "PAYMENT_BLOCKED";
 
-  appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", "CONSULTANT");
+  appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", actor);
   return report;
 }
 
@@ -1133,6 +1195,8 @@ export async function prepareFinalReport(caseId: string, actor: AppUser) {
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Final report can only be prepared after the balance is approved.");
   }
+  const balancePayment = state.payments.find((item) => item.caseId === caseId && item.type === "BALANCE" && item.status === "APPROVED");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Final report preparation requires exact scoped balance proof verified by a different person.");
 
   const existing = state.reportVersions.find((item) => item.caseId === caseId && !item.isPreview && item.status !== "RELEASED");
   if (existing?.artifact?.immutable) {
@@ -1152,7 +1216,7 @@ export async function prepareFinalReport(caseId: string, actor: AppUser) {
 
   caseRecord.reportStatus = "READY_FOR_APPROVAL";
   caseRecord.status = "REPORT_APPROVAL_PENDING";
-  appendTimeline(caseRecord.clientId, "Final report prepared", `Official verdict report prepared by ${actor.fullName}.`, "Reports", actor.role);
+  appendTimeline(caseRecord.clientId, "Final report prepared", `Official verdict report prepared by ${actor.fullName}.`, "Reports", actor);
   return report;
 }
 
@@ -1287,6 +1351,8 @@ export function approveReport(reportId: string, actor: AppUser, comment = "Revie
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Balance approval is required before the final report can be approved.");
   }
+  const balancePayment = state.payments.find((item) => item.caseId === caseRecord.id && item.type === "BALANCE" && item.status === "APPROVED");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Report approval requires exact scoped balance proof.");
   if (report.status !== "READY_FOR_APPROVAL" && report.status !== "APPROVED") {
     throw new Error("Report is not in an approvable state.");
   }
@@ -1302,7 +1368,7 @@ export function approveReport(reportId: string, actor: AppUser, comment = "Revie
   caseRecord.reportStatus = report.status;
   caseRecord.status = (report.approvals ?? []).length >= 2 ? "REPORT_APPROVED" : "REPORT_APPROVAL_PENDING";
 
-  appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor.role);
+  appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor);
   return report;
 }
 
@@ -1319,6 +1385,8 @@ export function releaseVerdict(reportId: string, actor: AppUser) {
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Verdict release is blocked until the balance is approved.");
   }
+  const balancePayment = state.payments.find((item) => item.caseId === caseRecord.id && item.type === "BALANCE" && item.status === "APPROVED");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Verdict release requires exact scoped balance proof.");
   if (report.status !== "APPROVED" || caseRecord.reportStatus !== "APPROVED") {
     throw new Error("Verdict release requires an approved report.");
   }
@@ -1332,7 +1400,7 @@ export function releaseVerdict(reportId: string, actor: AppUser) {
   caseRecord.status = "VERDICT_RELEASED";
   caseRecord.reportStatus = "RELEASED";
   report.status = "RELEASED";
-  appendTimeline(caseRecord.clientId, "Verdict released", `Released by ${actor.fullName} after approvals.`, "Reports", actor.role);
+  appendTimeline(caseRecord.clientId, "Verdict released", `Released by ${actor.fullName} after approvals.`, "Reports", actor);
   return report;
 }
 

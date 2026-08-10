@@ -167,6 +167,7 @@ export interface PaymentRecord {
   verifiedBy?: string;
   verifiedAt?: string;
   verificationNote?: string;
+  proofAssetId?: string;
 }
 
 export interface AdvanceVerificationRecord {
@@ -179,6 +180,7 @@ export interface AdvanceVerificationRecord {
   verifiedBy: string;
   verifiedAt: string;
   paymentId: string;
+  proofAssetId?: string;
   caseId?: string;
   status: "VERIFIED" | "CASE_OPENED";
 }

@@ -77,7 +77,8 @@ export function WorkflowConsole() {
     caseRecord &&
       caseRecord.balanceApproved &&
       caseRecord.fullPaymentApproved &&
-      balancePayment?.status === "APPROVED"
+      balancePayment?.status === "APPROVED" &&
+      Boolean(balancePayment.proofAssetId)
   );
   const approvalCount = finalReport?.approvals?.length ?? 0;
   const verdictReadyByState = Boolean(

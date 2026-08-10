@@ -18,7 +18,13 @@ export const DEFAULT_PROPOSAL_AMOUNT_INR = 51000;
 export const QUALIFICATION_CALL_TARGET_MINUTES = 2;
 
 export function canCreateCase(proposal: CommercialProposalRecord, advance: PaymentRecord | undefined) {
-  return proposal.status === "APPROVED" && !!advance && advance.status === "APPROVED" && advance.amountInr >= MIN_ADVANCE_INR;
+  return proposal.status === "APPROVED"
+    && Number.isSafeInteger(proposal.minAdvanceInr)
+    && proposal.minAdvanceInr > 0
+    && !!advance
+    && advance.status === "APPROVED"
+    && advance.amountInr >= proposal.minAdvanceInr
+    && Boolean(advance.proofAssetId);
 }
 
 export function isPreviewWatermarked(report: ReportVersionRecord) {
@@ -26,7 +32,7 @@ export function isPreviewWatermarked(report: ReportVersionRecord) {
 }
 
 export function canReleaseOfficialVerdict(caseRecord: VastuCaseRecord, balancePayment: PaymentRecord | undefined) {
-  return caseRecord.balanceApproved && caseRecord.fullPaymentApproved && !!balancePayment && balancePayment.status === "APPROVED";
+  return caseRecord.balanceApproved && caseRecord.fullPaymentApproved && !!balancePayment && balancePayment.status === "APPROVED" && Boolean(balancePayment.proofAssetId);
 }
 
 export function canApproveCommercialProposal(user: AppUser) {
@@ -128,9 +134,14 @@ export function approvalSummary(caseRecord: VastuCaseRecord, proposal: Commercia
 
   return {
     commercialApproved: proposal.status === "APPROVED",
-    advanceApproved: !!advancePayment && advancePayment.status === "APPROVED" && advancePayment.amountInr >= MIN_ADVANCE_INR,
-    balanceApproved: !!balancePayment && balancePayment.status === "APPROVED",
-    verdictUnlocked: caseRecord.fullPaymentApproved && caseRecord.balanceApproved
+    advanceApproved: !!advancePayment
+      && advancePayment.status === "APPROVED"
+      && advancePayment.amountInr >= proposal.minAdvanceInr
+      && Boolean(advancePayment.proofAssetId),
+    balanceApproved: !!balancePayment && balancePayment.status === "APPROVED" && Boolean(balancePayment.proofAssetId),
+    verdictUnlocked: caseRecord.fullPaymentApproved
+      && caseRecord.balanceApproved
+      && Boolean(balancePayment?.proofAssetId)
   };
 }
 
