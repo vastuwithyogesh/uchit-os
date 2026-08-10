@@ -1,13 +1,14 @@
 import { NextResponse } from "next/server";
 import { requireRouteActor } from "@/lib/auth";
-import { loadStateFromPersistence, persistStateToDatabase } from "@/lib/persistence";
+import { loadStateFromPersistence, loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 
 export async function GET(request: Request) {
   const access = await requireRouteActor(request, "SETTER");
   if (!access.ok) {
     return access.response;
   }
-  return NextResponse.json(await loadStateFromPersistence());
+  const snapshot = await loadStateSnapshotFromPersistence();
+  return NextResponse.json({ ...snapshot.state, persistenceRevision: snapshot.revision });
 }
 
 export async function POST(request: Request) {

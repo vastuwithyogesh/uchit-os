@@ -24,6 +24,7 @@ import {
   PaymentRecord,
   ReviewCallBookingRecord,
   ReportVersionRecord,
+  RectificationRequestRecord,
   ShaktiSnapshotRecord,
   TimelineEvent,
   UtilityRule,
@@ -34,6 +35,8 @@ import {
 } from "@/lib/domain";
 
 export interface AppState {
+  /** Read-only response metadata used for optimistic concurrency; not a domain collection. */
+  persistenceRevision?: number | null;
   clients: typeof seedClients;
   leadQualifications: LeadQualificationRecord[];
   commercialProposals: CommercialProposalRecord[];
@@ -43,6 +46,7 @@ export interface AppState {
   vastuCases: VastuCaseRecord[];
   floorWorkspaces: FloorWorkspaceRecord[];
   reportVersions: ReportVersionRecord[];
+  rectificationRequests: RectificationRequestRecord[];
   evaluationSnapshots: EvaluationSnapshotRecord[];
   mapping32D: typeof seedMapping32D;
   mapping16D: typeof seedMapping16D;
@@ -64,6 +68,7 @@ const createInitialState = (): AppState => ({
   vastuCases: structuredClone(seedVastuCases),
   floorWorkspaces: structuredClone(seedFloorWorkspaces),
   reportVersions: structuredClone(seedReportVersions),
+  rectificationRequests: [],
   evaluationSnapshots: structuredClone(seedEvaluationSnapshots),
   mapping32D: structuredClone(seedMapping32D),
   mapping16D: structuredClone(seedMapping16D),

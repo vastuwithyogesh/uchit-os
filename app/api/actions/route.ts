@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { resolveRequestActor } from "@/lib/auth";
-import { persistStateToDatabase } from "@/lib/persistence";
+import { loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
+import { getAppState, setAppState, type AppState } from "@/lib/store";
 import {
   canApproveCommercialProposal,
   canApproveReport,
@@ -27,6 +28,7 @@ import {
   bookReviewCall,
   completeReviewCall,
   configureCaseService,
+  approveCaseRectification,
   generatePreviewReport,
   getClientSnapshot,
   lockOrientation,
@@ -36,6 +38,7 @@ import {
   recordShaktiSnapshot,
   recordLeadQualification,
   recordClientOutreachSend,
+  requestCaseRectification,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -51,6 +54,10 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve"]);
+  let expectedGlobalRevision: number | undefined;
+  let rollbackState: AppState | undefined;
+  let globalRevisionStale = false;
 
   function deny(message: string) {
     return NextResponse.json({ ok: false, error: message }, { status: 403 });
@@ -58,6 +65,16 @@ export async function POST(request: Request) {
 
   try {
     let response: unknown;
+
+    if (concurrencyActions.has(action)) {
+      if (!("expectedRecordVersion" in body) || !("expectedRevision" in body)) {
+        return NextResponse.json({ ok: false, error: "The latest case and state versions are required. Refresh and try again." }, { status: 428 });
+      }
+      const latest = await loadStateSnapshotFromPersistence();
+      rollbackState = structuredClone(latest.state);
+      globalRevisionStale = body.expectedRevision !== latest.revision;
+      expectedGlobalRevision = latest.revision ?? undefined;
+    }
 
     switch (action) {
       case "reset":
@@ -159,7 +176,7 @@ export async function POST(request: Request) {
           return deny("Only a consultant or administrator can update service setup.");
         }
         {
-          const allowedFields = new Set(["action", "actorRole", "caseId", "serviceType", "canonicalStage", "serviceTemplateVersion", "scopeVersion", "inputReadiness", "currentDrawing"]);
+          const allowedFields = new Set(["action", "actorRole", "caseId", "serviceType", "canonicalStage", "serviceTemplateVersion", "scopeVersion", "inputReadiness", "currentDrawing", "expectedRecordVersion", "expectedRevision"]);
           const unknownField = Object.keys(body).find((key) => !allowedFields.has(key));
           if (unknownField) return NextResponse.json({ ok: false, error: `Unknown service setup field: ${unknownField}.` }, { status: 400 });
         }
@@ -173,9 +190,18 @@ export async function POST(request: Request) {
             scopeVersion: body.scopeVersion,
             inputReadiness: body.inputReadiness,
             currentDrawing: body.currentDrawing,
-            actor
+            actor,
+            expectedRecordVersion: body.expectedRecordVersion
           })
         };
+        break;
+      case "case-rectification-request":
+        if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can request rectification.");
+        response = { ok: true, request: requestCaseRectification({ caseId: body.caseId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion, actor }) };
+        break;
+      case "case-rectification-approve":
+        if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") return deny("Only an administrator can approve rectification.");
+        response = { ok: true, result: await approveCaseRectification({ requestId: body.requestId, expectedRecordVersion: body.expectedRecordVersion, actor }) };
         break;
       case "floor-create":
         if (!canEditFloorWorkspaces(actor)) {
@@ -324,11 +350,20 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
     }
 
-    await persistStateToDatabase();
+    if (globalRevisionStale) {
+      const changed = JSON.stringify(getAppState()) !== JSON.stringify(rollbackState);
+      if (changed) {
+        setAppState(rollbackState!);
+        return NextResponse.json({ ok: false, error: "The saved state changed. Refresh and try again." }, { status: 409 });
+      }
+      return NextResponse.json(response);
+    }
+    await persistStateToDatabase(undefined, expectedGlobalRevision);
     return NextResponse.json(response);
   } catch (error) {
+    if (rollbackState) setAppState(rollbackState);
     const message = error instanceof Error ? error.message : "Unexpected error";
-    const status = error && typeof error === "object" && "statusCode" in error && error.statusCode === 409 ? 409 : 400;
+    const status = error && typeof error === "object" && "statusCode" in error && (error.statusCode === 409 || error.statusCode === 428) ? error.statusCode : 400;
     return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

@@ -10,7 +10,7 @@ test("service configuration is consultant-only, validated, and persisted by the 
   const action = switchCaseBody(actions, "case-service-configure");
   assert.match(action, /if \(!canEvaluateCases\(actor\)\)/);
   assert.match(action, /configureCaseService\(/);
-  assert.match(actions, /await persistStateToDatabase\(\)/);
+  assert.match(actions, /await persistStateToDatabase\(undefined, expectedGlobalRevision\)/);
   const configure = functionBody(workflow, "configureCaseService");
   assert.match(configure, /serviceTypes\.includes/);
   assert.match(configure, /canonicalServiceStages\.includes/);
@@ -28,11 +28,11 @@ test("rejected configuration cannot partially mutate a case", () => {
   }
 });
 
-test("service setup is locked after evaluation snapshots or any report", () => {
+test("service setup is locked after evaluation snapshots or an artifacted report", () => {
   const configure = functionBody(workflow, "configureCaseService");
   assert.match(configure, /state\.evaluationSnapshots\.some/);
   assert.match(configure, /state\.shaktiSnapshots\.some/);
-  assert.match(configure, /state\.reportVersions\.some\(\(item\) => item\.caseId === caseId\)/);
+  assert.match(configure, /state\.reportVersions\.some\(\(item\) => item\.caseId === caseId && item\.artifact\)/);
   assert.match(configure, /formal rectification workflow/);
 });
 
@@ -50,5 +50,5 @@ test("evaluation readiness requires orientation, complete inputs, and locked flo
   const assertion = functionBody(framework, "assertCaseReadyForEvaluation");
   assert.match(assertion, /getCaseEvaluationBlockers/);
   assert.match(assertion, /CaseReadinessError/);
-  assert.match(actions, /error\.statusCode === 409 \? 409 : 400/);
+  assert.match(actions, /error\.statusCode === 409 \|\| error\.statusCode === 428/);
 });

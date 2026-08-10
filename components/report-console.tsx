@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
+import { getActiveCaseForClient } from "@/lib/service-framework";
 import { canApproveReport, canEditFloorWorkspaces, canReleaseVerdict } from "@/lib/permissions";
 import { canReleaseOfficialVerdict, formatMoney, isPreviewWatermarked } from "@/lib/workflows";
 import { buildActionHeaders } from "@/lib/request-helpers";
@@ -40,7 +41,7 @@ export function ReportConsole() {
 
   const clients = state?.clients ?? [];
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
-  const currentCase = state?.vastuCases?.find((item) => item.clientId === selectedClient?.id);
+  const currentCase = state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined;
   const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
   const previewReport = reports.find((item) => item.isPreview);
   const finalReport = reports.find((item) => !item.isPreview);

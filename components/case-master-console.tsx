@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
 import type { CanonicalServiceStage, CaseInputReadiness, VastuServiceType } from "@/lib/domain";
-import { canonicalStageLabel, getServiceReadiness, getServiceReadinessChecklist, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import { canonicalStageLabel, getActiveCaseForClient, getServiceReadiness, getServiceReadinessChecklist, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 
@@ -21,7 +21,7 @@ async function fetchBootstrap() {
   if (!response.ok) {
     throw new Error("Failed to load case snapshot");
   }
-  return response.json() as Promise<AppState>;
+  return response.json() as Promise<AppState & { persistenceRevision?: number | null }>;
 }
 
 async function fetchChartSummary() {
@@ -32,10 +32,12 @@ async function fetchChartSummary() {
   return response.json() as Promise<ChartAssetSummaryPayload>;
 }
 
+class ActionError extends Error { constructor(message: string, readonly status: number) { super(message); } }
+
 async function postAction(payload: Record<string, unknown>, role: string) {
   const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(role as never), body: JSON.stringify(payload) });
   const result = await response.json();
-  if (!response.ok || result.ok === false) throw new Error(typeof result.error === "string" ? result.error : result.error?.message ?? "The service setup could not be saved. Review the fields and try again.");
+  if (!response.ok || result.ok === false) throw new ActionError(typeof result.error === "string" ? result.error : result.error?.message ?? "The change could not be saved. Review the fields and try again.", response.status);
   return result;
 }
 
@@ -56,12 +58,16 @@ export function CaseMasterConsole() {
   const [drawingVerifiedAt, setDrawingVerifiedAt] = useState("");
   const [drawingDiscrepancy, setDrawingDiscrepancy] = useState("");
   const [drawingSuperseded, setDrawingSuperseded] = useState(false);
+  const [persistenceRevision, setPersistenceRevision] = useState<number | null>(null);
+  const [conflict, setConflict] = useState(false);
+  const [rectificationReason, setRectificationReason] = useState("");
 
   async function refresh(preferredClientId?: string) {
     setBusy(true);
     try {
       const [nextState, nextAssets] = await Promise.all([fetchBootstrap(), fetchChartSummary()]);
       setState(nextState);
+      setPersistenceRevision(nextState.persistenceRevision ?? null);
       setAssetSummary(nextAssets.summary);
       setSelectedClientId((current) => preferredClientId ?? current ?? nextState.clients[0]?.id ?? "");
       setMessage("Case snapshot refreshed.");
@@ -81,7 +87,7 @@ export function CaseMasterConsole() {
   const lead = state?.leadQualifications.find((item) => item.clientId === selectedClient?.id);
   const proposal = state?.commercialProposals.find((item) => item.clientId === selectedClient?.id);
   const booking = state?.reviewCallBookings.find((item) => item.clientId === selectedClient?.id);
-  const caseRecord = state?.vastuCases.find((item) => item.clientId === selectedClient?.id);
+  const caseRecord = state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined;
   const floors = state?.floorWorkspaces.filter((item) => item.caseId === caseRecord?.id) ?? [];
   const payments = state?.payments.filter((item) => item.clientId === selectedClient?.id) ?? [];
   const reports = state?.reportVersions.filter((item) => item.caseId === caseRecord?.id) ?? [];
@@ -90,6 +96,8 @@ export function CaseMasterConsole() {
   const serviceReadiness = caseRecord ? getServiceReadiness(caseRecord) : null;
   const draftCase = caseRecord ? { ...caseRecord, serviceType, canonicalStage, serviceTemplateVersion, scopeVersion, inputReadiness, currentDrawing: serviceType === "NEW_CONSTRUCTION" ? { versionLabel: drawingVersion, verifiedAt: drawingVerifiedAt || undefined, discrepancy: drawingDiscrepancy || undefined, superseded: drawingSuperseded } : undefined } : null;
   const draftChecklist = draftCase ? getServiceReadinessChecklist(draftCase) : [];
+  const pendingRectification = state?.rectificationRequests.find((item) => item.predecessorCaseId === caseRecord?.id && item.status === "PENDING");
+  const canApproveRectification = Boolean(pendingRectification && (activeUser.role === "ADMIN" || activeUser.role === "SUPER_ADMIN") && pendingRectification.requestedBy.id !== activeUser.id);
 
   useEffect(() => {
     if (!caseRecord) return;
@@ -119,15 +127,39 @@ export function CaseMasterConsole() {
     setBusy(true);
     setMessage("Saving service setup...");
     try {
-      await postAction({ action: "case-service-configure", caseId: caseRecord.id, serviceType, canonicalStage, serviceTemplateVersion, scopeVersion, inputReadiness, currentDrawing: serviceType === "NEW_CONSTRUCTION" ? { versionLabel: drawingVersion, verifiedAt: drawingVerifiedAt || undefined, discrepancy: drawingDiscrepancy || undefined, superseded: drawingSuperseded } : undefined }, activeUser.role);
+      await postAction({ action: "case-service-configure", caseId: caseRecord.id, serviceType, canonicalStage, serviceTemplateVersion, scopeVersion, inputReadiness, currentDrawing: serviceType === "NEW_CONSTRUCTION" ? { versionLabel: drawingVersion, verifiedAt: drawingVerifiedAt || undefined, discrepancy: drawingDiscrepancy || undefined, superseded: drawingSuperseded } : undefined, expectedRecordVersion: caseRecord.recordVersion ?? 0, expectedRevision: persistenceRevision }, activeUser.role);
       await refresh(selectedClient?.id);
       setDirty(false);
       setMessage("Service setup saved. Evaluation readiness has been refreshed.");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "The service setup could not be saved. Try again.");
+      if (error instanceof ActionError && error.status === 409) { setConflict(true); setMessage("This case changed after you opened it. Reload the latest case, then review and reapply your changes. Nothing was saved."); }
+      else if (error instanceof ActionError && error.status === 428) setMessage("The case version is missing. Reload the latest case before saving.");
+      else setMessage(error instanceof Error ? error.message : "The service setup could not be saved. Try again.");
     } finally {
       setBusy(false);
     }
+  }
+
+  async function requestRectification() {
+    if (!caseRecord || rectificationReason.trim().length < 20) { setMessage("Explain the correction in at least 20 characters."); return; }
+    if (!window.confirm("Request a formal rectification? The released report stays unchanged. Approval opens a new linked case revision.")) return;
+    setBusy(true);
+    try {
+      await postAction({ action: "case-rectification-request", caseId: caseRecord.id, reason: rectificationReason.trim(), idempotencyKey: crypto.randomUUID(), expectedRecordVersion: caseRecord.recordVersion ?? 0, expectedRevision: persistenceRevision }, activeUser.role);
+      await refresh(selectedClient?.id); setRectificationReason(""); setMessage("Rectification requested. A different administrator must approve it.");
+    } catch (error) { if (error instanceof ActionError && error.status === 409) { setConflict(true); setMessage("This case changed. Reload it before requesting rectification."); } else if (error instanceof ActionError && error.status === 428) setMessage("Reload the latest case before requesting rectification."); else setMessage(error instanceof Error ? error.message : "Rectification could not be requested."); }
+    finally { setBusy(false); }
+  }
+
+  async function approveRectification() {
+    if (!caseRecord || !pendingRectification || !canApproveRectification) return;
+    if (!window.confirm("Approve this rectification? The old report remains immutable and a new linked case workspace will open.")) return;
+    setBusy(true);
+    try {
+      await postAction({ action: "case-rectification-approve", requestId: pendingRectification.id, expectedRecordVersion: caseRecord.recordVersion ?? 0, expectedRevision: persistenceRevision }, activeUser.role);
+      await refresh(selectedClient?.id); setMessage("Rectification approved. The new case revision is now active.");
+    } catch (error) { if (error instanceof ActionError && error.status === 409) { setConflict(true); setMessage("This case changed. Reload it before approving rectification."); } else if (error instanceof ActionError && error.status === 428) setMessage("Reload the latest case before approving rectification."); else setMessage(error instanceof Error ? error.message : "Rectification could not be approved."); }
+    finally { setBusy(false); }
   }
 
   const snapshotChecklist = useMemo(
@@ -218,7 +250,7 @@ export function CaseMasterConsole() {
         <h3>{service ? "Choose the service and confirm its required inputs" : "Open the case to choose a service"}</h3>
         {service && serviceReadiness ? (
           <>
-            <p className="subtle">Saved service: <strong>{serviceTypeLabel(service.serviceType)}</strong>. Current stage: <strong>{canonicalStageLabel(service.canonicalStage)}</strong>. Saved inputs ready: {serviceReadiness.completed} of {serviceReadiness.total}.</p>
+            <p className="subtle">Saved service: <strong>{serviceTypeLabel(service.serviceType)}</strong>. Current stage: <strong>{canonicalStageLabel(service.canonicalStage)}</strong>. Case revision: <strong>{caseRecord?.revisionNumber ?? 1}</strong>. Saved inputs ready: {serviceReadiness.completed} of {serviceReadiness.total}.</p>
             <div className="two-col" style={{ marginTop: 14 }}>
               <div className="field"><label htmlFor="service-type">Service</label><select id="service-type" value={serviceType} onChange={(event) => changeService(event.target.value as VastuServiceType)} disabled={busy}><option value="EXISTING_SPACE">Existing space assessment</option><option value="NEW_CONSTRUCTION">New construction planning</option></select></div>
               <div className="field"><label htmlFor="service-stage">Current stage</label><select id="service-stage" value={canonicalStage} onChange={(event) => { setCanonicalStage(event.target.value as CanonicalServiceStage); setDirty(true); }} disabled={busy}>{(["UNDERSTAND", "VERIFY", "MAP", "EVALUATE", "PRIORITISE", "RECOMMEND", "IMPLEMENT"] as CanonicalServiceStage[]).map((stage) => <option value={stage} key={stage}>{canonicalStageLabel(stage)}</option>)}</select></div>
@@ -229,9 +261,12 @@ export function CaseMasterConsole() {
             {serviceType === "NEW_CONSTRUCTION" ? <fieldset className="panel" style={{ marginTop: 14 }}><legend><strong>Current drawing</strong></legend><div className="two-col"><div className="field"><label htmlFor="drawing-version">Drawing version</label><input id="drawing-version" value={drawingVersion} onChange={(event) => { setDrawingVersion(event.target.value); setDirty(true); }} disabled={busy} /></div><div className="field"><label htmlFor="drawing-verified-at">Verified date</label><input id="drawing-verified-at" type="date" value={drawingVerifiedAt} onChange={(event) => { setDrawingVerifiedAt(event.target.value); setDirty(true); }} disabled={busy} /></div></div><div className="field" style={{ marginTop: 10 }}><label htmlFor="drawing-discrepancy">Unresolved discrepancy</label><textarea id="drawing-discrepancy" value={drawingDiscrepancy} onChange={(event) => { setDrawingDiscrepancy(event.target.value); setDirty(true); }} disabled={busy} placeholder="Leave blank when the drawing is verified and consistent." /></div><label className="list-item"><span><input type="checkbox" checked={drawingSuperseded} onChange={(event) => { setDrawingSuperseded(event.target.checked); setDirty(true); }} disabled={busy} /> <strong>This drawing has been replaced</strong></span><span className="meta">Superseded drawings cannot make the case ready.</span></label></fieldset> : null}
             <div className="workflow" style={{ marginTop: 14 }}><button type="button" className="button" onClick={saveServiceSetup} disabled={busy || !dirty} aria-busy={busy}>{busy ? "Saving..." : "Save service setup"}</button><span className={`tag ${dirty ? "warn" : "good"}`}>{dirty ? "Unsaved changes" : "Saved"}</span><span className="meta">Current form readiness: {draftChecklist.filter((item) => item.ready).length} of {draftChecklist.length}</span></div>
             <details style={{ marginTop: 14 }}><summary>Saved readiness status</summary><div className="list">{serviceReadiness.checklist.map((item) => <div className="list-item" key={item.key}><strong>{item.label}</strong><span className={`tag ${item.ready ? "good" : "warn"}`}>{item.ready ? "Ready" : "Needed"}</span></div>)}</div></details>
+            {conflict ? <div className="panel" role="alert" style={{ marginTop: 14 }}><strong>Reload before saving</strong><p className="subtle">Your unsaved form may be based on an older case version. Reload the latest case, then reapply the changes you still need.</p><button type="button" className="button-secondary" onClick={() => { setConflict(false); void refresh(selectedClient?.id); }} disabled={busy}>Reload latest case</button></div> : null}
           </>
         ) : <p className="subtle">Service details and the correct readiness checklist appear after the advance is approved and the case is opened.</p>}
       </div>
+
+      {caseRecord ? <div className="card span-12"><div className="eyebrow">Formal rectification</div><h3>Open a new linked case revision</h3><p className="subtle">Use this only when released or evaluated work needs correction. The old report and evidence stay unchanged. Approval creates a separate linked case workspace.</p>{pendingRectification ? <div className="panel"><strong>Request pending</strong><p className="subtle">{pendingRectification.reason}</p><span className="meta">Requested by {pendingRectification.requestedBy.name}</span>{canApproveRectification ? <button type="button" className="button" style={{ marginTop: 10 }} onClick={approveRectification} disabled={busy}>Approve and open new revision</button> : <span className="tag warn">A different administrator must approve</span>}</div> : <><div className="field"><label htmlFor="rectification-reason">Why is a new revision needed?</label><textarea id="rectification-reason" value={rectificationReason} onChange={(event) => setRectificationReason(event.target.value)} maxLength={500} placeholder="Describe what changed and why the existing evidence cannot be edited." disabled={busy} /></div><button type="button" className="button-secondary" onClick={requestRectification} disabled={busy || rectificationReason.trim().length < 20}>Request rectification</button></>}{caseRecord.parentCaseId ? <details style={{ marginTop: 14 }}><summary>Revision history</summary><p className="meta">This is revision {caseRecord.revisionNumber ?? 1}. Previous case ID: {caseRecord.parentCaseId}. <a href="/timeline">Open the permanent client history</a>.</p></details> : null}</div> : null}
 
       <div className="card span-4">
         <div className="eyebrow">Case health</div>

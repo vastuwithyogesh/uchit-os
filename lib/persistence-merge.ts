@@ -10,6 +10,7 @@ const collectionKeys = [
   "vastuCases",
   "floorWorkspaces",
   "reportVersions",
+  "rectificationRequests",
   "evaluationSnapshots",
   "mapping32D",
   "mapping16D",

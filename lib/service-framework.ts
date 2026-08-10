@@ -40,6 +40,12 @@ export function normalizeCaseService(caseRecord: VastuCaseRecord) {
   };
 }
 
+export function getActiveCaseForClient(state: Pick<AppState, "vastuCases">, clientId: string) {
+  return state.vastuCases
+    .filter((item) => item.clientId === clientId)
+    .sort((left, right) => (right.revisionNumber ?? 1) - (left.revisionNumber ?? 1))[0];
+}
+
 export function serviceTypeLabel(serviceType: VastuServiceType) {
   return serviceType === "NEW_CONSTRUCTION" ? "New construction planning" : "Existing space assessment";
 }
@@ -102,7 +108,7 @@ export function getCaseEvaluationBlockers(state: AppState, caseId: string) {
   if (!caseRecord) return ["Case not found. Return to the case workspace and select a valid case."];
   const blockers: string[] = [];
   if (!caseRecord.orientationLocked) blockers.push("Lock the orientation after completing direction verification.");
-  if (state.reportVersions.some((report) => report.caseId === caseId)) blockers.push("A report already exists. Start the formal rectification workflow before creating new evidence.");
+  if (state.reportVersions.some((report) => report.caseId === caseId && report.artifact)) blockers.push("An immutable report already exists. Start the formal rectification workflow before creating new evidence.");
 
   const readiness = getServiceReadiness(caseRecord);
   if (!readiness.ready) {

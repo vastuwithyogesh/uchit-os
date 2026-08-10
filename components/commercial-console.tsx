@@ -12,6 +12,7 @@ import type {
 } from "@/lib/domain";
 import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
+import { getActiveCaseForClient } from "@/lib/service-framework";
 import { formatTimeStamp } from "@/lib/format";
 import { canApproveReport, canReleaseVerdict } from "@/lib/permissions";
 import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
@@ -81,7 +82,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
 
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id) ?? proposals[0];
-  const activeCase = cases.find((item) => item.clientId === activeClient?.id) ?? cases[0];
+  const activeCase = activeClient ? getActiveCaseForClient({ vastuCases: cases }, activeClient.id) : cases[0];
   const activeReport =
     reports.find((item) => item.caseId === activeCase?.id && !item.isPreview) ??
     reports.find((item) => item.caseId === activeCase?.id) ??

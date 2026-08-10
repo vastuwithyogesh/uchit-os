@@ -1,5 +1,6 @@
 import type { AppUser, ClientRecord, VastuCaseStatus } from "@/lib/domain";
 import type { AppState } from "@/lib/store";
+import { getActiveCaseForClient } from "@/lib/service-framework";
 
 export class ClientAccountUnlinkedError extends Error {
   readonly code = "CLIENT_ACCOUNT_UNLINKED";
@@ -22,6 +23,7 @@ export class ClientPortalAccessError extends Error {
 const journeyStages: Array<{ status: VastuCaseStatus; label: string }> = [
   { status: "AWAITING_ADVANCE", label: "Advance payment" },
   { status: "CASE_CREATED", label: "Case opened" },
+  { status: "RECTIFICATION", label: "Revision opened" },
   { status: "FLOOR_WORKSPACE_ACTIVE", label: "Plan review" },
   { status: "ORIENTATION_LOCKED", label: "Direction confirmed" },
   { status: "STAGE_A_READY", label: "Preview prepared" },
@@ -65,7 +67,7 @@ export function buildClientPortalView(state: AppState, actor: AppUser) {
   const client = findOwnedClient(actor, state.clients);
   const cases = state.vastuCases.filter((item) => item.clientId === client.id);
   const caseIds = new Set(cases.map((item) => item.id));
-  const currentCase = cases.at(-1);
+  const currentCase = getActiveCaseForClient(state, client.id);
   const currentIndex = currentCase ? journeyStages.findIndex((item) => item.status === currentCase.status) : -1;
 
   return {

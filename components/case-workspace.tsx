@@ -98,6 +98,7 @@ export function CaseWorkspace({ items }: { items: CaseWorkspaceItem[] }) {
             <details>
               <summary>Show task details</summary>
               <p className="meta">Next action: {item.nextAction} · Blocked by: {item.blocker} · Responsible role: {item.ownerRole.toLowerCase()} · Internal status: {item.stage} · Timing: {item.slaLabel}</p>
+              {item.caseNumber?.match(/-R\d+$/) ? <p className="meta">This is a rectification revision linked to predecessor case {item.caseNumber.replace(/-R\d+$/, "")}. The earlier report remains unchanged. <Link href="/timeline">View revision history</Link>.</p> : null}
             </details>
           </article>
         ))}

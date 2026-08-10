@@ -14,6 +14,7 @@ import {
   WhatsAppTemplateRecord
 } from "@/lib/domain";
 import { useSession } from "@/components/session-provider";
+import { getActiveCaseForClient } from "@/lib/service-framework";
 import {
   DEFAULT_PROPOSAL_AMOUNT_INR,
   MIN_ADVANCE_INR,
@@ -76,7 +77,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const activeLead = leads.find((lead) => lead.clientId === activeClient?.id) ?? leads[0];
   const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id) ?? proposals[0];
-  const activeCase = cases.find((item) => item.clientId === activeClient?.id) ?? cases[0];
+  const activeCase = activeClient ? getActiveCaseForClient({ vastuCases: cases }, activeClient.id) : cases[0];
   const activeFloor = floors.find((item) => item.caseId === activeCase?.id) ?? floors[0];
   const activeReport = reports.find((item) => item.caseId === activeCase?.id) ?? reports[0];
   const activePayments = payments.filter((payment) => payment.clientId === activeClient?.id);

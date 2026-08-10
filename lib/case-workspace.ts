@@ -1,6 +1,6 @@
 import type { AppUser, UserRole, VastuCaseStatus } from "@/lib/domain";
 import { users } from "@/lib/seed";
-import { canonicalStageLabel, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import { canonicalStageLabel, getActiveCaseForClient, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 import type { AppState } from "@/lib/store";
 
 export type CaseWorkspaceItem = {
@@ -51,7 +51,7 @@ export function buildCaseWorkspaceProjection(state: AppState, actor: AppUser, as
   return state.clients
     .filter((client) => actor.role !== "SETTER" || client.assignedSetterId === actor.id)
     .map((client) => {
-      const caseRecord = state.vastuCases.find((item) => item.clientId === client.id);
+      const caseRecord = getActiveCaseForClient(state, client.id);
       const qualification = state.leadQualifications.find((item) => item.clientId === client.id);
       const assignedSetter = state.clients.find((item) => item.id === client.id)?.assignedSetterId;
       const setter = assignedSetter ? users.find((user) => user.id === assignedSetter) : undefined;

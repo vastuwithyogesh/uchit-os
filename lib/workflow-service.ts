@@ -34,7 +34,8 @@ import {
   UTILITY_RULESET_FORMAT_VERSION,
   validateShaktiInputs
 } from "@/lib/evaluation-provenance";
-import { assertCaseReadyForEvaluation, getServiceReadinessChecklist, normalizeCaseService } from "@/lib/service-framework";
+import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService } from "@/lib/service-framework";
+import { artifactStillMatches } from "@/lib/report-artifacts";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -64,6 +65,16 @@ function optionalDate(value: unknown, label: string) {
   return parsed.toISOString();
 }
 
+export class PreconditionRequiredError extends Error {
+  readonly statusCode = 428;
+  constructor(message: string) { super(message); this.name = "PreconditionRequiredError"; }
+}
+
+function assertExpectedRecordVersion(caseRecord: { recordVersion?: number }, expectedRecordVersion: unknown) {
+  if (!Number.isInteger(expectedRecordVersion) || (expectedRecordVersion as number) < 0) throw new PreconditionRequiredError("The latest case record version is required. Refresh the case and try again.");
+  if ((caseRecord.recordVersion ?? 0) !== expectedRecordVersion) throw new WorkflowConflictError("This case changed since it was opened. Refresh the case and retry.");
+}
+
 export function configureCaseService(input: {
   caseId: unknown;
   serviceType: unknown;
@@ -73,12 +84,13 @@ export function configureCaseService(input: {
   inputReadiness: unknown;
   currentDrawing?: unknown;
   actor: AppUser;
+  expectedRecordVersion: unknown;
 }) {
   const state = getAppState();
   const caseId = boundedRequiredString(input.caseId, "Case ID");
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) throw new Error("Case not found.");
-  if (state.evaluationSnapshots.some((item) => item.caseId === caseId) || state.shaktiSnapshots.some((item) => item.caseId === caseId) || state.reportVersions.some((item) => item.caseId === caseId)) {
+  if (state.evaluationSnapshots.some((item) => item.caseId === caseId) || state.shaktiSnapshots.some((item) => item.caseId === caseId) || state.reportVersions.some((item) => item.caseId === caseId && item.artifact)) {
     throw new WorkflowConflictError("Service setup is locked because evaluation or report evidence already exists. Start the formal rectification workflow before changing these inputs.");
   }
 
@@ -133,9 +145,80 @@ export function configureCaseService(input: {
     currentDrawing: caseRecord.currentDrawing
   };
   if (deterministicContentHash(currentConfiguration) === deterministicContentHash(nextConfiguration)) return caseRecord;
-  Object.assign(caseRecord, nextConfiguration);
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  Object.assign(caseRecord, nextConfiguration, { recordVersion: (caseRecord.recordVersion ?? 0) + 1 });
   appendTimeline(caseRecord.clientId, "Service setup updated", `${input.actor.fullName} set ${serviceType} at ${canonicalStage}; template=${serviceTemplateVersion}; scope=${scopeVersion}.`, "Case", input.actor);
   return caseRecord;
+}
+
+export function requestCaseRectification(input: { caseId: unknown; reason: unknown; idempotencyKey: unknown; expectedRecordVersion: unknown; actor: AppUser }) {
+  const state = getAppState();
+  const caseId = boundedRequiredString(input.caseId, "Case ID");
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) throw new Error("Case not found.");
+  const hasFormalEvidence = state.evaluationSnapshots.some((item) => item.caseId === caseId) || state.shaktiSnapshots.some((item) => item.caseId === caseId) || state.reportVersions.some((item) => item.caseId === caseId);
+  if (!hasFormalEvidence) throw new WorkflowConflictError("Rectification requires existing evaluation or report evidence. Continue the current case workflow instead.");
+  const reason = boundedRequiredString(input.reason, "Rectification reason", 500);
+  if (reason.length < 20) throw new Error("Rectification reason must be at least 20 characters.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const existing = state.rectificationRequests.find((item) => item.predecessorCaseId === caseId && item.idempotencyKey === idempotencyKey);
+  if (existing) return existing;
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const pending = state.rectificationRequests.find((item) => item.predecessorCaseId === caseId && item.status === "PENDING");
+  if (pending) throw new WorkflowConflictError("A rectification request is already pending for this case.");
+  const request = {
+    id: nextId("rectification"), predecessorCaseId: caseId, clientId: caseRecord.clientId, reason, idempotencyKey,
+    requestedBy: { id: input.actor.id, name: input.actor.fullName, role: input.actor.role }, requestedAt: nowIso(), status: "PENDING" as const
+  };
+  state.rectificationRequests.unshift(request);
+  appendTimeline(caseRecord.clientId, "Rectification requested", `${input.actor.fullName} created request ${request.id} for predecessor ${caseRecord.id}: ${reason}`, "Case", input.actor);
+  return request;
+}
+
+export async function approveCaseRectification(input: { requestId: unknown; expectedRecordVersion: unknown; actor: AppUser }) {
+  const state = getAppState();
+  const requestId = boundedRequiredString(input.requestId, "Rectification request ID");
+  const request = state.rectificationRequests.find((item) => item.id === requestId);
+  if (!request) throw new Error("Rectification request not found.");
+  if (request.status === "APPROVED" && request.successorCaseId) return { request, successor: state.vastuCases.find((item) => item.id === request.successorCaseId) };
+  if (request.requestedBy.id === input.actor.id) throw new WorkflowConflictError("The requester cannot approve their own rectification request.");
+  const predecessor = state.vastuCases.find((item) => item.id === request.predecessorCaseId);
+  if (!predecessor) throw new Error("Predecessor case not found.");
+  assertExpectedRecordVersion(predecessor, input.expectedRecordVersion);
+
+  const protectedReports = state.reportVersions.filter((item) => item.caseId === predecessor.id && item.artifact);
+  const matchesBefore = await Promise.all(protectedReports.map((report) => artifactStillMatches(state, report)));
+  if (matchesBefore.some((matches) => !matches)) throw new WorkflowConflictError("Historical report integrity failed before rectification. Stop and investigate the case evidence.");
+
+  const revisionNumber = (predecessor.revisionNumber ?? 1) + 1;
+  const successor = {
+    ...predecessor,
+    id: nextId("case"),
+    caseNumber: `${predecessor.caseNumber}-R${revisionNumber}`,
+    parentCaseId: predecessor.id,
+    revisionNumber,
+    recordVersion: 0,
+    status: "RECTIFICATION" as const,
+    reportStatus: "DRAFT" as const,
+    orientationLocked: false,
+    balanceApproved: false,
+    fullPaymentApproved: false,
+    canonicalStage: "UNDERSTAND" as const,
+    inputReadiness: undefined,
+    currentDrawing: undefined
+  };
+  state.vastuCases.unshift(successor);
+  const matchesAfter = await Promise.all(protectedReports.map((report) => artifactStillMatches(state, report)));
+  if (matchesAfter.some((matches) => !matches)) {
+    state.vastuCases = state.vastuCases.filter((item) => item.id !== successor.id);
+    throw new WorkflowConflictError("Rectification would alter historical report integrity, so no successor was created.");
+  }
+  request.status = "APPROVED";
+  request.approvedBy = { id: input.actor.id, name: input.actor.fullName, role: input.actor.role };
+  request.approvedAt = nowIso();
+  request.successorCaseId = successor.id;
+  appendTimeline(predecessor.clientId, "Rectification approved", `${input.actor.fullName} approved request ${request.id}; predecessor ${predecessor.id} remains unchanged and successor ${successor.id} (${successor.caseNumber}) is now active.`, "Case", input.actor);
+  return { request, successor, artifactStillMatchesBefore: matchesBefore.every(Boolean), artifactStillMatchesAfter: matchesAfter.every(Boolean) };
 }
 
 function nextId(prefix: string) {
@@ -1202,9 +1285,9 @@ export function getClientSnapshot(clientId: string) {
     reviewCallBooking: state.reviewCallBookings.find((item) => item.clientId === clientId),
     payments: state.payments.filter((item) => item.clientId === clientId),
     advanceVerifications: state.advanceVerifications.filter((item) => item.clientId === clientId),
-    caseRecord: state.vastuCases.find((item) => item.clientId === clientId),
-    floors: state.floorWorkspaces.filter((item) => item.caseId === state.vastuCases.find((caseItem) => caseItem.clientId === clientId)?.id),
-    reports: state.reportVersions.filter((item) => item.caseId === state.vastuCases.find((caseItem) => caseItem.clientId === clientId)?.id),
+    caseRecord: getActiveCaseForClient(state, clientId),
+    floors: state.floorWorkspaces.filter((item) => item.caseId === getActiveCaseForClient(state, clientId)?.id),
+    reports: state.reportVersions.filter((item) => item.caseId === getActiveCaseForClient(state, clientId)?.id),
     timeline: getClientTimeline(clientId),
     utilityRules: state.utilityRules
   };

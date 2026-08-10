@@ -9,8 +9,8 @@
       "_record-BdkTR7AP.js"
     ]
   },
-  "_app-rsc-cache-busting-CKUYMwgU.js": {
-    "file": "_next/static/chunks/app-rsc-cache-busting-CKUYMwgU.js",
+  "_app-rsc-cache-busting-DkMM1qwi.js": {
+    "file": "_next/static/chunks/app-rsc-cache-busting-DkMM1qwi.js",
     "name": "app-rsc-cache-busting",
     "imports": [
       "_rolldown-runtime-C60lm6uB.js",
@@ -90,8 +90,8 @@
     "file": "_next/static/chunks/rolldown-runtime-C60lm6uB.js",
     "name": "rolldown-runtime"
   },
-  "_service-framework-PLXz0GFV.js": {
-    "file": "_next/static/chunks/service-framework-PLXz0GFV.js",
+  "_service-framework-BpqluRT9.js": {
+    "file": "_next/static/chunks/service-framework-BpqluRT9.js",
     "name": "service-framework"
   },
   "_workflows-CLuNz0Ph.js": {
@@ -123,7 +123,7 @@
     ]
   },
   "components/case-master-console.tsx": {
-    "file": "_next/static/chunks/case-master-console-6ZF7SijA.js",
+    "file": "_next/static/chunks/case-master-console-ChAcTlfI.js",
     "name": "case-master-console",
     "src": "components/case-master-console.tsx",
     "isDynamicEntry": true,
@@ -131,12 +131,12 @@
       "_rolldown-runtime-C60lm6uB.js",
       "components/session-provider.tsx",
       "_request-helpers-BzARIuTP.js",
-      "_service-framework-PLXz0GFV.js",
+      "_service-framework-BpqluRT9.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/case-workspace.tsx": {
-    "file": "_next/static/chunks/case-workspace-BXHUlVMS.js",
+    "file": "_next/static/chunks/case-workspace-D6lpb5WK.js",
     "name": "case-workspace",
     "src": "components/case-workspace.tsx",
     "isDynamicEntry": true,
@@ -178,7 +178,7 @@
     ]
   },
   "components/commercial-console.tsx": {
-    "file": "_next/static/chunks/commercial-console-DurbTq1J.js",
+    "file": "_next/static/chunks/commercial-console-NH87kAab.js",
     "name": "commercial-console",
     "src": "components/commercial-console.tsx",
     "isDynamicEntry": true,
@@ -190,11 +190,12 @@
       "_image-upload-DoU-_GmH.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
+      "_service-framework-BpqluRT9.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "components/crm-workbench.tsx": {
-    "file": "_next/static/chunks/crm-workbench-CGNph3yD.js",
+    "file": "_next/static/chunks/crm-workbench-BiO0tV4Q.js",
     "name": "crm-workbench",
     "src": "components/crm-workbench.tsx",
     "isDynamicEntry": true,
@@ -204,6 +205,7 @@
       "_workflows-CLuNz0Ph.js",
       "_format-W_0JI1qT.js",
       "_request-helpers-BzARIuTP.js",
+      "_service-framework-BpqluRT9.js",
       "_framework-BaE7mD_r.js"
     ]
   },
@@ -220,7 +222,7 @@
     ]
   },
   "components/evaluation-console.tsx": {
-    "file": "_next/static/chunks/evaluation-console-TAittdW9.js",
+    "file": "_next/static/chunks/evaluation-console-tuXyTFdz.js",
     "name": "evaluation-console",
     "src": "components/evaluation-console.tsx",
     "isDynamicEntry": true,
@@ -229,7 +231,7 @@
       "components/session-provider.tsx",
       "_workflows-CLuNz0Ph.js",
       "_request-helpers-BzARIuTP.js",
-      "_service-framework-PLXz0GFV.js",
+      "_service-framework-BpqluRT9.js",
       "_framework-BaE7mD_r.js"
     ]
   },
@@ -269,7 +271,7 @@
     ]
   },
   "components/report-console.tsx": {
-    "file": "_next/static/chunks/report-console-ByUHaD9T.js",
+    "file": "_next/static/chunks/report-console-CS0mK35N.js",
     "name": "report-console",
     "src": "components/report-console.tsx",
     "isDynamicEntry": true,
@@ -279,6 +281,7 @@
       "_workflows-CLuNz0Ph.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
+      "_service-framework-BpqluRT9.js",
       "_framework-BaE7mD_r.js"
     ]
   },
@@ -304,7 +307,7 @@
     ]
   },
   "components/site-header.tsx": {
-    "file": "_next/static/chunks/site-header-CinslQfK.js",
+    "file": "_next/static/chunks/site-header-C77fVRNz.js",
     "name": "site-header",
     "src": "components/site-header.tsx",
     "isDynamicEntry": true,
@@ -337,7 +340,7 @@
     ]
   },
   "components/workflow-console.tsx": {
-    "file": "_next/static/chunks/workflow-console-DcM4xECw.js",
+    "file": "_next/static/chunks/workflow-console-Dalvfz1I.js",
     "name": "workflow-console",
     "src": "components/workflow-console.tsx",
     "isDynamicEntry": true,
@@ -347,11 +350,12 @@
       "_workflows-CLuNz0Ph.js",
       "_permissions-05waxgq9.js",
       "_request-helpers-BzARIuTP.js",
+      "_service-framework-BpqluRT9.js",
       "_framework-BaE7mD_r.js"
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js": {
-    "file": "_next/static/chunks/hybrid-client-route-owner-COQFlh8s.js",
+    "file": "_next/static/chunks/hybrid-client-route-owner-B0I8nqI_.js",
     "name": "hybrid-client-route-owner",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js",
     "isDynamicEntry": true,
@@ -362,7 +366,7 @@
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/layout-segment-context.js": {
-    "file": "_next/static/chunks/layout-segment-context-BNg7ZgtP.js",
+    "file": "_next/static/chunks/layout-segment-context-sVc_olcf.js",
     "name": "layout-segment-context",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/layout-segment-context.js",
     "isDynamicEntry": true,
@@ -374,7 +378,7 @@
     ]
   },
   "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js": {
-    "file": "_next/static/chunks/link-BFnQlEc3.js",
+    "file": "_next/static/chunks/link-BpBVDqei.js",
     "name": "link",
     "src": "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/link.js",
     "isDynamicEntry": true,
@@ -391,13 +395,13 @@
       "node_modules/.pnpm/vinext@1.0.0-beta.2_@vitejs_561aadbab87c1e2e2c6c09addacbf130/node_modules/vinext/dist/shims/internal/hybrid-client-route-owner.js",
       "virtual:vinext-app-browser-entry",
       "_app-elements-Drg5O4vw.js",
-      "_app-rsc-cache-busting-CKUYMwgU.js",
+      "_app-rsc-cache-busting-DkMM1qwi.js",
       "_app-rsc-render-mode-IDJu5NEE.js",
       "_headers-CeAbe3am.js"
     ]
   },
   "virtual:vinext-app-browser-entry": {
-    "file": "_next/static/chunks/index-CcTXeqrV.js",
+    "file": "_next/static/chunks/index-DQO9Uzt8.js",
     "name": "index",
     "src": "virtual:vinext-app-browser-entry",
     "isEntry": true,
@@ -405,7 +409,7 @@
       "_rolldown-runtime-C60lm6uB.js",
       "_framework-BaE7mD_r.js",
       "_app-elements-Drg5O4vw.js",
-      "_app-rsc-cache-busting-CKUYMwgU.js",
+      "_app-rsc-cache-busting-DkMM1qwi.js",
       "_headers-CeAbe3am.js",
       "_navigation-errors-wvgRKjB-.js",
       "_hash-D0ldriCF.js",

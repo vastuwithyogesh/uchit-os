@@ -200,6 +200,25 @@ export interface VastuCaseRecord {
   scopeVersion?: string;
   inputReadiness?: CaseInputReadiness;
   currentDrawing?: CaseDrawingReference;
+  /** Optimistic-concurrency token; legacy records normalize to version 0. */
+  recordVersion?: number;
+  /** Rectifications link forward only from the successor, preserving predecessor evidence. */
+  parentCaseId?: string;
+  revisionNumber?: number;
+}
+
+export interface RectificationRequestRecord {
+  id: string;
+  predecessorCaseId: string;
+  clientId: string;
+  reason: string;
+  idempotencyKey: string;
+  requestedBy: { id: string; name: string; role: UserRole };
+  requestedAt: string;
+  status: "PENDING" | "APPROVED";
+  approvedBy?: { id: string; name: string; role: UserRole };
+  approvedAt?: string;
+  successorCaseId?: string;
 }
 
 export interface FloorWorkspaceRecord {

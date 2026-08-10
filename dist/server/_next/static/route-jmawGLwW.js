@@ -1,0 +1,17 @@
+import{a as e,c as t}from"./auth-DgI-DxVa.js";import{n}from"./server-CWFOU-7j.js";import{t as r}from"./chart-asset-definitions-RMRpRTIu.js";import{extname as i,join as a}from"node:path";import{constants as o}from"node:fs";import{access as s,mkdir as c,readFile as l,writeFile as u}from"node:fs/promises";var d=a(process.cwd(),`data`,`chart-assets.json`),f=a(process.cwd(),`public`,`chart-assets`);async function p(){try{await s(d,o.F_OK)}catch{await c(a(process.cwd(),`data`),{recursive:!0}),await u(d,JSON.stringify([],null,2),`utf8`)}}function m(e){return{key:String(e.key??``),label:String(e.label??``),fileName:String(e.fileName??e.file_name??``),url:String(e.url??``),uploadedAt:String(e.uploadedAt??e.uploaded_at??new Date().toISOString())}}async function h(){try{await s(d,o.F_OK);let e=await l(d,`utf8`);return JSON.parse(e).map(m)}catch{}let e=t();if(e.DB)return await e.DB.prepare(`
+      CREATE TABLE IF NOT EXISTS chart_assets (
+        key TEXT PRIMARY KEY,
+        label TEXT NOT NULL,
+        file_name TEXT NOT NULL,
+        url TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL
+      )
+    `).run(),((await e.DB.prepare(`SELECT key, label, file_name, url, uploaded_at FROM chart_assets ORDER BY uploaded_at DESC`).all()).results??[]).map(m);await p();let n=await l(d,`utf8`);return JSON.parse(n).map(m)}async function g(e){let n=t();if(n.DB){let t=n.DB;await t.batch([t.prepare(`
+        CREATE TABLE IF NOT EXISTS chart_assets (
+          key TEXT PRIMARY KEY,
+          label TEXT NOT NULL,
+          file_name TEXT NOT NULL,
+          url TEXT NOT NULL,
+          uploaded_at TEXT NOT NULL
+        )
+      `),t.prepare(`DELETE FROM chart_assets`)]),e.length>0&&await n.DB.batch(e.map(e=>t.prepare(`INSERT INTO chart_assets (key, label, file_name, url, uploaded_at) VALUES (?, ?, ?, ?, ?)`).bind(e.key,e.label,e.fileName,e.url,e.uploadedAt)))}return await p(),await u(d,JSON.stringify(e,null,2),`utf8`),e}async function _(){return await c(f,{recursive:!0}),f}function v(e){return r.find(t=>t.key===e)}function y(e){return`/chart-assets/${e}`}function b(e){return e.replace(/[^a-zA-Z0-9._-]/g,`_`)}function x(e,t){let n=i(t)||`.png`;return`${e}-${Date.now()}${n}`}async function S(e,n){let r=t();return r.R2?(await r.R2.put(`chart-assets/${e}`,n),{fileName:e,url:`/chart-assets/${e}`}):(await _(),await u(a(f,e),n),{fileName:e,url:y(e)})}async function C(t){let i=await e(t,`CONSULTANT`);if(!i.ok)return i.response;let a=await h(),o=new Set(a.map(e=>e.key));return n.json({assets:a,definitions:r,summary:{required:r.length,uploaded:a.length,pending:r.length-a.length,complete:r.length>0&&a.length===r.length,missingKeys:r.filter(e=>!o.has(e.key)).map(e=>e.key)}})}async function w(t){let r=await e(t,`CONSULTANT`);if(!r.ok)return r.response;let i=await t.formData(),a=String(i.get(`key`)??``),o=i.get(`file`);if(!v(a))return n.json({ok:!1,error:`Unknown chart key.`},{status:400});if(!(o instanceof File))return n.json({ok:!1,error:`Missing chart image file.`},{status:400});let s=x(a,b(o.name||`${a}.png`));await S(s,new Uint8Array(await o.arrayBuffer()));let c=(await h()).filter(e=>e.key!==a),l=v(a),u={key:l.key,label:l.label,fileName:s,url:y(s),uploadedAt:new Date().toISOString()};return await g([u,...c]),n.json({ok:!0,asset:u})}export{C as GET,w as POST};

@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
+import { getActiveCaseForClient } from "@/lib/service-framework";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { canApproveCommercialProposal, canApproveReport, canEditFloorWorkspaces, canReleaseVerdict } from "@/lib/permissions";
 import { canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
@@ -45,7 +46,7 @@ export function WorkflowConsole() {
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const proposal = state?.commercialProposals.find((item) => item.clientId === selectedClient?.id);
   const booking = state?.reviewCallBookings.find((item) => item.clientId === selectedClient?.id);
-  const caseRecord = state?.vastuCases.find((item) => item.clientId === selectedClient?.id);
+  const caseRecord = state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined;
   const floorWorkspaces = state?.floorWorkspaces.filter((item) => item.caseId === caseRecord?.id) ?? [];
   const selectedFloor = floorWorkspaces[0];
   const reportVersions = state?.reportVersions.filter((item) => item.caseId === caseRecord?.id) ?? [];

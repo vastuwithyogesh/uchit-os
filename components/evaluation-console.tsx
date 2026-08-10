@@ -6,7 +6,7 @@ import type { ReportVersionRecord, UtilityRule } from "@/lib/domain";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { isPreviewWatermarked, formatMoney } from "@/lib/workflows";
-import { getCaseEvaluationBlockers, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import { getActiveCaseForClient, getCaseEvaluationBlockers, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 
 async function fetchMaster() {
   const response = await fetch("/api/utility/master", { cache: "no-store" });
@@ -50,7 +50,7 @@ export function EvaluationConsole() {
 
   const clients = state?.clients ?? [];
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
-  const currentCase = state?.vastuCases?.find((item) => item.clientId === selectedClient?.id);
+  const currentCase = state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined;
   const readiness = currentCase ? getServiceReadiness(currentCase) : null;
   const service = currentCase ? normalizeCaseService(currentCase) : null;
   const evaluationBlockers = currentCase && state ? getCaseEvaluationBlockers(state, currentCase.id) : ["Open a case and save its service setup."];

@@ -35,12 +35,12 @@ test("service configuration rejects unknown top-level fields with a bad request"
   assert.match(action, /status: 400/);
 });
 
-test("all existing reports block both engines with conflict semantics", () => {
+test("artifacted reports block both engines with conflict semantics", () => {
   const blockers = functionBody(framework, "getCaseEvaluationBlockers");
-  assert.match(blockers, /report\.caseId === caseId/);
+  assert.match(blockers, /report\.caseId === caseId && report\.artifact/);
   assert.match(blockers, /formal rectification workflow/);
   assert.match(functionBody(framework, "assertCaseReadyForEvaluation"), /getCaseEvaluationBlockers/);
-  assert.match(actions, /statusCode === 409 \? 409 : 400/);
+  assert.match(actions, /error\.statusCode === 409 \|\| error\.statusCode === 428/);
 });
 
 test("drawing dates reject future values and invalid chronology", () => {
