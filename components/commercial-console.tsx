@@ -5,6 +5,7 @@ import type {
   AdvanceVerificationRecord,
   ClientRecord,
   CommercialProposalRecord,
+  CommercialPolicy,
   PaymentRecord,
   ReportVersionRecord,
   ReviewCallBookingRecord,
@@ -14,12 +15,14 @@ import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
 import { getActiveCaseForClient } from "@/lib/service-framework";
 import { formatTimeStamp } from "@/lib/format";
-import { canApproveReport, canReleaseVerdict } from "@/lib/permissions";
-import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
+import { canApproveReport, canReleaseVerdict, canVerifyPayments } from "@/lib/permissions";
+import { approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { prepareImageUpload } from "@/lib/image-upload";
+import type { PaymentProofRecord } from "@/lib/payment-proof-types";
 
 interface CommercialConsoleProps {
+  commercialPolicy: CommercialPolicy;
   clients: ClientRecord[];
   proposals: CommercialProposalRecord[];
   reviewCallBookings: ReviewCallBookingRecord[];
@@ -62,12 +65,14 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     next.setHours(10, 30, 0, 0);
     return next.toISOString().slice(0, 16);
   });
-  const [proofAmount, setProofAmount] = useState(MIN_ADVANCE_INR);
+  const [proofAmount, setProofAmount] = useState(props.commercialPolicy.minimumAdvanceInr);
   const [proofFileName, setProofFileName] = useState("");
   const [proofUrl, setProofUrl] = useState("");
-  const [balanceProofAmount, setBalanceProofAmount] = useState(40000);
+  const [proofId, setProofId] = useState("");
+  const [balanceProofAmount, setBalanceProofAmount] = useState(Math.max(0, props.commercialPolicy.defaultProposalAmountInr - props.commercialPolicy.minimumAdvanceInr));
   const [balanceProofFileName, setBalanceProofFileName] = useState("");
   const [balanceProofUrl, setBalanceProofUrl] = useState("");
+  const [balanceProofId, setBalanceProofId] = useState("");
   const [reviewOutcomeNote, setReviewOutcomeNote] = useState("Client attended the review call and is ready for the next step.");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Use the controls below to move the commercial flow forward.");
@@ -79,26 +84,33 @@ export function CommercialConsole(props: CommercialConsoleProps) {
   const advanceVerifications = liveState?.advanceVerifications ?? props.advanceVerifications;
   const cases = liveState?.vastuCases ?? props.cases;
   const reports = liveState?.reportVersions ?? props.reports;
+  const commercialPolicy = liveState?.commercialPolicy ?? props.commercialPolicy;
 
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
-  const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id) ?? proposals[0];
-  const activeCase = activeClient ? getActiveCaseForClient({ vastuCases: cases }, activeClient.id) : cases[0];
+  const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id);
+  const activeCase = activeClient ? getActiveCaseForClient({ vastuCases: cases }, activeClient.id) : undefined;
   const activeReport =
     reports.find((item) => item.caseId === activeCase?.id && !item.isPreview) ??
-    reports.find((item) => item.caseId === activeCase?.id) ??
-    reports[0];
-  const activeBooking = reviewCallBookings.find((item) => item.clientId === activeClient?.id) ?? reviewCallBookings[0];
-  const activeVerification = advanceVerifications.find((item) => item.clientId === activeClient?.id) ?? advanceVerifications[0];
+    reports.find((item) => item.caseId === activeCase?.id);
+  const activeBooking = reviewCallBookings.find((item) => item.clientId === activeClient?.id);
+  const activeVerification = advanceVerifications.find((item) => item.clientId === activeClient?.id && item.proposalId === activeProposal?.id);
   const activePayments = payments.filter((payment) => payment.clientId === activeClient?.id);
   const approval = activeCase && activeProposal ? approvalSummary(activeCase, activeProposal, activePayments) : null;
   const advancePayment = activePayments.find((payment) => payment.proposalId === activeProposal?.id && payment.type === "ADVANCE");
+  useEffect(() => {
+    const advance = activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr;
+    setProofAmount(advance);
+    setBalanceProofAmount(Math.max(0, (activeProposal?.amountInr ?? commercialPolicy.defaultProposalAmountInr) - (advancePayment?.amountInr ?? advance)));
+  }, [activeClient?.id, activeProposal?.id, activeProposal?.amountInr, activeProposal?.minAdvanceInr, advancePayment?.amountInr, commercialPolicy]);
   const balancePayment = activePayments.find((payment) => payment.caseId === activeCase?.id && payment.type === "BALANCE");
+  const advanceVerified = Boolean(activeVerification?.proofAssetId && advancePayment?.proofAssetId);
   const approvalCount = activeReport?.isPreview ? 0 : activeReport?.approvals?.length ?? 0;
   const canPrepareFinalReport = Boolean(
     activeCase &&
       activeCase.balanceApproved &&
       activeCase.fullPaymentApproved &&
-      balancePayment?.status === "APPROVED"
+      balancePayment?.status === "APPROVED" &&
+      Boolean(balancePayment.proofAssetId)
   );
   const verdictReadyByState = Boolean(
     activeCase &&
@@ -127,20 +139,20 @@ export function CommercialConsole(props: CommercialConsoleProps) {
       },
       {
         label: "Advance verified",
-        done: Boolean(activeVerification),
-        note: activeVerification ? `${formatMoney(activeVerification.amountInr)} verified` : "Waiting on screenshot proof"
+        done: advanceVerified,
+        note: advanceVerified ? `${formatMoney(activeVerification!.amountInr)} verified` : "Waiting on independently verified receipt"
       },
       { label: "Case opened", done: Boolean(activeCase), note: activeCase ? activeCase.caseNumber : "Case is still locked" },
       { label: "Verdict ready", done: Boolean(canRelease), note: canRelease ? "Ready for final release" : "Balance or approvals still pending" }
     ],
-    [activeBooking, activeCase, activeProposal, activeVerification, canRelease, commercialStatus]
+    [activeBooking, activeCase, activeProposal, activeVerification, advanceVerified, canRelease, commercialStatus]
   );
 
   const blockers = [
     !activeProposal ? "Create the proposal first." : null,
     activeProposal && activeProposal.status !== "APPROVED" ? "The proposal still needs Super-Admin approval." : null,
     activeProposal && !activeBooking ? "Book the review call before collecting the advance." : null,
-    activeProposal && !activeVerification ? "Verify the advance screenshot to open the case automatically." : null,
+    activeProposal && !advanceVerified ? "Upload and independently verify the scoped advance receipt to open the case." : null,
     activeProposal && !caseGateOpen ? "Advance exists, but it does not yet clear the minimum gate." : null,
     activeCase && !balancePayment ? "Balance payment is not recorded yet." : null,
     activeCase && !canPrepareFinalReport ? "Balance approval still blocks the final report." : null,
@@ -152,7 +164,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     if (!activeProposal) return "Create the proposal for this client.";
     if (activeProposal.status !== "APPROVED") return "Get the proposal approved by a Super-Admin.";
     if (!activeBooking) return "Book the review call and send the meeting link.";
-    if (!activeVerification) return "Upload and verify the advance screenshot.";
+    if (!advanceVerified) return "Upload the advance receipt, then have a different administrator verify it.";
     if (!activeCase) return "Open the case now that the advance rule is satisfied.";
     if (!balancePayment) return "Collect and verify the balance payment.";
     if (!canPrepareFinalReport) return "Finish balance approval to unlock the final report.";
@@ -181,22 +193,31 @@ export function CommercialConsole(props: CommercialConsoleProps) {
       return;
     }
 
+    if (!activeClient || (kind === "advance" && !activeProposal) || (kind === "balance" && !activeCase)) {
+      setMessage("Choose the client and matching proposal or active case first.");
+      return;
+    }
     setBusy(true);
     try {
       const prepared = await prepareImageUpload(file);
       const formData = new FormData();
       formData.append("key", kind === "advance" ? "advance-proof" : "balance-proof");
       formData.append("file", prepared.file);
+      formData.append("clientId", activeClient.id);
+      if (kind === "advance" && activeProposal) formData.append("proposalId", activeProposal.id);
+      if (kind === "balance" && activeCase) formData.append("caseId", activeCase.id);
       const response = await fetch("/api/payment-proofs", { method: "POST", body: formData });
       const result = await response.json();
       if (!response.ok || result.ok === false) {
         throw new Error(result.error ?? "Upload failed");
       }
       if (kind === "advance") {
+        setProofId(result.proof.id);
         setProofFileName(result.proof.fileName);
         setProofUrl(result.proof.url);
         setMessage(prepared.compressed ? "Advance proof screenshot uploaded after trimming the file." : "Advance proof screenshot uploaded.");
       } else {
+        setBalanceProofId(result.proof.id);
         setBalanceProofFileName(result.proof.fileName);
         setBalanceProofUrl(result.proof.url);
         setMessage(prepared.compressed ? "Balance proof screenshot uploaded after trimming the file." : "Balance proof screenshot uploaded.");
@@ -228,6 +249,34 @@ export function CommercialConsole(props: CommercialConsoleProps) {
   useEffect(() => {
     refresh().catch(() => undefined);
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    async function loadScopedProofs() {
+      if (!activeClient || (!activeProposal && !activeCase)) {
+        setProofId(""); setProofUrl(""); setProofFileName("");
+        setBalanceProofId(""); setBalanceProofUrl(""); setBalanceProofFileName("");
+        return;
+      }
+      const query = new URLSearchParams({ clientId: activeClient.id });
+      if (activeProposal) query.set("proposalId", activeProposal.id);
+      if (activeCase) query.set("caseId", activeCase.id);
+      try {
+        const response = await fetch(`/api/payment-proofs?${query.toString()}`, { cache: "no-store" });
+        const result = await response.json() as { assets?: PaymentProofRecord[]; error?: string };
+        if (!response.ok) throw new Error(result.error ?? "Payment receipts could not be loaded.");
+        if (cancelled) return;
+        const advanceProof = result.assets?.find((asset) => asset.key === "advance-proof");
+        const balanceProof = result.assets?.find((asset) => asset.key === "balance-proof");
+        setProofId(advanceProof?.id ?? ""); setProofUrl(advanceProof?.url ?? ""); setProofFileName(advanceProof?.fileName ?? "");
+        setBalanceProofId(balanceProof?.id ?? ""); setBalanceProofUrl(balanceProof?.url ?? ""); setBalanceProofFileName(balanceProof?.fileName ?? "");
+      } catch (error) {
+        if (!cancelled) setMessage(error instanceof Error ? error.message : "Payment receipts could not be loaded.");
+      }
+    }
+    loadScopedProofs().catch(() => undefined);
+    return () => { cancelled = true; };
+  }, [activeClient?.id, activeProposal?.id, activeCase?.id]);
 
   return (
     <section className="section-grid" style={{ marginTop: 22 }}>
@@ -270,7 +319,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
           <div className="panel">
             <div className="field">
               <label>Client</label>
-              <select value={selectedClientId} onChange={(event) => setSelectedClientId(event.target.value)}>
+              <select value={selectedClientId} onChange={(event) => {
+                setSelectedClientId(event.target.value);
+                setProofId(""); setProofUrl(""); setProofFileName("");
+                setBalanceProofId(""); setBalanceProofUrl(""); setBalanceProofFileName("");
+              }}>
                 {clients.map((client) => (
                   <option key={client.id} value={client.id}>
                     {client.displayName}
@@ -330,7 +383,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
                 type="button"
                 className="button-secondary"
                 disabled={busy || !activeClient}
-                onClick={() => run({ action: "proposal-create", amountInr: DEFAULT_PROPOSAL_AMOUNT_INR }, "Proposal drafted")}
+                onClick={() => run({ action: "proposal-create" }, "Proposal drafted")}
               >
                 Create proposal
               </button>
@@ -348,7 +401,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
                 type="button"
                 className="button-secondary"
                 disabled={busy || !activeProposal}
-                onClick={() => run({ action: "advance-pay", proposalId: activeProposal?.id, amountInr: MIN_ADVANCE_INR }, "Advance payment approved")}
+                onClick={() => run({ action: "advance-pay", proposalId: activeProposal?.id, amountInr: activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr }, "Advance payment approved")}
               >
                 Approve advance
               </button>
@@ -356,7 +409,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
                 type="button"
                 className="button-secondary"
                 disabled={busy || !activeCase}
-                onClick={() => run({ action: "balance-pay", caseId: activeCase?.id, amountInr: 40000 }, "Balance payment approved")}
+                onClick={() => run({ action: "balance-pay", caseId: activeCase?.id, amountInr: Math.max(0, (activeProposal?.amountInr ?? commercialPolicy.defaultProposalAmountInr) - (advancePayment?.amountInr ?? activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr)) }, "Balance payment approved")}
               >
                 Approve balance
               </button>
@@ -494,11 +547,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
           <div className="two-col" style={{ marginTop: 12 }}>
             <div className="field">
               <label>Advance amount</label>
-              <input type="number" min={MIN_ADVANCE_INR} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
+              <input type="number" min={activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
             </div>
             <div className="field">
               <label>Reference screenshot</label>
-              <input type="file" accept="image/*" disabled={busy} onChange={(event) => uploadProof("advance", event.target.files?.[0] ?? null)} />
+              <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" disabled={busy} onChange={(event) => uploadProof("advance", event.target.files?.[0] ?? null)} />
             </div>
           </div>
           <div className="pill-row" style={{ marginTop: 8 }}>
@@ -510,15 +563,14 @@ export function CommercialConsole(props: CommercialConsoleProps) {
             <button
               type="button"
               className="button"
-              disabled={busy || !activeProposal || !(proofUrl || activeVerification?.referenceScreenshotUrl)}
+              disabled={busy || !canVerifyPayments(activeUser) || !activeProposal || !(proofId || activeVerification?.proofAssetId)}
               onClick={() =>
                 run(
                   {
                     action: "advance-proof-verify",
                     proposalId: activeProposal?.id,
                     amountInr: proofAmount,
-                    referenceScreenshotUrl: proofUrl || activeVerification?.referenceScreenshotUrl,
-                    referenceScreenshotFileName: proofFileName || activeVerification?.referenceScreenshotFileName
+                    proofId: proofId || activeVerification?.proofAssetId
                   },
                   "Advance verified and case opened"
                 )
@@ -544,7 +596,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
             </div>
             <div className="field">
               <label>Reference screenshot</label>
-              <input type="file" accept="image/*" disabled={busy} onChange={(event) => uploadProof("balance", event.target.files?.[0] ?? null)} />
+              <input type="file" accept="image/png,image/jpeg,image/webp,application/pdf" disabled={busy} onChange={(event) => uploadProof("balance", event.target.files?.[0] ?? null)} />
             </div>
           </div>
           <div className="pill-row" style={{ marginTop: 8 }}>
@@ -556,15 +608,14 @@ export function CommercialConsole(props: CommercialConsoleProps) {
             <button
               type="button"
               className="button"
-              disabled={busy || !activeCase || !(balanceProofUrl || balancePayment?.referenceScreenshotUrl)}
+              disabled={busy || !canVerifyPayments(activeUser) || !activeCase || !(balanceProofId || balancePayment?.proofAssetId)}
               onClick={() =>
                 run(
                   {
                     action: "balance-proof-verify",
                     caseId: activeCase?.id,
                     amountInr: balanceProofAmount,
-                    referenceScreenshotUrl: balanceProofUrl || balancePayment?.referenceScreenshotUrl,
-                    referenceScreenshotFileName: balanceProofFileName || balancePayment?.referenceScreenshotFileName
+                    proofId: balanceProofId || balancePayment?.proofAssetId
                   },
                   "Balance verified and final report flow unlocked"
                 )
@@ -588,11 +639,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
         <div className="list" style={{ marginTop: 14 }}>
           <div className="list-item">
             <strong>Default proposal</strong>
-            <span className="meta">{formatMoney(DEFAULT_PROPOSAL_AMOUNT_INR)}</span>
+            <span className="meta">{formatMoney(commercialPolicy.defaultProposalAmountInr)} · policy v{commercialPolicy.version}</span>
           </div>
           <div className="list-item">
             <strong>Minimum advance</strong>
-            <span className="meta">{formatMoney(MIN_ADVANCE_INR)}</span>
+            <span className="meta">{formatMoney(commercialPolicy.minimumAdvanceInr)}</span>
           </div>
           <div className="list-item">
             <strong>Super-Admin approval</strong>

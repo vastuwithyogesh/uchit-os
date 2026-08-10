@@ -91,6 +91,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [isLocalDemo, setIsLocalDemo] = useState(false);
   const [sessionStatus, setSessionStatus] = useState<SessionContextValue["sessionStatus"]>("loading");
   const [sessionError, setSessionError] = useState<string | null>(null);
+  const [sessionErrorCode, setSessionErrorCode] = useState<SessionErrorCode | null>(null);
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
@@ -99,6 +100,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     async function hydrateSession() {
       setSessionStatus("loading");
       setSessionError(null);
+      setSessionErrorCode(null);
       try {
         const payload = await fetchSession();
         if (cancelled) {
@@ -126,6 +128,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           setIsLocalDemo(false);
           setSessionStatus("error");
           setSessionError(error instanceof Error ? error.message : "Unable to verify your session.");
+          setSessionErrorCode(error instanceof SessionRequestError ? error.code : "SESSION_UNAVAILABLE");
         }
       }
     }
@@ -183,9 +186,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
                 : `${sessionError ?? "The session service is unavailable."} No workspace data or privileged navigation has been shown.`}
             </p>
             {sessionStatus === "error" ? (
-              <button type="button" className="button" onClick={() => setRetryCount((count) => count + 1)}>
-                Try again
-              </button>
+              <div className="hero-actions">
+                {sessionErrorCode === "UNAUTHENTICATED" ? (
+                  <a className="button" href="/signin-with-chatgpt?return_to=/">Sign in with ChatGPT</a>
+                ) : null}
+                <button type="button" className={sessionErrorCode === "UNAUTHENTICATED" ? "button-secondary" : "button"} onClick={() => setRetryCount((count) => count + 1)}>
+                  Try again
+                </button>
+              </div>
             ) : null}
           </section>
         </main>

@@ -17,14 +17,13 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { alignmentStatuses, attentionClasses, canonicalServiceStages, caseDocumentTypes, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
+import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonicalServiceStages, caseDocumentTypes, decisionMakerStatuses, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalPipelineStage, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionMakerStatus, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
-import { MIN_ADVANCE_INR, DEFAULT_PROPOSAL_AMOUNT_INR, canCreateCase, generateUtilityEvaluation, lockWorkspace, qualifyLead, rankShakti } from "@/lib/workflows";
+import { canCreateCase, generateUtilityEvaluation, lockWorkspace, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
 import { formatMoney } from "@/lib/workflows";
 import { writeOptInLeadRecords } from "@/lib/optin-leads-store";
 import { writeReviewCallBookingRecords } from "@/lib/review-call-bookings-store";
-import { writeAdvanceVerificationRecords } from "@/lib/advance-verifications-store";
 import {
   deterministicContentHash,
   SHAKTI_ALGORITHM_VERSION,
@@ -37,6 +36,8 @@ import {
 import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
 import { assertCaseFileEvidenceRefs, assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
+import { getAllowedPipelineTransitions, normalizeClientPipeline } from "@/lib/crm-pipeline";
+import { readPaymentProofForVerification } from "@/lib/payment-proof-assets.server";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -99,6 +100,136 @@ function assessmentContext(caseIdValue: unknown, allowArtifact = false) {
 }
 
 function audit(actor: AppUser) { return { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, at: nowIso() }; }
+
+export function transitionClientPipeline(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  const clientId = boundedRequiredString(input.clientId, "Client ID");
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) throw new Error("Client not found.");
+  if (input.actor.role === "SETTER" && client.assignedSetterId && client.assignedSetterId !== input.actor.id) throw new WorkflowConflictError("Setters may update only clients assigned to them.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.pipelineTransitions.find((item) => item.clientId === clientId && item.idempotencyKey === idempotencyKey);
+  if (retry) return { client, transition: retry };
+  assertExpectedRecordVersion(client, input.expectedRecordVersion);
+  const beforeStage = normalizeClientPipeline(client).stage;
+  const afterStage = enumValue(input.pipelineStage, canonicalPipelineStages, "pipeline stage") as CanonicalPipelineStage;
+  const correction = input.correction === true;
+  const correctionReason = input.correctionReason === undefined || input.correctionReason === "" ? undefined : boundedRequiredString(input.correctionReason, "Correction reason", 500);
+  const isAdmin = input.actor.role === "ADMIN" || input.actor.role === "SUPER_ADMIN";
+  const allowed = getAllowedPipelineTransitions(beforeStage).includes(afterStage);
+  if (!allowed && !(correction && isAdmin && correctionReason && correctionReason.length >= 20)) throw new WorkflowConflictError("Pipeline stages cannot move backwards or skip steps. An administrator may record an explicit correction with a reason of at least 20 characters.");
+  if (correction && (!isAdmin || !correctionReason || correctionReason.length < 20)) throw new WorkflowConflictError("Administrative pipeline correction requires a reason of at least 20 characters.");
+  const ownerId = input.actor.id;
+  const ownerName = input.actor.fullName;
+  const ownerRole = input.actor.role;
+  const isTerminal = afterStage === "CLOSED_REFERRAL" || afterStage === "DISQUALIFIED";
+  let nextAction: { summary: string; dueAt: string } | undefined;
+  if (!isTerminal || input.nextAction !== undefined || input.nextActionDueAt !== undefined) {
+    const dueAt = optionalMilestoneDate(input.nextActionDueAt, "Next action due date");
+    if (!dueAt) throw new Error("Every active pipeline stage requires a dated next action.");
+    if (new Date(dueAt).getTime() <= Date.now()) throw new Error("Next action due date must be in the future.");
+    nextAction = { summary: boundedRequiredString(input.nextAction, "Next action", 500), dueAt };
+  }
+  const happenedAt = nowIso();
+  const transition = { id: nextId("pipeline"), clientId, idempotencyKey, beforeStage, afterStage, owner: { id: ownerId, name: ownerName, role: ownerRole }, nextAction, correctionReason: correction ? correctionReason : undefined, actor: { id: input.actor.id, name: input.actor.fullName, role: input.actor.role }, happenedAt };
+  Object.assign(client, { pipelineStage: afterStage, pipelineOwner: transition.owner, nextAction, recordVersion: (client.recordVersion ?? 0) + 1 });
+  state.pipelineTransitions.unshift(transition);
+  appendTimeline(clientId, "CRM pipeline updated", `${input.actor.fullName} moved ${beforeStage} to ${afterStage}; owner ${ownerName}; ${nextAction ? `next action due ${nextAction.dueAt}.` : "terminal stage has no next action."}${transition.correctionReason ? ` Correction: ${transition.correctionReason}` : ""}`, "CRM", input.actor);
+  return { client, transition };
+}
+
+function boundedPolicyInteger(value: unknown, label: string, minimum: number, maximum: number) {
+  if (!Number.isSafeInteger(value) || Number(value) < minimum || Number(value) > maximum) throw new Error(`${label} must be a whole number from ${minimum} to ${maximum}.`);
+  return Number(value);
+}
+
+export function updateCommercialPolicy(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  if (input.actor.role !== "SUPER_ADMIN") throw new Error("Only a Super-Admin can publish commercial policy.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.commercialPolicyHistory.find((item) => item.idempotencyKey === idempotencyKey);
+  if (retry) return retry;
+  if (!Number.isSafeInteger(input.expectedPolicyVersion) || input.expectedPolicyVersion !== state.commercialPolicy.version) throw new WorkflowConflictError("Commercial policy changed. Refresh and retry with the current policy version.");
+  const reason = boundedRequiredString(input.reason, "Policy change reason", 500);
+  if (reason.length < 20) throw new Error("Policy change reason must be at least 20 characters.");
+  const policy = { version: state.commercialPolicy.version + 1, defaultProposalAmountInr: boundedPolicyInteger(input.defaultProposalAmountInr, "Default proposal amount", 1, 100_000_000), minimumAdvanceInr: boundedPolicyInteger(input.minimumAdvanceInr, "Minimum advance", 1, 100_000_000), qualificationCallTargetMinutes: boundedPolicyInteger(input.qualificationCallTargetMinutes, "Qualification call target", 1, 1440), nextActionDueSoonHours: boundedPolicyInteger(input.nextActionDueSoonHours, "Next-action due-soon threshold", 1, 720), defaultReviewCallMinutes: boundedPolicyInteger(input.defaultReviewCallMinutes, "Default review-call duration", 5, 480), reason, updatedAt: nowIso(), updatedBy: { id: input.actor.id, name: input.actor.fullName, role: input.actor.role }, idempotencyKey };
+  if (policy.minimumAdvanceInr > policy.defaultProposalAmountInr) throw new Error("Minimum advance cannot exceed the default proposal amount.");
+  state.commercialPolicy = policy;
+  state.commercialPolicyHistory.unshift(policy);
+  appendTimeline("system", "Commercial policy updated", `${input.actor.fullName} published commercial policy v${policy.version}: ${reason}`, "Commercial", input.actor);
+  return policy;
+}
+
+function intakeObject(value: unknown, label: string, allowedFields: readonly string[]) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be a structured object.`);
+  const object = value as Record<string, unknown>;
+  const unknown = Object.keys(object).find((key) => !allowedFields.includes(key));
+  if (unknown) throw new Error(`Unknown ${label.toLowerCase()} field: ${unknown}.`);
+  return object;
+}
+
+function optionalIntakeString(value: unknown, label: string, maxLength = 500) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const clean = boundedRequiredString(value, label, maxLength);
+  if (/[\u0000-\u001f\u007f<>]/.test(clean) || /(?:^|\s)(?:[a-z][a-z0-9+.-]*:|www\.)\S*/i.test(clean) || /^(?:\/|\\|\.\.)/.test(clean) || /(?:\/|\\)\.\.(?:\/|\\)/.test(clean)) {
+    throw new Error(`${label} must not contain HTML, a URL, or an embedded data payload.`);
+  }
+  return clean;
+}
+
+export function upsertClientIntake(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  const clientId = boundedRequiredString(input.clientId, "Client ID");
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) throw new Error("Client not found.");
+  if (input.actor.role === "SETTER" && client.assignedSetterId && client.assignedSetterId !== input.actor.id) throw new WorkflowConflictError("Setters may update intake only for clients assigned to them.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const existing = state.clientIntakeProfiles.find((item) => item.clientId === clientId);
+  if (existing?.idempotencyKey === idempotencyKey) return existing;
+  assertExpectedRecordVersion(client, input.expectedRecordVersion);
+  const activeCase = getActiveCaseForClient(state, clientId);
+  if (activeCase && state.reportVersions.some((item) => item.caseId === activeCase.id && item.artifact)) throw new WorkflowConflictError("Client intake is locked by an immutable report. Use formal case rectification before changing intake evidence.");
+
+  const contactInput = intakeObject(input.contactPreference, "Contact preference", ["whatsapp", "preferredLanguage", "preferredContactWindow"]);
+  let whatsapp: string | undefined;
+  if (contactInput?.whatsapp !== undefined && contactInput.whatsapp !== "") {
+    if (typeof contactInput.whatsapp !== "string") throw new Error("WhatsApp number must be text in international format.");
+    whatsapp = contactInput.whatsapp.replace(/[\s()-]/g, "");
+    if (!/^\+[1-9]\d{7,14}$/.test(whatsapp)) throw new Error("WhatsApp number must use valid international E.164 format.");
+  }
+  const contactPreference = contactInput ? { whatsapp, preferredLanguage: optionalIntakeString(contactInput.preferredLanguage, "Preferred language", 80), preferredContactWindow: optionalIntakeString(contactInput.preferredContactWindow, "Preferred contact window", 120) } : undefined;
+
+  const businessInput = intakeObject(input.businessContext, "Business context", ["company", "industry", "designation", "vision"]);
+  const businessContext = businessInput ? { company: optionalIntakeString(businessInput.company, "Company", 160), industry: optionalIntakeString(businessInput.industry, "Industry", 120), designation: optionalIntakeString(businessInput.designation, "Designation", 120), vision: optionalIntakeString(businessInput.vision, "Business vision", 1000) } : undefined;
+  const decisionMakerStatus = input.decisionMakerStatus === undefined || input.decisionMakerStatus === "" ? undefined : enumValue(input.decisionMakerStatus, decisionMakerStatuses, "decision-maker status") as DecisionMakerStatus;
+  const otherDecisionMakers = optionalIntakeString(input.otherDecisionMakers, "Other decision makers", 500);
+
+  const propertyInput = intakeObject(input.propertyContext, "Property context", ["serviceInterest", "propertyType", "propertyStatus", "areaValue", "areaUnit", "cityCountry", "constraints"]);
+  let areaValue: number | undefined;
+  if (propertyInput?.areaValue !== undefined && propertyInput.areaValue !== null && propertyInput.areaValue !== "") {
+    if (typeof propertyInput.areaValue !== "number" || !Number.isFinite(propertyInput.areaValue) || propertyInput.areaValue <= 0 || propertyInput.areaValue > 1_000_000_000) throw new Error("Area must be a finite number greater than zero and no more than 1,000,000,000.");
+    areaValue = propertyInput.areaValue;
+  }
+  const areaUnit = propertyInput ? optionalIntakeString(propertyInput.areaUnit, "Area unit", 40) : undefined;
+  if ((areaValue === undefined) !== (areaUnit === undefined)) throw new Error("Area value and area unit must be provided together.");
+  const serviceInterest = propertyInput?.serviceInterest === undefined || propertyInput.serviceInterest === "" ? undefined : enumValue(propertyInput.serviceInterest, serviceTypes, "service interest") as VastuServiceType;
+  const propertyContext = propertyInput ? { serviceInterest, propertyType: optionalIntakeString(propertyInput.propertyType, "Property type", 120), propertyStatus: optionalIntakeString(propertyInput.propertyStatus, "Property status", 120), areaValue, areaUnit, cityCountry: optionalIntakeString(propertyInput.cityCountry, "City and country", 160), constraints: optionalIntakeString(propertyInput.constraints, "Property constraints", 1000) } : undefined;
+
+  const needsInput = intakeObject(input.needs, "Needs", ["mainChallenge", "desiredOutcome", "urgency"]);
+  const needs = needsInput ? { mainChallenge: optionalIntakeString(needsInput.mainChallenge, "Main challenge", 1000), desiredOutcome: optionalIntakeString(needsInput.desiredOutcome, "Desired outcome", 1000), urgency: optionalIntakeString(needsInput.urgency, "Urgency", 120) } : undefined;
+
+  const consentInput = intakeObject(input.consent, "Consent", ["version", "contact", "accuracy", "confidentiality"]);
+  if (!consentInput || consentInput.version !== "uchit-intake/v1") throw new Error("Consent version must be uchit-intake/v1.");
+  for (const key of ["contact", "accuracy", "confidentiality"] as const) if (consentInput[key] !== undefined && typeof consentInput[key] !== "boolean") throw new Error(`Consent ${key} must be true or false.`);
+  const consentComplete = consentInput.contact === true && consentInput.accuracy === true && consentInput.confidentiality === true;
+  const stamp = audit(input.actor);
+  const profile = { clientId, version: (existing?.version ?? 0) + 1, idempotencyKey, contactPreference, businessContext, decisionMakerStatus, otherDecisionMakers, propertyContext, needs, consent: { version: "uchit-intake/v1" as const, contact: consentInput.contact as boolean | undefined, accuracy: consentInput.accuracy as boolean | undefined, confidentiality: consentInput.confidentiality as boolean | undefined, confirmedAt: consentComplete ? (existing?.consent.confirmedAt ?? stamp.at) : undefined }, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, profile); else state.clientIntakeProfiles.unshift(profile);
+  client.recordVersion = (client.recordVersion ?? 0) + 1;
+  appendTimeline(clientId, "Client intake updated", `${input.actor.fullName} recorded client intake profile version ${profile.version}.`, "CRM", input.actor);
+  return profile;
+}
 
 export function upsertAssessmentObservation(input: Record<string, unknown> & { actor: AppUser }) {
   const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
@@ -452,7 +583,7 @@ export function recordLeadQualification(input: {
     clientId: input.clientId,
     score: input.score,
     notes: input.notes,
-    qualificationCallDueAt: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+    qualificationCallDueAt: new Date(Date.now() + state.commercialPolicy.qualificationCallTargetMinutes * 60 * 1000).toISOString(),
     qualificationCallCompletedAt: input.qualificationCallCompletedAt,
     deliverableTriggeredAt: input.score >= 80 && input.qualificationCallCompletedAt ? new Date().toISOString() : undefined,
     conversationalForm: input.conversationalForm
@@ -478,7 +609,7 @@ export function bookQualificationCall(input: {
   appendTimeline(
     input.clientId,
     "Qualification call booked",
-    `Qualification call scheduled for ${input.scheduledAt}. The 2-minute window remains the working SLA.`,
+    `Qualification call scheduled for ${input.scheduledAt}. The configured target is ${state.commercialPolicy.qualificationCallTargetMinutes} minutes.`,
     "Lead",
     input.actor.role
   );
@@ -647,7 +778,7 @@ export function qualifyInboundLead(inboundLeadId: string, actor: AppUser) {
     clientId,
     score: inboundLead.score,
     notes: inboundLead.notes || inboundLead.message || "Imported from CSV opt-in",
-    qualificationCallDueAt: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+    qualificationCallDueAt: new Date(Date.now() + state.commercialPolicy.qualificationCallTargetMinutes * 60 * 1000).toISOString(),
     qualificationCallCompletedAt: new Date().toISOString(),
     deliverableTriggeredAt: inboundLead.score >= 80 ? new Date().toISOString() : undefined,
     conversationalForm: [
@@ -706,18 +837,20 @@ export function updateInboundLeadStatus(inboundLeadId: string, status: InboundLe
   return inboundLead;
 }
 
-export function createCommercialProposal(clientId: string, amountInr = DEFAULT_PROPOSAL_AMOUNT_INR) {
+export function createCommercialProposal(clientId: string, amountInr?: number) {
   const state = getAppState();
+  const explicitAmount = amountInr ?? state.commercialPolicy.defaultProposalAmountInr;
+  if (!Number.isSafeInteger(explicitAmount) || explicitAmount <= 0) throw new Error("Proposal amount must be a positive whole INR amount.");
   const proposal: CommercialProposalRecord = {
     id: nextId("proposal"),
     clientId,
-    amountInr,
-    minAdvanceInr: MIN_ADVANCE_INR,
+    amountInr: explicitAmount,
+    minAdvanceInr: state.commercialPolicy.minimumAdvanceInr,
     status: "PENDING_APPROVAL"
   };
 
   state.commercialProposals.unshift(proposal);
-  appendTimeline(clientId, "Commercial proposal drafted", `Proposal prepared at ${formatMoney(amountInr)}.`, "Commercial", "ADMIN");
+  appendTimeline(clientId, "Commercial proposal drafted", `Proposal prepared at ${formatMoney(explicitAmount)} under commercial policy v${state.commercialPolicy.version}.`, "Commercial", "ADMIN");
   return proposal;
 }
 
@@ -741,7 +874,7 @@ export async function bookReviewCall(input: {
     proposalId: input.proposalId,
     provider: input.provider,
     scheduledAt: input.scheduledAt,
-    durationMinutes: input.durationMinutes ?? 30,
+    durationMinutes: input.durationMinutes ?? state.commercialPolicy.defaultReviewCallMinutes,
     meetingLink: buildMeetingLink(input.provider, input.clientId),
     calendarHoldId: `cal_${input.clientId}_${Date.now()}`,
     status: "BOOKED",
@@ -813,6 +946,16 @@ export function approveAdvancePayment(clientId: string, proposalId: string, amou
   if (proposal.status !== "APPROVED") {
     throw new Error("The commercial proposal must be approved before the advance can be accepted.");
   }
+  if (proposal.clientId !== clientId) throw new Error("The proposal does not belong to this client.");
+  if (!Number.isSafeInteger(proposal.minAdvanceInr) || proposal.minAdvanceInr < 1 || proposal.minAdvanceInr > proposal.amountInr) {
+    throw new WorkflowConflictError("The approved proposal has an invalid minimum advance and must be corrected before payment verification.");
+  }
+  if (!Number.isSafeInteger(amountInr) || amountInr < proposal.minAdvanceInr || amountInr > proposal.amountInr) {
+    throw new Error(`Advance amount must be between ${formatMoney(proposal.minAdvanceInr)} and the approved proposal amount.`);
+  }
+  if (state.payments.some((payment) => payment.clientId === clientId && payment.proposalId === proposalId && payment.type === "ADVANCE" && payment.status === "APPROVED")) {
+    throw new WorkflowConflictError("An approved advance already exists for this proposal.");
+  }
 
   const payment: PaymentRecord = {
     id: nextId("payment"),
@@ -820,12 +963,12 @@ export function approveAdvancePayment(clientId: string, proposalId: string, amou
     proposalId,
     type: "ADVANCE",
     amountInr,
-    status: amountInr >= MIN_ADVANCE_INR ? "APPROVED" : "PENDING",
-    approvedAt: amountInr >= MIN_ADVANCE_INR ? new Date().toISOString() : undefined
+    status: "APPROVED",
+    approvedAt: new Date().toISOString()
   };
 
   state.payments.unshift(payment);
-  appendTimeline(clientId, "Advance payment recorded", `${formatMoney(amountInr)} advance marked ${payment.status}.`, "Payments", reviewer.role);
+  appendTimeline(clientId, "Advance payment recorded", `${formatMoney(amountInr)} advance marked ${payment.status}.`, "Payments", reviewer);
   return payment;
 }
 
@@ -833,8 +976,7 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   clientId: string;
   proposalId: string;
   amountInr: number;
-  referenceScreenshotUrl: string;
-  referenceScreenshotFileName: string;
+  proofId: string;
   actor: AppUser;
 }) {
   const state = getAppState();
@@ -845,62 +987,89 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   if (proposal.status !== "APPROVED") {
     throw new Error("The commercial proposal must be approved before advance proof can be verified.");
   }
+  if (proposal.clientId !== input.clientId) throw new Error("The proposal does not belong to this client.");
+
+  const proof = await readPaymentProofForVerification(input.proofId, {
+    key: "advance-proof",
+    clientId: input.clientId,
+    proposalId: input.proposalId
+  });
+  if (!proof?.id) throw new Error("Choose an uploaded advance proof for this client and proposal.");
+  if (proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  const existingVerification = state.advanceVerifications.find((item) => item.clientId === input.clientId && item.proposalId === input.proposalId);
+  if (existingVerification?.proofAssetId === proof.id) {
+    const existingPayment = state.payments.find((item) => item.id === existingVerification.paymentId);
+    if (!existingPayment) throw new WorkflowConflictError("The verified advance is missing its payment record and must be repaired before continuing.");
+    return {
+      payment: existingPayment,
+      verification: existingVerification,
+      caseRecord: existingVerification.caseId ? state.vastuCases.find((item) => item.id === existingVerification.caseId) : undefined
+    };
+  }
+  if (existingVerification) throw new WorkflowConflictError("This proposal already has a different verified advance proof.");
 
   const payment = approveAdvancePayment(input.clientId, input.proposalId, input.amountInr, input.actor);
-  payment.referenceScreenshotUrl = input.referenceScreenshotUrl;
-  payment.referenceScreenshotFileName = input.referenceScreenshotFileName;
+  payment.proofAssetId = proof.id;
+  payment.referenceScreenshotUrl = proof.url;
+  payment.referenceScreenshotFileName = proof.fileName;
   payment.verifiedBy = input.actor.fullName;
   payment.verifiedAt = nowIso();
-  payment.verificationNote = "Reference screenshot uploaded and checked against the advance amount.";
+  payment.verificationNote = "Scoped receipt uploaded and checked against the approved advance amount.";
 
   const verification: AdvanceVerificationRecord = {
     id: nextId("advver"),
     clientId: input.clientId,
     proposalId: input.proposalId,
     amountInr: input.amountInr,
-    referenceScreenshotUrl: input.referenceScreenshotUrl,
-    referenceScreenshotFileName: input.referenceScreenshotFileName,
+    referenceScreenshotUrl: proof.url,
+    referenceScreenshotFileName: proof.fileName,
     verifiedBy: input.actor.fullName,
     verifiedAt: payment.verifiedAt!,
     paymentId: payment.id,
+    proofAssetId: proof.id,
     status: "VERIFIED"
   };
 
   state.advanceVerifications.unshift(verification);
-  await writeAdvanceVerificationRecords(state.advanceVerifications);
 
   let caseRecord = state.vastuCases.find((item) => item.clientId === input.clientId && item.proposalId === input.proposalId);
   if (!caseRecord) {
     try {
-      caseRecord = createVastuCase(input.clientId, input.proposalId);
+      caseRecord = createVastuCase(input.clientId, input.proposalId, input.actor);
       verification.caseId = caseRecord.id;
       verification.status = "CASE_OPENED";
-      appendTimeline(input.clientId, "Advance verified and case opened", `Reference screenshot checked. Case ${caseRecord.caseNumber} opened automatically.`, "Payments", input.actor.role);
+      appendTimeline(input.clientId, "Advance verified and case opened", `Scoped receipt checked. Case ${caseRecord.caseNumber} opened automatically.`, "Payments", input.actor);
     } catch (error) {
-      appendTimeline(input.clientId, "Advance verified", "Advance was checked, but automatic case opening could not complete.", "Payments", input.actor.role);
+      appendTimeline(input.clientId, "Advance verified", "Advance was checked, but automatic case opening could not complete.", "Payments", input.actor);
     }
   } else {
     verification.caseId = caseRecord.id;
     verification.status = "CASE_OPENED";
-    appendTimeline(input.clientId, "Advance verified", `Reference screenshot checked for case ${caseRecord.caseNumber}.`, "Payments", input.actor.role);
+    appendTimeline(input.clientId, "Advance verified", `Scoped receipt checked for case ${caseRecord.caseNumber}.`, "Payments", input.actor);
   }
 
   return { payment, verification, caseRecord };
 }
 
-export function createVastuCase(clientId: string, proposalId: string) {
+export function createVastuCase(clientId: string, proposalId: string, actor: AppUser) {
   const state = getAppState();
   const proposal = state.commercialProposals.find((item) => item.id === proposalId);
   if (!proposal) {
     throw new Error("Proposal not found.");
   }
+  if (proposal.clientId !== clientId) throw new Error("The proposal does not belong to this client.");
 
-  const advance = state.payments.find((payment) => payment.clientId === clientId && payment.proposalId === proposalId && payment.type === "ADVANCE");
+  const advance = state.payments.find((payment) => payment.clientId === clientId
+    && payment.proposalId === proposalId
+    && payment.type === "ADVANCE"
+    && payment.status === "APPROVED"
+    && Boolean(payment.proofAssetId));
   if (!canCreateCase(proposal, advance)) {
     throw new Error("Advance approval is required before the case can be created.");
   }
 
-  const record = state.vastuCases.find((item) => item.clientId === clientId && item.proposalId === proposalId);
+  const activeRecord = getActiveCaseForClient(state, clientId);
+  const record = activeRecord?.proposalId === proposalId ? activeRecord : state.vastuCases.find((item) => item.clientId === clientId && item.proposalId === proposalId);
   if (record) {
     return record;
   }
@@ -929,7 +1098,7 @@ export function createVastuCase(clientId: string, proposalId: string) {
   };
 
   state.floorWorkspaces.unshift(primaryFloor);
-  appendTimeline(clientId, "Case created", `Case ${caseNumber} opened after advance approval.`, "Case", "ADMIN");
+  appendTimeline(clientId, "Case created", `Case ${caseNumber} opened after scoped advance proof approval.`, "Case", actor);
   return nextCase;
 }
 
@@ -1042,6 +1211,21 @@ export function approveBalancePayment(clientId: string, caseId: string, amountIn
   if (caseRecord.status === "VERDICT_RELEASED") {
     throw new Error("The verdict has already been released for this case.");
   }
+  if (caseRecord.clientId !== clientId) throw new Error("The case does not belong to this client.");
+  const activeCase = getActiveCaseForClient(state, clientId);
+  if (activeCase?.id !== caseId) throw new WorkflowConflictError("Balance proof must be verified against the active case revision.");
+  const proposal = state.commercialProposals.find((item) => item.id === caseRecord.proposalId && item.clientId === clientId);
+  if (!proposal) throw new Error("The approved proposal for this case was not found.");
+  const approvedAdvance = state.payments
+    .filter((item) => item.clientId === clientId && item.proposalId === proposal.id && item.type === "ADVANCE" && item.status === "APPROVED")
+    .reduce((total, item) => total + item.amountInr, 0);
+  const expectedBalance = Math.max(0, proposal.amountInr - approvedAdvance);
+  if (!Number.isSafeInteger(amountInr) || amountInr !== expectedBalance || expectedBalance <= 0) {
+    throw new Error(`Balance amount must exactly match the remaining approved proposal balance of ${formatMoney(expectedBalance)}.`);
+  }
+  if (state.payments.some((item) => item.clientId === clientId && item.caseId === caseId && item.type === "BALANCE" && item.status === "APPROVED")) {
+    throw new WorkflowConflictError("An approved balance already exists for this case.");
+  }
 
   const payment: PaymentRecord = {
     id: nextId("payment"),
@@ -1059,16 +1243,15 @@ export function approveBalancePayment(clientId: string, caseId: string, amountIn
   caseRecord.status = "FULL_PAYMENT_APPROVED";
   caseRecord.reportStatus = "READY_FOR_APPROVAL";
 
-  appendTimeline(clientId, "Balance approved", `${formatMoney(amountInr)} balance cleared.`, "Payments", reviewer.role);
+  appendTimeline(clientId, "Balance approved", `${formatMoney(amountInr)} balance cleared.`, "Payments", reviewer);
   return payment;
 }
 
-export function verifyBalanceProof(input: {
+export async function verifyBalanceProof(input: {
   clientId: string;
   caseId: string;
   amountInr: number;
-  referenceScreenshotUrl: string;
-  referenceScreenshotFileName: string;
+  proofId: string;
   actor: AppUser;
 }) {
   const state = getAppState();
@@ -1077,19 +1260,31 @@ export function verifyBalanceProof(input: {
     throw new Error("Case not found.");
   }
 
+  const proof = await readPaymentProofForVerification(input.proofId, {
+    key: "balance-proof",
+    clientId: input.clientId,
+    caseId: input.caseId
+  });
+  if (!proof?.id) throw new Error("Choose an uploaded balance proof for this client and active case.");
+  if (proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  const existingPayment = state.payments.find((item) => item.clientId === input.clientId && item.caseId === input.caseId && item.type === "BALANCE" && item.status === "APPROVED");
+  if (existingPayment?.proofAssetId === proof.id) return { payment: existingPayment, caseRecord };
+  if (existingPayment) throw new WorkflowConflictError("This case already has a different verified balance proof.");
+
   const payment = approveBalancePayment(input.clientId, input.caseId, input.amountInr, input.actor);
-  payment.referenceScreenshotUrl = input.referenceScreenshotUrl;
-  payment.referenceScreenshotFileName = input.referenceScreenshotFileName;
+  payment.proofAssetId = proof.id;
+  payment.referenceScreenshotUrl = proof.url;
+  payment.referenceScreenshotFileName = proof.fileName;
   payment.verifiedBy = input.actor.fullName;
   payment.verifiedAt = nowIso();
-  payment.verificationNote = "Balance reference screenshot uploaded and checked before unlocking the final report flow.";
+  payment.verificationNote = "Scoped balance receipt uploaded and checked before unlocking the final report flow.";
 
   appendTimeline(
     input.clientId,
     "Balance proof verified",
-    `${formatMoney(input.amountInr)} balance verified from ${input.referenceScreenshotFileName}. Final report flow is now unlocked.`,
+    `${formatMoney(input.amountInr)} balance verified from ${proof.fileName}. Final report flow is now unlocked.`,
     "Payments",
-    input.actor.role
+    input.actor
   );
 
   return { payment, caseRecord };
@@ -1120,7 +1315,7 @@ export async function generatePreviewReport(caseId: string, actor: AppUser) {
   state.reportVersions.unshift(report);
   caseRecord.reportStatus = "PAYMENT_BLOCKED";
 
-  appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", "CONSULTANT");
+  appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", actor);
   return report;
 }
 
@@ -1133,6 +1328,8 @@ export async function prepareFinalReport(caseId: string, actor: AppUser) {
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Final report can only be prepared after the balance is approved.");
   }
+  const balancePayment = state.payments.find((item) => item.caseId === caseId && item.type === "BALANCE" && item.status === "APPROVED");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Final report preparation requires exact scoped balance proof verified by a different person.");
 
   const existing = state.reportVersions.find((item) => item.caseId === caseId && !item.isPreview && item.status !== "RELEASED");
   if (existing?.artifact?.immutable) {
@@ -1152,7 +1349,7 @@ export async function prepareFinalReport(caseId: string, actor: AppUser) {
 
   caseRecord.reportStatus = "READY_FOR_APPROVAL";
   caseRecord.status = "REPORT_APPROVAL_PENDING";
-  appendTimeline(caseRecord.clientId, "Final report prepared", `Official verdict report prepared by ${actor.fullName}.`, "Reports", actor.role);
+  appendTimeline(caseRecord.clientId, "Final report prepared", `Official verdict report prepared by ${actor.fullName}.`, "Reports", actor);
   return report;
 }
 
@@ -1287,6 +1484,8 @@ export function approveReport(reportId: string, actor: AppUser, comment = "Revie
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Balance approval is required before the final report can be approved.");
   }
+  const balancePayment = state.payments.find((item) => item.caseId === caseRecord.id && item.type === "BALANCE" && item.status === "APPROVED");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Report approval requires exact scoped balance proof.");
   if (report.status !== "READY_FOR_APPROVAL" && report.status !== "APPROVED") {
     throw new Error("Report is not in an approvable state.");
   }
@@ -1302,7 +1501,7 @@ export function approveReport(reportId: string, actor: AppUser, comment = "Revie
   caseRecord.reportStatus = report.status;
   caseRecord.status = (report.approvals ?? []).length >= 2 ? "REPORT_APPROVED" : "REPORT_APPROVAL_PENDING";
 
-  appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor.role);
+  appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor);
   return report;
 }
 
@@ -1319,6 +1518,8 @@ export function releaseVerdict(reportId: string, actor: AppUser) {
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Verdict release is blocked until the balance is approved.");
   }
+  const balancePayment = state.payments.find((item) => item.caseId === caseRecord.id && item.type === "BALANCE" && item.status === "APPROVED");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Verdict release requires exact scoped balance proof.");
   if (report.status !== "APPROVED" || caseRecord.reportStatus !== "APPROVED") {
     throw new Error("Verdict release requires an approved report.");
   }
@@ -1332,7 +1533,7 @@ export function releaseVerdict(reportId: string, actor: AppUser) {
   caseRecord.status = "VERDICT_RELEASED";
   caseRecord.reportStatus = "RELEASED";
   report.status = "RELEASED";
-  appendTimeline(caseRecord.clientId, "Verdict released", `Released by ${actor.fullName} after approvals.`, "Reports", actor.role);
+  appendTimeline(caseRecord.clientId, "Verdict released", `Released by ${actor.fullName} after approvals.`, "Reports", actor);
   return report;
 }
 

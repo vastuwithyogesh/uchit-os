@@ -2,6 +2,10 @@
 
 This document records the source-controlled release gates. It does not certify live infrastructure, rotate credentials, inspect production data, or authorize deployment.
 
+## Current release scope
+
+The current launch target is an internal staff pilot for SUPER_ADMIN, ADMIN and CONSULTANT users. Client accounts, client-portal acceptance, outbound client messages and external integrations are deferred. This narrower scope does not weaken authentication, payment, evidence, report approval or data-protection controls.
+
 ## Automated gates
 
 | Gate | Evidence | Release rule |
@@ -19,12 +23,12 @@ This document records the source-controlled release gates. It does not certify l
 
 ## NO-GO until production authority verifies
 
-- D1 binding exists in the production environment and migrations 1–3 have completed successfully.
+- D1 binding exists in the production environment and migrations 1–4 have completed successfully.
 - Private R2 binding exists, public bucket access is disabled, lifecycle/retention policy is approved, and upload/download smoke tests pass using non-sensitive fixtures.
 - At least two administrator assignments exist and two-person report approval/release is exercised with separate production identities.
 - Production environment has `UCHIT_VASTU_DEMO_MODE` absent or false and no demo headers are trusted at the edge.
 - All credentials that may ever have existed in `data/local-settings.json` are rotated by an authorized owner. This change removes the file from current tracking but does not rewrite Git history or rotate secrets.
 - Production backup, restore, incident response, monitoring, alerting, data-retention, privacy, and legal/commercial sign-off are evidenced.
-- A staging journey completes lead → case → protected upload → evaluation → assessment → immutable report → two-person release → post-delivery follow-up without using live client data.
+- A controlled staff rehearsal completes lead → case → protected upload → evaluation → assessment → immutable report → two-person release → post-delivery follow-up without using live client data.
 
 Any unresolved item above is a release blocker. Deployment requires explicit production authority after these checks are evidenced.

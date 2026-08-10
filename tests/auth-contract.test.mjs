@@ -5,6 +5,7 @@ import { functionBody, source } from "./helpers/source-contracts.mjs";
 const auth = source("lib/auth.ts");
 const sessionRoute = source("app/api/session/route.ts");
 const sessionProvider = source("components/session-provider.tsx");
+const siteHeader = source("components/site-header.tsx");
 
 test("client requires session contract version 1", () => {
   assert.match(sessionProvider, /version: 1;/);
@@ -32,9 +33,23 @@ test("session success and auth failures cannot be cached", () => {
   assert.match(functionBody(sessionProvider, "fetchSession"), /cache: "no-store"/);
 });
 
+test("authenticated display names are decoded only with the declared encoding", () => {
+  const body = functionBody(auth, "resolveAuthenticatedDisplayName");
+  assert.match(body, /oai-authenticated-user-full-name-encoding/);
+  assert.match(body, /encoding !== "percent-encoded-utf-8"/);
+});
+
 test("client maps structured auth failures to safe fixed messages", () => {
   const body = functionBody(sessionProvider, "fetchSession");
   assert.match(body, /responseCode === "UNAUTHENTICATED"/);
   assert.match(body, /responseCode === "UNAUTHORIZED"/);
   assert.doesNotMatch(body, /failure\.error\?\.message/);
+});
+
+test("public visitors get the platform sign-in path and can switch accounts safely", () => {
+  assert.match(sessionProvider, /sessionErrorCode === "UNAUTHENTICATED"/);
+  assert.match(sessionProvider, /href="\/signin-with-chatgpt\?return_to=\/"/);
+  assert.match(sessionProvider, /Sign in with ChatGPT/);
+  assert.match(siteHeader, /href="\/signout-with-chatgpt\?return_to=\/"/);
+  assert.match(siteHeader, /!isLocalDemo/);
 });

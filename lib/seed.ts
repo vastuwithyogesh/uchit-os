@@ -308,7 +308,7 @@ export const whatsappTemplates: WhatsAppTemplateRecord[] = [
     slug: "qualification-call-reminder",
     title: "Qualification call reminder",
     category: "Lead",
-    body: "Hi {{client_name}}, this is a quick reminder for your 2-minute qualification call. We are ready to review your plan and lock next steps.",
+    body: "Hi {{client_name}}, this is a quick reminder for your qualification call. We are ready to review your plan and lock next steps.",
     variables: ["client_name", "setter_name", "call_time"],
     active: true
   },

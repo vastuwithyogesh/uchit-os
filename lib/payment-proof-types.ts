@@ -12,6 +12,7 @@ export type PaymentProofRecord = {
   sizeBytes?: number;
   checksumSha256?: string;
   uploadedBy?: string;
+  uploadedById?: string;
   status?: PaymentProofStatus;
   clientId?: string;
   proposalId?: string;

@@ -26,6 +26,7 @@ function hydrateVerification(record: Partial<AdvanceVerificationRecord>, index: 
     verifiedBy: String(record.verifiedBy ?? "System"),
     verifiedAt: String(record.verifiedAt ?? new Date().toISOString()),
     paymentId: String(record.paymentId ?? ""),
+    proofAssetId: record.proofAssetId ? String(record.proofAssetId) : undefined,
     caseId: record.caseId ? String(record.caseId) : undefined,
     status: record.status === "CASE_OPENED" ? "CASE_OPENED" : "VERIFIED"
   };

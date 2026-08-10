@@ -60,7 +60,8 @@ export function ReportConsole() {
     currentCase &&
       currentCase.balanceApproved &&
       currentCase.fullPaymentApproved &&
-      balancePayment?.status === "APPROVED"
+      balancePayment?.status === "APPROVED" &&
+      Boolean(balancePayment.proofAssetId)
   );
   const watermarkActive = Boolean(previewReport && isPreviewWatermarked(previewReport));
   const blockerReasons = [
@@ -69,6 +70,7 @@ export function ReportConsole() {
     currentCase && !currentCase.balanceApproved ? "Balance is still pending." : null,
     currentCase && !currentCase.fullPaymentApproved ? "Full payment is not approved yet." : null,
     currentCase && balancePayment?.status !== "APPROVED" ? "Balance payment record is not approved." : null,
+    currentCase && balancePayment?.status === "APPROVED" && !balancePayment.proofAssetId ? "Balance payment uses legacy evidence and must be reconciled before final release." : null,
     finalReport && approvalCount < 2 ? "Two report approvals are required before verdict release." : null,
     finalReport && !canReleaseVerdict(activeUser) ? "Your role cannot release verdicts." : null
   ].filter(Boolean) as string[];
@@ -87,8 +89,8 @@ export function ReportConsole() {
     { label: "Preview exists", done: Boolean(previewReport), note: previewReport ? previewReport.status : "Generate the Stage-A preview first" },
     {
       label: "Balance approved",
-      done: Boolean(currentCase?.balanceApproved && currentCase?.fullPaymentApproved && balancePayment?.status === "APPROVED"),
-      note: currentCase?.balanceApproved ? "Balance is cleared" : "Balance is still pending"
+      done: Boolean(currentCase?.balanceApproved && currentCase?.fullPaymentApproved && balancePayment?.status === "APPROVED" && balancePayment.proofAssetId),
+      note: balancePayment?.proofAssetId ? "Balance and scoped receipt are verified" : currentCase?.balanceApproved ? "Legacy receipt must be reconciled" : "Balance is still pending"
     },
     { label: "Final report prepared", done: Boolean(finalReport), note: finalReport ? finalReport.status : "Prepare the official report" },
     { label: "Two approvals logged", done: approvalCount >= 2, note: `${approvalCount} / 2 approvals` },

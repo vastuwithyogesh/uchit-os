@@ -30,6 +30,7 @@ import {
   ImplementationTask,
   CaseDocumentRecord,
   DeliveryMilestone,
+  ClientIntakeProfile,
   ShaktiSnapshotRecord,
   TimelineEvent,
   UtilityRule,
@@ -38,11 +39,16 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
+import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "@/lib/commercial-policy";
 
 export interface AppState {
   /** Read-only response metadata used for optimistic concurrency; not a domain collection. */
   persistenceRevision?: number | null;
   clients: typeof seedClients;
+  pipelineTransitions: import("@/lib/domain").PipelineTransitionRecord[];
+  commercialPolicy: import("@/lib/domain").CommercialPolicy;
+  commercialPolicyHistory: import("@/lib/domain").CommercialPolicy[];
+  clientIntakeProfiles: ClientIntakeProfile[];
   leadQualifications: LeadQualificationRecord[];
   commercialProposals: CommercialProposalRecord[];
   reviewCallBookings: ReviewCallBookingRecord[];
@@ -68,8 +74,43 @@ export interface AppState {
   whatsappLogs: WhatsAppTemplateLogRecord[];
 }
 
-const createInitialState = (): AppState => ({
+export const createEmptyAppState = (): AppState => ({
+  clients: [],
+  pipelineTransitions: [],
+  commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
+  commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
+  clientIntakeProfiles: [],
+  leadQualifications: [],
+  commercialProposals: [],
+  reviewCallBookings: [],
+  payments: [],
+  advanceVerifications: [],
+  vastuCases: [],
+  floorWorkspaces: [],
+  reportVersions: [],
+  rectificationRequests: [],
+  assessmentObservations: [],
+  recommendations: [],
+  implementationTasks: [],
+  caseDocuments: [],
+  deliveryMilestones: [],
+  evaluationSnapshots: [],
+  mapping32D: [],
+  mapping16D: [],
+  utilityRules: [],
+  shaktiSnapshots: [],
+  timelineEvents: [],
+  optInLeads: [],
+  whatsappTemplates: [],
+  whatsappLogs: []
+});
+
+const createDemoAppState = (): AppState => ({
   clients: structuredClone(seedClients),
+  pipelineTransitions: [],
+  commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
+  commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
+  clientIntakeProfiles: [],
   leadQualifications: structuredClone(seedLeadQualifications),
   commercialProposals: structuredClone(seedCommercialProposals),
   reviewCallBookings: [],
@@ -95,6 +136,8 @@ const createInitialState = (): AppState => ({
   whatsappLogs: structuredClone(seedWhatsappLogs)
 });
 
+const createInitialState = () => process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();
+
 declare global {
   // eslint-disable-next-line no-var
   var uchitVastuState: AppState | undefined;
@@ -111,6 +154,9 @@ export function setAppState(nextState: AppState) {
 }
 
 export function resetAppState() {
-  globalThis.uchitVastuState = createInitialState();
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Demo reset is unavailable in production.");
+  }
+  globalThis.uchitVastuState = createDemoAppState();
   return globalThis.uchitVastuState;
 }

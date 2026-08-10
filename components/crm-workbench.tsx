@@ -3,6 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   ClientRecord,
+  CommercialPolicy,
   CommercialProposalRecord,
   FloorWorkspaceRecord,
   LeadQualificationRecord,
@@ -16,8 +17,6 @@ import {
 import { useSession } from "@/components/session-provider";
 import { getActiveCaseForClient } from "@/lib/service-framework";
 import {
-  DEFAULT_PROPOSAL_AMOUNT_INR,
-  MIN_ADVANCE_INR,
   approvalSummary,
   buildPermanentTimeline,
   canReleaseOfficialVerdict,
@@ -32,6 +31,7 @@ import { formatTimeStamp } from "@/lib/format";
 import { buildActionHeaders } from "@/lib/request-helpers";
 
 interface CrmWorkbenchProps {
+  commercialPolicy: CommercialPolicy;
   clients: ClientRecord[];
   leads: LeadQualificationRecord[];
   proposals: CommercialProposalRecord[];
@@ -52,7 +52,7 @@ interface CrmWorkbenchProps {
 }
 
 export function CrmWorkbench(props: CrmWorkbenchProps) {
-  const { clients, leads, proposals, payments, cases, floors, reports, utilityRules, templates, timeline } = props;
+  const { clients, leads, proposals, payments, cases, floors, reports, utilityRules, templates, timeline, commercialPolicy } = props;
   const { activeUser, availableUsers, isLocalDemo } = useSession();
   const [selectedClientId, setSelectedClientId] = useState(clients[0]?.id ?? "");
   const [selectedRole, setSelectedRole] = useState<UserRole>("SUPER_ADMIN");
@@ -76,7 +76,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
 
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const activeLead = leads.find((lead) => lead.clientId === activeClient?.id) ?? leads[0];
-  const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id) ?? proposals[0];
+  const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id);
   const activeCase = activeClient ? getActiveCaseForClient({ vastuCases: cases }, activeClient.id) : cases[0];
   const activeFloor = floors.find((item) => item.caseId === activeCase?.id) ?? floors[0];
   const activeReport = reports.find((item) => item.caseId === activeCase?.id) ?? reports[0];
@@ -391,7 +391,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
         <div className="eyebrow">ScoreApp-style intake</div>
         <h2>Conversational lead qualification</h2>
         <p className="subtle">
-          The setter can move through a structured conversation, keep the 2-minute qualification call honest, and trigger the first deliverable as soon as the lead crosses the acceptance bar.
+          The setter can move through a structured conversation, keep the {commercialPolicy.qualificationCallTargetMinutes}-minute qualification call honest, and trigger the first deliverable as soon as the lead crosses the acceptance bar.
         </p>
         <div className="two-col" style={{ marginTop: 18 }}>
           <div className="panel">
@@ -443,7 +443,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
               <div className="pill-row" style={{ marginTop: 12 }}>
                 <span className="pill">Qualification score {intakeScore}</span>
                 <span className="pill">Projected score {projectedScore}</span>
-                <span className="pill">2-minute SLA {leadQualification?.completedInMinutes ?? 0} min</span>
+                <span className="pill">{commercialPolicy.qualificationCallTargetMinutes}-minute target · {leadQualification?.completedInMinutes ?? 0} min</span>
                 <span className="pill">Deliverable {leadQualification?.triggerDeliverable ? "triggered" : "pending"}</span>
               </div>
               <div className="workflow" style={{ marginTop: 12 }}>
@@ -499,7 +499,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
             </div>
             <label style={{ display: "flex", gap: 10, alignItems: "center", marginTop: 14 }}>
               <input type="checkbox" checked={intakeCallCompleted} onChange={(event) => setIntakeCallCompleted(event.target.checked)} />
-              2-minute qualification call completed
+              {commercialPolicy.qualificationCallTargetMinutes}-minute qualification call completed
             </label>
             <div className="pill-row" style={{ marginTop: 14 }}>
               <span className="pill">Conversation step {conversationStep + 1}</span>
@@ -523,11 +523,11 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
         <div className="list">
           <div className="list-item">
             <strong>Minimum advance</strong>
-            <span className="meta">{formatMoney(MIN_ADVANCE_INR)}</span>
+            <span className="meta">{formatMoney(activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr)}</span>
           </div>
           <div className="list-item">
             <strong>Proposal amount</strong>
-            <span className="meta">{formatMoney(activeProposal?.amountInr ?? DEFAULT_PROPOSAL_AMOUNT_INR)}</span>
+            <span className="meta">{formatMoney(activeProposal?.amountInr ?? commercialPolicy.defaultProposalAmountInr)}</span>
           </div>
           <div className="list-item">
             <strong>Commercial approval</strong>

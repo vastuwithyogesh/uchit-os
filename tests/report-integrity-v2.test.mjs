@@ -136,3 +136,54 @@ test("legacy v1 artifacts retain their original hash and report layout", async (
   assert.doesNotMatch(html, /Executive summary and client objective/);
   assert.match(html, /PREVIEW ONLY · NOT FOR FINAL USE/);
 });
+
+test("successor intake edits cannot change predecessor v2 hash or rendered bytes", async () => {
+  const state = fixture();
+  state.clientIntakeProfiles = [{
+    clientId: "client-1", version: 1, idempotencyKey: "intake-1",
+    businessContext: { company: "Private company detail" },
+    contactPreference: { whatsapp: "+919999999999" },
+    propertyContext: { serviceInterest: "EXISTING_SPACE", propertyType: "Apartment", propertyStatus: "Occupied", cityCountry: "Pune, India", constraints: "Keep civil work minimal" },
+    needs: { mainChallenge: "Improve room use", desiredOutcome: "A practical plan" },
+    consent: { version: "uchit-intake/v1", contact: true, accuracy: true, confidentiality: true, confirmedAt: "2026-01-01T00:00:00.000Z" },
+    created: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-01-01T00:00:00.000Z" },
+    updated: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-01-01T00:00:00.000Z" }
+  }];
+  const report = { id: "report-intake-frozen", caseId: "case-1", versionLabel: "Final", isPreview: false, status: "READY_FOR_APPROVAL", approvals: [] };
+  report.artifact = await createArtifactManifest(state, report, actor);
+  const originalHash = report.artifact.contentHash;
+  const originalHtml = renderPrintableReport(state, report);
+  assert.deepEqual(report.artifact.intakeSnapshot, { mainChallenge: "Improve room use", desiredOutcome: "A practical plan", serviceInterest: "EXISTING_SPACE", propertyType: "Apartment", propertyStatus: "Occupied", cityCountry: "Pune, India", constraints: "Keep civil work minimal" });
+  assert.doesNotMatch(JSON.stringify(report.artifact.intakeSnapshot), /whatsapp|consent|company|idempotency|actor/i);
+
+  state.vastuCases.unshift({ ...state.vastuCases[0], id: "case-2", caseNumber: "UV-1-R2", parentCaseId: "case-1", revisionNumber: 2, recordVersion: 0, status: "RECTIFICATION", reportStatus: "DRAFT" });
+  state.clientIntakeProfiles[0].version = 2;
+  state.clientIntakeProfiles[0].needs = { mainChallenge: "Changed for successor", desiredOutcome: "Different outcome" };
+  state.clientIntakeProfiles[0].propertyContext.cityCountry = "Different city";
+
+  assert.equal(await artifactStillMatches(state, report), true);
+  assert.equal(await sha256Hex(canonicalReportPayload(state, report)), originalHash);
+  assert.equal(renderPrintableReport(state, report), originalHtml);
+});
+
+test("pre-artifact intake edits remain meaningful canonical input changes", async () => {
+  const state = fixture();
+  state.clientIntakeProfiles = [{ clientId: "client-1", version: 1, idempotencyKey: "intake-1", needs: { mainChallenge: "Original" }, consent: { version: "uchit-intake/v1" }, created: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-01-01" }, updated: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-01-01" } }];
+  const report = { id: "report-intake-draft", caseId: "case-1", versionLabel: "Draft", isPreview: true, status: "DRAFT", approvals: [] };
+  const before = await sha256Hex(canonicalReportPayload(state, report));
+  state.clientIntakeProfiles[0].needs.mainChallenge = "Changed before artifact";
+  assert.notEqual(await sha256Hex(canonicalReportPayload(state, report)), before);
+});
+
+test("pre-intake v2 artifacts without a snapshot resolve to the historical empty projection", async () => {
+  const state = fixture();
+  const report = { id: "report-pre-intake", caseId: "case-1", versionLabel: "Historical", isPreview: false, status: "RELEASED", approvals: [], artifact: { schemaVersion: "report-artifact/v1", mediaType: "text/html", createdAt: "2026-01-01", createdBy: { id: actor.id, name: actor.fullName, role: actor.role }, templateVersion: "uchit-verdict/v2", evaluationSnapshotId: "eval-1", contentHash: "", immutable: true, downloadPath: "/historical" } };
+  const historicalPayload = canonicalReportPayload(state, report);
+  assert.equal(Object.hasOwn(historicalPayload, "intake"), false);
+  const authenticHistoricalHash = "776e638c7d349df6b00eb27168f460541c27b1ea8b5bc038ede4ab431fd9f9ec";
+  assert.equal(await sha256Hex(historicalPayload), authenticHistoricalHash);
+  report.artifact.contentHash = authenticHistoricalHash;
+  state.clientIntakeProfiles = [{ clientId: "client-1", version: 1, idempotencyKey: "later-intake", needs: { mainChallenge: "Added later" }, consent: { version: "uchit-intake/v1" }, created: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-02-01" }, updated: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-02-01" } }];
+  assert.equal(await artifactStillMatches(state, report), true);
+  assert.doesNotMatch(renderPrintableReport(state, report), /Added later/);
+});

@@ -7,9 +7,17 @@ const ALLOWED_MIME_TYPES = new Set(["image/png", "image/jpeg", "image/webp", "ap
 type ProofContext = { clientId?: string; proposalId?: string; caseId?: string };
 type ProofUploader = { id: string; email: string };
 
+export type PaymentProofScope = ProofContext & { key: PaymentProofKey };
+
 function cleanContextValue(value?: string) {
   const clean = value?.trim();
   return clean && /^[a-zA-Z0-9_-]{1,128}$/.test(clean) ? clean : undefined;
+}
+
+function requireContextValue(value: string | undefined, label: string) {
+  const clean = cleanContextValue(value);
+  if (!clean) throw new Error(`${label} is required and must be a valid record identifier.`);
+  return clean;
 }
 
 function hasExpectedSignature(bytes: Uint8Array, mimeType: string) {
@@ -39,21 +47,26 @@ async function ensureProofTable(db: D1DatabaseBinding) {
 
 function mapV2(row: Record<string, unknown>): PaymentProofRecord {
   const id = String(row.id);
+  const key = normalizePaymentProofKey(String(row.proof_key));
+  const clientId = row.client_id ? String(row.client_id) : undefined;
+  const proposalId = row.proposal_id ? String(row.proposal_id) : undefined;
+  const caseId = row.case_id ? String(row.case_id) : undefined;
   return {
     id,
-    key: normalizePaymentProofKey(String(row.proof_key)),
+    key,
     label: String(row.label),
     fileName: String(row.original_file_name),
-    url: makePaymentProofUrl(id),
+    url: makePaymentProofUrl(id, { key, clientId, proposalId, caseId }),
     uploadedAt: String(row.uploaded_at),
     mimeType: String(row.mime_type),
     sizeBytes: Number(row.size_bytes),
     checksumSha256: String(row.checksum_sha256),
     uploadedBy: String(row.uploaded_by_email),
+    uploadedById: String(row.uploaded_by_id),
     status: String(row.status) as PaymentProofRecord["status"],
-    clientId: row.client_id ? String(row.client_id) : undefined,
-    proposalId: row.proposal_id ? String(row.proposal_id) : undefined,
-    caseId: row.case_id ? String(row.case_id) : undefined
+    clientId,
+    proposalId,
+    caseId
   };
 }
 
@@ -61,8 +74,21 @@ export function normalizePaymentProofKey(key?: string | null): PaymentProofKey {
   return key === "balance-proof" ? "balance-proof" : "advance-proof";
 }
 
-export function makePaymentProofUrl(id: string) {
-  return `/api/payment-proofs/files/${encodeURIComponent(id)}`;
+export function makePaymentProofUrl(id: string, scope?: PaymentProofScope) {
+  const query = new URLSearchParams();
+  if (scope) {
+    query.set("key", scope.key);
+    if (scope.clientId) query.set("clientId", scope.clientId);
+    if (scope.proposalId) query.set("proposalId", scope.proposalId);
+    if (scope.caseId) query.set("caseId", scope.caseId);
+  }
+  const suffix = query.size ? `?${query.toString()}` : "";
+  return `/api/payment-proofs/files/${encodeURIComponent(id)}${suffix}`;
+}
+
+export function toPublicPaymentProofRecord(record: PaymentProofRecord): PaymentProofRecord {
+  const { checksumSha256: _checksum, uploadedBy: _uploader, uploadedById: _uploaderId, ...safe } = record;
+  return safe;
 }
 
 export async function readPaymentProofManifest(): Promise<PaymentProofRecord[]> {
@@ -83,6 +109,34 @@ export async function readPaymentProofManifest(): Promise<PaymentProofRecord[]> 
   }));
 }
 
+export async function readScopedPaymentProofManifest(scope: ProofContext): Promise<PaymentProofRecord[]> {
+  const clientId = requireContextValue(scope.clientId, "Client");
+  const proposalId = cleanContextValue(scope.proposalId);
+  const caseId = cleanContextValue(scope.caseId);
+  if (!proposalId && !caseId) throw new Error("A proposal or case is required to load payment proof.");
+  const manifest = await readPaymentProofManifest();
+  return manifest.filter((record) => record.clientId === clientId && (
+    (record.key === "advance-proof" && Boolean(proposalId) && record.proposalId === proposalId && !record.caseId)
+    || (record.key === "balance-proof" && Boolean(caseId) && record.caseId === caseId)
+  ));
+}
+
+export async function readPaymentProofForVerification(id: string, scope: PaymentProofScope) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) return null;
+  const clientId = requireContextValue(scope.clientId, "Client");
+  const proposalId = scope.key === "advance-proof" ? requireContextValue(scope.proposalId, "Proposal") : undefined;
+  const caseId = scope.key === "balance-proof" ? requireContextValue(scope.caseId, "Case") : undefined;
+  const { DB } = getRuntimeEnv();
+  if (!DB) return null;
+  await ensureProofTable(DB);
+  const row = await DB.prepare("SELECT * FROM payment_proof_assets_v2 WHERE id = ?").bind(id).first<Record<string, unknown>>();
+  if (!row) return null;
+  const record = mapV2(row);
+  const exact = record.key === scope.key && record.clientId === clientId
+    && (scope.key === "advance-proof" ? record.proposalId === proposalId && !record.caseId : record.caseId === caseId);
+  return exact && record.status === "UPLOADED" ? record : null;
+}
+
 export async function savePaymentProofUpload(file: File, key: string, uploader: ProofUploader, context: ProofContext = {}) {
   const { DB, R2 } = getRuntimeEnv();
   if (!DB || !R2) throw new Error("Secure payment-proof storage is not configured.");
@@ -92,9 +146,9 @@ export async function savePaymentProofUpload(file: File, key: string, uploader: 
   if (!hasExpectedSignature(bytes, file.type)) throw new Error("The payment proof content does not match its declared file type.");
 
   const normalizedKey = normalizePaymentProofKey(key);
-  const safeContext = {
-    clientId: cleanContextValue(context.clientId), proposalId: cleanContextValue(context.proposalId), caseId: cleanContextValue(context.caseId)
-  };
+  const safeContext = normalizedKey === "advance-proof"
+    ? { clientId: requireContextValue(context.clientId, "Client"), proposalId: requireContextValue(context.proposalId, "Proposal"), caseId: undefined }
+    : { clientId: requireContextValue(context.clientId, "Client"), proposalId: undefined, caseId: requireContextValue(context.caseId, "Case") };
   const id = crypto.randomUUID();
   const slotId = [normalizedKey, safeContext.clientId ?? "", safeContext.proposalId ?? "", safeContext.caseId ?? ""].join(":");
   const objectKey = `payment-proofs/${id}`;
@@ -121,11 +175,12 @@ export async function savePaymentProofUpload(file: File, key: string, uploader: 
   }
   return mapV2({ id, proof_key: normalizedKey, label: paymentProofLabels[normalizedKey], original_file_name: file.name,
     mime_type: file.type, size_bytes: bytes.byteLength, checksum_sha256: checksum, uploaded_by_email: uploader.email,
-    uploaded_at: uploadedAt, status: "UPLOADED", client_id: safeContext.clientId, proposal_id: safeContext.proposalId, case_id: safeContext.caseId });
+    uploaded_by_id: uploader.id, uploaded_at: uploadedAt, status: "UPLOADED", client_id: safeContext.clientId, proposal_id: safeContext.proposalId, case_id: safeContext.caseId });
 }
 
-export async function readPaymentProofFile(id: string) {
-  if (!/^[0-9a-f-]{36}$/i.test(id)) return null;
+export async function readPaymentProofFile(id: string, scope: PaymentProofScope) {
+  const record = await readPaymentProofForVerification(id, scope);
+  if (!record) return null;
   const { DB, R2 } = getRuntimeEnv();
   if (!DB || !R2) return null;
   await ensureProofTable(DB);

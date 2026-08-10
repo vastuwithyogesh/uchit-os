@@ -8,21 +8,21 @@ export default async function BootstrapPage() {
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="Bootstrap Control Room" subtitle="State sync and recovery" />
-        <AccessDeniedPanel area="Bootstrap control room" requiredRole="ADMIN" actorRole={access.actor.role} />
+        <SiteHeader title="Data Readiness" subtitle="Safe state inspection and recovery" />
+        <AccessDeniedPanel area="Data readiness" requiredRole="ADMIN" actorRole={access.actor.role} />
       </main>
     );
   }
 
   return (
     <main className="page-shell">
-      <SiteHeader title="Bootstrap Control Room" subtitle="State sync and recovery" />
+      <SiteHeader title="Data Readiness" subtitle="Safe state inspection and recovery" />
 
       <section className="hero-panel" style={{ marginTop: 22 }}>
-        <div className="eyebrow">State management</div>
-        <h1>Sync the working state into persistence and reload the current snapshot.</h1>
+        <div className="eyebrow">Production data safety</div>
+        <h1>Check the saved records without replacing them.</h1>
         <p className="lede">
-          Use this page whenever you want the application state, persistence layer, and seeded workflow records to line up before a broader verification pass.
+          Production records always come from durable storage. This screen can inspect the current snapshot, while full restoration stays in the owner-only recovery area.
         </p>
         <div className="hero-actions" style={{ marginTop: 14 }}>
           <a href="/state" className="button">
@@ -33,9 +33,9 @@ export default async function BootstrapPage() {
           </a>
         </div>
         <div className="pill-row" style={{ marginTop: 16 }}>
-          <span className="pill">State sync and recovery</span>
-          <span className="pill">Persistence alignment</span>
-          <span className="pill">Verification support</span>
+          <span className="pill">Read-only inspection</span>
+          <span className="pill">No demo overwrite</span>
+          <span className="pill">Owner-controlled recovery</span>
         </div>
       </section>
 

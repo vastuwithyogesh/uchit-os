@@ -15,6 +15,16 @@ type StaffRoleAssignment = {
   updatedAt: string;
 };
 
+type StaffRoleAuditRecord = {
+  id: string;
+  targetEmail: string;
+  previousRole?: UserRole;
+  nextRole: UserRole;
+  actorName: string;
+  actorRole: UserRole;
+  changedAt: string;
+};
+
 async function fetchState() {
   const response = await fetch("/api/bootstrap", { cache: "no-store" });
   if (!response.ok) {
@@ -32,7 +42,7 @@ async function fetchStaffRoles(role?: string) {
   if (!response.ok || result.ok === false) {
     throw new Error(result.error ?? "Failed to load staff roles");
   }
-  return result as { ok: true; assignments: StaffRoleAssignment[] };
+  return result as { ok: true; assignments: StaffRoleAssignment[]; audit: StaffRoleAuditRecord[] };
 }
 
 async function saveStaffRoleAssignment(payload: { email: string; role: UserRole; fullName: string }, role?: string) {
@@ -45,7 +55,18 @@ async function saveStaffRoleAssignment(payload: { email: string; role: UserRole;
   if (!response.ok || result.ok === false) {
     throw new Error(result.error ?? "Failed to save staff role");
   }
-  return result as { ok: true; assignments: StaffRoleAssignment[] };
+  return result as { ok: true; assignments: StaffRoleAssignment[]; audit: StaffRoleAuditRecord[] };
+}
+
+async function revokeStaffRoleAssignment(email: string, role?: string) {
+  const response = await fetch("/api/staff-roles", {
+    method: "DELETE",
+    headers: buildActionHeaders(role),
+    body: JSON.stringify({ email })
+  });
+  const result = await response.json();
+  if (!response.ok || result.ok === false) throw new Error(result.error ?? "Failed to revoke staff access");
+  return result as { ok: true; assignments: StaffRoleAssignment[]; audit: StaffRoleAuditRecord[] };
 }
 
 async function postAction(payload: Record<string, unknown>, role?: string) {
@@ -66,6 +87,7 @@ export function AdminConsole() {
   const { activeUser } = useSession();
   const [state, setState] = useState<AppState | null>(null);
   const [assignments, setAssignments] = useState<StaffRoleAssignment[]>([]);
+  const [roleAudit, setRoleAudit] = useState<StaffRoleAuditRecord[]>([]);
   const [message, setMessage] = useState("Load admin state to start");
   const [busy, setBusy] = useState(false);
   const [draft, setDraft] = useState({
@@ -98,6 +120,7 @@ export function AdminConsole() {
       const [nextState, nextAssignments] = await Promise.all([fetchState(), fetchStaffRoles(activeUser.role)]);
       setState(nextState);
       setAssignments(nextAssignments.assignments);
+      setRoleAudit(nextAssignments.audit);
       setMessage("Admin state refreshed");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
@@ -120,10 +143,12 @@ export function AdminConsole() {
   }
 
   async function saveAssignment() {
+    if (!window.confirm(`Give ${staffDraft.fullName || staffDraft.email} the ${staffDraft.role} role? This changes their production data access after hosting access is granted.`)) return;
     setBusy(true);
     try {
       const result = await saveStaffRoleAssignment(staffDraft, activeUser.role);
       setAssignments(result.assignments);
+      setRoleAudit(result.audit);
       setStaffDraft({
         email: "",
         fullName: "",
@@ -132,6 +157,21 @@ export function AdminConsole() {
       setMessage("Staff role assignment updated");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Assignment update failed");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function revokeAssignment(assignment: StaffRoleAssignment) {
+    if (!window.confirm(`Remove staff access for ${assignment.fullName} (${assignment.email})? They will fall back to client-only access.`)) return;
+    setBusy(true);
+    try {
+      const result = await revokeStaffRoleAssignment(assignment.email, activeUser.role);
+      setAssignments(result.assignments);
+      setRoleAudit(result.audit);
+      setMessage("Staff access revoked");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "Staff access revocation failed");
     } finally {
       setBusy(false);
     }
@@ -307,6 +347,11 @@ export function AdminConsole() {
                 <span className="meta">
                   {assignment.email} · {assignment.role}
                 </span>
+                {activeUser.role === "SUPER_ADMIN" && assignment.role !== "SUPER_ADMIN" ? (
+                  <button className="button-secondary" type="button" disabled={busy} onClick={() => revokeAssignment(assignment)}>
+                    Remove staff access
+                  </button>
+                ) : null}
               </div>
             ))}
             {!assignments.length ? <span className="meta">No staff role assignments loaded yet.</span> : null}
@@ -322,7 +367,7 @@ export function AdminConsole() {
           <div className="field">
             <label>Role</label>
             <select value={staffDraft.role} onChange={(event) => setStaffDraft((current) => ({ ...current, role: event.target.value as UserRole }))}>
-              {(["SETTER", "CONSULTANT", "ADMIN", "SUPER_ADMIN"] as UserRole[]).map((role) => (
+              {(["SETTER", "CONSULTANT", "ADMIN"] as UserRole[]).map((role) => (
                 <option key={role} value={role}>
                   {role}
                 </option>
@@ -333,7 +378,21 @@ export function AdminConsole() {
             Save staff role
           </button>
           <div className="footer-note" style={{ marginTop: 10 }}>
-            {activeUser.role === "SUPER_ADMIN" ? "Live role assignment editing is enabled for your account." : "Only Super-Admin can change staff role assignments."}
+            {activeUser.role === "SUPER_ADMIN" ? "Choose the least-powerful role needed. Super-Admin and hosting access are controlled separately." : "Only Super-Admin can change staff role assignments."}
+          </div>
+        </div>
+
+        <div className="panel" style={{ marginTop: 16 }}>
+          <div className="panel-head"><div><strong>Recent role changes</strong><div className="meta">Permanent production access audit</div></div></div>
+          <div className="list" style={{ marginTop: 12 }}>
+            {roleAudit.slice(0, 8).map((entry) => (
+              <div key={entry.id} className="list-item">
+                <strong>{entry.targetEmail}</strong>
+                <span className="meta">{entry.previousRole ?? "Unassigned"} → {entry.nextRole}</span>
+                <span className="meta">Changed by {entry.actorName} ({entry.actorRole}) · {new Date(entry.changedAt).toLocaleString()}</span>
+              </div>
+            ))}
+            {!roleAudit.length ? <span className="meta">No production role changes recorded yet.</span> : null}
           </div>
         </div>
 

@@ -14,11 +14,15 @@ export function inspectIntegrity(
     staffAssignments?: number;
   },
   paymentProofAssets?: Array<{
+    id?: string;
     key: string;
     label: string;
     fileName: string;
     url: string;
     uploadedAt: string;
+    clientId?: string;
+    proposalId?: string;
+    caseId?: string;
   }>
 ) {
   const issues: IntegrityIssue[] = [];
@@ -138,24 +142,19 @@ export function inspectIntegrity(
   }
 
   if (paymentProofAssets) {
-    const proofKeys = new Set(paymentProofAssets.map((asset) => asset.key));
-    const hasAdvanceProof = proofKeys.has("advance-proof");
-    const hasBalanceProof = proofKeys.has("balance-proof");
-
-    if (state.payments.some((payment) => payment.type === "ADVANCE" && payment.status === "APPROVED") && !hasAdvanceProof) {
-      issues.push({
-        area: "Payment proofs",
-        message: "An approved advance payment exists, but no advance proof image is uploaded.",
-        severity: "warn"
-      });
-    }
-
-    if (state.payments.some((payment) => payment.type === "BALANCE" && payment.status === "APPROVED") && !hasBalanceProof) {
-      issues.push({
-        area: "Payment proofs",
-        message: "An approved balance payment exists, but no balance proof image is uploaded.",
-        severity: "warn"
-      });
+    for (const payment of state.payments.filter((item) => item.status === "APPROVED")) {
+      const expectedKey = payment.type === "ADVANCE" ? "advance-proof" : "balance-proof";
+      const exactProof = paymentProofAssets.find((asset) => asset.id === payment.proofAssetId
+        && asset.key === expectedKey
+        && asset.clientId === payment.clientId
+        && (payment.type === "ADVANCE" ? asset.proposalId === payment.proposalId : asset.caseId === payment.caseId));
+      if (!exactProof) {
+        issues.push({
+          area: "Payment proofs",
+          message: `Approved ${payment.type.toLowerCase()} payment ${payment.id} is legacy or is not bound to exact scoped proof. Keep it quarantined from new release decisions.`,
+          severity: "warn"
+        });
+      }
     }
   }
 

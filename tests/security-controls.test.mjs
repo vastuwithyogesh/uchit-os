@@ -15,7 +15,7 @@ function allowedRoles(permissionName) {
 }
 
 test("role permission matrix preserves least privilege on high-risk actions", () => {
-  assert.deepEqual(allowedRoles("canVerifyPayments"), ["CONSULTANT", "ADMIN", "SUPER_ADMIN"]);
+  assert.deepEqual(allowedRoles("canVerifyPayments"), ["ADMIN", "SUPER_ADMIN"]);
   assert.deepEqual(allowedRoles("canEvaluateCases"), ["CONSULTANT", "ADMIN", "SUPER_ADMIN"]);
   assert.deepEqual(allowedRoles("canReadClientSnapshots"), ["CONSULTANT", "ADMIN", "SUPER_ADMIN"]);
   assert.deepEqual(allowedRoles("canReleaseVerdict"), ["ADMIN", "SUPER_ADMIN"]);

@@ -66,6 +66,21 @@ CREATE TABLE IF NOT EXISTS staff_role_assignments (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS staff_role_assignment_audit (
+  id TEXT PRIMARY KEY,
+  target_email TEXT NOT NULL,
+  previous_role TEXT,
+  next_role TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  actor_email TEXT NOT NULL,
+  actor_name TEXT NOT NULL,
+  actor_role TEXT NOT NULL,
+  changed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_role_audit_target_time
+ON staff_role_assignment_audit(target_email, changed_at);
+
 CREATE TABLE IF NOT EXISTS case_file_assets (
   id TEXT PRIMARY KEY, evidence_ref TEXT NOT NULL UNIQUE, case_id TEXT NOT NULL,
   case_revision_number INTEGER NOT NULL, service_type TEXT NOT NULL, floor_label TEXT,
@@ -80,4 +95,17 @@ ON case_file_assets(case_id, case_revision_number, service_type, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_case_file_assets_floor
 ON case_file_assets(case_id, floor_label);
+
+CREATE TABLE IF NOT EXISTS inbound_optin_events (
+  event_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, source TEXT NOT NULL,
+  payload_hash TEXT NOT NULL, identity_hash TEXT NOT NULL, received_at TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK (outcome IN ('CREATED', 'UPDATED')),
+  submission_count INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_received
+ON inbound_optin_events(received_at);
+
+CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_identity
+ON inbound_optin_events(identity_hash, received_at);
 `;

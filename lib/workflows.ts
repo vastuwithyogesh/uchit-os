@@ -12,13 +12,21 @@ import type {
   VastuCaseRecord
 } from "./domain.ts";
 import { validateShaktiInputs } from "./evaluation-provenance.ts";
+import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
 
-export const MIN_ADVANCE_INR = 11000;
-export const DEFAULT_PROPOSAL_AMOUNT_INR = 51000;
-export const QUALIFICATION_CALL_TARGET_MINUTES = 2;
+/** UI compatibility only; server mutations read the versioned policy from AppState. */
+export const DEFAULT_PROPOSAL_AMOUNT_INR = LEGACY_COMMERCIAL_POLICY_DEFAULTS.defaultProposalAmountInr;
+export const MIN_ADVANCE_INR = LEGACY_COMMERCIAL_POLICY_DEFAULTS.minimumAdvanceInr;
+
 
 export function canCreateCase(proposal: CommercialProposalRecord, advance: PaymentRecord | undefined) {
-  return proposal.status === "APPROVED" && !!advance && advance.status === "APPROVED" && advance.amountInr >= MIN_ADVANCE_INR;
+  return proposal.status === "APPROVED"
+    && Number.isSafeInteger(proposal.minAdvanceInr)
+    && proposal.minAdvanceInr > 0
+    && !!advance
+    && advance.status === "APPROVED"
+    && advance.amountInr >= proposal.minAdvanceInr
+    && Boolean(advance.proofAssetId);
 }
 
 export function isPreviewWatermarked(report: ReportVersionRecord) {
@@ -26,14 +34,14 @@ export function isPreviewWatermarked(report: ReportVersionRecord) {
 }
 
 export function canReleaseOfficialVerdict(caseRecord: VastuCaseRecord, balancePayment: PaymentRecord | undefined) {
-  return caseRecord.balanceApproved && caseRecord.fullPaymentApproved && !!balancePayment && balancePayment.status === "APPROVED";
+  return caseRecord.balanceApproved && caseRecord.fullPaymentApproved && !!balancePayment && balancePayment.status === "APPROVED" && Boolean(balancePayment.proofAssetId);
 }
 
 export function canApproveCommercialProposal(user: AppUser) {
   return user.role === "SUPER_ADMIN";
 }
 
-export function qualifyLead(lead: LeadQualificationRecord) {
+export function qualifyLead(lead: LeadQualificationRecord, qualificationCallTargetMinutes = LEGACY_COMMERCIAL_POLICY_DEFAULTS.qualificationCallTargetMinutes) {
   const scoreBand = lead.score >= 85 ? "hot" : lead.score >= 70 ? "warm" : "cool";
   const triggerDeliverable = lead.score >= 80 && !!lead.qualificationCallCompletedAt;
   const completedInMinutes = lead.qualificationCallCompletedAt && lead.qualificationCallDueAt
@@ -47,7 +55,7 @@ export function qualifyLead(lead: LeadQualificationRecord) {
     scoreBand,
     triggerDeliverable,
     completedInMinutes,
-    callSlaMet: completedInMinutes !== null ? completedInMinutes <= QUALIFICATION_CALL_TARGET_MINUTES : false
+    callSlaMet: completedInMinutes !== null ? completedInMinutes <= qualificationCallTargetMinutes : false
   };
 }
 
@@ -128,15 +136,20 @@ export function approvalSummary(caseRecord: VastuCaseRecord, proposal: Commercia
 
   return {
     commercialApproved: proposal.status === "APPROVED",
-    advanceApproved: !!advancePayment && advancePayment.status === "APPROVED" && advancePayment.amountInr >= MIN_ADVANCE_INR,
-    balanceApproved: !!balancePayment && balancePayment.status === "APPROVED",
-    verdictUnlocked: caseRecord.fullPaymentApproved && caseRecord.balanceApproved
+    advanceApproved: !!advancePayment
+      && advancePayment.status === "APPROVED"
+      && advancePayment.amountInr >= proposal.minAdvanceInr
+      && Boolean(advancePayment.proofAssetId),
+    balanceApproved: !!balancePayment && balancePayment.status === "APPROVED" && Boolean(balancePayment.proofAssetId),
+    verdictUnlocked: caseRecord.fullPaymentApproved
+      && caseRecord.balanceApproved
+      && Boolean(balancePayment?.proofAssetId)
   };
 }
 
 export function timelineHeadlineForLead(lead: LeadQualificationRecord) {
   const qualification = qualifyLead(lead);
-  return qualification.callSlaMet ? "Call handled inside the 2-minute window" : "Call needs attention";
+  return qualification.callSlaMet ? `Call handled inside the ${LEGACY_COMMERCIAL_POLICY_DEFAULTS.qualificationCallTargetMinutes}-minute window` : "Call needs attention";
 }
 
 export function formatMoney(amountInr: number) {

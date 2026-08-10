@@ -20,6 +20,7 @@ export default async function HomePage() {
     const work = buildCaseWorkspaceProjection(state, access.actor);
     const needsAttention = work.filter((item) => item.sla === "OVERDUE" || item.sla === "DUE_SOON");
     const firstItem = needsAttention[0] ?? work.find((item) => item.stage !== "Complete") ?? work[0];
+    const hasNoClients = state.clients.length === 0;
 
     return (
       <main className="page-shell">
@@ -28,15 +29,17 @@ export default async function HomePage() {
         <section className="hero">
           <div className="hero-panel">
             <div className="eyebrow">Staff home</div>
-            <h1>{firstItem ? "Start with the next client task" : "You are all caught up"}</h1>
+            <h1>{hasNoClients ? "Start by adding your first client" : firstItem ? "Start with the next client task" : "You are all caught up"}</h1>
             <p className="lede">
-              {firstItem
+              {hasNoClients
+                ? "Import website opt-ins or add a client in the Clients area. The workspace will then show one clear next step at a time."
+                : firstItem
                 ? "The workspace puts urgent work first and explains what to do, what is waiting, and what happens after."
                 : "There are no client tasks in your queue. New work will appear here when it is assigned to you."}
             </p>
             <div className="hero-actions">
-              <a href="/workspace" className="button">Open my workspace</a>
-              <a href="/crm" className="button-secondary">Add or find a client</a>
+              <a href={hasNoClients ? "/crm" : "/workspace"} className="button">{hasNoClients ? "Add first client" : "Open my workspace"}</a>
+              <a href={hasNoClients ? "/workspace" : "/crm"} className="button-secondary">{hasNoClients ? "View empty workspace" : "Add or find a client"}</a>
             </div>
           </div>
 

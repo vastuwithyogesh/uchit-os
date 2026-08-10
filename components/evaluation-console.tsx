@@ -56,6 +56,8 @@ export function EvaluationConsole() {
   const evaluationBlockers = currentCase && state ? getCaseEvaluationBlockers(state, currentCase.id) : ["Open a case and save its service setup."];
   const evaluationReady = Boolean(currentCase && evaluationBlockers.length === 0);
   const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
+  const caseAmountInr = state?.commercialProposals.find((item) => item.clientId === selectedClient?.id)?.amountInr
+    ?? state?.commercialPolicy.defaultProposalAmountInr;
   const report = (reports.find((item) => item.isPreview) ?? reports[0] ?? null) as ReportVersionRecord | null;
   const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
   const shaktiSnapshots = state?.shaktiSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
@@ -114,11 +116,11 @@ export function EvaluationConsole() {
 
   return (
     <section className="section-grid">
-      <div className="card span-8">
-        <div className="eyebrow">Utility-evaluation master</div>
-        <h2>Residential tab CSV</h2>
+      <div className={`card ${evaluationReady ? "span-8" : "span-12"}`}>
+        <div className="eyebrow">Case evaluation</div>
+        <h2>{evaluationReady ? "Run the verified case evaluation" : "Complete setup before evaluating"}</h2>
         <p className="subtle">
-          This view is the source of truth for the GOOD / BAD / OK-OK matrix. It now also lets us save evaluation snapshots against a live case instead of only reading the rule table.
+          Choose a client, complete the required case inputs, then save the two evaluation snapshots.
         </p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
@@ -139,7 +141,7 @@ export function EvaluationConsole() {
           </div>
         </div>
         <div className="workflow" style={{ marginTop: 14 }}>
-          <button type="button" className="button" onClick={() => refresh()} disabled={busy}>
+          <button type="button" className="button-secondary" onClick={() => refresh()} disabled={busy}>
             Reload master table
           </button>
           <label htmlFor="evaluation-client"><strong>Client</strong></label>
@@ -157,11 +159,11 @@ export function EvaluationConsole() {
           <span className="pill">OK-OK {grouped["OK-OK"].length}</span>
           <span className="pill">Snapshots {evaluationSnapshots.length}</span>
         </div>
-        <div className="field" style={{ marginTop: 14 }}>
+        <div className="panel" style={{ marginTop: 14 }} aria-live="polite"><strong>{evaluationReady ? "Ready to run evaluation" : "Complete the case setup first"}</strong><div className="meta" style={{ marginTop: 6 }}>{service ? `${serviceTypeLabel(service.serviceType)} · ${readiness?.completed ?? 0} of ${readiness?.total ?? 0} required inputs ready.` : "Open a case and save its service setup."}</div>{!evaluationReady ? <><p className="subtle">Evaluation controls stay unavailable until these requirements are complete:</p><ul>{evaluationBlockers.slice(0, 3).map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>{evaluationBlockers.length > 3 ? <p className="meta">Case setup shows {evaluationBlockers.length - 3} more requirement{evaluationBlockers.length - 3 === 1 ? "" : "s"}.</p> : null}<a className="button" href="/ops">Complete case setup</a></> : null}</div>
+        {evaluationReady ? <><div className="field" style={{ marginTop: 14 }}>
           <label htmlFor="snapshot-name">Snapshot name</label>
           <input id="snapshot-name" value={snapshotName} onChange={(event) => setSnapshotName(event.target.value)} />
         </div>
-        <div className="panel" style={{ marginTop: 14 }} aria-live="polite"><strong>{evaluationReady ? "Ready to run evaluation" : "Complete the case setup first"}</strong><div className="meta" style={{ marginTop: 6 }}>{service ? `${serviceTypeLabel(service.serviceType)} · ${readiness?.completed ?? 0} of ${readiness?.total ?? 0} required inputs ready.` : "Open a case and save its service setup."}</div>{!evaluationReady ? <ul>{evaluationBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : null}{!evaluationReady ? <a className="button-secondary" href="/ops">Open case setup</a> : null}</div>
         <button
           type="button"
           className="button-secondary"
@@ -171,7 +173,10 @@ export function EvaluationConsole() {
         >
           Save utility snapshot
         </button>
-        <div className="list" style={{ marginTop: 14 }}>
+        </> : null}
+        <details style={{ marginTop: 14 }}>
+          <summary>View rule master and technical details</summary>
+          <div className="list" style={{ marginTop: 14 }}>
           {rules.map((rule) => (
             <div key={rule.id} className="list-item">
               <strong>{rule.zoneCode}</strong>
@@ -183,10 +188,11 @@ export function EvaluationConsole() {
               </div>
             </div>
           ))}
-        </div>
+          </div>
+        </details>
       </div>
 
-      <div className="card span-4">
+      {evaluationReady ? <div className="card span-4">
         <div className="eyebrow">Shakti engine</div>
         <h2>16-value ranking snapshot</h2>
         <div className="pill-row" style={{ marginTop: 14 }}>
@@ -245,11 +251,11 @@ export function EvaluationConsole() {
           </div>
           <div className="list-item">
             <strong>Case amount</strong>
-            <span className="meta">{formatMoney(51000)}</span>
+            <span className="meta">{caseAmountInr ? formatMoney(caseAmountInr) : "Not set"}</span>
           </div>
         </div>
         <div className="footer-note" role={message.toLowerCase().includes("failed") || message.toLowerCase().includes("could not") ? "alert" : "status"} aria-live="polite">{message}</div>
-      </div>
+      </div> : null}
     </section>
   );
 }

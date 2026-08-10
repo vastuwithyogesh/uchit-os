@@ -12,6 +12,24 @@ test("the main navigation has one clear destination and an accessible More menu"
   assert.match(header, /aria-current=/);
 });
 
+test("shared navigation uses reliable native links", () => {
+  for (const file of [
+    "components/site-header.tsx",
+    "components/case-workspace.tsx",
+    "components/access-denied-panel.tsx"
+  ]) {
+    const content = source(file);
+    assert.doesNotMatch(content, /next\/link|<Link\b|prefetch=/);
+    assert.match(content, /<a\b[^>]*href=/);
+  }
+});
+
+test("workspace primary actions use direct href navigation", () => {
+  const workspace = source("components/case-workspace.tsx");
+  assert.match(workspace, /<a className=\{index === 0 \? "button" : "button-secondary"\} href=\{link\.href\}/);
+  assert.match(workspace, /Do this: \$\{item\.nextAction\}/);
+});
+
 test("the mobile menu stays above browser controls and remains scrollable", () => {
   const css = source("app/globals.css");
   assert.match(css, /inset:\s*12px 12px max\(12px, env\(safe-area-inset-bottom\)\)/);

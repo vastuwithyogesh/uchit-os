@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import type { PaymentProofRecord, PaymentProofKey } from "@/lib/payment-proof-types";
 import { prepareImageUpload } from "@/lib/image-upload";
+import type { AppState } from "@/lib/store";
+import { getActiveCaseForClient } from "@/lib/service-framework";
 
 type PaymentProofPayload = {
   assets: PaymentProofRecord[];
@@ -20,18 +22,26 @@ const uploadLabels: Record<PaymentProofKey, string> = {
   "balance-proof": "Balance proof"
 };
 
-async function fetchProofs() {
-  const response = await fetch("/api/payment-proofs", { cache: "no-store" });
+type PaymentContext = { clientId: string; proposalId?: string; caseId?: string };
+
+async function fetchProofs(context: PaymentContext) {
+  const query = new URLSearchParams({ clientId: context.clientId });
+  if (context.proposalId) query.set("proposalId", context.proposalId);
+  if (context.caseId) query.set("caseId", context.caseId);
+  const response = await fetch(`/api/payment-proofs?${query.toString()}`, { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Failed to load payment proofs");
   }
   return response.json() as Promise<PaymentProofPayload>;
 }
 
-async function uploadProof(key: PaymentProofKey, file: File) {
+async function uploadProof(key: PaymentProofKey, file: File, context: PaymentContext) {
   const formData = new FormData();
   formData.append("key", key);
   formData.append("file", file);
+  formData.append("clientId", context.clientId);
+  if (key === "advance-proof" && context.proposalId) formData.append("proposalId", context.proposalId);
+  if (key === "balance-proof" && context.caseId) formData.append("caseId", context.caseId);
   const response = await fetch("/api/payment-proofs", {
     method: "POST",
     body: formData
@@ -44,6 +54,8 @@ async function uploadProof(key: PaymentProofKey, file: File) {
 }
 
 export function PaymentProofConsole() {
+  const [appState, setAppState] = useState<AppState | null>(null);
+  const [selectedClientId, setSelectedClientId] = useState("");
   const [payload, setPayload] = useState<PaymentProofPayload | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Record<PaymentProofKey, File | null>>({
     "advance-proof": null,
@@ -56,11 +68,37 @@ export function PaymentProofConsole() {
     () => Object.fromEntries((payload?.assets ?? []).map((asset) => [asset.key, asset])) as Record<PaymentProofKey, PaymentProofRecord | undefined>,
     [payload]
   );
+  const boundProofIds = useMemo(
+    () => new Set([
+      ...(appState?.payments ?? []).map((payment) => payment.proofAssetId),
+      ...(appState?.advanceVerifications ?? []).map((verification) => verification.proofAssetId)
+    ].filter(Boolean)),
+    [appState]
+  );
 
-  async function refresh() {
+  const activeClient = appState?.clients.find((item) => item.id === selectedClientId) ?? appState?.clients[0];
+  const activeProposal = appState?.commercialProposals.find((item) => item.clientId === activeClient?.id);
+  const activeCase = appState && activeClient ? getActiveCaseForClient(appState, activeClient.id) : undefined;
+  const context = activeClient ? { clientId: activeClient.id, proposalId: activeProposal?.id, caseId: activeCase?.id } : null;
+
+  async function refresh(preferredClientId?: string) {
     setBusy(true);
     try {
-      const nextPayload = await fetchProofs();
+      const stateResponse = await fetch("/api/bootstrap", { cache: "no-store" });
+      if (!stateResponse.ok) throw new Error("Failed to load clients and cases");
+      const nextState = await stateResponse.json() as AppState;
+      const nextClientId = preferredClientId || selectedClientId || nextState.clients[0]?.id || "";
+      setAppState(nextState);
+      setSelectedClientId(nextClientId);
+      const client = nextState.clients.find((item) => item.id === nextClientId) ?? nextState.clients[0];
+      const proposal = nextState.commercialProposals.find((item) => item.clientId === client?.id);
+      const caseRecord = client ? getActiveCaseForClient(nextState, client.id) : undefined;
+      if (!client || (!proposal && !caseRecord)) {
+        setPayload({ assets: [], summary: { required: 0, uploaded: 0, pending: 0, complete: false, missingKeys: [] } });
+        setMessage("Open a proposal or case before uploading payment receipts.");
+        return;
+      }
+      const nextPayload = await fetchProofs({ clientId: client.id, proposalId: proposal?.id, caseId: caseRecord?.id });
       setPayload(nextPayload);
       setMessage(nextPayload.summary.complete ? "Both payment receipts are uploaded." : "Upload the missing payment receipt shown below.");
     } catch (error) {
@@ -72,7 +110,7 @@ export function PaymentProofConsole() {
 
   async function handleUpload(key: PaymentProofKey) {
     const file = selectedFiles[key];
-    if (!file) {
+    if (!file || !context || (key === "advance-proof" && !context.proposalId) || (key === "balance-proof" && !context.caseId)) {
       setMessage(`Choose an image for ${uploadLabels[key].toLowerCase()} first.`);
       return;
     }
@@ -80,14 +118,14 @@ export function PaymentProofConsole() {
     setBusy(true);
     try {
       const prepared = await prepareImageUpload(file);
-      const result = await uploadProof(key, prepared.file);
+      const result = await uploadProof(key, prepared.file, context);
       setSelectedFiles((current) => ({ ...current, [key]: null }));
       setMessage(
         prepared.compressed
           ? `${result.proof.label} uploaded after trimming the image for a safer upload.`
           : `${result.proof.label} uploaded.`
       );
-      await refresh();
+      await refresh(context.clientId);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");
     } finally {
@@ -105,9 +143,18 @@ export function PaymentProofConsole() {
         <div className="eyebrow">Payment receipts</div>
         <h2>Upload proof of payment</h2>
         <p className="subtle">First upload the advance receipt. After the final payment, upload the balance receipt.</p>
+        <div className="field" style={{ marginTop: 16 }}>
+          <label htmlFor="payment-proof-client">Client</label>
+          <select id="payment-proof-client" value={activeClient?.id ?? ""} onChange={(event) => {
+            setSelectedFiles({ "advance-proof": null, "balance-proof": null });
+            void refresh(event.target.value);
+          }}>
+            {(appState?.clients ?? []).map((client) => <option key={client.id} value={client.id}>{client.displayName}</option>)}
+          </select>
+        </div>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
-            <span className="stat-value">{payload?.summary.required ?? 2}</span>
+            <span className="stat-value">{payload?.summary.required ?? 0}</span>
             <span className="stat-label">receipts needed</span>
           </div>
           <div className="stat-card">
@@ -115,7 +162,7 @@ export function PaymentProofConsole() {
             <span className="stat-label">receipts uploaded</span>
           </div>
           <div className="stat-card">
-            <span className="stat-value">{payload?.summary.pending ?? 2}</span>
+            <span className="stat-value">{payload?.summary.pending ?? 0}</span>
             <span className="stat-label">still needed</span>
           </div>
           <div className="stat-card">
@@ -130,7 +177,7 @@ export function PaymentProofConsole() {
           <a href="/ops" className="button-secondary">
             Open ops console
           </a>
-          <button type="button" className="button-secondary" onClick={refresh} disabled={busy}>
+          <button type="button" className="button-secondary" onClick={() => void refresh()} disabled={busy}>
             Refresh proofs
           </button>
         </div>
@@ -139,6 +186,7 @@ export function PaymentProofConsole() {
           {(Object.keys(uploadLabels) as PaymentProofKey[]).map((key) => {
             const asset = assetsByKey[key];
             const file = selectedFiles[key];
+            const isVerified = Boolean(asset?.id && boundProofIds.has(asset.id));
             return (
               <div key={key} className="panel">
                 <div className="panel-head">
@@ -180,17 +228,17 @@ export function PaymentProofConsole() {
                     id={`proof-${key}`}
                     type="file"
                     accept="image/png,image/jpeg,image/webp,application/pdf"
-                    disabled={busy}
+                    disabled={busy || isVerified || (key === "advance-proof" ? !activeProposal : !activeCase)}
                     onChange={(event) => setSelectedFiles((current) => ({ ...current, [key]: event.target.files?.[0] ?? null }))}
                   />
                 </div>
                 <div className="workflow" style={{ marginTop: 10 }}>
-                  <button type="button" className="button-secondary" onClick={() => handleUpload(key)} disabled={busy || !file}>
-                    {asset ? "Replace receipt" : "Upload receipt"}
+                  <button type="button" className="button-secondary" onClick={() => handleUpload(key)} disabled={busy || isVerified || !file || (key === "advance-proof" ? !activeProposal : !activeCase)}>
+                    {isVerified ? "Verified receipt locked" : asset ? "Replace receipt" : "Upload receipt"}
                   </button>
                   {file ? <span className="pill">Selected: {file.name}</span> : null}
                 </div>
-                {asset ? <details style={{ marginTop: 10 }}><summary>File details</summary><span className="meta">{asset.fileName}{asset.sizeBytes ? ` · ${Math.ceil(asset.sizeBytes / 1024)} KB` : ""}</span>{asset.checksumSha256 ? <span className="meta">File fingerprint: {asset.checksumSha256}</span> : null}</details> : null}
+                {asset ? <details style={{ marginTop: 10 }}><summary>File details</summary><span className="meta">{asset.fileName}{asset.sizeBytes ? ` · ${Math.ceil(asset.sizeBytes / 1024)} KB` : ""}</span></details> : null}
               </div>
             );
           })}
@@ -200,6 +248,7 @@ export function PaymentProofConsole() {
       <div className="card span-4">
         <div className="eyebrow">Your next step</div>
         <h2>{payload?.summary.complete ? "Receipts are complete" : "Upload the missing receipt"}</h2>
+        <p className="meta">For safety, the person who uploads a receipt must be different from the administrator who verifies it.</p>
         <div className="list" style={{ marginTop: 14 }}>
           {(Object.keys(uploadLabels) as PaymentProofKey[]).map((key) => {
             const asset = assetsByKey[key];

@@ -4,11 +4,19 @@ import { useEffect, useRef, useState } from "react";
 
 type StatePayload = {
   state: Record<string, unknown>;
+  revision: number | null;
   integrity: {
     ok: boolean;
     issues: Array<{ area: string; message: string; severity: "info" | "warn" | "error" }>;
   };
   counts: Record<string, number>;
+};
+
+type StateExportEnvelope = {
+  formatVersion: 1;
+  exportedAt: string;
+  sourceRevision: number | null;
+  state: Record<string, unknown>;
 };
 
 async function fetchState() {
@@ -19,11 +27,11 @@ async function fetchState() {
   return response.json() as Promise<StatePayload>;
 }
 
-async function importState(state: Record<string, unknown>) {
+async function importState(state: Record<string, unknown>, expectedRevision: number | null) {
   const response = await fetch("/api/state", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ state })
+    body: JSON.stringify({ state, expectedRevision })
   });
   const result = await response.json();
   if (!response.ok || result.ok === false) {
@@ -59,10 +67,14 @@ export function StateConsole() {
       return;
     }
 
+    if (!window.confirm("Replace the complete application state with this snapshot? Current records will be overwritten, while uploaded file bytes remain separate.")) return;
     setBusy(true);
     try {
-      const nextState = JSON.parse(importText) as Record<string, unknown>;
-      const result = await importState(nextState);
+      const parsed = JSON.parse(importText) as Record<string, unknown>;
+      const nextState = parsed.formatVersion === 1 && parsed.state && typeof parsed.state === "object" && !Array.isArray(parsed.state)
+        ? parsed.state as Record<string, unknown>
+        : parsed;
+      const result = await importState(nextState, payload?.revision ?? null);
       setMessage(result.integrity.ok ? "State imported cleanly." : "State imported with warnings.");
       await refresh();
     } catch (error) {
@@ -78,7 +90,13 @@ export function StateConsole() {
       return;
     }
 
-    const blob = new Blob([JSON.stringify(payload.state, null, 2)], { type: "application/json" });
+    const envelope: StateExportEnvelope = {
+      formatVersion: 1,
+      exportedAt: new Date().toISOString(),
+      sourceRevision: payload.revision,
+      state: payload.state
+    };
+    const blob = new Blob([JSON.stringify(envelope, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = url;
@@ -106,11 +124,15 @@ export function StateConsole() {
     <section className="section-grid">
       <div className="card span-8">
         <div className="eyebrow">State export</div>
-        <h2>Full local snapshot</h2>
+        <h2>Full production snapshot</h2>
         <p className="subtle">
-          This is the entire local app state in one JSON block. It is useful for moving a build snapshot around or restoring the demo after a reset.
+          This export contains the durable application records in one JSON block. Download it before any approved restore or production data correction.
         </p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
+          <div className="stat-card">
+            <span className="stat-value">{payload?.revision ?? "—"}</span>
+            <span className="stat-label">current revision</span>
+          </div>
           <div className="stat-card">
             <span className="stat-value">{payload?.counts.clients ?? 0}</span>
             <span className="stat-label">clients in snapshot</span>

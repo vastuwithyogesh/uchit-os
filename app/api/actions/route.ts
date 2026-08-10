@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveRequestActor } from "@/lib/auth";
+import { isExplicitLocalDemo, resolveRequestActor } from "@/lib/auth";
 import { loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 import { getAppState, setAppState, type AppState } from "@/lib/store";
 import {
@@ -16,8 +16,6 @@ import {
 import {
   addFloorEvidence,
   addFloorWorkspace,
-  approveAdvancePayment,
-  approveBalancePayment,
   approveCommercialProposal,
   approveReport,
   bookQualificationCall,
@@ -44,6 +42,9 @@ import {
   upsertImplementationTask,
   upsertCaseDocument,
   upsertDeliveryMilestone,
+  transitionClientPipeline,
+  updateCommercialPolicy,
+  upsertClientIntake,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert"]);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert"]);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -72,13 +73,25 @@ export async function POST(request: Request) {
     let response: unknown;
 
     if (concurrencyActions.has(action)) {
-      if (!("expectedRecordVersion" in body) || !("expectedRevision" in body)) {
+      const hasEntityVersion = action === "commercial-policy-update" ? "expectedPolicyVersion" in body : "expectedRecordVersion" in body;
+      if (!hasEntityVersion || !("expectedRevision" in body)) {
         return NextResponse.json({ ok: false, error: "The latest case and state versions are required. Refresh and try again." }, { status: 428 });
       }
       const latest = await loadStateSnapshotFromPersistence();
       rollbackState = structuredClone(latest.state);
       globalRevisionStale = body.expectedRevision !== latest.revision;
       expectedGlobalRevision = latest.revision ?? undefined;
+    }
+
+    const crmAllowedFields: Record<string, string[]> = {
+      "client-pipeline-transition": ["action", "actorRole", "clientId", "pipelineStage", "nextAction", "nextActionDueAt", "correction", "correctionReason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "commercial-policy-update": ["action", "actorRole", "defaultProposalAmountInr", "minimumAdvanceInr", "qualificationCallTargetMinutes", "nextActionDueSoonHours", "defaultReviewCallMinutes", "reason", "idempotencyKey", "expectedPolicyVersion", "expectedRevision"]
+      ,"client-intake-upsert": ["action", "actorRole", "clientId", "contactPreference", "businessContext", "decisionMakerStatus", "otherDecisionMakers", "propertyContext", "needs", "consent", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
+    };
+    if (crmAllowedFields[action]) {
+      const allowed = new Set(crmAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown CRM field: ${unknown}.` }, { status: 400 });
     }
 
     const assessmentAllowedFields: Record<string, string[]> = {
@@ -93,9 +106,21 @@ export async function POST(request: Request) {
       const unknown = Object.keys(body).find((key) => !allowed.has(key));
       if (unknown) return NextResponse.json({ ok: false, error: `Unknown assessment field: ${unknown}.` }, { status: 400 });
     }
+    const paymentAllowedFields: Record<string, string[]> = {
+      "advance-proof-verify": ["action", "actorRole", "clientId", "proposalId", "amountInr", "proofId"],
+      "balance-proof-verify": ["action", "actorRole", "clientId", "caseId", "amountInr", "proofId"]
+    };
+    if (paymentAllowedFields[action]) {
+      const allowed = new Set(paymentAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown payment field: ${unknown}.` }, { status: 400 });
+    }
 
     switch (action) {
       case "reset":
+        if (!isExplicitLocalDemo(request.headers)) {
+          return NextResponse.json({ ok: false, error: "Demo reset is unavailable outside an explicit local demo." }, { status: 403 });
+        }
         if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
           return deny("Only an admin can reset the local demo state.");
         }
@@ -106,6 +131,18 @@ export async function POST(request: Request) {
           return deny("This role cannot record lead qualification.");
         }
         response = { ok: true, lead: recordLeadQualification(body) };
+        break;
+      case "client-pipeline-transition":
+        if (!canTriggerDeliverables(actor)) return deny("Only assigned setters, consultants, or administrators can update the client pipeline.");
+        response = { ok: true, result: transitionClientPipeline({ ...body, actor }) };
+        break;
+      case "commercial-policy-update":
+        if (actor.role !== "SUPER_ADMIN") return deny("Only a Super-Admin can publish commercial policy.");
+        response = { ok: true, policy: updateCommercialPolicy({ ...body, actor }) };
+        break;
+      case "client-intake-upsert":
+        if (!canTriggerDeliverables(actor)) return deny("Only assigned setters, consultants, or administrators can update client intake.");
+        response = { ok: true, intake: upsertClientIntake({ ...body, actor }) };
         break;
       case "lead-qualify":
         if (!canTriggerDeliverables(actor)) {
@@ -152,7 +189,7 @@ export async function POST(request: Request) {
             proposalId: body.proposalId,
             provider: body.provider === "ZOOM" ? "ZOOM" : "GOOGLE_MEET",
             scheduledAt: String(body.scheduledAt ?? new Date().toISOString()),
-            durationMinutes: Number(body.durationMinutes ?? 30),
+            durationMinutes: body.durationMinutes === undefined ? undefined : Number(body.durationMinutes),
             actor
           })
         };
@@ -178,10 +215,10 @@ export async function POST(request: Request) {
         response = { ok: true, proposal: approveCommercialProposal(body.proposalId, actor) };
         break;
       case "case-create":
-        if (!canTriggerDeliverables(actor)) {
-          return deny("This role cannot create cases.");
+        if (!canVerifyPayments(actor)) {
+          return deny("Only an independent payment verifier can create a case after scoped advance proof is approved.");
         }
-        response = { ok: true, caseRecord: createVastuCase(body.clientId, body.proposalId) };
+        response = { ok: true, caseRecord: createVastuCase(body.clientId, body.proposalId, actor) };
         break;
       case "orientation-lock":
         if (!canEditFloorWorkspaces(actor)) {
@@ -263,8 +300,7 @@ export async function POST(request: Request) {
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot approve payments.");
         }
-        response = { ok: true, payment: approveAdvancePayment(body.clientId, body.proposalId, body.amountInr, actor) };
-        break;
+        return NextResponse.json({ ok: false, error: "Upload and independently verify scoped advance proof before approving payment." }, { status: 409 });
       case "advance-proof-verify":
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot verify advance proof.");
@@ -275,8 +311,7 @@ export async function POST(request: Request) {
             clientId: body.clientId,
             proposalId: body.proposalId,
             amountInr: Number(body.amountInr ?? 0),
-            referenceScreenshotUrl: String(body.referenceScreenshotUrl ?? ""),
-            referenceScreenshotFileName: String(body.referenceScreenshotFileName ?? ""),
+            proofId: String(body.proofId ?? ""),
             actor
           })
         };
@@ -285,20 +320,18 @@ export async function POST(request: Request) {
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot approve payments.");
         }
-        response = { ok: true, payment: approveBalancePayment(body.clientId, body.caseId, body.amountInr, actor) };
-        break;
+        return NextResponse.json({ ok: false, error: "Upload and independently verify scoped balance proof before approving payment." }, { status: 409 });
       case "balance-proof-verify":
         if (!canVerifyPayments(actor)) {
           return deny("This role cannot verify balance proof.");
         }
         response = {
           ok: true,
-          result: verifyBalanceProof({
+          result: await verifyBalanceProof({
             clientId: body.clientId,
             caseId: body.caseId,
             amountInr: Number(body.amountInr ?? 0),
-            referenceScreenshotUrl: String(body.referenceScreenshotUrl ?? ""),
-            referenceScreenshotFileName: String(body.referenceScreenshotFileName ?? ""),
+            proofId: String(body.proofId ?? ""),
             actor
           })
         };

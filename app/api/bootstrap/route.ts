@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { requireRouteActor } from "@/lib/auth";
+import { isExplicitLocalDemo, requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence, loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 
 export async function GET(request: Request) {
@@ -12,12 +12,19 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-  const access = await requireRouteActor(request, "ADMIN");
+  const access = await requireRouteActor(request, "SUPER_ADMIN");
   if (!access.ok) {
     return access.response;
   }
-  await persistStateToDatabase();
+  if (!isExplicitLocalDemo(request.headers)) {
+    return NextResponse.json(
+      { ok: false, error: "Seed synchronization is disabled in production. Current records were not changed." },
+      { status: 403, headers: { "Cache-Control": "private, no-store" } }
+    );
+  }
+
   const state = await loadStateFromPersistence();
+  await persistStateToDatabase(state);
 
   return NextResponse.json({
     ok: true,
@@ -37,5 +44,5 @@ export async function POST(request: Request) {
       templates: state.whatsappTemplates.length,
       timelineEvents: state.timelineEvents.length
     }
-  });
+  }, { headers: { "Cache-Control": "private, no-store" } });
 }

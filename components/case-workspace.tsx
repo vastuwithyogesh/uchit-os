@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { useMemo, useState } from "react";
 import type { CaseWorkspaceItem } from "@/lib/case-workspace";
 
@@ -65,7 +64,7 @@ export function CaseWorkspace({ items }: { items: CaseWorkspaceItem[] }) {
         <span>{items.filter((item) => item.sla === "DUE_SOON").length} due soon</span>
       </div>
 
-      {items.length === 0 ? <div className="workspace-state"><h2>You are all caught up</h2><p>No client tasks are assigned to you. Use “Add or find a client” in the CRM when new work arrives.</p><Link className="button-secondary" href="/crm">Add or find a client</Link></div> : null}
+      {items.length === 0 ? <div className="workspace-state"><h2>No client work yet</h2><p>Add or import the first client. Their next task will appear here automatically.</p><a className="button" href="/crm">Add first client</a></div> : null}
       {items.length > 0 && filtered.length === 0 ? <div className="workspace-state" role="status"><h2>Nothing to show here</h2><p>Try another filter, or clear the search to see more client tasks.</p><button className="button-secondary" type="button" onClick={() => { setQuery(""); setView("ALL"); }}>Show all tasks</button></div> : null}
 
       <div className="workspace-list">
@@ -93,12 +92,12 @@ export function CaseWorkspace({ items }: { items: CaseWorkspaceItem[] }) {
               <p className="subtle">{whatHappensAfter(item)}</p>
             </div>
             <div className="workspace-actions" aria-label={`Actions for ${item.clientName}`}>
-              {item.links.map((link, index) => <Link className={index === 0 ? "button" : "button-secondary"} href={link.href} key={link.href}>{index === 0 ? `Do this: ${item.nextAction}` : link.label}</Link>)}
+              {item.links.map((link, index) => <a className={index === 0 ? "button" : "button-secondary"} href={link.href} key={link.href}>{index === 0 ? `Do this: ${item.nextAction}` : link.label}</a>)}
             </div>
             <details>
               <summary>Show task details</summary>
               <p className="meta">Next action: {item.nextAction} · Blocked by: {item.blocker} · Responsible role: {item.ownerRole.toLowerCase()} · Internal status: {item.stage} · Timing: {item.slaLabel}</p>
-              {item.caseNumber?.match(/-R\d+$/) ? <p className="meta">This is a rectification revision linked to predecessor case {item.caseNumber.replace(/-R\d+$/, "")}. The earlier report remains unchanged. <Link href="/timeline">View revision history</Link>.</p> : null}
+              {item.caseNumber?.match(/-R\d+$/) ? <p className="meta">This is a rectification revision linked to predecessor case {item.caseNumber.replace(/-R\d+$/, "")}. The earlier report remains unchanged. <a href="/timeline">View revision history</a>.</p> : null}
             </details>
           </article>
         ))}

@@ -3,7 +3,7 @@ export const STATE_BACKUP_FORMAT = "uchit-state-backup/v1" as const;
 export type StateBackupEnvelope = {
   format: typeof STATE_BACKUP_FORMAT;
   createdAt: string;
-  sourceEnvironment: "local" | "staging";
+  sourceEnvironment: "local" | "staging" | "production";
   stateRevision: number;
   stateSha256: string;
   state: Record<string, unknown>;
@@ -41,7 +41,7 @@ export function validateBackupState(state: unknown): asserts state is Record<str
   validateNoProtectedMaterial(state);
 }
 
-export async function createStateBackup(state: Record<string, unknown>, stateRevision: number, sourceEnvironment: "local" | "staging", createdAt = new Date().toISOString()): Promise<StateBackupEnvelope> {
+export async function createStateBackup(state: Record<string, unknown>, stateRevision: number, sourceEnvironment: "local" | "staging" | "production", createdAt = new Date().toISOString()): Promise<StateBackupEnvelope> {
   validateBackupState(state);
   if (!Number.isSafeInteger(stateRevision) || stateRevision < 0) throw new Error("State revision must be a safe non-negative integer.");
   return { format: STATE_BACKUP_FORMAT, createdAt, sourceEnvironment, stateRevision, stateSha256: await sha256Text(canonicalStateJson(state)), state: structuredClone(state), exclusions: { r2Bytes: true, secrets: true } };
@@ -50,7 +50,7 @@ export async function createStateBackup(state: Record<string, unknown>, stateRev
 export async function validateStateBackup(value: unknown): Promise<StateBackupEnvelope> {
   if (!value || typeof value !== "object" || Array.isArray(value)) throw new Error("Backup envelope must be an object.");
   const backup = value as StateBackupEnvelope;
-  if (backup.format !== STATE_BACKUP_FORMAT || !["local", "staging"].includes(backup.sourceEnvironment)) throw new Error("Unsupported backup format or environment.");
+  if (backup.format !== STATE_BACKUP_FORMAT || !["local", "staging", "production"].includes(backup.sourceEnvironment)) throw new Error("Unsupported backup format or environment.");
   if (!Number.isSafeInteger(backup.stateRevision) || backup.stateRevision < 0 || !/^\d{4}-\d{2}-\d{2}T/.test(backup.createdAt)) throw new Error("Backup metadata is invalid.");
   validateBackupState(backup.state);
   const actual = await sha256Text(canonicalStateJson(backup.state));

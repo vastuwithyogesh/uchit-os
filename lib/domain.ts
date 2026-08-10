@@ -3,6 +3,8 @@ export type UserRole = (typeof roles)[number];
 
 export const leadStages = ["NEW", "QUALIFYING", "QUALIFIED", "DISQUALIFIED", "CONVERTED"] as const;
 export type LeadStage = (typeof leadStages)[number];
+export const canonicalPipelineStages = ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"] as const;
+export type CanonicalPipelineStage = (typeof canonicalPipelineStages)[number];
 
 export const inboundLeadStatuses = ["NEW", "FILTERED", "QUALIFIED", "DISQUALIFIED", "DUPLICATE"] as const;
 export type InboundLeadStatus = (typeof inboundLeadStatuses)[number];
@@ -82,6 +84,37 @@ export interface ClientRecord {
   email: string;
   phone: string;
   stage: LeadStage;
+  recordVersion?: number;
+  pipelineStage?: CanonicalPipelineStage;
+  pipelineOwner?: { id: string; name: string; role: UserRole };
+  nextAction?: { summary: string; dueAt: string };
+}
+
+export interface PipelineTransitionRecord {
+  id: string; clientId: string; idempotencyKey: string;
+  beforeStage: CanonicalPipelineStage; afterStage: CanonicalPipelineStage;
+  owner: { id: string; name: string; role: UserRole }; nextAction?: { summary: string; dueAt: string };
+  correctionReason?: string; actor: { id: string; name: string; role: UserRole }; happenedAt: string;
+}
+
+export interface CommercialPolicy {
+  version: number; defaultProposalAmountInr: number; minimumAdvanceInr: number;
+  qualificationCallTargetMinutes: number; nextActionDueSoonHours: number; defaultReviewCallMinutes: number;
+  reason: string; updatedAt: string; updatedBy: { id: string; name: string; role: UserRole };
+  idempotencyKey: string;
+}
+
+export const decisionMakerStatuses = ["SOLE", "JOINT", "NOT_DECISION_MAKER"] as const;
+export type DecisionMakerStatus = (typeof decisionMakerStatuses)[number];
+export interface ClientIntakeProfile {
+  clientId: string; version: number; idempotencyKey: string;
+  contactPreference?: { whatsapp?: string; preferredLanguage?: string; preferredContactWindow?: string };
+  businessContext?: { company?: string; industry?: string; designation?: string; vision?: string };
+  decisionMakerStatus?: DecisionMakerStatus; otherDecisionMakers?: string;
+  propertyContext?: { serviceInterest?: VastuServiceType; propertyType?: string; propertyStatus?: string; areaValue?: number; areaUnit?: string; cityCountry?: string; constraints?: string };
+  needs?: { mainChallenge?: string; desiredOutcome?: string; urgency?: string };
+  consent: { version: "uchit-intake/v1"; contact?: boolean; accuracy?: boolean; confidentiality?: boolean; confirmedAt?: string };
+  created: AssessmentAudit; updated: AssessmentAudit;
 }
 
 export interface LeadQualificationRecord {
@@ -167,6 +200,7 @@ export interface PaymentRecord {
   verifiedBy?: string;
   verifiedAt?: string;
   verificationNote?: string;
+  proofAssetId?: string;
 }
 
 export interface AdvanceVerificationRecord {
@@ -179,6 +213,7 @@ export interface AdvanceVerificationRecord {
   verifiedBy: string;
   verifiedAt: string;
   paymentId: string;
+  proofAssetId?: string;
   caseId?: string;
   status: "VERIFIED" | "CASE_OPENED";
 }
@@ -341,6 +376,13 @@ export interface ReportArtifactManifest {
   contentHash: string;
   immutable: true;
   downloadPath: string;
+  /** Exact client-safe intake fields frozen for v2 hashing/rendering; excludes consent, contact and business metadata. */
+  intakeSnapshot?: ClientSafeIntakeSnapshot;
+}
+
+export interface ClientSafeIntakeSnapshot {
+  mainChallenge: string | null; desiredOutcome: string | null; serviceInterest: VastuServiceType | null;
+  propertyType: string | null; propertyStatus: string | null; cityCountry: string | null; constraints: string | null;
 }
 
 export interface EvaluationSnapshotRecord {

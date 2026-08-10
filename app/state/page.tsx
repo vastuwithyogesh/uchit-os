@@ -22,11 +22,11 @@ export default async function StatePage() {
         <div className="eyebrow">State control</div>
         <h1>Capture, inspect, and restore the current application snapshot with confidence.</h1>
         <p className="lede">
-          This is the safest way to move the working build forward while backend setup continues. It gives us one place to export the current state, review integrity warnings, and re-import a known-good snapshot when needed.
+          Export before material data work, review integrity warnings, and restore only a reviewed snapshot. Restoration replaces current records and remains restricted to the production owner.
         </p>
         <div className="hero-actions" style={{ marginTop: 14 }}>
           <a href="/bootstrap" className="button">
-            Open bootstrap controls
+            Check data readiness
           </a>
           <a href="/integrity" className="button-secondary">
             Review integrity status

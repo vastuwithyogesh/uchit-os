@@ -1,6 +1,5 @@
 "use client";
 
-import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RoleSwitcher } from "@/components/role-switcher";
 import { useSession } from "@/components/session-provider";
@@ -14,15 +13,17 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
     activeUser.role === "CLIENT" ? item.href === "/client" : item.href === "/workspace"
   );
   const moreNavigation = visibleNavigation.filter((item) => !primaryNavigation.includes(item));
+  const adminNavigation = moreNavigation.filter((item) => item.minimumRole === "ADMIN" || item.minimumRole === "SUPER_ADMIN");
+  const workNavigation = moreNavigation.filter((item) => !adminNavigation.includes(item));
   const activeMoreItem = moreNavigation.find((item) => item.href === pathname);
 
   return (
     <header className="topbar">
       <div className="brand">
-        <Link className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/workspace"} aria-label="Uchit Vastu India home">
+        <a className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/workspace"} aria-label="Uchit Vastu India home">
           <span className="brand-name">UCHIT</span>
           <span className="brand-descriptor">VASTU INDIA</span>
-        </Link>
+        </a>
         <div className="brand-context">
           <strong>{title}</strong>
           <span className="meta">{subtitle}</span>
@@ -30,9 +31,9 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
       </div>
       <nav className="nav" aria-label="Main navigation">
         {primaryNavigation.map((item) => (
-          <Link key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
+          <a key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
             {item.label}
-          </Link>
+          </a>
         ))}
         {moreNavigation.length ? (
           <details className="nav-more">
@@ -42,11 +43,17 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
               <span className="nav-more-chevron" aria-hidden="true" />
             </summary>
             <div className="nav-more-menu" aria-label="All pages">
-              <strong className="nav-more-heading">Go to</strong>
-              {moreNavigation.map((item) => (
-                <Link key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
+              {workNavigation.length ? <strong className="nav-more-heading">Work</strong> : null}
+              {workNavigation.map((item) => (
+                <a key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
                   {item.label}
-                </Link>
+                </a>
+              ))}
+              {adminNavigation.length ? <strong className="nav-more-heading">Administration</strong> : null}
+              {adminNavigation.map((item) => (
+                <a key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
+                  {item.label}
+                </a>
               ))}
             </div>
           </details>
@@ -65,6 +72,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
             <div className="header-session-copy">
               <div className="signed-in-name" title={activeUser.role}>Hi, {activeUser.fullName}</div>
               {isLocalDemo ? <div className="pill">Demo mode</div> : null}
+              {!isLocalDemo ? <a className="header-signout" href="/signout-with-chatgpt?return_to=/">Sign out</a> : null}
             </div>
             <RoleSwitcher />
           </>

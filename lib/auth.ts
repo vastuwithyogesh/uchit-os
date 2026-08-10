@@ -1,12 +1,25 @@
 import { AppUser, UserRole, roles } from "@/lib/domain";
 import { users } from "@/lib/seed";
 import { getRuntimeEnv } from "@/lib/runtime-env";
+import { migrateD1 } from "@/db/migrations";
 
 export type StaffRoleAssignment = {
   email: string;
   role: UserRole;
   fullName: string;
   updatedAt: string;
+};
+
+export type StaffRoleAuditRecord = {
+  id: string;
+  targetEmail: string;
+  previousRole?: UserRole;
+  nextRole: UserRole;
+  actorId: string;
+  actorEmail: string;
+  actorName: string;
+  actorRole: UserRole;
+  changedAt: string;
 };
 
 export const rolePermissions: Record<UserRole, string[]> = {
@@ -76,8 +89,9 @@ function readAuthenticatedIdentity(headers: Headers) {
 
 function resolveAuthenticatedDisplayName(headers: Headers, fallback: string) {
   const fullNameHeader = headers.get("oai-authenticated-user-full-name");
+  const encoding = headers.get("oai-authenticated-user-full-name-encoding");
 
-  if (!fullNameHeader) {
+  if (!fullNameHeader || encoding !== "percent-encoded-utf-8") {
     return fallback;
   }
 
@@ -102,25 +116,13 @@ function hydrateAuthenticatedActor(baseUser: AppUser, headers: Headers) {
 }
 
 async function getRoleForAuthenticatedEmail(email: string) {
-  const env = getRuntimeEnv();
-  if (!env.DB) {
-    return users.find((user) => user.email.toLowerCase() === email.toLowerCase())?.role ?? null;
-  }
-
-  await env.DB.prepare(`
-    CREATE TABLE IF NOT EXISTS staff_role_assignments (
-      email TEXT PRIMARY KEY,
-      role TEXT NOT NULL,
-      full_name TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `).run();
-
-  const row = await env.DB.prepare("SELECT role FROM staff_role_assignments WHERE email = ?").bind(email.toLowerCase()).first<{ role: string }>();
+  const db = await ensureStaffRoleAssignmentsTable();
+  if (!db) return null;
+  const row = await db.prepare("SELECT role FROM staff_role_assignments WHERE email = ?").bind(email.toLowerCase()).first<{ role: string }>();
   const storedRole = row?.role;
   return storedRole && roles.includes(storedRole as UserRole)
     ? (storedRole as UserRole)
-    : users.find((user) => user.email.toLowerCase() === email.toLowerCase())?.role ?? null;
+    : null;
 }
 
 async function ensureStaffRoleAssignmentsTable() {
@@ -128,27 +130,9 @@ async function ensureStaffRoleAssignmentsTable() {
   if (!env.DB) {
     return null;
   }
-
-  await env.DB.prepare(`
-    CREATE TABLE IF NOT EXISTS staff_role_assignments (
-      email TEXT PRIMARY KEY,
-      role TEXT NOT NULL,
-      full_name TEXT NOT NULL,
-      updated_at TEXT NOT NULL
-    )
-  `).run();
+  await migrateD1(env.DB);
 
   return env.DB;
-}
-
-async function hasStoredStaffRoleAssignments() {
-  const db = await ensureStaffRoleAssignmentsTable();
-  if (!db) {
-    return false;
-  }
-
-  const row = await db.prepare("SELECT COUNT(*) as count FROM staff_role_assignments").first<{ count: number }>();
-  return Number(row?.count ?? 0) > 0;
 }
 
 export function resolveActor(role?: string | null) {
@@ -166,90 +150,82 @@ export async function resolveRequestActor(headers: Headers, demoRole?: string | 
   }
 
   const { id: authenticatedUserId, email: authenticatedEmail } = readAuthenticatedIdentity(headers);
-    const matchedUser = users.find((user) => {
-      return user.email.toLowerCase() === authenticatedEmail;
-    });
+  const mappedRole = await getRoleForAuthenticatedEmail(authenticatedEmail);
+  if (mappedRole) {
+    return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);
+  }
 
-    if (matchedUser) {
-      return hydrateAuthenticatedActor(matchedUser, headers);
-    }
-
-    const mappedRole = await getRoleForAuthenticatedEmail(authenticatedEmail);
-    if (mappedRole) {
-      return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);
-    }
-
-    if (initialOwnerEmails.has(authenticatedEmail)) {
-      await upsertStaffRoleAssignment({
-        email: authenticatedEmail,
-        role: "SUPER_ADMIN",
-        fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail)
-      });
-      return hydrateAuthenticatedActor(getUserByRole("SUPER_ADMIN"), headers);
-    }
-
-    return {
-      ...getUserByRole("CLIENT"),
-      id: authenticatedUserId,
+  if (initialOwnerEmails.has(authenticatedEmail)) {
+    const owner = hydrateAuthenticatedActor(getUserByRole("SUPER_ADMIN"), headers);
+    await upsertStaffRoleAssignment({
       email: authenticatedEmail,
+      role: "SUPER_ADMIN",
       fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail)
-    };
+    }, owner, { allowInitialOwnerBootstrap: true });
+    return owner;
+  }
+
+  return {
+    ...getUserByRole("CLIENT"),
+    id: authenticatedUserId,
+    email: authenticatedEmail,
+    fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail)
+  };
 }
 
 export async function listStaffRoleAssignments(): Promise<StaffRoleAssignment[]> {
   const db = await ensureStaffRoleAssignmentsTable();
-  if (!db) {
-    return users
-      .filter((user) => user.role !== "CLIENT")
-      .map((user) => ({
-        email: user.email.toLowerCase(),
-        role: user.role,
-        fullName: user.fullName,
-        updatedAt: new Date("2026-08-08T00:00:00+05:30").toISOString()
-      }));
-  }
+  if (!db) return [];
 
   const result = await db
     .prepare("SELECT email, role, full_name, updated_at FROM staff_role_assignments ORDER BY updated_at DESC, email ASC")
     .all<{ email: string; role: UserRole; full_name: string; updated_at: string }>();
 
-  const stored = (result.results ?? []).map((row: { email: string; role: UserRole; full_name: string; updated_at: string }) => ({
-    email: row.email,
-    role: row.role,
-    fullName: row.full_name,
-    updatedAt: row.updated_at
-  }));
-
-  if (stored.length > 0) {
-    return stored;
-  }
-
-  const seeded = users
-    .filter((user) => user.role !== "CLIENT")
-    .map((user) => ({
-      email: user.email.toLowerCase(),
-      role: user.role,
-      fullName: user.fullName,
-      updatedAt: new Date("2026-08-08T00:00:00+05:30").toISOString()
+  return (result.results ?? [])
+    .filter((row) => roles.includes(row.role))
+    .map((row: { email: string; role: UserRole; full_name: string; updated_at: string }) => ({
+      email: row.email,
+      role: row.role,
+      fullName: row.full_name,
+      updatedAt: row.updated_at
     }));
-
-  await db.batch(
-    seeded.map((entry) =>
-      db.prepare("INSERT OR REPLACE INTO staff_role_assignments (email, role, full_name, updated_at) VALUES (?, ?, ?, ?)").bind(
-        entry.email,
-        entry.role,
-        entry.fullName,
-        entry.updatedAt
-      )
-    )
-  );
-
-  return seeded;
 }
 
-export async function upsertStaffRoleAssignment(input: { email: string; role: UserRole; fullName: string }) {
+export async function listStaffRoleAudit(limit = 30): Promise<StaffRoleAuditRecord[]> {
+  const db = await ensureStaffRoleAssignmentsTable();
+  if (!db) return [];
+  const safeLimit = Number.isInteger(limit) ? Math.min(100, Math.max(1, limit)) : 30;
+  const result = await db.prepare(`SELECT id, target_email, previous_role, next_role, actor_id, actor_email,
+    actor_name, actor_role, changed_at FROM staff_role_assignment_audit ORDER BY changed_at DESC LIMIT ?`)
+    .bind(safeLimit)
+    .all<{ id: string; target_email: string; previous_role: string | null; next_role: string; actor_id: string; actor_email: string; actor_name: string; actor_role: string; changed_at: string }>();
+  return (result.results ?? []).filter((row) => roles.includes(row.next_role as UserRole) && roles.includes(row.actor_role as UserRole)).map((row) => ({
+    id: row.id,
+    targetEmail: row.target_email,
+    previousRole: row.previous_role && roles.includes(row.previous_role as UserRole) ? row.previous_role as UserRole : undefined,
+    nextRole: row.next_role as UserRole,
+    actorId: row.actor_id,
+    actorEmail: row.actor_email,
+    actorName: row.actor_name,
+    actorRole: row.actor_role as UserRole,
+    changedAt: row.changed_at
+  }));
+}
+
+export async function upsertStaffRoleAssignment(
+  input: { email: string; role: UserRole; fullName: string },
+  actor: AppUser,
+  options: { allowInitialOwnerBootstrap?: boolean } = {}
+) {
   const normalizedEmail = input.email.trim().toLowerCase();
-  const normalizedName = input.fullName.trim() || normalizedEmail;
+  const normalizedName = input.fullName.trim();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || normalizedEmail.length > 254) throw new Error("Enter a valid staff email address.");
+  if (!normalizedName || normalizedName.length > 160) throw new Error("Enter a staff name of 160 characters or fewer.");
+  if (!roles.includes(input.role)) throw new Error("Choose a valid staff role.");
+  if (initialOwnerEmails.has(normalizedEmail) && input.role !== "SUPER_ADMIN") throw new Error("The initial owner cannot be demoted inside the application.");
+  if (input.role === "SUPER_ADMIN" && !(options.allowInitialOwnerBootstrap && initialOwnerEmails.has(normalizedEmail))) {
+    throw new Error("Additional Super-Admin access must be configured through the controlled production access process.");
+  }
   const updatedAt = new Date().toISOString();
   const db = await ensureStaffRoleAssignmentsTable();
 
@@ -261,11 +237,19 @@ export async function upsertStaffRoleAssignment(input: { email: string; role: Us
       updatedAt
     } satisfies StaffRoleAssignment;
   }
-
-  await db
-    .prepare("INSERT OR REPLACE INTO staff_role_assignments (email, role, full_name, updated_at) VALUES (?, ?, ?, ?)")
-    .bind(normalizedEmail, input.role, normalizedName, updatedAt)
-    .run();
+  const previous = await db.prepare("SELECT role, full_name FROM staff_role_assignments WHERE email = ?").bind(normalizedEmail)
+    .first<{ role: string; full_name: string }>();
+  if (previous?.role === input.role && previous.full_name === normalizedName) {
+    return { email: normalizedEmail, role: input.role, fullName: normalizedName, updatedAt } satisfies StaffRoleAssignment;
+  }
+  await db.batch([
+    db.prepare("INSERT OR REPLACE INTO staff_role_assignments (email, role, full_name, updated_at) VALUES (?, ?, ?, ?)")
+      .bind(normalizedEmail, input.role, normalizedName, updatedAt),
+    db.prepare(`INSERT INTO staff_role_assignment_audit
+      (id, target_email, previous_role, next_role, actor_id, actor_email, actor_name, actor_role, changed_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), normalizedEmail, previous?.role ?? null, input.role, actor.id, actor.email, actor.fullName, actor.role, updatedAt)
+  ]);
 
   return {
     email: normalizedEmail,
@@ -273,6 +257,25 @@ export async function upsertStaffRoleAssignment(input: { email: string; role: Us
     fullName: normalizedName,
     updatedAt
   } satisfies StaffRoleAssignment;
+}
+
+export async function revokeStaffRoleAssignment(email: string, actor: AppUser) {
+  const normalizedEmail = email.trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizedEmail) || normalizedEmail.length > 254) throw new Error("Enter a valid staff email address.");
+  if (initialOwnerEmails.has(normalizedEmail)) throw new Error("The initial owner cannot be revoked inside the application.");
+  const db = await ensureStaffRoleAssignmentsTable();
+  if (!db) throw new Error("Durable staff-role storage is not configured.");
+  const previous = await db.prepare("SELECT role FROM staff_role_assignments WHERE email = ?").bind(normalizedEmail).first<{ role: string }>();
+  if (!previous?.role) throw new Error("Staff assignment not found.");
+  const changedAt = new Date().toISOString();
+  await db.batch([
+    db.prepare("DELETE FROM staff_role_assignments WHERE email = ?").bind(normalizedEmail),
+    db.prepare(`INSERT INTO staff_role_assignment_audit
+      (id, target_email, previous_role, next_role, actor_id, actor_email, actor_name, actor_role, changed_at)
+      VALUES (?, ?, ?, 'CLIENT', ?, ?, ?, ?, ?)`)
+      .bind(crypto.randomUUID(), normalizedEmail, previous.role, actor.id, actor.email, actor.fullName, actor.role, changedAt)
+  ]);
+  return { email: normalizedEmail, previousRole: previous.role, revokedAt: changedAt };
 }
 
 export async function requireRouteActor(request: Request, minimumRole: UserRole) {

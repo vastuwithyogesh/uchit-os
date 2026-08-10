@@ -390,6 +390,18 @@ h3,
   font-size: 0.98rem;
 }
 
+.pilot-checklist {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  padding-left: 24px;
+}
+
+.pilot-checklist li {
+  padding-left: 6px;
+  line-height: 1.6;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
@@ -711,6 +723,12 @@ h3,
   grid-column: 1 / -1;
   padding: 8px 12px 4px;
   color: var(--text);
+}
+
+.nav-more-heading:not(:first-child) {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
 }
 
 .signed-in-name {
@@ -1105,6 +1123,15 @@ body {
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
+}
+
+.header-signout {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 
 .session-error {
