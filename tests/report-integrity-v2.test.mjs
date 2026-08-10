@@ -180,7 +180,9 @@ test("pre-intake v2 artifacts without a snapshot resolve to the historical empty
   const report = { id: "report-pre-intake", caseId: "case-1", versionLabel: "Historical", isPreview: false, status: "RELEASED", approvals: [], artifact: { schemaVersion: "report-artifact/v1", mediaType: "text/html", createdAt: "2026-01-01", createdBy: { id: actor.id, name: actor.fullName, role: actor.role }, templateVersion: "uchit-verdict/v2", evaluationSnapshotId: "eval-1", contentHash: "", immutable: true, downloadPath: "/historical" } };
   const historicalPayload = canonicalReportPayload(state, report);
   assert.equal(Object.hasOwn(historicalPayload, "intake"), false);
-  report.artifact.contentHash = await sha256Hex(historicalPayload);
+  const authenticHistoricalHash = "776e638c7d349df6b00eb27168f460541c27b1ea8b5bc038ede4ab431fd9f9ec";
+  assert.equal(await sha256Hex(historicalPayload), authenticHistoricalHash);
+  report.artifact.contentHash = authenticHistoricalHash;
   state.clientIntakeProfiles = [{ clientId: "client-1", version: 1, idempotencyKey: "later-intake", needs: { mainChallenge: "Added later" }, consent: { version: "uchit-intake/v1" }, created: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-02-01" }, updated: { actorId: "setter-1", actorName: "Setter", actorRole: "SETTER", at: "2026-02-01" } }];
   assert.equal(await artifactStillMatches(state, report), true);
   assert.doesNotMatch(renderPrintableReport(state, report), /Added later/);
