@@ -29,10 +29,10 @@ export function AccessDeniedPanel({
         </div>
       </div>
       <div className="hero-actions">
-        <Link href="/" className="button">
+        <Link prefetch={false} href="/" className="button">
           Return to overview
         </Link>
-        <Link href="/crm" className="button-secondary">
+        <Link prefetch={false} href="/crm" className="button-secondary">
           Open CRM workbench
         </Link>
       </div>

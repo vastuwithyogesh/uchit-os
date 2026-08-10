@@ -19,7 +19,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
   return (
     <header className="topbar">
       <div className="brand">
-        <Link className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/workspace"} aria-label="Uchit Vastu India home">
+        <Link prefetch={false} className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/workspace"} aria-label="Uchit Vastu India home">
           <span className="brand-name">UCHIT</span>
           <span className="brand-descriptor">VASTU INDIA</span>
         </Link>
@@ -30,7 +30,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
       </div>
       <nav className="nav" aria-label="Main navigation">
         {primaryNavigation.map((item) => (
-          <Link key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
+          <Link prefetch={false} key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
             {item.label}
           </Link>
         ))}
@@ -44,7 +44,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
             <div className="nav-more-menu" aria-label="All pages">
               <strong className="nav-more-heading">Go to</strong>
               {moreNavigation.map((item) => (
-                <Link key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
+                <Link prefetch={false} key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
                   {item.label}
                 </Link>
               ))}
