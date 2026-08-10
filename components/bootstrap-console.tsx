@@ -22,7 +22,7 @@ async function syncState() {
 }
 
 export function BootstrapConsole() {
-  const { activeUser } = useSession();
+  const { activeUser, isLocalDemo } = useSession();
   const [state, setState] = useState<AppState | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Load the current state to begin.");
@@ -52,7 +52,7 @@ export function BootstrapConsole() {
     setBusy(true);
     try {
       setState(await fetchState());
-      setMessage("Bootstrap state loaded from the active store");
+      setMessage("Current production state loaded. Nothing was changed.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Load failed");
     } finally {
@@ -76,10 +76,10 @@ export function BootstrapConsole() {
   return (
     <section className="section-grid">
       <div className="card span-8">
-        <div className="eyebrow">Bootstrap control room</div>
-        <h2>Sync the seeded workflow into persistence, then reload it</h2>
+        <div className="eyebrow">Data readiness</div>
+        <h2>Inspect the current saved records without overwriting them</h2>
         <p className="subtle">
-          This is the fastest way to keep the working application state and persistence layer aligned while the CRM, approval, and report flows are being verified.
+          Production always loads the durable database first. Demo records and reset tools are available only on an explicitly enabled local development site.
         </p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
@@ -103,9 +103,11 @@ export function BootstrapConsole() {
           <button className="button" type="button" onClick={refresh} disabled={busy}>
             Load current state
           </button>
-          <button className="button-secondary" type="button" onClick={sync} disabled={busy}>
-            Sync state to persistence
-          </button>
+          {isLocalDemo ? (
+            <button className="button-secondary" type="button" onClick={sync} disabled={busy}>
+              Save local demo state
+            </button>
+          ) : null}
         </div>
         <div className="panel" style={{ marginTop: 18 }}>
           <div className="panel-head">
@@ -132,7 +134,7 @@ export function BootstrapConsole() {
           )) ?? (
             <div className="list-item">
               <strong>No state loaded yet</strong>
-              <span className="meta">Press load or sync to inspect counts</span>
+              <span className="meta">Press Load current state to inspect counts safely</span>
             </div>
           )}
         </div>

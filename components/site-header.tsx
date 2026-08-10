@@ -65,6 +65,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
             <div className="header-session-copy">
               <div className="signed-in-name" title={activeUser.role}>Hi, {activeUser.fullName}</div>
               {isLocalDemo ? <div className="pill">Demo mode</div> : null}
+              {!isLocalDemo ? <a className="header-signout" href="/signout-with-chatgpt?return_to=/">Sign out</a> : null}
             </div>
             <RoleSwitcher />
           </>

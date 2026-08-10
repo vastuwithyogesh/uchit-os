@@ -68,7 +68,34 @@ export interface AppState {
   whatsappLogs: WhatsAppTemplateLogRecord[];
 }
 
-const createInitialState = (): AppState => ({
+export const createEmptyAppState = (): AppState => ({
+  clients: [],
+  leadQualifications: [],
+  commercialProposals: [],
+  reviewCallBookings: [],
+  payments: [],
+  advanceVerifications: [],
+  vastuCases: [],
+  floorWorkspaces: [],
+  reportVersions: [],
+  rectificationRequests: [],
+  assessmentObservations: [],
+  recommendations: [],
+  implementationTasks: [],
+  caseDocuments: [],
+  deliveryMilestones: [],
+  evaluationSnapshots: [],
+  mapping32D: [],
+  mapping16D: [],
+  utilityRules: [],
+  shaktiSnapshots: [],
+  timelineEvents: [],
+  optInLeads: [],
+  whatsappTemplates: [],
+  whatsappLogs: []
+});
+
+const createDemoAppState = (): AppState => ({
   clients: structuredClone(seedClients),
   leadQualifications: structuredClone(seedLeadQualifications),
   commercialProposals: structuredClone(seedCommercialProposals),
@@ -95,6 +122,8 @@ const createInitialState = (): AppState => ({
   whatsappLogs: structuredClone(seedWhatsappLogs)
 });
 
+const createInitialState = () => process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();
+
 declare global {
   // eslint-disable-next-line no-var
   var uchitVastuState: AppState | undefined;
@@ -111,6 +140,9 @@ export function setAppState(nextState: AppState) {
 }
 
 export function resetAppState() {
-  globalThis.uchitVastuState = createInitialState();
+  if (process.env.NODE_ENV === "production") {
+    throw new Error("Demo reset is unavailable in production.");
+  }
+  globalThis.uchitVastuState = createDemoAppState();
   return globalThis.uchitVastuState;
 }

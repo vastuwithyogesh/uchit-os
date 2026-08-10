@@ -1107,6 +1107,15 @@ body {
   flex-wrap: wrap;
 }
 
+.header-signout {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
 .session-error {
   display: flex;
   gap: 10px;

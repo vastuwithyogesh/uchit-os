@@ -124,9 +124,9 @@ export function StateConsole() {
     <section className="section-grid">
       <div className="card span-8">
         <div className="eyebrow">State export</div>
-        <h2>Full local snapshot</h2>
+        <h2>Full production snapshot</h2>
         <p className="subtle">
-          This is the entire local app state in one JSON block. It is useful for moving a build snapshot around or restoring the demo after a reset.
+          This export contains the durable application records in one JSON block. Download it before any approved restore or production data correction.
         </p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">

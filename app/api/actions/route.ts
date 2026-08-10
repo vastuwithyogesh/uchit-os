@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { resolveRequestActor } from "@/lib/auth";
+import { isExplicitLocalDemo, resolveRequestActor } from "@/lib/auth";
 import { loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 import { getAppState, setAppState, type AppState } from "@/lib/store";
 import {
@@ -103,6 +103,9 @@ export async function POST(request: Request) {
 
     switch (action) {
       case "reset":
+        if (!isExplicitLocalDemo(request.headers)) {
+          return NextResponse.json({ ok: false, error: "Demo reset is unavailable outside an explicit local demo." }, { status: 403 });
+        }
         if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") {
           return deny("Only an admin can reset the local demo state.");
         }
