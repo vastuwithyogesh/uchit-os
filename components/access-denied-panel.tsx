@@ -13,9 +13,9 @@ export function AccessDeniedPanel({
   return (
     <section className="hero-panel access-panel" style={{ marginTop: 22 }}>
       <div className="eyebrow">Access restricted</div>
-      <h1>{area} needs a higher role.</h1>
+      <h1>{area} is not available for this account.</h1>
       <p className="lede">
-        Your current role is {actorRole}. This screen is reserved for {requiredRole} and above, so the app is keeping the route visible while protecting the operational data behind it.
+        Your current role is {actorRole}. This screen has a specific access rule for {requiredRole} accounts, so its protected data has not been opened.
       </p>
       <div className="pill-row" style={{ marginTop: 16 }}>
         <span className="pill">Current role {actorRole}</span>
