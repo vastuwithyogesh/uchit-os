@@ -4,15 +4,15 @@ import { headers } from "next/headers";
 import "@/app/globals.css";
 import { SessionProvider } from "@/components/session-provider";
 
-function resolveMetadataBase() {
-  const headerStore = headers();
+async function resolveMetadataBase() {
+  const headerStore = await headers();
   const host = headerStore.get("x-forwarded-host") ?? headerStore.get("host") ?? "localhost:3003";
   const protocol = headerStore.get("x-forwarded-proto") ?? (host.includes("localhost") ? "http" : "https");
   return new URL(`${protocol}://${host}`);
 }
 
 export async function generateMetadata(): Promise<Metadata> {
-  const metadataBase = resolveMetadataBase();
+  const metadataBase = await resolveMetadataBase();
 
   return {
     metadataBase,

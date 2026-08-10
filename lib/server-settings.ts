@@ -13,6 +13,15 @@ export type LocalConnectionSettings = {
   appUrl: string;
 };
 
+export type RedactedConnectionSettings = {
+  databaseUrl: "";
+  directUrl: "";
+  supabaseUrl: string;
+  supabaseAnonKey: "";
+  supabaseServiceRoleKey: "";
+  appUrl: string;
+};
+
 const defaultSettings: LocalConnectionSettings = {
   databaseUrl: "",
   directUrl: "",
@@ -100,6 +109,17 @@ export function getConnectionStatus(settings: LocalConnectionSettings = readLoca
     supabaseAnonKey: Boolean(process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || settings.supabaseAnonKey),
     supabaseServiceRoleKey: Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY || settings.supabaseServiceRoleKey),
     appUrl: Boolean(process.env.NEXT_PUBLIC_APP_URL || settings.appUrl)
+  };
+}
+
+export function redactConnectionSettings(settings: LocalConnectionSettings): RedactedConnectionSettings {
+  return {
+    databaseUrl: "",
+    directUrl: "",
+    supabaseUrl: settings.supabaseUrl,
+    supabaseAnonKey: "",
+    supabaseServiceRoleKey: "",
+    appUrl: settings.appUrl
   };
 }
 

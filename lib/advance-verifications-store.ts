@@ -55,7 +55,9 @@ async function readFromD1(): Promise<AdvanceVerificationRecord[] | null> {
   `).run();
 
   const result = await env.DB.prepare("SELECT payload FROM advance_verifications ORDER BY verified_at DESC").all<{ payload: string }>();
-  return (result.results ?? []).map((row, index) => hydrateVerification(JSON.parse(row.payload) as Partial<AdvanceVerificationRecord>, index));
+  return (result.results ?? []).map((row: { payload: string }, index: number) =>
+    hydrateVerification(JSON.parse(row.payload) as Partial<AdvanceVerificationRecord>, index)
+  );
 }
 
 async function writeToD1(records: AdvanceVerificationRecord[]) {
@@ -63,9 +65,10 @@ async function writeToD1(records: AdvanceVerificationRecord[]) {
   if (!env.DB) {
     return null;
   }
+  const db = env.DB;
 
-  await env.DB.batch([
-    env.DB.prepare(`
+  await db.batch([
+    db.prepare(`
       CREATE TABLE IF NOT EXISTS advance_verifications (
         id TEXT PRIMARY KEY,
         client_id TEXT NOT NULL,
@@ -81,13 +84,13 @@ async function writeToD1(records: AdvanceVerificationRecord[]) {
         payload TEXT NOT NULL
       )
     `),
-    env.DB.prepare("DELETE FROM advance_verifications")
+    db.prepare("DELETE FROM advance_verifications")
   ]);
 
   if (records.length > 0) {
     await env.DB.batch(
       records.map((record) =>
-        env.DB.prepare(
+        db.prepare(
           "INSERT INTO advance_verifications (id, client_id, proposal_id, amount_inr, reference_screenshot_url, reference_screenshot_file_name, verified_by, verified_at, payment_id, case_id, status, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
           record.id,

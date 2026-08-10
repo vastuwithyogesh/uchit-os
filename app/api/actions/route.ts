@@ -5,9 +5,12 @@ import {
   canApproveCommercialProposal,
   canApproveReport,
   canEditFloorWorkspaces,
+  canEvaluateCases,
   canManageTemplates,
+  canReadClientSnapshots,
   canReleaseVerdict,
-  canTriggerDeliverables
+  canTriggerDeliverables,
+  canVerifyPayments
 } from "@/lib/permissions";
 import {
   addFloorEvidence,
@@ -169,13 +172,13 @@ export async function POST(request: Request) {
         response = { ok: true, floor: markFloorWorkspaceReady(body.floorId, actor) };
         break;
       case "advance-pay":
-        if (!canTriggerDeliverables(actor)) {
+        if (!canVerifyPayments(actor)) {
           return deny("This role cannot approve payments.");
         }
         response = { ok: true, payment: approveAdvancePayment(body.clientId, body.proposalId, body.amountInr, actor) };
         break;
       case "advance-proof-verify":
-        if (!canTriggerDeliverables(actor)) {
+        if (!canVerifyPayments(actor)) {
           return deny("This role cannot verify advance proof.");
         }
         response = {
@@ -191,13 +194,13 @@ export async function POST(request: Request) {
         };
         break;
       case "balance-pay":
-        if (!canTriggerDeliverables(actor)) {
+        if (!canVerifyPayments(actor)) {
           return deny("This role cannot approve payments.");
         }
         response = { ok: true, payment: approveBalancePayment(body.clientId, body.caseId, body.amountInr, actor) };
         break;
       case "balance-proof-verify":
-        if (!canTriggerDeliverables(actor)) {
+        if (!canVerifyPayments(actor)) {
           return deny("This role cannot verify balance proof.");
         }
         response = {
@@ -237,9 +240,15 @@ export async function POST(request: Request) {
         response = { ok: true, report: releaseVerdict(body.reportId, actor) };
         break;
       case "shakti-rank":
+        if (!canEvaluateCases(actor)) {
+          return deny("This role cannot run or save Shakti evaluations.");
+        }
         response = { ok: true, ranking: rankShaktiValues(body.values ?? []), snapshot: body.caseId ? recordShaktiSnapshot(body.caseId, body.values ?? []) : null };
         break;
       case "utility-evaluate":
+        if (!canEvaluateCases(actor)) {
+          return deny("This role cannot create utility evaluation snapshots.");
+        }
         response = {
           ok: true,
           snapshot: createEvaluationSnapshot(body.caseId, body.snapshotName, body.zoneCodes ?? [])
@@ -264,6 +273,9 @@ export async function POST(request: Request) {
         response = { ok: true, template: createWhatsAppTemplate(body, actor) };
         break;
       case "snapshot":
+        if (!canReadClientSnapshots(actor)) {
+          return deny("This role cannot read client snapshots.");
+        }
         response = { ok: true, snapshot: getClientSnapshot(body.clientId) };
         break;
       case "client-outreach-send":

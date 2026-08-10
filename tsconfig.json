@@ -3,6 +3,7 @@
     "target": "ES2022",
     "lib": ["DOM", "DOM.Iterable", "ES2022"],
     "allowJs": false,
+    "allowImportingTsExtensions": true,
     "skipLibCheck": true,
     "strict": true,
     "noEmit": true,
@@ -19,5 +20,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/routes.d.ts", "**/*.mts"],
-  "exclude": ["node_modules", ".next/types/app", "lib/db.ts", "lib/supabase.ts"]
+  "exclude": ["node_modules", ".next/types/app", "dist", "work", "build", "lib/db.ts", "lib/supabase.ts"]
 }

@@ -18,7 +18,7 @@ async function ensureManifestExists() {
 
 function mapChartAssetRecord(record: Record<string, unknown>): ChartAssetRecord {
   return {
-    key: String(record.key ?? ""),
+    key: String(record.key ?? "") as ChartAssetKey,
     label: String(record.label ?? ""),
     fileName: String(record.fileName ?? record.file_name ?? ""),
     url: String(record.url ?? ""),
@@ -57,8 +57,9 @@ export async function readChartAssetManifest(): Promise<ChartAssetRecord[]> {
 export async function writeChartAssetManifest(records: ChartAssetRecord[]) {
   const env = getRuntimeEnv();
   if (env.DB) {
-    await env.DB.batch([
-      env.DB.prepare(`
+    const db = env.DB;
+    await db.batch([
+      db.prepare(`
         CREATE TABLE IF NOT EXISTS chart_assets (
           key TEXT PRIMARY KEY,
           label TEXT NOT NULL,
@@ -67,12 +68,12 @@ export async function writeChartAssetManifest(records: ChartAssetRecord[]) {
           uploaded_at TEXT NOT NULL
         )
       `),
-      env.DB.prepare("DELETE FROM chart_assets")
+      db.prepare("DELETE FROM chart_assets")
     ]);
     if (records.length > 0) {
       await env.DB.batch(
         records.map((record) =>
-          env.DB.prepare("INSERT INTO chart_assets (key, label, file_name, url, uploaded_at) VALUES (?, ?, ?, ?, ?)").bind(
+          db.prepare("INSERT INTO chart_assets (key, label, file_name, url, uploaded_at) VALUES (?, ?, ?, ?, ?)").bind(
             record.key,
             record.label,
             record.fileName,

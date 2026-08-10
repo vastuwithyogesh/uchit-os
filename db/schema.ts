@@ -50,7 +50,13 @@ ON advance_verifications(verified_at);
 CREATE TABLE IF NOT EXISTS app_state_snapshot (
   id TEXT PRIMARY KEY,
   payload TEXT NOT NULL,
-  updated_at TEXT NOT NULL
+  updated_at TEXT NOT NULL,
+  revision INTEGER NOT NULL DEFAULT 0
+);
+
+CREATE TABLE IF NOT EXISTS schema_migrations (
+  version INTEGER PRIMARY KEY,
+  applied_at TEXT NOT NULL
 );
 
 CREATE TABLE IF NOT EXISTS staff_role_assignments (

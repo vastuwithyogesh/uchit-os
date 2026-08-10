@@ -1,13 +1,14 @@
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import type { D1DatabaseBinding, R2BucketBinding } from "../lib/runtime-env";
 
 interface Fetcher {
   fetch(request: Request): Promise<Response>;
 }
 
 interface Env {
-  DB?: D1Database;
-  R2?: R2Bucket;
+  DB?: D1DatabaseBinding;
+  R2?: R2BucketBinding;
   ASSETS: Fetcher;
   IMAGES: {
     input(stream: ReadableStream): {

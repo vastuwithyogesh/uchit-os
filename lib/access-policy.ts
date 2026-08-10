@@ -28,3 +28,7 @@ export const pageAccessRules: PageAccessRule[] = [
 export function canRoleAccess(role: UserRole, minimumRole: UserRole) {
   return roles.indexOf(role) >= roles.indexOf(minimumRole);
 }
+
+export function getAccessiblePageRules(role: UserRole) {
+  return pageAccessRules.filter((item) => canRoleAccess(role, item.minimumRole));
+}

@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
 import { requireRouteActor } from "@/lib/auth";
 import { readPaymentProofManifest } from "@/lib/payment-proof-assets.server";
-import { loadStateFromPersistence, persistStateToDatabase } from "@/lib/persistence";
+import {
+  loadStateSnapshotFromPersistence,
+  persistStateToDatabase,
+  PersistenceConflictError
+} from "@/lib/persistence";
+import { parseExpectedRevision } from "@/lib/persistence-version";
 import { inspectIntegrity } from "@/lib/integrity";
-import { setAppState } from "@/lib/store";
 import type { AppState } from "@/lib/store";
 
 export async function GET(request: Request) {
@@ -11,12 +15,13 @@ export async function GET(request: Request) {
   if (!access.ok) {
     return access.response;
   }
-  const state = await loadStateFromPersistence();
+  const { state, revision } = await loadStateSnapshotFromPersistence();
   const paymentProofAssets = await readPaymentProofManifest();
   const integrity = inspectIntegrity(state, undefined, paymentProofAssets);
 
   return NextResponse.json({
     state,
+    revision,
     integrity,
     counts: {
       clients: state.clients.length,
@@ -51,6 +56,15 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Missing state payload." }, { status: 400 });
   }
 
+  const current = await loadStateSnapshotFromPersistence();
+  const expectedRevision = parseExpectedRevision(body.expectedRevision);
+  if (current.revision !== null && expectedRevision === null) {
+    return NextResponse.json(
+      { ok: false, error: "expectedRevision is required for full-state replacement.", revision: current.revision },
+      { status: 428 }
+    );
+  }
+
   const paymentProofAssets = await readPaymentProofManifest();
   const integrity = inspectIntegrity(nextState, undefined, paymentProofAssets);
   if (!integrity.ok && !body.force) {
@@ -64,11 +78,24 @@ export async function POST(request: Request) {
     );
   }
 
-  setAppState(nextState);
-  await persistStateToDatabase(nextState);
+  try {
+    await persistStateToDatabase(nextState, expectedRevision ?? undefined);
+  } catch (error) {
+    if (error instanceof PersistenceConflictError) {
+      const latest = await loadStateSnapshotFromPersistence();
+      return NextResponse.json(
+        { ok: false, error: error.message, revision: latest.revision },
+        { status: 409 }
+      );
+    }
+    throw error;
+  }
+
+  const revision = expectedRevision === null ? null : expectedRevision + 1;
 
   return NextResponse.json({
     ok: true,
+    revision,
     integrity,
     counts: {
       clients: nextState.clients.length,

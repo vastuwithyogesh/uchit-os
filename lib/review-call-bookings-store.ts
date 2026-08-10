@@ -55,7 +55,9 @@ async function readFromD1(): Promise<ReviewCallBookingRecord[] | null> {
   `).run();
 
   const result = await env.DB.prepare("SELECT payload FROM review_call_bookings ORDER BY booked_at DESC").all<{ payload: string }>();
-  return (result.results ?? []).map((row, index) => hydrateBooking(JSON.parse(row.payload) as Partial<ReviewCallBookingRecord>, index));
+  return (result.results ?? []).map((row: { payload: string }, index: number) =>
+    hydrateBooking(JSON.parse(row.payload) as Partial<ReviewCallBookingRecord>, index)
+  );
 }
 
 async function writeToD1(records: ReviewCallBookingRecord[]) {
@@ -63,9 +65,10 @@ async function writeToD1(records: ReviewCallBookingRecord[]) {
   if (!env.DB) {
     return null;
   }
+  const db = env.DB;
 
-  await env.DB.batch([
-    env.DB.prepare(`
+  await db.batch([
+    db.prepare(`
       CREATE TABLE IF NOT EXISTS review_call_bookings (
         id TEXT PRIMARY KEY,
         client_id TEXT NOT NULL,
@@ -81,13 +84,13 @@ async function writeToD1(records: ReviewCallBookingRecord[]) {
         payload TEXT NOT NULL
       )
     `),
-    env.DB.prepare("DELETE FROM review_call_bookings")
+    db.prepare("DELETE FROM review_call_bookings")
   ]);
 
   if (records.length > 0) {
     await env.DB.batch(
       records.map((record) =>
-        env.DB.prepare(
+        db.prepare(
           "INSERT INTO review_call_bookings (id, client_id, proposal_id, provider, scheduled_at, duration_minutes, meeting_link, calendar_hold_id, status, booked_by, booked_at, payload) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).bind(
           record.id,

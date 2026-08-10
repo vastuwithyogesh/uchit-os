@@ -1,1 +1,0 @@
-var e=[`CLIENT`,`SETTER`,`CONSULTANT`,`ADMIN`,`SUPER_ADMIN`];export{e as t};

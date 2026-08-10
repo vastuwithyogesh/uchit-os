@@ -38,6 +38,42 @@ export function getUserByRole(role: UserRole) {
 
 const initialOwnerEmails = new Set(["iyogesh2020@gmail.com"]);
 
+export const SESSION_API_VERSION = 1 as const;
+
+export class AuthenticationError extends Error {
+  readonly status = 401;
+  readonly code = "UNAUTHENTICATED";
+
+  constructor(message = "A verified signed-in identity is required.") {
+    super(message);
+    this.name = "AuthenticationError";
+  }
+}
+
+function isLocalRequest(headers: Headers) {
+  const host = (headers.get("host") ?? "").trim().toLowerCase();
+  return /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) || /^\[::1\](:\d+)?$/.test(host) || host === "::1";
+}
+
+export function isExplicitLocalDemo(headers: Headers) {
+  return process.env.NODE_ENV !== "production" && process.env.UCHIT_VASTU_DEMO_MODE === "true" && isLocalRequest(headers);
+}
+
+function readAuthenticatedIdentity(headers: Headers) {
+  const id = headers.get("oai-authenticated-user-id")?.trim() ?? "";
+  const email = headers.get("oai-authenticated-user-email")?.trim().toLowerCase() ?? "";
+  const validEmail = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+  const validId = id.length > 0 && id.length <= 256 && !/[\u0000-\u001f\u007f]/.test(id);
+
+  // A partial identity must never be accepted: both values are supplied by Sites
+  // and together provide a stable, auditable actor key.
+  if (!validId || !validEmail) {
+    throw new AuthenticationError();
+  }
+
+  return { id, email };
+}
+
 function resolveAuthenticatedDisplayName(headers: Headers, fallback: string) {
   const fullNameHeader = headers.get("oai-authenticated-user-full-name");
 
@@ -46,7 +82,8 @@ function resolveAuthenticatedDisplayName(headers: Headers, fallback: string) {
   }
 
   try {
-    return decodeURIComponent(fullNameHeader);
+    const decoded = decodeURIComponent(fullNameHeader).replace(/[\u0000-\u001f\u007f]/g, "").trim();
+    return decoded ? decoded.slice(0, 160) : fallback;
   } catch {
     return fallback;
   }
@@ -79,8 +116,11 @@ async function getRoleForAuthenticatedEmail(email: string) {
     )
   `).run();
 
-  const row = await env.DB.prepare("SELECT role FROM staff_role_assignments WHERE email = ?").bind(email.toLowerCase()).first<{ role: UserRole }>();
-  return row?.role ?? users.find((user) => user.email.toLowerCase() === email.toLowerCase())?.role ?? null;
+  const row = await env.DB.prepare("SELECT role FROM staff_role_assignments WHERE email = ?").bind(email.toLowerCase()).first<{ role: string }>();
+  const storedRole = row?.role;
+  return storedRole && roles.includes(storedRole as UserRole)
+    ? (storedRole as UserRole)
+    : users.find((user) => user.email.toLowerCase() === email.toLowerCase())?.role ?? null;
 }
 
 async function ensureStaffRoleAssignmentsTable() {
@@ -116,37 +156,30 @@ export function resolveActor(role?: string | null) {
     return getUserByRole(role as UserRole);
   }
 
-  return getUserByRole("SUPER_ADMIN");
+  return getUserByRole("CLIENT");
 }
 
 export async function resolveRequestActor(headers: Headers, demoRole?: string | null) {
-  const authenticatedUserId = headers.get("oai-authenticated-user-id");
-  const authenticatedEmail = headers.get("oai-authenticated-user-email")?.trim().toLowerCase();
-  const isDev = process.env.NODE_ENV !== "production";
-  const host = headers.get("host")?.toLowerCase() ?? "";
-  const isLocalHostRequest =
-    host.startsWith("localhost") ||
-    host.startsWith("127.0.0.1") ||
-    host.startsWith("[::1]") ||
-    host.startsWith("::1");
+  if (isExplicitLocalDemo(headers)) {
+    const role = demoRole && roles.includes(demoRole as UserRole) ? (demoRole as UserRole) : "SUPER_ADMIN";
+    return getUserByRole(role);
+  }
 
-  if (authenticatedUserId || authenticatedEmail) {
+  const { id: authenticatedUserId, email: authenticatedEmail } = readAuthenticatedIdentity(headers);
     const matchedUser = users.find((user) => {
-      const sameEmail = authenticatedEmail ? user.email.toLowerCase() === authenticatedEmail : false;
-      const sameId = authenticatedUserId ? user.id === authenticatedUserId : false;
-      return sameEmail || sameId;
+      return user.email.toLowerCase() === authenticatedEmail;
     });
 
     if (matchedUser) {
       return hydrateAuthenticatedActor(matchedUser, headers);
     }
 
-    const mappedRole = authenticatedEmail ? await getRoleForAuthenticatedEmail(authenticatedEmail) : null;
+    const mappedRole = await getRoleForAuthenticatedEmail(authenticatedEmail);
     if (mappedRole) {
       return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);
     }
 
-    if (authenticatedEmail && initialOwnerEmails.has(authenticatedEmail)) {
+    if (initialOwnerEmails.has(authenticatedEmail)) {
       await upsertStaffRoleAssignment({
         email: authenticatedEmail,
         role: "SUPER_ADMIN",
@@ -157,21 +190,10 @@ export async function resolveRequestActor(headers: Headers, demoRole?: string | 
 
     return {
       ...getUserByRole("CLIENT"),
-      id: authenticatedUserId ?? `auth_${authenticatedEmail ?? "visitor"}`,
-      email: authenticatedEmail ?? getUserByRole("CLIENT").email,
-      fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail ?? getUserByRole("CLIENT").fullName)
+      id: authenticatedUserId,
+      email: authenticatedEmail,
+      fullName: resolveAuthenticatedDisplayName(headers, authenticatedEmail)
     };
-  }
-
-  if (isDev && demoRole && roles.includes(demoRole as UserRole)) {
-    return getUserByRole(demoRole as UserRole);
-  }
-
-  if (isDev && isLocalHostRequest) {
-    return getUserByRole("SUPER_ADMIN");
-  }
-
-  return getUserByRole("CLIENT");
 }
 
 export async function listStaffRoleAssignments(): Promise<StaffRoleAssignment[]> {
@@ -254,7 +276,19 @@ export async function upsertStaffRoleAssignment(input: { email: string; role: Us
 }
 
 export async function requireRouteActor(request: Request, minimumRole: UserRole) {
-  const actor = await resolveRequestActor(request.headers);
+  let actor: AppUser;
+  try {
+    actor = await resolveRequestActor(request.headers);
+  } catch (error) {
+    if (error instanceof AuthenticationError) {
+      return {
+        ok: false as const,
+        actor: null,
+        response: authErrorResponse(error)
+      };
+    }
+    throw error;
+  }
   if (!canAccessRole(actor, minimumRole)) {
     return {
       ok: false as const,
@@ -262,7 +296,8 @@ export async function requireRouteActor(request: Request, minimumRole: UserRole)
       response: new Response(JSON.stringify({ ok: false, error: `This route requires ${minimumRole} access.` }), {
         status: 403,
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "Cache-Control": "no-store"
         }
       })
     };
@@ -272,4 +307,14 @@ export async function requireRouteActor(request: Request, minimumRole: UserRole)
     ok: true as const,
     actor
   };
+}
+
+export function authErrorResponse(error: AuthenticationError) {
+  return new Response(JSON.stringify({ ok: false, error: { code: error.code, message: error.message } }), {
+    status: error.status,
+    headers: {
+      "Content-Type": "application/json",
+      "Cache-Control": "no-store"
+    }
+  });
 }

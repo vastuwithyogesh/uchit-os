@@ -15,9 +15,9 @@ export async function GET(request: Request) {
     assets,
     summary: {
       required: 2,
-      uploaded: assets.length,
-      pending: 2 - assets.length,
-      complete: assets.length >= 2,
+      uploaded: uploadedKeys.size,
+      pending: Math.max(0, 2 - uploadedKeys.size),
+      complete: uploadedKeys.size >= 2,
       missingKeys: ["advance-proof", "balance-proof"].filter((key) => !uploadedKeys.has(normalizePaymentProofKey(key)))
     }
   });
@@ -38,7 +38,12 @@ export async function POST(request: Request) {
       return NextResponse.json({ ok: false, error: "Missing payment proof file." }, { status: 400 });
     }
 
-    const asset = await savePaymentProofUpload(file, key);
+    const context = {
+      clientId: String(formData.get("clientId") ?? "") || undefined,
+      proposalId: String(formData.get("proposalId") ?? "") || undefined,
+      caseId: String(formData.get("caseId") ?? "") || undefined
+    };
+    const asset = await savePaymentProofUpload(file, key, { id: access.actor.id, email: access.actor.email }, context);
     return NextResponse.json({ ok: true, proof: asset });
   } catch (error) {
     return NextResponse.json(
@@ -46,7 +51,7 @@ export async function POST(request: Request) {
         ok: false,
         error: error instanceof Error ? error.message : "Failed to save payment proof."
       },
-      { status: 500 }
+      { status: error instanceof Error && /allowed|must be|does not match|Missing/.test(error.message) ? 400 : 500 }
     );
   }
 }

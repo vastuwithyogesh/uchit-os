@@ -1,39 +1,20 @@
 import { NextResponse } from "next/server";
-import { access, readFile } from "node:fs/promises";
-import { constants as fsConstants } from "node:fs";
-import { join } from "node:path";
+import { requireRouteActor } from "@/lib/auth";
+import { readPaymentProofFile } from "@/lib/payment-proof-assets.server";
 
-function sanitizeFileName(fileName: string) {
-  return fileName.replace(/[^a-zA-Z0-9._-]/g, "_");
-}
+export async function GET(request: Request, { params }: { params: Promise<{ fileName: string }> }) {
+  const access = await requireRouteActor(request, "SETTER");
+  if (!access.ok) return access.response;
 
-function getUploadPath(fileName: string) {
-  return join(process.cwd(), "data", "payment-proofs", sanitizeFileName(fileName));
-}
+  const { fileName: opaqueId } = await params;
+  const proof = await readPaymentProofFile(opaqueId);
+  if (!proof) return NextResponse.json({ ok: false, error: "Payment proof file not found." }, { status: 404 });
 
-function getContentType(fileName: string) {
-  const lower = fileName.toLowerCase();
-  if (lower.endsWith(".png")) return "image/png";
-  if (lower.endsWith(".jpg") || lower.endsWith(".jpeg")) return "image/jpeg";
-  if (lower.endsWith(".webp")) return "image/webp";
-  if (lower.endsWith(".gif")) return "image/gif";
-  return "application/octet-stream";
-}
-
-export async function GET(_: Request, { params }: { params: Promise<{ fileName: string }> }) {
-  const { fileName } = await params;
-  const filePath = getUploadPath(fileName);
-
-  try {
-    await access(filePath, fsConstants.F_OK);
-    const bytes = await readFile(filePath);
-    return new NextResponse(bytes, {
-      headers: {
-        "Content-Type": getContentType(fileName),
-        "Cache-Control": "no-store"
-      }
-    });
-  } catch {
-    return NextResponse.json({ ok: false, error: "Payment proof file not found." }, { status: 404 });
-  }
+  const headers = new Headers({
+    "Content-Type": proof.mimeType,
+    "Cache-Control": "private, no-store",
+    "X-Content-Type-Options": "nosniff",
+    "Content-Disposition": `inline; filename="${proof.fileName.replace(/[\"\\\r\n]/g, "_")}"`
+  });
+  return new Response(proof.object.body, { headers });
 }

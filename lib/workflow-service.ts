@@ -920,12 +920,18 @@ export function sendWhatsAppTemplate(templateId: string, clientId: string, recip
     clientId,
     templateId,
     recipientPhone,
-    status: "SENT",
+    status: "QUEUED",
     sentAt: new Date().toISOString()
   } satisfies WhatsAppTemplateLogRecord;
 
   state.whatsappLogs.unshift(log);
-  appendTimeline(clientId, `WhatsApp template sent: ${template.title}`, `Sent to ${recipientPhone} by ${sentBy.fullName}.`, "WhatsApp", sentBy.role);
+  appendTimeline(
+    clientId,
+    `WhatsApp template queued: ${template.title}`,
+    `Queued locally for ${recipientPhone} by ${sentBy.fullName}; provider delivery is not configured.`,
+    "WhatsApp",
+    sentBy.role
+  );
   return log;
 }
 
@@ -938,8 +944,8 @@ export function recordClientOutreachSend(input: {
 }) {
   appendTimeline(
     input.clientId,
-    `${input.channel === "email" ? "Email" : "WhatsApp"} sent: ${input.title}`,
-    `step=${input.stepKey};channel=${input.channel};by=${input.sentBy.fullName}`,
+    `${input.channel === "email" ? "Email" : "WhatsApp"} outreach recorded: ${input.title}`,
+    `step=${input.stepKey};channel=${input.channel};status=RECORDED;by=${input.sentBy.fullName}`,
     "Outreach",
     input.sentBy.role
   );
@@ -949,7 +955,8 @@ export function recordClientOutreachSend(input: {
     channel: input.channel,
     title: input.title,
     sentBy: input.sentBy.fullName,
-    sentAt: new Date().toISOString()
+    status: "RECORDED" as const,
+    recordedAt: new Date().toISOString()
   };
 }
 

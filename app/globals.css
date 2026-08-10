@@ -39,6 +39,21 @@ body {
   background: transparent;
 }
 
+.session-gate {
+  display: grid;
+  min-height: 100vh;
+  padding: 24px;
+  place-items: center;
+}
+
+.session-gate .card {
+  width: min(100%, 560px);
+}
+
+.session-gate .button {
+  margin-top: 18px;
+}
+
 a {
   color: inherit;
   text-decoration: none;
@@ -687,6 +702,24 @@ body {
   flex-wrap: wrap;
 }
 
+.session-error {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  max-width: 560px;
+  padding: 10px 12px;
+  border: 1px solid rgba(185, 28, 28, 0.28);
+  border-radius: 14px;
+  color: var(--bad);
+  background: rgba(254, 226, 226, 0.92);
+  font-size: 0.9rem;
+}
+
+.session-error .button-secondary {
+  flex: 0 0 auto;
+  padding: 8px 12px;
+}
+
 .role-switcher-panel {
   display: grid;
   gap: 6px;
@@ -953,6 +986,13 @@ select:disabled {
   }
 
   .nav {
+    width: 100%;
+  }
+
+  .session-error {
+    align-items: stretch;
+    flex-direction: column;
+    max-width: none;
     width: 100%;
   }
 }

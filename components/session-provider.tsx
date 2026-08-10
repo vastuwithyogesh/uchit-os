@@ -2,15 +2,27 @@
 
 import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
-import { AppUser, UserRole } from "@/lib/domain";
-import { users } from "@/lib/seed";
+import { AppUser, UserRole, roles } from "@/lib/domain";
 
 type SessionPayload = {
+  version: 1;
   ok: true;
   actor: AppUser;
   availableUsers: AppUser[];
   isLocalDemo: boolean;
 };
+
+type SessionErrorCode = "UNAUTHENTICATED" | "UNAUTHORIZED" | "SESSION_UNAVAILABLE";
+
+class SessionRequestError extends Error {
+  readonly code: SessionErrorCode;
+
+  constructor(code: SessionErrorCode, message: string) {
+    super(message);
+    this.name = "SessionRequestError";
+    this.code = code;
+  }
+}
 
 type SessionContextValue = {
   activeUser: AppUser;
@@ -18,28 +30,75 @@ type SessionContextValue = {
   setActiveUser: (userId: string) => void;
   availableUsers: AppUser[];
   isLocalDemo: boolean;
+  sessionStatus: "loading" | "ready" | "error";
+  sessionError: string | null;
+  retrySession: () => void;
 };
 
-const defaultUser = users.find((user) => user.role === "SUPER_ADMIN") ?? users[0];
+const failClosedUser: AppUser = {
+  id: "session-unavailable",
+  fullName: "Session unavailable",
+  email: "",
+  role: "CLIENT",
+  color: "#6d5d4d"
+};
 const SessionContext = createContext<SessionContextValue | null>(null);
+
+function isAppUser(value: unknown): value is AppUser {
+  if (!value || typeof value !== "object") return false;
+  const candidate = value as Partial<AppUser>;
+  return (
+    typeof candidate.id === "string" &&
+    typeof candidate.fullName === "string" &&
+    typeof candidate.email === "string" &&
+    typeof candidate.color === "string" &&
+    roles.includes(candidate.role as UserRole)
+  );
+}
 
 async function fetchSession() {
   const response = await fetch("/api/session", { cache: "no-store" });
   if (!response.ok) {
-    throw new Error("Failed to load session");
+    let responseCode: unknown;
+    try {
+      const failure = (await response.json()) as { error?: { code?: unknown } };
+      responseCode = failure.error?.code;
+    } catch {
+      // The UI deliberately ignores server details and presents a safe message.
+    }
+
+    if (response.status === 401 || responseCode === "UNAUTHENTICATED") {
+      throw new SessionRequestError("UNAUTHENTICATED", "Your sign-in could not be verified. Please sign in again.");
+    }
+    if (response.status === 403 || responseCode === "UNAUTHORIZED") {
+      throw new SessionRequestError("UNAUTHORIZED", "Your account does not have access to this workspace.");
+    }
+    throw new SessionRequestError("SESSION_UNAVAILABLE", "The secure session service is temporarily unavailable.");
   }
-  return (await response.json()) as SessionPayload;
+  const payload = (await response.json()) as Partial<SessionPayload>;
+  if (payload.version !== 1 || payload.ok !== true || !isAppUser(payload.actor) || !Array.isArray(payload.availableUsers) || typeof payload.isLocalDemo !== "boolean") {
+    throw new Error("The server returned an invalid session.");
+  }
+  if (!payload.availableUsers.every(isAppUser)) {
+    throw new Error("The server returned an invalid user list.");
+  }
+  return payload as SessionPayload;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
-  const [activeUser, setActiveUserState] = useState<AppUser>(defaultUser);
-  const [availableUsers, setAvailableUsers] = useState<AppUser[]>(users);
-  const [isLocalDemo, setIsLocalDemo] = useState(true);
+  const [activeUser, setActiveUserState] = useState<AppUser>(failClosedUser);
+  const [availableUsers, setAvailableUsers] = useState<AppUser[]>([]);
+  const [isLocalDemo, setIsLocalDemo] = useState(false);
+  const [sessionStatus, setSessionStatus] = useState<SessionContextValue["sessionStatus"]>("loading");
+  const [sessionError, setSessionError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
     let cancelled = false;
 
     async function hydrateSession() {
+      setSessionStatus("loading");
+      setSessionError(null);
       try {
         const payload = await fetchSession();
         if (cancelled) {
@@ -59,11 +118,14 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             payload.actor;
           setActiveUserState(nextUser);
         }
-      } catch {
+        setSessionStatus("ready");
+      } catch (error) {
         if (!cancelled) {
-          setActiveUserState(defaultUser);
-          setAvailableUsers(users);
-          setIsLocalDemo(true);
+          setActiveUserState(failClosedUser);
+          setAvailableUsers([]);
+          setIsLocalDemo(false);
+          setSessionStatus("error");
+          setSessionError(error instanceof Error ? error.message : "Unable to verify your session.");
         }
       }
     }
@@ -72,7 +134,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [retryCount]);
 
   const value = useMemo<SessionContextValue>(
     () => ({
@@ -82,7 +144,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const nextUser = availableUsers.find((user) => user.role === role) ?? defaultUser;
+        const nextUser = availableUsers.find((user) => user.role === role);
+        if (!nextUser) return;
         setActiveUserState(nextUser);
         window.localStorage.setItem("uchit-vastu-role", role);
         window.localStorage.setItem("uchit-vastu-user-id", nextUser.id);
@@ -92,18 +155,43 @@ export function SessionProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        const nextUser = availableUsers.find((user) => user.id === userId) ?? defaultUser;
+        const nextUser = availableUsers.find((user) => user.id === userId);
+        if (!nextUser) return;
         setActiveUserState(nextUser);
         window.localStorage.setItem("uchit-vastu-role", nextUser.role);
         window.localStorage.setItem("uchit-vastu-user-id", nextUser.id);
       },
       availableUsers,
-      isLocalDemo
+      isLocalDemo,
+      sessionStatus,
+      sessionError,
+      retrySession: () => setRetryCount((count) => count + 1)
     }),
-    [activeUser, availableUsers, isLocalDemo]
+    [activeUser, availableUsers, isLocalDemo, sessionError, sessionStatus]
   );
 
-  return <SessionContext.Provider value={value}>{children}</SessionContext.Provider>;
+  return (
+    <SessionContext.Provider value={value}>
+      {sessionStatus === "ready" ? children : (
+        <main className="session-gate" aria-busy={sessionStatus === "loading"}>
+          <section className="card" role={sessionStatus === "error" ? "alert" : "status"}>
+            <div className="eyebrow">Secure workspace</div>
+            <h1>{sessionStatus === "loading" ? "Verifying your session…" : "We could not verify your session"}</h1>
+            <p className="subtle">
+              {sessionStatus === "loading"
+                ? "The workspace will open after your identity and role are confirmed."
+                : `${sessionError ?? "The session service is unavailable."} No workspace data or privileged navigation has been shown.`}
+            </p>
+            {sessionStatus === "error" ? (
+              <button type="button" className="button" onClick={() => setRetryCount((count) => count + 1)}>
+                Try again
+              </button>
+            ) : null}
+          </section>
+        </main>
+      )}
+    </SessionContext.Provider>
+  );
 }
 
 export function useSession() {

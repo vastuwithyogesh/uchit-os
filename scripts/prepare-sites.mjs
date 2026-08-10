@@ -1,4 +1,4 @@
-import { cp, mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { spawn } from "node:child_process";
 import { join } from "node:path";
 import process from "node:process";
@@ -9,7 +9,31 @@ const serverWrapperPath = join(distDir, "server", "index.js");
 const prismaSourceDir = join(projectDir, "node_modules", ".prisma");
 const prismaClientSourceDir = join(projectDir, "node_modules", "@prisma", "client");
 
-const topLevelExcludes = new Set(["dist", "node_modules", ".git", ".next", "site-archive.tar", "site-archive.tar.gz"]);
+// Keep this list explicit: deployment preparation must never copy developer
+// credentials, local state, archives, or other unreviewed workspace files.
+const packageEntries = [
+  ".openai/hosting.json",
+  "app",
+  "build",
+  "components",
+  "db",
+  "lib",
+  "next-env.d.ts",
+  "next.config.mjs",
+  "package.json",
+  "pnpm-lock.yaml",
+  "pnpm-workspace.yaml",
+  "prisma",
+  "public",
+  "scripts",
+  "supabase/config.toml",
+  "tsconfig.json",
+  "vercel.json",
+  "vite.config.ts",
+  "worker"
+];
+
+const packageDataEntries = ["data/residential-tab.csv"];
 
 async function copyIfExists(source, destination, options = {}) {
   try {
@@ -51,16 +75,11 @@ async function main() {
   await rm(distDir, { recursive: true, force: true });
   await mkdir(distDir, { recursive: true });
 
-  const entries = await readdir(projectDir, { withFileTypes: true });
-  for (const entry of entries) {
-    if (topLevelExcludes.has(entry.name)) {
-      continue;
-    }
-
-    await cp(join(projectDir, entry.name), join(distDir, entry.name), { recursive: true });
+  for (const entry of [...packageEntries, ...packageDataEntries]) {
+    await copyIfExists(join(projectDir, entry), join(distDir, entry));
   }
 
-  await run("pnpm.cmd", ["install", "--prod", "--ignore-scripts", "--no-frozen-lockfile", "--node-linker=hoisted"], distDir);
+  await run("pnpm.cmd", ["install", "--prod", "--ignore-scripts", "--frozen-lockfile", "--node-linker=hoisted"], distDir);
   await copyIfExists(prismaSourceDir, join(distDir, "node_modules", ".prisma"), { dereference: true });
   await copyIfExists(prismaClientSourceDir, join(distDir, "node_modules", "@prisma", "client"), { dereference: true });
 

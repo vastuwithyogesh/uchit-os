@@ -4,11 +4,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { RoleSwitcher } from "@/components/role-switcher";
 import { useSession } from "@/components/session-provider";
-import { pageAccessRules, canRoleAccess } from "@/lib/access-policy";
+import { getAccessiblePageRules } from "@/lib/access-policy";
 
 export function SiteHeader({ title, subtitle }: { title: string; subtitle: string }) {
-  const { activeUser, isLocalDemo } = useSession();
+  const { activeUser, isLocalDemo, sessionStatus, sessionError, retrySession } = useSession();
   const pathname = usePathname();
+  const visibleNavigation = sessionStatus === "ready" ? getAccessiblePageRules(activeUser.role) : [];
 
   return (
     <header className="topbar">
@@ -20,9 +21,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
         </div>
       </div>
       <nav className="nav" aria-label="Primary">
-        {pageAccessRules
-          .filter((item) => canRoleAccess(activeUser.role, item.minimumRole))
-          .map((item) => (
+        {visibleNavigation.map((item) => (
             <Link
               key={item.href}
               href={item.href}
@@ -34,11 +33,22 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
           ))}
       </nav>
       <div className="header-session">
-        <div className="header-session-copy">
-          <div className="pill">Signed in as {activeUser.fullName}</div>
-          <div className="pill">{isLocalDemo ? "Workspace role mode" : "Signed-in staff session"}</div>
-        </div>
-        <RoleSwitcher />
+        {sessionStatus === "loading" ? <div className="pill" role="status">Verifying session…</div> : null}
+        {sessionStatus === "error" ? (
+          <div className="session-error" role="alert">
+            <span>Access is paused because your session could not be verified. {sessionError}</span>
+            <button type="button" className="button-secondary" onClick={retrySession}>Try again</button>
+          </div>
+        ) : null}
+        {sessionStatus === "ready" ? (
+          <>
+            <div className="header-session-copy">
+              <div className="pill">Signed in as {activeUser.fullName}</div>
+              <div className="pill">{isLocalDemo ? "Local demo role mode" : "Verified staff session"}</div>
+            </div>
+            <RoleSwitcher />
+          </>
+        ) : null}
       </div>
     </header>
   );

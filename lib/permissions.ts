@@ -20,6 +20,18 @@ export function canEditFloorWorkspaces(user: AppUser) {
   return user.role === "CONSULTANT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 }
 
+export function canEvaluateCases(user: AppUser) {
+  return user.role === "CONSULTANT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+}
+
+export function canVerifyPayments(user: AppUser) {
+  return user.role === "CONSULTANT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+}
+
+export function canReadClientSnapshots(user: AppUser) {
+  return user.role === "CONSULTANT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
+}
+
 export function canTriggerDeliverables(user: AppUser) {
   return user.role === "SETTER" || user.role === "CONSULTANT" || user.role === "ADMIN" || user.role === "SUPER_ADMIN";
 }

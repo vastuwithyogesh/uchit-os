@@ -87,7 +87,9 @@ async function readFromD1(): Promise<InboundLeadRecord[] | null> {
   `).run();
 
   const result = await env.DB.prepare("SELECT payload FROM optin_leads ORDER BY last_seen_at DESC").all<{ payload: string }>();
-  return (result.results ?? []).map((row, index) => hydrateLead(JSON.parse(row.payload) as Partial<InboundLeadRecord>, index));
+  return (result.results ?? []).map((row: { payload: string }, index: number) =>
+    hydrateLead(JSON.parse(row.payload) as Partial<InboundLeadRecord>, index)
+  );
 }
 
 async function writeToD1(records: InboundLeadRecord[]) {
@@ -95,9 +97,10 @@ async function writeToD1(records: InboundLeadRecord[]) {
   if (!env.DB) {
     return null;
   }
+  const db = env.DB;
 
-  await env.DB.batch([
-    env.DB.prepare(`
+  await db.batch([
+    db.prepare(`
       CREATE TABLE IF NOT EXISTS optin_leads (
         id TEXT PRIMARY KEY,
         identity_key TEXT NOT NULL UNIQUE,
@@ -107,13 +110,13 @@ async function writeToD1(records: InboundLeadRecord[]) {
         last_seen_at TEXT NOT NULL
       )
     `),
-    env.DB.prepare("DELETE FROM optin_leads")
+    db.prepare("DELETE FROM optin_leads")
   ]);
 
   if (records.length > 0) {
     await env.DB.batch(
       records.map((record) =>
-        env.DB.prepare(
+        db.prepare(
           "INSERT INTO optin_leads (id, identity_key, unique_client_id, payload, imported_at, last_seen_at) VALUES (?, ?, ?, ?, ?, ?)"
         ).bind(
           record.id,
