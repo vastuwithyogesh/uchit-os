@@ -20,6 +20,8 @@ class FakeD1 {
     if (/CREATE TABLE IF NOT EXISTS app_state_snapshot/i.test(sql)) { this.tables.add("app_state_snapshot"); this.columns.set("app_state_snapshot", new Set(["id", "payload", "updated_at"])); }
     if (/ALTER TABLE app_state_snapshot ADD COLUMN revision/i.test(sql)) { this.columns.get("app_state_snapshot").add("revision"); if (this.revision === null) this.revision = 0; }
     if (/CREATE TABLE IF NOT EXISTS case_file_assets/i.test(sql)) { this.tables.add("case_file_assets"); this.columns.set("case_file_assets", new Set(["id", "evidence_ref", "case_id", "case_revision_number", "service_type", "floor_label", "object_key", "checksum_sha256", "status"])); }
+    if (/CREATE TABLE IF NOT EXISTS staff_role_assignments/i.test(sql)) this.tables.add("staff_role_assignments");
+    if (/CREATE TABLE IF NOT EXISTS staff_role_assignment_audit/i.test(sql)) this.tables.add("staff_role_assignment_audit");
     const index = sql.match(/CREATE INDEX IF NOT EXISTS (\w+)/i); if (index) this.indexes.add(index[1]);
     if (/INSERT OR IGNORE INTO schema_migrations/i.test(sql)) this.applied.add(Number(values[0]));
     return { meta: { changes: 1 }, success: true };
@@ -31,14 +33,16 @@ class FakeD1 {
   }
 }
 
-test("v1 through v3 migrate an empty database and repeat without drift", async () => {
+test("v1 through v4 migrate an empty database and repeat without drift", async () => {
   const db = new FakeD1();
   await migrateD1(db);
-  assert.deepEqual([...db.applied], [1, 2, 3]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4]);
   assert.ok(db.tables.has("app_state_snapshot"));
   assert.ok(db.tables.has("case_file_assets"));
+  assert.ok(db.tables.has("staff_role_assignments"));
+  assert.ok(db.tables.has("staff_role_assignment_audit"));
   assert.ok(db.columns.get("app_state_snapshot").has("revision"));
-  assert.deepEqual([...db.indexes].sort(), ["idx_case_file_assets_floor", "idx_case_file_assets_scope"]);
+  assert.deepEqual([...db.indexes].sort(), ["idx_case_file_assets_floor", "idx_case_file_assets_scope", "idx_staff_role_audit_target_time"]);
   const before = JSON.stringify({ applied: [...db.applied], tables: [...db.tables], indexes: [...db.indexes], revision: db.revision });
   await migrateD1(db);
   assert.equal(JSON.stringify({ applied: [...db.applied], tables: [...db.tables], indexes: [...db.indexes], revision: db.revision }), before);
@@ -48,12 +52,12 @@ test("production-like v2 schema adopts migration markers without changing revisi
   const db = new FakeD1({ revisionColumn: true, revision: 37, applied: [1] });
   await migrateD1(db);
   assert.equal(db.revision, 37);
-  assert.deepEqual([...db.applied], [1, 2, 3]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4]);
   assert.ok(db.tables.has("case_file_assets"));
 });
 
 test("migration list is deterministic and Sites packages the db directory", async () => {
-  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3]);
+  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4]);
   const prepare = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../scripts/prepare-sites.mjs", import.meta.url), "utf8"));
   assert.match(prepare, /"db"/);
 });

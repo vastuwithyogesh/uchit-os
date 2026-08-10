@@ -34,6 +34,23 @@ export const d1Migrations: readonly D1Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_case_file_assets_scope ON case_file_assets(case_id, case_revision_number, service_type, created_at)",
       "CREATE INDEX IF NOT EXISTS idx_case_file_assets_floor ON case_file_assets(case_id, floor_label)"
     ]
+  },
+  {
+    version: 4,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS staff_role_assignments (
+        email TEXT PRIMARY KEY, role TEXT NOT NULL, full_name TEXT NOT NULL, updated_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS staff_role_assignment_audit (
+        id TEXT PRIMARY KEY, target_email TEXT NOT NULL, previous_role TEXT, next_role TEXT NOT NULL,
+        actor_id TEXT NOT NULL, actor_email TEXT NOT NULL, actor_name TEXT NOT NULL, actor_role TEXT NOT NULL,
+        changed_at TEXT NOT NULL
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_staff_role_audit_target_time ON staff_role_assignment_audit(target_email, changed_at)",
+      `DELETE FROM staff_role_assignments
+       WHERE updated_at = '2026-08-07T18:30:00.000Z'
+       AND email IN ('aarav@uchitvastu.in', 'nandini@uchitvastu.in', 'rishi@uchitvastu.in', 'meera@uchitvastu.in')`
+    ]
   }
 ];
 

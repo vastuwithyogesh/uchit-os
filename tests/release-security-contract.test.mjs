@@ -45,7 +45,7 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/session/route.ts": /resolveRequestActor/,
     "app/api/settings/route.ts": /requireRouteActor/,
     "app/api/settings/test/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
-    "app/api/staff-roles/route.ts": /resolveRequestActor/,
+    "app/api/staff-roles/route.ts": /requireRouteActor/,
     "app/api/state/route.ts": /requireRouteActor/,
     "app/api/timeline/route.ts": /requireRouteActor/,
     "app/api/utility/master/route.ts": /requireRouteActor/
@@ -80,6 +80,7 @@ test("upload, report, migration and deployment package gates are present", () =>
   assert.match(files, /R2\.delete\(objectKey\)/);
   assert.match(source("lib/report-artifacts.ts"), /sha256Hex.*canonicalReportPayload/s);
   assert.match(source("db/migrations.ts"), /version: 3.*case_file_assets/s);
+  assert.match(source("db/migrations.ts"), /version: 4.*staff_role_assignment_audit/s);
   const prepare = source("scripts/prepare-sites.mjs");
   assert.match(prepare, /const packageEntries = \[/);
   assert.doesNotMatch(prepare, /local-settings\.json/);

@@ -32,6 +32,12 @@ test("session success and auth failures cannot be cached", () => {
   assert.match(functionBody(sessionProvider, "fetchSession"), /cache: "no-store"/);
 });
 
+test("authenticated display names are decoded only with the declared encoding", () => {
+  const body = functionBody(auth, "resolveAuthenticatedDisplayName");
+  assert.match(body, /oai-authenticated-user-full-name-encoding/);
+  assert.match(body, /encoding !== "percent-encoded-utf-8"/);
+});
+
 test("client maps structured auth failures to safe fixed messages", () => {
   const body = functionBody(sessionProvider, "fetchSession");
   assert.match(body, /responseCode === "UNAUTHENTICATED"/);

@@ -66,6 +66,21 @@ CREATE TABLE IF NOT EXISTS staff_role_assignments (
   updated_at TEXT NOT NULL
 );
 
+CREATE TABLE IF NOT EXISTS staff_role_assignment_audit (
+  id TEXT PRIMARY KEY,
+  target_email TEXT NOT NULL,
+  previous_role TEXT,
+  next_role TEXT NOT NULL,
+  actor_id TEXT NOT NULL,
+  actor_email TEXT NOT NULL,
+  actor_name TEXT NOT NULL,
+  actor_role TEXT NOT NULL,
+  changed_at TEXT NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_staff_role_audit_target_time
+ON staff_role_assignment_audit(target_email, changed_at);
+
 CREATE TABLE IF NOT EXISTS case_file_assets (
   id TEXT PRIMARY KEY, evidence_ref TEXT NOT NULL UNIQUE, case_id TEXT NOT NULL,
   case_revision_number INTEGER NOT NULL, service_type TEXT NOT NULL, floor_label TEXT,
