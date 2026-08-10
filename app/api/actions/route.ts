@@ -44,6 +44,7 @@ import {
   upsertDeliveryMilestone,
   transitionClientPipeline,
   updateCommercialPolicy,
+  upsertClientIntake,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -59,7 +60,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "client-pipeline-transition", "commercial-policy-update"]);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert"]);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -85,6 +86,7 @@ export async function POST(request: Request) {
     const crmAllowedFields: Record<string, string[]> = {
       "client-pipeline-transition": ["action", "actorRole", "clientId", "pipelineStage", "nextAction", "nextActionDueAt", "correction", "correctionReason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "commercial-policy-update": ["action", "actorRole", "defaultProposalAmountInr", "minimumAdvanceInr", "qualificationCallTargetMinutes", "nextActionDueSoonHours", "defaultReviewCallMinutes", "reason", "idempotencyKey", "expectedPolicyVersion", "expectedRevision"]
+      ,"client-intake-upsert": ["action", "actorRole", "clientId", "contactPreference", "businessContext", "decisionMakerStatus", "otherDecisionMakers", "propertyContext", "needs", "consent", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
     };
     if (crmAllowedFields[action]) {
       const allowed = new Set(crmAllowedFields[action]);
@@ -137,6 +139,10 @@ export async function POST(request: Request) {
       case "commercial-policy-update":
         if (actor.role !== "SUPER_ADMIN") return deny("Only a Super-Admin can publish commercial policy.");
         response = { ok: true, policy: updateCommercialPolicy({ ...body, actor }) };
+        break;
+      case "client-intake-upsert":
+        if (!canTriggerDeliverables(actor)) return deny("Only assigned setters, consultants, or administrators can update client intake.");
+        response = { ok: true, intake: upsertClientIntake({ ...body, actor }) };
         break;
       case "lead-qualify":
         if (!canTriggerDeliverables(actor)) {

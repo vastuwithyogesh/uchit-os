@@ -30,6 +30,7 @@ import {
   ImplementationTask,
   CaseDocumentRecord,
   DeliveryMilestone,
+  ClientIntakeProfile,
   ShaktiSnapshotRecord,
   TimelineEvent,
   UtilityRule,
@@ -47,6 +48,7 @@ export interface AppState {
   pipelineTransitions: import("@/lib/domain").PipelineTransitionRecord[];
   commercialPolicy: import("@/lib/domain").CommercialPolicy;
   commercialPolicyHistory: import("@/lib/domain").CommercialPolicy[];
+  clientIntakeProfiles: ClientIntakeProfile[];
   leadQualifications: LeadQualificationRecord[];
   commercialProposals: CommercialProposalRecord[];
   reviewCallBookings: ReviewCallBookingRecord[];
@@ -77,6 +79,7 @@ export const createEmptyAppState = (): AppState => ({
   pipelineTransitions: [],
   commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
   commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
+  clientIntakeProfiles: [],
   leadQualifications: [],
   commercialProposals: [],
   reviewCallBookings: [],
@@ -107,6 +110,7 @@ const createDemoAppState = (): AppState => ({
   pipelineTransitions: [],
   commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
   commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
+  clientIntakeProfiles: [],
   leadQualifications: structuredClone(seedLeadQualifications),
   commercialProposals: structuredClone(seedCommercialProposals),
   reviewCallBookings: [],

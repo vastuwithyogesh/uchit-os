@@ -104,6 +104,19 @@ export interface CommercialPolicy {
   idempotencyKey: string;
 }
 
+export const decisionMakerStatuses = ["SOLE", "JOINT", "NOT_DECISION_MAKER"] as const;
+export type DecisionMakerStatus = (typeof decisionMakerStatuses)[number];
+export interface ClientIntakeProfile {
+  clientId: string; version: number; idempotencyKey: string;
+  contactPreference?: { whatsapp?: string; preferredLanguage?: string; preferredContactWindow?: string };
+  businessContext?: { company?: string; industry?: string; designation?: string; vision?: string };
+  decisionMakerStatus?: DecisionMakerStatus; otherDecisionMakers?: string;
+  propertyContext?: { serviceInterest?: VastuServiceType; propertyType?: string; propertyStatus?: string; areaValue?: number; areaUnit?: string; cityCountry?: string; constraints?: string };
+  needs?: { mainChallenge?: string; desiredOutcome?: string; urgency?: string };
+  consent: { version: "uchit-intake/v1"; contact?: boolean; accuracy?: boolean; confidentiality?: boolean; confirmedAt?: string };
+  created: AssessmentAudit; updated: AssessmentAudit;
+}
+
 export interface LeadQualificationRecord {
   id: string;
   clientId: string;
@@ -363,6 +376,13 @@ export interface ReportArtifactManifest {
   contentHash: string;
   immutable: true;
   downloadPath: string;
+  /** Exact client-safe intake fields frozen for v2 hashing/rendering; excludes consent, contact and business metadata. */
+  intakeSnapshot?: ClientSafeIntakeSnapshot;
+}
+
+export interface ClientSafeIntakeSnapshot {
+  mainChallenge: string | null; desiredOutcome: string | null; serviceInterest: VastuServiceType | null;
+  propertyType: string | null; propertyStatus: string | null; cityCountry: string | null; constraints: string | null;
 }
 
 export interface EvaluationSnapshotRecord {

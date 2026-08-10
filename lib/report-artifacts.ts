@@ -1,5 +1,5 @@
 import type { AppState } from "@/lib/store";
-import type { AppUser, ReportArtifactManifest, ReportVersionRecord } from "@/lib/domain";
+import type { AppUser, ClientSafeIntakeSnapshot, ReportArtifactManifest, ReportVersionRecord } from "@/lib/domain";
 
 export const LEGACY_REPORT_TEMPLATE_VERSION = "uchit-verdict/v1";
 export const REPORT_TEMPLATE_VERSION = "uchit-verdict/v2";
@@ -20,6 +20,18 @@ function qualificationAnswer(state: AppState, clientId: string | undefined, patt
 }
 
 const stableTextOrder = (left: { title: string }, right: { title: string }) => left.title < right.title ? -1 : left.title > right.title ? 1 : 0;
+
+export function buildClientSafeIntakeProjection(state: AppState, clientId: string | undefined): ClientSafeIntakeSnapshot {
+  const profile = (state.clientIntakeProfiles ?? []).find((item) => item.clientId === clientId);
+  return { mainChallenge: profile?.needs?.mainChallenge ?? null, desiredOutcome: profile?.needs?.desiredOutcome ?? null, serviceInterest: profile?.propertyContext?.serviceInterest ?? null, propertyType: profile?.propertyContext?.propertyType ?? null, propertyStatus: profile?.propertyContext?.propertyStatus ?? null, cityCountry: profile?.propertyContext?.cityCountry ?? null, constraints: profile?.propertyContext?.constraints ?? null };
+}
+
+const EMPTY_CLIENT_SAFE_INTAKE: ClientSafeIntakeSnapshot = { mainChallenge: null, desiredOutcome: null, serviceInterest: null, propertyType: null, propertyStatus: null, cityCountry: null, constraints: null };
+
+export function resolveReportIntakeProjection(state: AppState, report: ReportVersionRecord, clientId: string | undefined): ClientSafeIntakeSnapshot {
+  if (report.artifact) return report.artifact.intakeSnapshot ?? EMPTY_CLIENT_SAFE_INTAKE;
+  return buildClientSafeIntakeProjection(state, clientId);
+}
 
 /** Client-safe, revision-bound assessment content used by both the v2 hash and renderer. */
 export function buildClientSafeAssessmentComposition(state: AppState, caseRecord: AppState["vastuCases"][number] | undefined) {
@@ -94,7 +106,7 @@ export function buildPreDeliveryMilestoneComposition(state: AppState, caseRecord
   })).sort((left, right) => left.kind < right.kind ? -1 : left.kind > right.kind ? 1 : left.sequence - right.sequence || (left.title < right.title ? -1 : left.title > right.title ? 1 : 0));
 }
 
-export function buildReportComposition(state: AppState, report: ReportVersionRecord) {
+export function buildReportComposition(state: AppState, report: ReportVersionRecord, intakeOverride?: ClientSafeIntakeSnapshot) {
   const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
   const client = state.clients.find((item) => item.id === caseRecord?.clientId);
   const evaluation = report.artifact?.evaluationSnapshotId
@@ -116,6 +128,8 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
   const assessment = buildClientSafeAssessmentComposition(state, caseRecord);
   const verifiedDocuments = buildVerifiedDocumentComposition(state, caseRecord);
   const preDeliveryMilestones = buildPreDeliveryMilestoneComposition(state, caseRecord);
+  const includeIntake = intakeOverride !== undefined || !report.artifact || report.artifact.intakeSnapshot !== undefined;
+  const intake = intakeOverride ?? resolveReportIntakeProjection(state, report, client?.id);
   return {
     report: { id: report.id, caseId: report.caseId, versionLabel: report.versionLabel, isPreview: report.isPreview },
     case: caseRecord ? {
@@ -130,6 +144,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
     } : null,
     client: client ? { id: client.id, displayName: client.displayName, city: client.city } : null,
     qualification: { objective, propertyType, propertyStatus },
+    ...(includeIntake ? { intake } : {}),
     floors,
     evaluation: evaluation ?? null,
     shakti: shakti ?? null,
@@ -162,9 +177,9 @@ function legacyCanonicalReportPayload(state: AppState, report: ReportVersionReco
   });
 }
 
-export function canonicalReportPayload(state: AppState, report: ReportVersionRecord) {
+export function canonicalReportPayload(state: AppState, report: ReportVersionRecord, intakeOverride?: ClientSafeIntakeSnapshot) {
   if (report.artifact?.templateVersion === LEGACY_REPORT_TEMPLATE_VERSION) return legacyCanonicalReportPayload(state, report);
-  return canonicalize({ schemaVersion: "report-content/v2", ...buildReportComposition(state, report) });
+  return canonicalize({ schemaVersion: "report-content/v2", ...buildReportComposition(state, report, intakeOverride) });
 }
 
 export async function sha256Hex(value: unknown) {
@@ -176,6 +191,8 @@ export async function sha256Hex(value: unknown) {
 export async function createArtifactManifest(state: AppState, report: ReportVersionRecord, actor: AppUser): Promise<ReportArtifactManifest> {
   const evaluation = state.evaluationSnapshots.find((item) => item.caseId === report.caseId);
   const shakti = state.shaktiSnapshots.find((item) => item.caseId === report.caseId);
+  const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
+  const intakeSnapshot = buildClientSafeIntakeProjection(state, caseRecord?.clientId);
   return {
     schemaVersion: "report-artifact/v1",
     mediaType: "text/html",
@@ -184,9 +201,10 @@ export async function createArtifactManifest(state: AppState, report: ReportVers
     templateVersion: REPORT_TEMPLATE_VERSION,
     evaluationSnapshotId: evaluation?.id,
     shaktiSnapshotId: shakti?.id,
-    contentHash: await sha256Hex(canonicalReportPayload(state, report)),
+    contentHash: await sha256Hex(canonicalReportPayload(state, report, intakeSnapshot)),
     immutable: true,
-    downloadPath: `/api/reports/${encodeURIComponent(report.id)}/print`
+    downloadPath: `/api/reports/${encodeURIComponent(report.id)}/print`,
+    intakeSnapshot
   };
 }
 

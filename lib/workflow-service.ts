@@ -17,7 +17,7 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonicalServiceStages, caseDocumentTypes, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalPipelineStage, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
+import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonicalServiceStages, caseDocumentTypes, decisionMakerStatuses, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalPipelineStage, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionMakerStatus, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { canCreateCase, generateUtilityEvaluation, lockWorkspace, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
@@ -158,6 +158,77 @@ export function updateCommercialPolicy(input: Record<string, unknown> & { actor:
   state.commercialPolicyHistory.unshift(policy);
   appendTimeline("system", "Commercial policy updated", `${input.actor.fullName} published commercial policy v${policy.version}: ${reason}`, "Commercial", input.actor);
   return policy;
+}
+
+function intakeObject(value: unknown, label: string, allowedFields: readonly string[]) {
+  if (value === undefined || value === null) return undefined;
+  if (typeof value !== "object" || Array.isArray(value)) throw new Error(`${label} must be a structured object.`);
+  const object = value as Record<string, unknown>;
+  const unknown = Object.keys(object).find((key) => !allowedFields.includes(key));
+  if (unknown) throw new Error(`Unknown ${label.toLowerCase()} field: ${unknown}.`);
+  return object;
+}
+
+function optionalIntakeString(value: unknown, label: string, maxLength = 500) {
+  if (value === undefined || value === null || value === "") return undefined;
+  const clean = boundedRequiredString(value, label, maxLength);
+  if (/[\u0000-\u001f\u007f<>]/.test(clean) || /(?:^|\s)(?:[a-z][a-z0-9+.-]*:|www\.)\S*/i.test(clean) || /^(?:\/|\\|\.\.)/.test(clean) || /(?:\/|\\)\.\.(?:\/|\\)/.test(clean)) {
+    throw new Error(`${label} must not contain HTML, a URL, or an embedded data payload.`);
+  }
+  return clean;
+}
+
+export function upsertClientIntake(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  const clientId = boundedRequiredString(input.clientId, "Client ID");
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) throw new Error("Client not found.");
+  if (input.actor.role === "SETTER" && client.assignedSetterId && client.assignedSetterId !== input.actor.id) throw new WorkflowConflictError("Setters may update intake only for clients assigned to them.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const existing = state.clientIntakeProfiles.find((item) => item.clientId === clientId);
+  if (existing?.idempotencyKey === idempotencyKey) return existing;
+  assertExpectedRecordVersion(client, input.expectedRecordVersion);
+  const activeCase = getActiveCaseForClient(state, clientId);
+  if (activeCase && state.reportVersions.some((item) => item.caseId === activeCase.id && item.artifact)) throw new WorkflowConflictError("Client intake is locked by an immutable report. Use formal case rectification before changing intake evidence.");
+
+  const contactInput = intakeObject(input.contactPreference, "Contact preference", ["whatsapp", "preferredLanguage", "preferredContactWindow"]);
+  let whatsapp: string | undefined;
+  if (contactInput?.whatsapp !== undefined && contactInput.whatsapp !== "") {
+    if (typeof contactInput.whatsapp !== "string") throw new Error("WhatsApp number must be text in international format.");
+    whatsapp = contactInput.whatsapp.replace(/[\s()-]/g, "");
+    if (!/^\+[1-9]\d{7,14}$/.test(whatsapp)) throw new Error("WhatsApp number must use valid international E.164 format.");
+  }
+  const contactPreference = contactInput ? { whatsapp, preferredLanguage: optionalIntakeString(contactInput.preferredLanguage, "Preferred language", 80), preferredContactWindow: optionalIntakeString(contactInput.preferredContactWindow, "Preferred contact window", 120) } : undefined;
+
+  const businessInput = intakeObject(input.businessContext, "Business context", ["company", "industry", "designation", "vision"]);
+  const businessContext = businessInput ? { company: optionalIntakeString(businessInput.company, "Company", 160), industry: optionalIntakeString(businessInput.industry, "Industry", 120), designation: optionalIntakeString(businessInput.designation, "Designation", 120), vision: optionalIntakeString(businessInput.vision, "Business vision", 1000) } : undefined;
+  const decisionMakerStatus = input.decisionMakerStatus === undefined || input.decisionMakerStatus === "" ? undefined : enumValue(input.decisionMakerStatus, decisionMakerStatuses, "decision-maker status") as DecisionMakerStatus;
+  const otherDecisionMakers = optionalIntakeString(input.otherDecisionMakers, "Other decision makers", 500);
+
+  const propertyInput = intakeObject(input.propertyContext, "Property context", ["serviceInterest", "propertyType", "propertyStatus", "areaValue", "areaUnit", "cityCountry", "constraints"]);
+  let areaValue: number | undefined;
+  if (propertyInput?.areaValue !== undefined && propertyInput.areaValue !== null && propertyInput.areaValue !== "") {
+    if (typeof propertyInput.areaValue !== "number" || !Number.isFinite(propertyInput.areaValue) || propertyInput.areaValue <= 0 || propertyInput.areaValue > 1_000_000_000) throw new Error("Area must be a finite number greater than zero and no more than 1,000,000,000.");
+    areaValue = propertyInput.areaValue;
+  }
+  const areaUnit = propertyInput ? optionalIntakeString(propertyInput.areaUnit, "Area unit", 40) : undefined;
+  if ((areaValue === undefined) !== (areaUnit === undefined)) throw new Error("Area value and area unit must be provided together.");
+  const serviceInterest = propertyInput?.serviceInterest === undefined || propertyInput.serviceInterest === "" ? undefined : enumValue(propertyInput.serviceInterest, serviceTypes, "service interest") as VastuServiceType;
+  const propertyContext = propertyInput ? { serviceInterest, propertyType: optionalIntakeString(propertyInput.propertyType, "Property type", 120), propertyStatus: optionalIntakeString(propertyInput.propertyStatus, "Property status", 120), areaValue, areaUnit, cityCountry: optionalIntakeString(propertyInput.cityCountry, "City and country", 160), constraints: optionalIntakeString(propertyInput.constraints, "Property constraints", 1000) } : undefined;
+
+  const needsInput = intakeObject(input.needs, "Needs", ["mainChallenge", "desiredOutcome", "urgency"]);
+  const needs = needsInput ? { mainChallenge: optionalIntakeString(needsInput.mainChallenge, "Main challenge", 1000), desiredOutcome: optionalIntakeString(needsInput.desiredOutcome, "Desired outcome", 1000), urgency: optionalIntakeString(needsInput.urgency, "Urgency", 120) } : undefined;
+
+  const consentInput = intakeObject(input.consent, "Consent", ["version", "contact", "accuracy", "confidentiality"]);
+  if (!consentInput || consentInput.version !== "uchit-intake/v1") throw new Error("Consent version must be uchit-intake/v1.");
+  for (const key of ["contact", "accuracy", "confidentiality"] as const) if (consentInput[key] !== undefined && typeof consentInput[key] !== "boolean") throw new Error(`Consent ${key} must be true or false.`);
+  const consentComplete = consentInput.contact === true && consentInput.accuracy === true && consentInput.confidentiality === true;
+  const stamp = audit(input.actor);
+  const profile = { clientId, version: (existing?.version ?? 0) + 1, idempotencyKey, contactPreference, businessContext, decisionMakerStatus, otherDecisionMakers, propertyContext, needs, consent: { version: "uchit-intake/v1" as const, contact: consentInput.contact as boolean | undefined, accuracy: consentInput.accuracy as boolean | undefined, confidentiality: consentInput.confidentiality as boolean | undefined, confirmedAt: consentComplete ? (existing?.consent.confirmedAt ?? stamp.at) : undefined }, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, profile); else state.clientIntakeProfiles.unshift(profile);
+  client.recordVersion = (client.recordVersion ?? 0) + 1;
+  appendTimeline(clientId, "Client intake updated", `${input.actor.fullName} recorded client intake profile version ${profile.version}.`, "CRM", input.actor);
+  return profile;
 }
 
 export function upsertAssessmentObservation(input: Record<string, unknown> & { actor: AppUser }) {

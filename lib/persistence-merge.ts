@@ -4,6 +4,7 @@ const collectionKeys = [
   "clients",
   "pipelineTransitions",
   "commercialPolicyHistory",
+  "clientIntakeProfiles",
   "leadQualifications",
   "commercialProposals",
   "reviewCallBookings",

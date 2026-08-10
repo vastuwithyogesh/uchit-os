@@ -1,6 +1,7 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { CrmWorkbench } from "@/components/crm-workbench";
 import { CrmPipelineBoard } from "@/components/crm-pipeline-board";
+import { ClientIntakeForm } from "@/components/client-intake-form";
 import { CommercialConsole } from "@/components/commercial-console";
 import { LeadInboxConsole } from "@/components/lead-inbox-console";
 import { SiteHeader } from "@/components/site-header";
@@ -67,6 +68,7 @@ export default async function CrmPage() {
       </section>
 
       <CrmPipelineBoard />
+      <ClientIntakeForm />
       <LeadInboxConsole
         leadQualifications={state.leadQualifications}
         proposals={state.commercialProposals}
