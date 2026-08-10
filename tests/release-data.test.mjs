@@ -72,6 +72,15 @@ test("backup preserves revision, hashes canonical state and validates dry-run im
   assert.deepEqual(backup.exclusions, { r2Bytes: true, secrets: true });
 });
 
+test("production backup envelopes remain offline, explicit and hash-verifiable", async () => {
+  const backup = await createStateBackup(sampleState, 23, "production", "2026-08-10T01:00:00.000Z");
+  assert.equal(backup.sourceEnvironment, "production");
+  assert.equal((await validateStateBackup(backup)).stateRevision, 23);
+  const script = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../scripts/state-backup.mjs", import.meta.url), "utf8"));
+  assert.match(script, /acknowledge-production-read-only/);
+  assert.doesNotMatch(script, /fetch\(|persistState|R2\.put/);
+});
+
 test("backup validation rejects tampering, embedded bytes and secrets", async () => {
   const backup = await createStateBackup(sampleState, 0, "local");
   await assert.rejects(() => validateStateBackup({ ...backup, state: { ...backup.state, clients: [{ id: "tampered" }] } }), /hash/);

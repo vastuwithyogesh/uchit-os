@@ -24,7 +24,7 @@ Do not infer these values from technical convenience.
    pnpm build
    ```
 
-4. Record migration versions currently present in `schema_migrations`. Expected application versions are 1, 2, and 3.
+4. Record migration versions currently present in `schema_migrations`. Expected application versions are 1, 2, 3, and 4.
 5. Confirm storage capacity, access roles, maintenance window, communications owner, and rollback decision time.
 
 ## Backup before migration
@@ -45,13 +45,22 @@ pnpm backup:state -- --mode import-dry-run --environment staging --input <BACKUP
 
 Record the printed SHA-256 in the release evidence. The envelope explicitly excludes secrets and R2 bytes.
 
+For an already authenticated production export, the same offline packager accepts the API response envelope only with an explicit read-only acknowledgement:
+
+```text
+pnpm backup:state -- --mode export --environment production --acknowledge-production-read-only true --input <AUTHENTICATED-STATE-EXPORT-JSON> --output <NEW-BACKUP-JSON>
+pnpm backup:state -- --mode import-dry-run --environment production --acknowledge-production-read-only true --input <BACKUP-JSON>
+```
+
+The production mode does not connect to D1 or R2 and has no import or mutation path. It uses the revision embedded in the authenticated export and refuses a conflicting revision argument.
+
 Separately create an R2 inventory using approved provider tooling: object key, size, checksum/custom checksum metadata, and last-modified time. Store the inventory in the protected release-evidence location. R2 recovery requires provider-side versioning or an independently approved bucket copy; the state backup cannot restore file bytes.
 
 ## Staged migration rehearsal
 
 1. Restore a disposable staging clone from the D1 export and the independently protected R2 copy/inventory.
 2. Start the candidate application against only that clone. Application startup applies ordered migrations through `migrateD1`.
-3. Verify `schema_migrations` contains one row each for versions 1, 2, and 3.
+3. Verify `schema_migrations` contains one row each for versions 1, 2, 3, and 4.
 4. Verify `app_state_snapshot.revision` equals its pre-migration value. Migration 2 may initialize revision to zero only for a true v1 database that never had the column.
 5. Verify `case_file_assets` exists with unique `evidence_ref` and `object_key`, the immutable-status constraint, and indexes `idx_case_file_assets_scope` and `idx_case_file_assets_floor`.
 6. Restart the candidate against the same clone and verify migration repeatability: no duplicate markers, schema drift, or revision change.

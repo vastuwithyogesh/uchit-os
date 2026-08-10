@@ -390,6 +390,18 @@ h3,
   font-size: 0.98rem;
 }
 
+.pilot-checklist {
+  display: grid;
+  gap: 12px;
+  margin: 18px 0;
+  padding-left: 24px;
+}
+
+.pilot-checklist li {
+  padding-left: 6px;
+  line-height: 1.6;
+}
+
 .two-col {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
