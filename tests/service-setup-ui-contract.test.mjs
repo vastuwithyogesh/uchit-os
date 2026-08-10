@@ -25,10 +25,12 @@ test("new-construction setup records drawing verification and discrepancy state"
 test("both evaluation actions remain disabled until service inputs are ready", () => {
   const evaluation = source("components/evaluation-console.tsx");
   assert.match(evaluation, /getCaseEvaluationBlockers/);
-  assert.match(evaluation, /evaluationBlockers\.map/);
+  assert.match(evaluation, /evaluationBlockers\.slice\(0, 3\)\.map/);
   assert.match(evaluation, /!snapshotName\.trim\(\)/);
   assert.equal((evaluation.match(/disabled=\{busy \|\| !evaluationReady/g) ?? []).length, 2);
   assert.match(evaluation, /Complete the case setup first/);
-  assert.match(evaluation, /Open case setup/);
+  assert.match(evaluation, /href="\/ops">Complete case setup/);
+  assert.match(evaluation, /evaluationReady \? <div className="card span-4"/);
+  assert.match(evaluation, /View rule master and technical details/);
   assert.match(evaluation, /Review the readiness steps and try again/);
 });

@@ -725,6 +725,12 @@ h3,
   color: var(--text);
 }
 
+.nav-more-heading:not(:first-child) {
+  margin-top: 6px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
 .signed-in-name {
   color: var(--muted);
   font-size: 0.9rem;

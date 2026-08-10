@@ -1,4 +1,3 @@
-import Link from "next/link";
 import type { UserRole } from "@/lib/domain";
 
 export function AccessDeniedPanel({
@@ -29,12 +28,12 @@ export function AccessDeniedPanel({
         </div>
       </div>
       <div className="hero-actions">
-        <Link prefetch={false} href="/" className="button">
+        <a href="/" className="button">
           Return to overview
-        </Link>
-        <Link prefetch={false} href="/crm" className="button-secondary">
+        </a>
+        <a href="/crm" className="button-secondary">
           Open CRM workbench
-        </Link>
+        </a>
       </div>
     </section>
   );
