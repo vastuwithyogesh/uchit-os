@@ -20,7 +20,7 @@ test("rectification is a linked successor and predecessor linkage is not mutated
   assert.doesNotMatch(approve, /predecessor\.supersededByCaseId/);
   assert.match(approve, /artifactStillMatchesBefore/);
   assert.match(approve, /artifactStillMatchesAfter/);
-  assert.doesNotMatch(reports, /parentCaseId|revisionNumber|recordVersion/);
+  assert.doesNotMatch(functionBody(reports, "legacyCanonicalReportPayload"), /parentCaseId|revisionNumber|recordVersion/);
 });
 
 test("successor resets all operational and commercial release gates", () => {

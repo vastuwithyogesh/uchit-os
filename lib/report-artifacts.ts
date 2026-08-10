@@ -19,6 +19,42 @@ function qualificationAnswer(state: AppState, clientId: string | undefined, patt
   return answer || null;
 }
 
+const stableTextOrder = (left: { title: string }, right: { title: string }) => left.title < right.title ? -1 : left.title > right.title ? 1 : 0;
+
+/** Client-safe, revision-bound assessment content used by both the v2 hash and renderer. */
+export function buildClientSafeAssessmentComposition(state: AppState, caseRecord: AppState["vastuCases"][number] | undefined) {
+  if (!caseRecord) return { observations: [], recommendations: [], implementationTasks: [] };
+  const revisionNumber = caseRecord.revisionNumber ?? 1;
+  const serviceType = caseRecord.serviceType;
+  const belongsToReportRevision = (item: { caseId: string; caseRevisionNumber: number; serviceType: string }) =>
+    item.caseId === caseRecord.id && item.caseRevisionNumber === revisionNumber && (!serviceType || item.serviceType === serviceType);
+  return {
+    observations: state.assessmentObservations.filter(belongsToReportRevision).map((item) => ({
+      title: item.title,
+      observation: item.observation,
+      alignmentStatus: item.alignmentStatus,
+      energyStatus: item.energyStatus,
+      placementStatus: item.placementStatus
+    })).sort(stableTextOrder),
+    recommendations: state.recommendations.filter(belongsToReportRevision).map((item) => ({
+      title: item.title,
+      rationale: item.rationale,
+      action: item.action,
+      decisionPriority: item.decisionPriority,
+      attentionClass: item.attentionClass,
+      implementationHorizon: item.implementationHorizon,
+      level: item.level
+    })).sort(stableTextOrder),
+    implementationTasks: state.implementationTasks.filter(belongsToReportRevision).map((item) => ({
+      title: item.title,
+      status: item.status,
+      implementationHorizon: item.implementationHorizon,
+      ownerRole: item.ownerRole,
+      ownerName: item.ownerName
+    })).sort(stableTextOrder)
+  };
+}
+
 export function buildReportComposition(state: AppState, report: ReportVersionRecord) {
   const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
   const client = state.clients.find((item) => item.id === caseRecord?.clientId);
@@ -38,6 +74,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
     status: floor.status,
     evidenceUploads: [...floor.evidenceUploads]
   }));
+  const assessment = buildClientSafeAssessmentComposition(state, caseRecord);
   return {
     report: { id: report.id, caseId: report.caseId, versionLabel: report.versionLabel, isPreview: report.isPreview },
     case: caseRecord ? {
@@ -55,6 +92,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
     floors,
     evaluation: evaluation ?? null,
     shakti: shakti ?? null,
+    assessment,
     templateVersion: REPORT_TEMPLATE_VERSION,
     watermark: report.isPreview ? PREVIEW_WATERMARK : null
   };

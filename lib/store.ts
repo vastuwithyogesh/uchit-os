@@ -25,6 +25,9 @@ import {
   ReviewCallBookingRecord,
   ReportVersionRecord,
   RectificationRequestRecord,
+  AssessmentObservation,
+  Recommendation,
+  ImplementationTask,
   ShaktiSnapshotRecord,
   TimelineEvent,
   UtilityRule,
@@ -47,6 +50,9 @@ export interface AppState {
   floorWorkspaces: FloorWorkspaceRecord[];
   reportVersions: ReportVersionRecord[];
   rectificationRequests: RectificationRequestRecord[];
+  assessmentObservations: AssessmentObservation[];
+  recommendations: Recommendation[];
+  implementationTasks: ImplementationTask[];
   evaluationSnapshots: EvaluationSnapshotRecord[];
   mapping32D: typeof seedMapping32D;
   mapping16D: typeof seedMapping16D;
@@ -69,6 +75,9 @@ const createInitialState = (): AppState => ({
   floorWorkspaces: structuredClone(seedFloorWorkspaces),
   reportVersions: structuredClone(seedReportVersions),
   rectificationRequests: [],
+  assessmentObservations: [],
+  recommendations: [],
+  implementationTasks: [],
   evaluationSnapshots: structuredClone(seedEvaluationSnapshots),
   mapping32D: structuredClone(seedMapping32D),
   mapping16D: structuredClone(seedMapping16D),

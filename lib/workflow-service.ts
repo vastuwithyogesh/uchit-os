@@ -17,7 +17,7 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { canonicalServiceStages, serviceTypes, type CanonicalServiceStage, type CaseDrawingReference, type CaseInputReadiness, type VastuServiceType } from "@/lib/domain";
+import { alignmentStatuses, attentionClasses, canonicalServiceStages, decisionPriorities, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { MIN_ADVANCE_INR, DEFAULT_PROPOSAL_AMOUNT_INR, canCreateCase, generateUtilityEvaluation, lockWorkspace, qualifyLead, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
@@ -73,6 +73,77 @@ export class PreconditionRequiredError extends Error {
 function assertExpectedRecordVersion(caseRecord: { recordVersion?: number }, expectedRecordVersion: unknown) {
   if (!Number.isInteger(expectedRecordVersion) || (expectedRecordVersion as number) < 0) throw new PreconditionRequiredError("The latest case record version is required. Refresh the case and try again.");
   if ((caseRecord.recordVersion ?? 0) !== expectedRecordVersion) throw new WorkflowConflictError("This case changed since it was opened. Refresh the case and retry.");
+}
+
+function enumValue<T extends string>(value: unknown, values: readonly T[], label: string): T {
+  if (typeof value !== "string" || !values.includes(value as T)) throw new Error(`Choose a valid ${label}.`);
+  return value as T;
+}
+
+function boundedRefs(value: unknown, label: string) {
+  if (!Array.isArray(value) || value.length > 40 || value.some((item) => typeof item !== "string" || !item.trim() || item.trim().length > 240)) throw new Error(`${label} must contain at most 40 valid references.`);
+  const refs = value.map((item) => (item as string).trim());
+  if (new Set(refs).size !== refs.length) throw new Error(`${label} must not contain duplicates.`);
+  return refs;
+}
+
+function assessmentContext(caseIdValue: unknown) {
+  const state = getAppState();
+  const caseId = boundedRequiredString(caseIdValue, "Case ID");
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) throw new Error("Case not found.");
+  if (getActiveCaseForClient(state, caseRecord.clientId)?.id !== caseId) throw new WorkflowConflictError("This is not the active case revision. Open the latest revision before recording assessment work.");
+  if (state.reportVersions.some((item) => item.caseId === caseId && item.artifact)) throw new WorkflowConflictError("Assessment work is locked by an immutable report. Start formal rectification to continue.");
+  return { state, caseRecord, caseId, serviceType: normalizeCaseService(caseRecord).serviceType, revisionNumber: caseRecord.revisionNumber ?? 1 };
+}
+
+function audit(actor: AppUser) { return { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, at: nowIso() }; }
+
+export function upsertAssessmentObservation(input: Record<string, unknown> & { actor: AppUser }) {
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.assessmentObservations.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey);
+  if (retry) return retry;
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Observation ID");
+  const existing = recordId ? state.assessmentObservations.find((item) => item.id === recordId && item.caseId === caseId) : undefined;
+  if (recordId && !existing) throw new Error("Observation not found on this case revision.");
+  const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references");
+  if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new observation for different evidence.");
+  const stamp = audit(input.actor);
+  const next = { id: existing?.id ?? nextId("observation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, title: boundedRequiredString(input.title, "Observation title", 160), observation: boundedRequiredString(input.observation, "Observation", 2000), alignmentStatus: enumValue(input.alignmentStatus, alignmentStatuses, "alignment status") as AlignmentStatus, energyStatus: enumValue(input.energyStatus, energyStatuses, "energy status") as EnergyStatus, placementStatus: enumValue(input.placementStatus, placementStatuses, "placement status") as PlacementStatus, evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, next); else state.assessmentObservations.unshift(next);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, existing ? "Assessment observation updated" : "Assessment observation recorded", `${input.actor.fullName} recorded ${next.title} on case revision ${revisionNumber}.`, "Assessment", input.actor);
+  return next;
+}
+
+export function upsertRecommendation(input: Record<string, unknown> & { actor: AppUser }) {
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.recommendations.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey); if (retry) return retry;
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Recommendation ID");
+  const existing = recordId ? state.recommendations.find((item) => item.id === recordId && item.caseId === caseId) : undefined; if (recordId && !existing) throw new Error("Recommendation not found on this case revision.");
+  const observationIds = boundedRefs(input.observationIds, "Observation links");
+  if (observationIds.some((id) => !state.assessmentObservations.some((item) => item.id === id && item.caseId === caseId))) throw new Error("Every observation link must belong to this case revision.");
+  const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references");
+  if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new recommendation for different evidence.");
+  const stamp = audit(input.actor);
+  const next = { id: existing?.id ?? nextId("recommendation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, title: boundedRequiredString(input.title, "Recommendation title", 160), rationale: boundedRequiredString(input.rationale, "Rationale", 2000), action: boundedRequiredString(input.recommendedAction, "Recommended action", 2000), decisionPriority: enumValue(input.decisionPriority, decisionPriorities, "decision priority") as DecisionPriority, attentionClass: enumValue(input.attentionClass, attentionClasses, "attention class") as AttentionClass, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, level: enumValue(input.level, recommendationLevels, "recommendation level") as RecommendationLevel, observationIds, evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, next); else state.recommendations.unshift(next); caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, existing ? "Recommendation updated" : "Recommendation recorded", `${input.actor.fullName} recorded ${next.title} at ${next.level}.`, "Assessment", input.actor); return next;
+}
+
+export function upsertImplementationTask(input: Record<string, unknown> & { actor: AppUser }) {
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120); const retry = state.implementationTasks.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey); if (retry) return retry;
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Implementation task ID"); const existing = recordId ? state.implementationTasks.find((item) => item.id === recordId && item.caseId === caseId) : undefined; if (recordId && !existing) throw new Error("Implementation task not found on this case revision.");
+  const recommendationId = boundedRequiredString(input.recommendationId, "Recommendation ID"); if (!state.recommendations.some((item) => item.id === recommendationId && item.caseId === caseId)) throw new Error("Recommendation must belong to this case revision.");
+  const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references"); if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new task for different evidence."); const stamp = audit(input.actor);
+  const next = { id: existing?.id ?? nextId("implementation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, recommendationId, title: boundedRequiredString(input.title, "Task title", 160), notes: input.notes === undefined || input.notes === "" ? undefined : boundedRequiredString(input.notes, "Task notes", 2000), status: enumValue(input.status, implementationStatuses, "implementation status") as ImplementationStatus, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, next); else state.implementationTasks.unshift(next); caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1; appendTimeline(caseRecord.clientId, existing ? "Implementation task updated" : "Implementation task recorded", `${input.actor.fullName} recorded ${next.title} as ${next.status}.`, "Assessment", input.actor); return next;
 }
 
 export function configureCaseService(input: {

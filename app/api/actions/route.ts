@@ -39,6 +39,9 @@ import {
   recordLeadQualification,
   recordClientOutreachSend,
   requestCaseRectification,
+  upsertAssessmentObservation,
+  upsertRecommendation,
+  upsertImplementationTask,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -54,7 +57,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve"]);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert"]);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -74,6 +77,17 @@ export async function POST(request: Request) {
       rollbackState = structuredClone(latest.state);
       globalRevisionStale = body.expectedRevision !== latest.revision;
       expectedGlobalRevision = latest.revision ?? undefined;
+    }
+
+    const assessmentAllowedFields: Record<string, string[]> = {
+      "assessment-observation-upsert": ["recordId", "title", "observation", "alignmentStatus", "energyStatus", "placementStatus", "evidenceRefs"],
+      "assessment-recommendation-upsert": ["recordId", "title", "rationale", "recommendedAction", "decisionPriority", "attentionClass", "implementationHorizon", "level", "observationIds", "evidenceRefs"],
+      "assessment-implementation-upsert": ["recordId", "recommendationId", "title", "notes", "status", "implementationHorizon", "ownerRole", "ownerName", "evidenceRefs"]
+    };
+    if (assessmentAllowedFields[action]) {
+      const allowed = new Set(["action", "actorRole", "caseId", "idempotencyKey", "expectedRecordVersion", "expectedRevision", ...assessmentAllowedFields[action]]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown assessment field: ${unknown}.` }, { status: 400 });
     }
 
     switch (action) {
@@ -202,6 +216,18 @@ export async function POST(request: Request) {
       case "case-rectification-approve":
         if (actor.role !== "ADMIN" && actor.role !== "SUPER_ADMIN") return deny("Only an administrator can approve rectification.");
         response = { ok: true, result: await approveCaseRectification({ requestId: body.requestId, expectedRecordVersion: body.expectedRecordVersion, actor }) };
+        break;
+      case "assessment-observation-upsert":
+        if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record assessment observations.");
+        response = { ok: true, observation: upsertAssessmentObservation({ ...body, actor }) };
+        break;
+      case "assessment-recommendation-upsert":
+        if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record recommendations.");
+        response = { ok: true, recommendation: upsertRecommendation({ ...body, actor }) };
+        break;
+      case "assessment-implementation-upsert":
+        if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record implementation tasks.");
+        response = { ok: true, task: upsertImplementationTask({ ...body, actor }) };
         break;
       case "floor-create":
         if (!canEditFloorWorkspaces(actor)) {

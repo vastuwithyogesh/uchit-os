@@ -221,6 +221,55 @@ export interface RectificationRequestRecord {
   successorCaseId?: string;
 }
 
+export const alignmentStatuses = ["ALIGNED", "REVIEW", "CONCERN"] as const;
+export type AlignmentStatus = (typeof alignmentStatuses)[number];
+export const energyStatuses = ["BALANCED", "WEAK", "EXCESS", "NA"] as const;
+export type EnergyStatus = (typeof energyStatuses)[number];
+export const placementStatuses = ["SUITABLE", "REVIEW", "RELOCATE", "NA"] as const;
+export type PlacementStatus = (typeof placementStatuses)[number];
+export const decisionPriorities = ["HIGH", "MEDIUM", "LOW"] as const;
+export type DecisionPriority = (typeof decisionPriorities)[number];
+export const attentionClasses = ["IMMEDIATE", "IMPORTANT", "ADVISORY"] as const;
+export type AttentionClass = (typeof attentionClasses)[number];
+export const implementationHorizons = ["IMMEDIATE", "SHORT_TERM", "MEDIUM_TERM", "LONG_TERM"] as const;
+export type ImplementationHorizon = (typeof implementationHorizons)[number];
+export const recommendationLevels = ["L1", "L2", "L3", "L4"] as const;
+export type RecommendationLevel = (typeof recommendationLevels)[number];
+export const implementationStatuses = ["NOT_STARTED", "PLANNED", "IN_PROGRESS", "COMPLETED", "DEFERRED", "NOT_APPLICABLE"] as const;
+export type ImplementationStatus = (typeof implementationStatuses)[number];
+export const responsibilityRoles = ["CLIENT", "CONSULTANT", "ARCHITECT", "STRUCTURAL_ENGINEER", "MEP_ENGINEER", "INTERIOR_DESIGNER", "CONTRACTOR", "SITE_TEAM"] as const;
+export type ResponsibilityRole = (typeof responsibilityRoles)[number];
+
+export interface AssessmentAudit {
+  actorId: string;
+  actorName: string;
+  actorRole: UserRole;
+  at: string;
+}
+
+export interface AssessmentObservation {
+  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+  version: number; idempotencyKey: string; title: string; observation: string;
+  alignmentStatus: AlignmentStatus; energyStatus: EnergyStatus; placementStatus: PlacementStatus;
+  evidenceRefs: readonly string[]; created: AssessmentAudit; updated: AssessmentAudit;
+}
+
+export interface Recommendation {
+  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+  version: number; idempotencyKey: string; title: string; rationale: string; action: string;
+  decisionPriority: DecisionPriority; attentionClass: AttentionClass; implementationHorizon: ImplementationHorizon;
+  level: RecommendationLevel; observationIds: readonly string[]; evidenceRefs: readonly string[];
+  created: AssessmentAudit; updated: AssessmentAudit;
+}
+
+export interface ImplementationTask {
+  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+  version: number; idempotencyKey: string; recommendationId: string; title: string; notes?: string;
+  status: ImplementationStatus; implementationHorizon: ImplementationHorizon; evidenceRefs: readonly string[];
+  ownerRole: ResponsibilityRole; ownerName: string;
+  created: AssessmentAudit; updated: AssessmentAudit;
+}
+
 export interface FloorWorkspaceRecord {
   id: string;
   caseId: string;

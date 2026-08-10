@@ -46,6 +46,13 @@ export function getActiveCaseForClient(state: Pick<AppState, "vastuCases">, clie
     .sort((left, right) => (right.revisionNumber ?? 1) - (left.revisionNumber ?? 1))[0];
 }
 
+export function getCaseAssessmentReadiness(state: AppState, caseId: string) {
+  const observationCount = state.assessmentObservations.filter((item) => item.caseId === caseId).length;
+  const recommendationCount = state.recommendations.filter((item) => item.caseId === caseId).length;
+  const implementationTaskCount = state.implementationTasks.filter((item) => item.caseId === caseId).length;
+  return { observationCount, recommendationCount, implementationTaskCount, readyForStructuredReport: observationCount > 0 && recommendationCount > 0 };
+}
+
 export function serviceTypeLabel(serviceType: VastuServiceType) {
   return serviceType === "NEW_CONSTRUCTION" ? "New construction planning" : "Existing space assessment";
 }
