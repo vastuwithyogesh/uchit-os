@@ -5,5 +5,9 @@ node_modules
 .wrangler
 coverage
 *.log
+data/local-settings.json
+dist
+.vinext
+tsconfig.tsbuildinfo
 site-archive*.tar
 site-archive*.tar.gz

@@ -1,1 +1,0 @@
-function e(e){let t={"Content-Type":`application/json`};return e&&window.location.hostname===`localhost`&&(t[`x-uchit-demo-role`]=e),t}export{e as t};

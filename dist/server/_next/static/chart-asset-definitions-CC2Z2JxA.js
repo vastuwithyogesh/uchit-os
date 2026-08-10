@@ -1,1 +1,0 @@
-var e=[{key:`location`,label:`Location chart`},{key:`angular`,label:`Angular chart`},{key:`brahmsthan`,label:`Brahmsthan chart`},{key:`marma`,label:`Marma chart`},{key:`16d`,label:`16D chart`},{key:`32d`,label:`32D chart`},{key:`hand-grid`,label:`Hand gridded chart`}];export{e as t};

@@ -20,7 +20,7 @@ export async function POST(request: Request) {
       await env.DB.prepare("SELECT 1 as ok").first();
       d1Reachable = true;
     } catch (error) {
-      d1Error = error instanceof Error ? error.message : "D1 check failed";
+      d1Error = "Database check failed. Review protected server logs.";
     }
   }
 
@@ -31,7 +31,7 @@ export async function POST(request: Request) {
       await env.R2.put("healthchecks/settings-test.txt", `checked:${new Date().toISOString()}`);
       r2Reachable = true;
     } catch (error) {
-      r2Error = error instanceof Error ? error.message : "R2 check failed";
+      r2Error = "Protected storage check failed. Review protected server logs.";
     }
   }
 
@@ -42,8 +42,6 @@ export async function POST(request: Request) {
     settings: {
       mode: env.DB || env.R2 ? "sites-persistent" : "local-fallback",
       actor: {
-        fullName: actor.fullName,
-        email: actor.email,
         role: actor.role
       }
     },

@@ -22,8 +22,6 @@ type SettingsTestPayload = {
   settings: {
     mode: string;
     actor: {
-      fullName: string;
-      email: string;
       role: string;
     };
   };
@@ -266,7 +264,7 @@ export function SettingsConsole() {
                 <div className="list-item">
                   <strong>Signed-in actor</strong>
                   <span className="meta">
-                    {testResult.settings.actor.fullName} · {testResult.settings.actor.role}
+                    Signed-in role · {testResult.settings.actor.role}
                   </span>
                 </div>
                 <div className="list-item">

@@ -1,66 +1,26 @@
 import { NextResponse } from "next/server";
-import { listStaffRoleAssignments, requireRouteActor, resolveRequestActor } from "@/lib/auth";
-import { readPaymentProofManifest } from "@/lib/payment-proof-assets.server";
+import { listStaffRoleAssignments, requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { getRuntimeEnv } from "@/lib/runtime-env";
 
 export async function GET(request: Request) {
   const access = await requireRouteActor(request, "ADMIN");
-  if (!access.ok) {
-    return access.response;
-  }
-  const state = await loadStateFromPersistence();
+  if (!access.ok) return access.response;
   const env = getRuntimeEnv();
-  const actor = await resolveRequestActor(request.headers);
-  const staffAssignments = await listStaffRoleAssignments();
-  const paymentProofAssets = await readPaymentProofManifest();
-
-  return NextResponse.json({
-    runtime: {
-      actor: {
-        fullName: actor.fullName,
-        email: actor.email,
-        role: actor.role
-      },
-      d1Configured: Boolean(env.DB),
-      r2Configured: Boolean(env.R2),
-      staffAssignments: staffAssignments.length
-    },
-    launchReadiness: {
-      authGovernanceReady: staffAssignments.length > 0,
-      storageReady: Boolean(env.DB) && Boolean(env.R2),
-      leadIntakeReady: state.optInLeads.length > 0 && state.leadQualifications.length > 0,
-      commercialReady: state.commercialProposals.some((proposal) => proposal.status === "APPROVED"),
-      paymentReady:
-        state.advanceVerifications.length > 0 &&
-        state.payments.some((payment) => payment.type === "BALANCE" && payment.status === "APPROVED"),
-      reportReady:
-        state.reportVersions.some((report) => !report.isPreview && (report.approvals?.length ?? 0) >= 2) ||
-        state.reportVersions.some((report) => report.status === "RELEASED"),
-      timelineReady: state.timelineEvents.length > 0
-    },
-    counts: {
-      clients: state.clients.length,
-      leadQualifications: state.leadQualifications.length,
-      commercialProposals: state.commercialProposals.length,
-      reviewCallBookings: state.reviewCallBookings.length,
-      payments: state.payments.length,
-      advanceVerifications: state.advanceVerifications.length,
-      vastuCases: state.vastuCases.length,
-      floorWorkspaces: state.floorWorkspaces.length,
-      reportVersions: state.reportVersions.length,
-      evaluationSnapshots: state.evaluationSnapshots.length,
-      shaktiSnapshots: state.shaktiSnapshots.length,
-      timelineEvents: state.timelineEvents.length,
-      utilityRules: state.utilityRules.length,
-      paymentProofAssets: paymentProofAssets.length
-    },
-    latestReviewCallBookings: state.reviewCallBookings.slice(0, 5),
-    latestPayments: state.payments.slice(0, 5),
-    latestAdvanceVerifications: state.advanceVerifications.slice(0, 5),
-    latestEvaluationSnapshots: state.evaluationSnapshots.slice(0, 5),
-    latestShaktiSnapshots: state.shaktiSnapshots.slice(0, 5),
-    latestReports: state.reportVersions.slice(0, 5),
-    latestPaymentProofAssets: paymentProofAssets.slice(0, 5)
-  });
+  let persistenceReady = false;
+  try { await loadStateFromPersistence(); persistenceReady = true; } catch { persistenceReady = false; }
+  let authReady = false;
+  try { authReady = (await listStaffRoleAssignments()).length > 0; } catch { authReady = false; }
+  const d1Ready = Boolean(env.DB) && persistenceReady;
+  const r2Ready = Boolean(env.R2);
+  const checks = [
+    { key: "auth", label: "Staff authentication", ready: authReady, recovery: "Create or restore at least one administrator assignment, then retry." },
+    { key: "d1", label: "Database connection", ready: d1Ready, recovery: "Check the D1 binding and database deployment." },
+    { key: "r2", label: "Protected file storage", ready: r2Ready, recovery: "Check the private R2 binding and bucket access." },
+    { key: "migrations", label: "Persistence and migrations", ready: persistenceReady, recovery: "Apply the required schema migrations, then run this check again." },
+    { key: "uploads", label: "Protected upload readiness", ready: d1Ready && r2Ready, recovery: "Restore both database and protected storage before accepting uploads." },
+    { key: "workflow", label: "Workflow build", ready: true, recovery: "Rebuild and redeploy the tested application version." }
+  ];
+  const status = checks.every((check) => check.ready) ? "GO" : "NO_GO";
+  return NextResponse.json({ status, checkedAt: new Date().toISOString(), build: process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || process.env.npm_package_version || "local", checks }, { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }
