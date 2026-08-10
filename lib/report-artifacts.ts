@@ -55,6 +55,26 @@ export function buildClientSafeAssessmentComposition(state: AppState, caseRecord
   };
 }
 
+export function buildVerifiedDocumentComposition(state: AppState, caseRecord: AppState["vastuCases"][number] | undefined) {
+  if (!caseRecord) return [];
+  const revisionNumber = caseRecord.revisionNumber ?? 1;
+  const serviceType = caseRecord.serviceType;
+  return (state.caseDocuments ?? []).filter((item) =>
+    item.caseId === caseRecord.id && item.caseRevisionNumber === revisionNumber && (!serviceType || item.serviceType === serviceType) &&
+    item.isCurrent && item.revisionStatus === "VERIFIED" && Boolean(item.verified) && !item.blocker && !item.discrepancy
+  ).map((item) => ({
+    assetType: item.assetType,
+    floorLabel: item.floorLabel ?? null,
+    versionLabel: item.versionLabel,
+    documentDate: item.documentDate ?? null,
+    verificationStatus: "VERIFIED" as const
+  })).sort((left, right) => {
+    const leftKey = `${left.assetType}\u0000${left.floorLabel ?? ""}\u0000${left.versionLabel}`;
+    const rightKey = `${right.assetType}\u0000${right.floorLabel ?? ""}\u0000${right.versionLabel}`;
+    return leftKey < rightKey ? -1 : leftKey > rightKey ? 1 : 0;
+  });
+}
+
 export function buildReportComposition(state: AppState, report: ReportVersionRecord) {
   const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
   const client = state.clients.find((item) => item.id === caseRecord?.clientId);
@@ -75,6 +95,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
     evidenceUploads: [...floor.evidenceUploads]
   }));
   const assessment = buildClientSafeAssessmentComposition(state, caseRecord);
+  const verifiedDocuments = buildVerifiedDocumentComposition(state, caseRecord);
   return {
     report: { id: report.id, caseId: report.caseId, versionLabel: report.versionLabel, isPreview: report.isPreview },
     case: caseRecord ? {
@@ -93,6 +114,7 @@ export function buildReportComposition(state: AppState, report: ReportVersionRec
     evaluation: evaluation ?? null,
     shakti: shakti ?? null,
     assessment,
+    verifiedDocuments,
     templateVersion: REPORT_TEMPLATE_VERSION,
     watermark: report.isPreview ? PREVIEW_WATERMARK : null
   };

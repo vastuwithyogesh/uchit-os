@@ -17,7 +17,7 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { alignmentStatuses, attentionClasses, canonicalServiceStages, decisionPriorities, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
+import { alignmentStatuses, attentionClasses, canonicalServiceStages, caseDocumentTypes, decisionPriorities, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { MIN_ADVANCE_INR, DEFAULT_PROPOSAL_AMOUNT_INR, canCreateCase, generateUtilityEvaluation, lockWorkspace, qualifyLead, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
@@ -34,7 +34,7 @@ import {
   UTILITY_RULESET_FORMAT_VERSION,
   validateShaktiInputs
 } from "@/lib/evaluation-provenance";
-import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService } from "@/lib/service-framework";
+import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
 
 export class WorkflowConflictError extends Error {
@@ -144,6 +144,40 @@ export function upsertImplementationTask(input: Record<string, unknown> & { acto
   const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references"); if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new task for different evidence."); const stamp = audit(input.actor);
   const next = { id: existing?.id ?? nextId("implementation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, recommendationId, title: boundedRequiredString(input.title, "Task title", 160), notes: input.notes === undefined || input.notes === "" ? undefined : boundedRequiredString(input.notes, "Task notes", 2000), status: enumValue(input.status, implementationStatuses, "implementation status") as ImplementationStatus, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
   if (existing) Object.assign(existing, next); else state.implementationTasks.unshift(next); caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1; appendTimeline(caseRecord.clientId, existing ? "Implementation task updated" : "Implementation task recorded", `${input.actor.fullName} recorded ${next.title} as ${next.status}.`, "Assessment", input.actor); return next;
+}
+
+export function upsertCaseDocument(input: Record<string, unknown> & { actor: AppUser }) {
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.caseDocuments.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey);
+  if (retry) return retry;
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Document ID");
+  const existing = recordId ? state.caseDocuments.find((item) => item.id === recordId && item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType) : undefined;
+  if (recordId && !existing) throw new Error("Document version not found on this case revision.");
+  const assetType = enumValue(input.assetType, caseDocumentTypes, "case document type") as CaseDocumentType;
+  if (!serviceDocumentRequirements[serviceType].includes(assetType)) throw new Error("This document type does not belong to the active case service.");
+  const floorLabel = input.floorLabel === undefined || input.floorLabel === "" ? undefined : boundedRequiredString(input.floorLabel, "Floor label", 120);
+  if (floorLabel && !state.floorWorkspaces.some((item) => item.caseId === caseId && item.floorLabel === floorLabel)) throw new Error("Floor label must identify a floor on this case revision.");
+  const versionLabel = boundedRequiredString(input.versionLabel, "Version label", 120);
+  if (state.caseDocuments.some((item) => item.caseId === caseId && item.id !== existing?.id && item.assetType === assetType && (item.floorLabel ?? "") === (floorLabel ?? "") && item.versionLabel.toLowerCase() === versionLabel.toLowerCase())) throw new WorkflowConflictError("That document version already exists for this requirement and floor.");
+  const evidenceRef = boundedRequiredString(input.evidenceRef, "Evidence reference", 500);
+  if (/^(?:data:|blob:)/i.test(evidenceRef) || /^[a-z][a-z0-9+.-]*:/i.test(evidenceRef) || evidenceRef.includes("..") || evidenceRef.includes("\\") || evidenceRef.startsWith("/")) throw new Error("Evidence reference must be an opaque protected-file reference, not embedded file data or a public path.");
+  if (existing && existing.evidenceRef !== evidenceRef) throw new WorkflowConflictError("Evidence reference is immutable. Add a new document version for a different file.");
+  if (typeof input.isCurrent !== "boolean" || typeof input.blocker !== "boolean") throw new Error("Current and blocker must be true or false.");
+  if (!input.isCurrent && (!existing || existing.isCurrent)) throw new WorkflowConflictError("Every document requirement must retain one current version. Make a replacement current to supersede this version.");
+  const revisionStatus = enumValue(input.revisionStatus, documentRevisionStatuses, "document revision status") as DocumentRevisionStatus;
+  if (revisionStatus === "VERIFIED" && !evidenceRef) throw new Error("A document cannot be verified without evidence.");
+  if (revisionStatus === "SUPERSEDED" && input.isCurrent) throw new Error("A superseded document cannot be current.");
+  const discrepancy = input.discrepancy === undefined || input.discrepancy === "" ? undefined : boundedRequiredString(input.discrepancy, "Discrepancy", 1000);
+  if (revisionStatus === "VERIFIED" && (input.blocker || discrepancy)) throw new WorkflowConflictError("Resolve blockers and discrepancies before verification.");
+  const stamp = audit(input.actor);
+  const next = { id: existing?.id ?? nextId("document"), caseId, caseRevisionNumber: revisionNumber, serviceType, assetType, floorLabel, versionLabel, documentDate: optionalDate(input.documentDate, "Document date"), isCurrent: input.isCurrent as boolean, evidenceRef, discrepancy, blocker: input.blocker as boolean, reviewObservation: input.reviewObservation === undefined || input.reviewObservation === "" ? undefined : boundedRequiredString(input.reviewObservation, "Review observation", 2000), requiredChange: input.requiredChange === undefined || input.requiredChange === "" ? undefined : boundedRequiredString(input.requiredChange, "Required change", 2000), preferredAlternative: input.preferredAlternative === undefined || input.preferredAlternative === "" ? undefined : boundedRequiredString(input.preferredAlternative, "Preferred alternative", 1000), acceptableAlternative: input.acceptableAlternative === undefined || input.acceptableAlternative === "" ? undefined : boundedRequiredString(input.acceptableAlternative, "Acceptable alternative", 1000), ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), revisionStatus, idempotencyKey, version: (existing?.version ?? 0) + 1, received: existing?.received ?? stamp, verified: revisionStatus === "VERIFIED" ? (existing?.verified ?? stamp) : undefined, updated: stamp };
+  if (next.isCurrent) for (const item of state.caseDocuments) if (item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.id !== next.id && item.assetType === assetType && (item.floorLabel ?? "") === (floorLabel ?? "") && item.isCurrent) { item.isCurrent = false; item.revisionStatus = "SUPERSEDED"; item.version += 1; item.updated = stamp; }
+  if (existing) Object.assign(existing, next); else state.caseDocuments.unshift(next);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, existing ? "Case document review updated" : "Case document received", `${input.actor.fullName} recorded ${assetType} ${versionLabel} as ${revisionStatus}.`, "Documents", input.actor);
+  return next;
 }
 
 export function configureCaseService(input: {

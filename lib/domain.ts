@@ -239,6 +239,10 @@ export const implementationStatuses = ["NOT_STARTED", "PLANNED", "IN_PROGRESS", 
 export type ImplementationStatus = (typeof implementationStatuses)[number];
 export const responsibilityRoles = ["CLIENT", "CONSULTANT", "ARCHITECT", "STRUCTURAL_ENGINEER", "MEP_ENGINEER", "INTERIOR_DESIGNER", "CONTRACTOR", "SITE_TEAM"] as const;
 export type ResponsibilityRole = (typeof responsibilityRoles)[number];
+export const caseDocumentTypes = ["DIMENSIONED_PLAN", "LOCATION_MAP", "PHOTO_VIDEO", "ENTRANCE_ACCESS", "CURRENT_USE", "STRUCTURE_SERVICES", "FURNITURE_EQUIPMENT", "CLIENT_PRIORITIES", "SURVEY_BOUNDARY", "ROADS_ACCESS", "DEVELOPMENT_CONTROLS", "INTENT_ROOM_BRIEF", "USER_HIERARCHY_MOVEMENT", "ARCHITECTURAL_DRAWING", "EQUIPMENT_SERVICES", "FUTURE_NEEDS", "PROJECT_TEAM", "MILESTONES"] as const;
+export type CaseDocumentType = (typeof caseDocumentTypes)[number];
+export const documentRevisionStatuses = ["RECEIVED", "UNDER_REVIEW", "CHANGES_REQUIRED", "VERIFIED", "SUPERSEDED"] as const;
+export type DocumentRevisionStatus = (typeof documentRevisionStatuses)[number];
 
 export interface AssessmentAudit {
   actorId: string;
@@ -268,6 +272,15 @@ export interface ImplementationTask {
   status: ImplementationStatus; implementationHorizon: ImplementationHorizon; evidenceRefs: readonly string[];
   ownerRole: ResponsibilityRole; ownerName: string;
   created: AssessmentAudit; updated: AssessmentAudit;
+}
+
+export interface CaseDocumentRecord {
+  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+  assetType: CaseDocumentType; floorLabel?: string; versionLabel: string; documentDate?: string;
+  isCurrent: boolean; evidenceRef: string; discrepancy?: string; blocker: boolean;
+  reviewObservation?: string; requiredChange?: string; preferredAlternative?: string; acceptableAlternative?: string;
+  ownerRole: ResponsibilityRole; ownerName: string; revisionStatus: DocumentRevisionStatus;
+  idempotencyKey: string; version: number; received: AssessmentAudit; verified?: AssessmentAudit; updated: AssessmentAudit;
 }
 
 export interface FloorWorkspaceRecord {

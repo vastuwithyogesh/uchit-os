@@ -1,6 +1,7 @@
 import type {
   CanonicalServiceStage,
   CaseInputReadiness,
+  CaseDocumentType,
   VastuCaseRecord,
   VastuCaseStatus,
   VastuServiceType
@@ -9,6 +10,31 @@ import type { AppState } from "@/lib/store";
 
 export const DEFAULT_SERVICE_TEMPLATE_VERSION = "uchit-service/v2";
 export const DEFAULT_SCOPE_VERSION = "scope/v1";
+
+export const serviceDocumentRequirements: Record<VastuServiceType, readonly CaseDocumentType[]> = {
+  EXISTING_SPACE: ["DIMENSIONED_PLAN", "LOCATION_MAP", "PHOTO_VIDEO", "ENTRANCE_ACCESS", "CURRENT_USE", "STRUCTURE_SERVICES", "FURNITURE_EQUIPMENT", "CLIENT_PRIORITIES"],
+  NEW_CONSTRUCTION: ["SURVEY_BOUNDARY", "ROADS_ACCESS", "DEVELOPMENT_CONTROLS", "INTENT_ROOM_BRIEF", "USER_HIERARCHY_MOVEMENT", "ARCHITECTURAL_DRAWING", "EQUIPMENT_SERVICES", "FUTURE_NEEDS", "PROJECT_TEAM", "MILESTONES"]
+};
+
+export function getCaseDocumentReadiness(state: AppState, caseRecord: VastuCaseRecord) {
+  const serviceType = normalizeCaseService(caseRecord).serviceType;
+  const revisionNumber = caseRecord.revisionNumber ?? 1;
+  const documents = state.caseDocuments.filter((item) => item.caseId === caseRecord.id && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType);
+  const requirementKeys: Array<{ assetType: CaseDocumentType; floorLabel?: string }> = [];
+  for (const assetType of serviceDocumentRequirements[serviceType]) {
+    if (assetType !== "DIMENSIONED_PLAN") requirementKeys.push({ assetType });
+    else {
+      const floors = state.floorWorkspaces.filter((item) => item.caseId === caseRecord.id);
+      if (floors.length) requirementKeys.push(...floors.map((floor) => ({ assetType, floorLabel: floor.floorLabel })));
+      else requirementKeys.push({ assetType });
+    }
+  }
+  const requirements = requirementKeys.map(({ assetType, floorLabel }) => {
+    const document = documents.find((item) => item.assetType === assetType && item.isCurrent && (floorLabel === undefined || item.floorLabel === floorLabel));
+    return { assetType, floorLabel, ready: Boolean(document && document.revisionStatus === "VERIFIED" && document.verified && !document.blocker && !document.discrepancy), document };
+  });
+  return { serviceType, requirements, ready: requirements.every((item) => item.ready) };
+}
 
 export type ServiceReadinessItem = {
   key: keyof CaseInputReadiness | "currentDrawingVerified";
@@ -116,6 +142,11 @@ export function getCaseEvaluationBlockers(state: AppState, caseId: string) {
   const blockers: string[] = [];
   if (!caseRecord.orientationLocked) blockers.push("Lock the orientation after completing direction verification.");
   if (state.reportVersions.some((report) => report.caseId === caseId && report.artifact)) blockers.push("An immutable report already exists. Start the formal rectification workflow before creating new evidence.");
+  const documentReadiness = getCaseDocumentReadiness(state, caseRecord);
+  if (!documentReadiness.ready) {
+    const missing = documentReadiness.requirements.filter((item) => !item.ready).map((item) => item.floorLabel ? `${item.assetType} (${item.floorLabel})` : item.assetType).join(", ");
+    blockers.push(`Verify the current required case documents before evaluation: ${missing}.`);
+  }
 
   const readiness = getServiceReadiness(caseRecord);
   if (!readiness.ready) {

@@ -28,6 +28,7 @@ import {
   AssessmentObservation,
   Recommendation,
   ImplementationTask,
+  CaseDocumentRecord,
   ShaktiSnapshotRecord,
   TimelineEvent,
   UtilityRule,
@@ -53,6 +54,7 @@ export interface AppState {
   assessmentObservations: AssessmentObservation[];
   recommendations: Recommendation[];
   implementationTasks: ImplementationTask[];
+  caseDocuments: CaseDocumentRecord[];
   evaluationSnapshots: EvaluationSnapshotRecord[];
   mapping32D: typeof seedMapping32D;
   mapping16D: typeof seedMapping16D;
@@ -78,6 +80,7 @@ const createInitialState = (): AppState => ({
   assessmentObservations: [],
   recommendations: [],
   implementationTasks: [],
+  caseDocuments: [],
   evaluationSnapshots: structuredClone(seedEvaluationSnapshots),
   mapping32D: structuredClone(seedMapping32D),
   mapping16D: structuredClone(seedMapping16D),

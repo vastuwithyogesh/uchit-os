@@ -14,6 +14,7 @@ const collectionKeys = [
   "assessmentObservations",
   "recommendations",
   "implementationTasks",
+  "caseDocuments",
   "evaluationSnapshots",
   "mapping32D",
   "mapping16D",

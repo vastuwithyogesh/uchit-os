@@ -12,7 +12,7 @@ function fixture() {
     commercialProposals: [], reviewCallBookings: [], payments: [], advanceVerifications: [],
     vastuCases: [{ id: "case-1", caseNumber: "UV-1", clientId: "client-1", proposalId: "proposal-1", status: "ORIENTATION_LOCKED", reportStatus: "DRAFT", orientationLocked: true, balanceApproved: false, fullPaymentApproved: false, serviceType: "EXISTING_SPACE", canonicalStage: "EVALUATE", serviceTemplateVersion: "uchit-service/v2", scopeVersion: "scope/v1", currentDrawing: { versionLabel: "Plan A", verifiedAt: "2026-01-01", superseded: false } }],
     floorWorkspaces: [{ id: "floor-1", caseId: "case-1", floorLabel: "Ground floor", status: "LOCKED", locked: true, evidenceUploads: ["plan.png"] }],
-    assessmentObservations: [], recommendations: [], implementationTasks: [],
+    assessmentObservations: [], recommendations: [], implementationTasks: [], caseDocuments: [],
     reportVersions: [],
     evaluationSnapshots: [{ id: "eval-1", caseId: "case-1", snapshotName: "Evaluation", sourceVersion: "rules/v1", generatedMatrix: [{ code: "N", verdict: "GOOD", confidence: 90 }] }],
     mapping32D: [], mapping16D: [], utilityRules: [], shaktiSnapshots: [], timelineEvents: [], optInLeads: [], whatsappTemplates: [], whatsappLogs: []
@@ -40,6 +40,34 @@ test("v2 report integrity fails closed when any rendered mutable input changes",
     if (mutate === mutations[3]) isolated.vastuCases[0].currentDrawing.versionLabel = "Plan B";
     assert.equal(await artifactStillMatches(isolated, isolatedReport), false);
   }
+});
+
+test("v2 includes only verified current document summaries and no private document metadata", async () => {
+  const state = fixture();
+  const report = { id: "report-v2-documents", caseId: "case-1", versionLabel: "Final", isPreview: false, status: "READY_FOR_APPROVAL", approvals: [] };
+  const audit = { actorId: "private-reviewer", actorName: "Private Reviewer", actorRole: "CONSULTANT", at: "2026-01-02T00:00:00.000Z" };
+  const document = { id: "doc-1", caseId: "case-1", caseRevisionNumber: 1, serviceType: "EXISTING_SPACE", assetType: "DIMENSIONED_PLAN", floorLabel: "Ground floor", versionLabel: "Plan 2", documentDate: "2026-01-01T00:00:00.000Z", isCurrent: true, evidenceRef: "private/documents/opaque-1", blocker: false, reviewObservation: "PRIVATE REVIEW NOTE", ownerRole: "ARCHITECT", ownerName: "Private owner", revisionStatus: "VERIFIED", idempotencyKey: "private-document-key", version: 1, received: audit, verified: audit, updated: audit };
+  state.caseDocuments.push(document);
+  const baseline = await sha256Hex(canonicalReportPayload(state, report));
+  const serialized = JSON.stringify(canonicalReportPayload(state, report));
+  assert.match(serialized, /DIMENSIONED_PLAN/);
+  assert.match(serialized, /Plan 2/);
+  assert.doesNotMatch(serialized, /private-reviewer|Private Reviewer|PRIVATE REVIEW NOTE|private\/documents|Private owner|private-document-key/);
+  const html = renderPrintableReport(state, report);
+  assert.match(html, /Verified document versions/);
+  assert.match(html, /Plan 2/);
+  assert.doesNotMatch(html, /private-reviewer|Private Reviewer|PRIVATE REVIEW NOTE|private\/documents|Private owner|private-document-key/);
+
+  document.reviewObservation = "Changed private note";
+  document.evidenceRef = "private/documents/opaque-2";
+  assert.equal(await sha256Hex(canonicalReportPayload(state, report)), baseline);
+  document.versionLabel = "Plan 3";
+  assert.notEqual(await sha256Hex(canonicalReportPayload(state, report)), baseline);
+  document.versionLabel = "Plan 2";
+  state.caseDocuments.push({ ...document, id: "doc-old", versionLabel: "Plan 1", isCurrent: false, revisionStatus: "SUPERSEDED", verified: undefined });
+  state.caseDocuments.push({ ...document, id: "doc-other-revision", caseRevisionNumber: 2, versionLabel: "Wrong revision" });
+  state.caseDocuments.push({ ...document, id: "doc-other-case", caseId: "case-other", versionLabel: "Wrong case" });
+  assert.equal(await sha256Hex(canonicalReportPayload(state, report)), baseline);
 });
 
 test("v2 canonical input is revision-bound, deterministic, and excludes private assessment metadata", async () => {

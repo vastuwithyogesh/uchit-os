@@ -31,6 +31,7 @@ export default async function EvaluationPage() {
           <span className="pill">±2 tie-break support</span>
         </div>
         <div className="hero-actions" style={{ marginTop: 14 }}>
+          <a href="/files" className="button">Open files and drawings</a>
           <a href="/assessment" className="button">Open assessment workspace</a>
           <a href="/assets" className="button">
             Open chart uploads

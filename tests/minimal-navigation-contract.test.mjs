@@ -13,7 +13,7 @@ test("the main navigation has one clear destination and an accessible More menu"
 
 test("navigation labels use plain language", () => {
   const policy = source("lib/access-policy.ts");
-  for (const label of ["My Case", "Workspace", "Clients", "History", "Case Setup", "Files", "Payments", "System Check"]) {
+  for (const label of ["My Case", "Workspace", "Clients", "History", "Case Setup", "Files & Drawings", "Report Charts", "Payments", "System Check"]) {
     assert.match(policy, new RegExp(`label: "${label}"`));
   }
   assert.doesNotMatch(policy, /label: "(?:CRM workbench|Ops|Proofs|Diagnostics|Integrity|State|Bootstrap)"/);

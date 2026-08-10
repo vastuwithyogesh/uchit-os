@@ -42,6 +42,7 @@ import {
   upsertAssessmentObservation,
   upsertRecommendation,
   upsertImplementationTask,
+  upsertCaseDocument,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -57,7 +58,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert"]);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert"]);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -83,6 +84,7 @@ export async function POST(request: Request) {
       "assessment-observation-upsert": ["recordId", "title", "observation", "alignmentStatus", "energyStatus", "placementStatus", "evidenceRefs"],
       "assessment-recommendation-upsert": ["recordId", "title", "rationale", "recommendedAction", "decisionPriority", "attentionClass", "implementationHorizon", "level", "observationIds", "evidenceRefs"],
       "assessment-implementation-upsert": ["recordId", "recommendationId", "title", "notes", "status", "implementationHorizon", "ownerRole", "ownerName", "evidenceRefs"]
+      ,"case-document-upsert": ["recordId", "assetType", "floorLabel", "versionLabel", "documentDate", "isCurrent", "evidenceRef", "discrepancy", "blocker", "reviewObservation", "requiredChange", "preferredAlternative", "acceptableAlternative", "ownerRole", "ownerName", "revisionStatus"]
     };
     if (assessmentAllowedFields[action]) {
       const allowed = new Set(["action", "actorRole", "caseId", "idempotencyKey", "expectedRecordVersion", "expectedRevision", ...assessmentAllowedFields[action]]);
@@ -228,6 +230,10 @@ export async function POST(request: Request) {
       case "assessment-implementation-upsert":
         if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record implementation tasks.");
         response = { ok: true, task: upsertImplementationTask({ ...body, actor }) };
+        break;
+      case "case-document-upsert":
+        if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record and verify case documents.");
+        response = { ok: true, document: upsertCaseDocument({ ...body, actor }) };
         break;
       case "floor-create":
         if (!canEditFloorWorkspaces(actor)) {
