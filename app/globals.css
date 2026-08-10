@@ -834,6 +834,7 @@ h3,
   .topbar {
     position: static;
     gap: 12px;
+    backdrop-filter: none;
   }
 
   .brand-copy .meta {

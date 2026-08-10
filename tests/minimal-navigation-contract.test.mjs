@@ -18,6 +18,7 @@ test("the mobile menu stays above browser controls and remains scrollable", () =
   assert.match(css, /z-index:\s*1000/);
   assert.match(css, /overflow-y:\s*auto/);
   assert.match(css, /overscroll-behavior:\s*contain/);
+  assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.topbar\s*\{[\s\S]*?backdrop-filter:\s*none/);
   assert.match(css, /\.nav-more\[open\] > summary\s*\{[\s\S]*?position:\s*fixed[\s\S]*?z-index:\s*1001/);
   assert.match(css, /@media \(max-width: 560px\)[\s\S]*?\.nav-more-menu\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
 });
