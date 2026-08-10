@@ -26,6 +26,7 @@ import {
   createVastuCase,
   bookReviewCall,
   completeReviewCall,
+  configureCaseService,
   generatePreviewReport,
   getClientSnapshot,
   lockOrientation,
@@ -153,6 +154,29 @@ export async function POST(request: Request) {
         }
         response = { ok: true, result: lockOrientation(body.caseId, body.reason, actor) };
         break;
+      case "case-service-configure":
+        if (!canEvaluateCases(actor)) {
+          return deny("Only a consultant or administrator can update service setup.");
+        }
+        {
+          const allowedFields = new Set(["action", "actorRole", "caseId", "serviceType", "canonicalStage", "serviceTemplateVersion", "scopeVersion", "inputReadiness", "currentDrawing"]);
+          const unknownField = Object.keys(body).find((key) => !allowedFields.has(key));
+          if (unknownField) return NextResponse.json({ ok: false, error: `Unknown service setup field: ${unknownField}.` }, { status: 400 });
+        }
+        response = {
+          ok: true,
+          caseRecord: configureCaseService({
+            caseId: body.caseId,
+            serviceType: body.serviceType,
+            canonicalStage: body.canonicalStage,
+            serviceTemplateVersion: body.serviceTemplateVersion,
+            scopeVersion: body.scopeVersion,
+            inputReadiness: body.inputReadiness,
+            currentDrawing: body.currentDrawing,
+            actor
+          })
+        };
+        break;
       case "floor-create":
         if (!canEditFloorWorkspaces(actor)) {
           return deny("This role cannot create floor workspaces.");
@@ -243,7 +267,7 @@ export async function POST(request: Request) {
         if (!canEvaluateCases(actor)) {
           return deny("This role cannot run or save Shakti evaluations.");
         }
-        response = { ok: true, ranking: rankShaktiValues(body.values ?? []), snapshot: body.caseId ? recordShaktiSnapshot(body.caseId, body.values ?? []) : null };
+        response = { ok: true, ranking: rankShaktiValues(body.values ?? []), snapshot: body.caseId ? recordShaktiSnapshot(body.caseId, body.values ?? [], actor) : null };
         break;
       case "utility-evaluate":
         if (!canEvaluateCases(actor)) {
@@ -251,7 +275,7 @@ export async function POST(request: Request) {
         }
         response = {
           ok: true,
-          snapshot: createEvaluationSnapshot(body.caseId, body.snapshotName, body.zoneCodes ?? [])
+          snapshot: createEvaluationSnapshot(body.caseId, body.snapshotName, body.zoneCodes, actor)
         };
         break;
       case "whatsapp-send":
@@ -304,6 +328,7 @@ export async function POST(request: Request) {
     return NextResponse.json(response);
   } catch (error) {
     const message = error instanceof Error ? error.message : "Unexpected error";
-    return NextResponse.json({ ok: false, error: message }, { status: 400 });
+    const status = error && typeof error === "object" && "statusCode" in error && error.statusCode === 409 ? 409 : 400;
+    return NextResponse.json({ ok: false, error: message }, { status });
   }
 }

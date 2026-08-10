@@ -318,6 +318,8 @@ export interface TimelineEvent {
   details: string;
   happenedAt: string;
   actorRole?: UserRole;
+  actorId?: string;
+  actorName?: string;
 }
 
 export interface WhatsAppTemplateRecord {

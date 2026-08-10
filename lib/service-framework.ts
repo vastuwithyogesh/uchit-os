@@ -5,6 +5,7 @@ import type {
   VastuCaseStatus,
   VastuServiceType
 } from "@/lib/domain";
+import type { AppState } from "@/lib/store";
 
 export const DEFAULT_SERVICE_TEMPLATE_VERSION = "uchit-service/v2";
 export const DEFAULT_SCOPE_VERSION = "scope/v1";
@@ -85,4 +86,43 @@ export function getServiceReadiness(caseRecord: VastuCaseRecord) {
   const checklist = getServiceReadinessChecklist(caseRecord);
   const completed = checklist.filter((item) => item.ready).length;
   return { checklist, completed, total: checklist.length, ready: completed === checklist.length };
+}
+
+export class CaseReadinessError extends Error {
+  readonly statusCode = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "CaseReadinessError";
+  }
+}
+
+export function getCaseEvaluationBlockers(state: AppState, caseId: string) {
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) return ["Case not found. Return to the case workspace and select a valid case."];
+  const blockers: string[] = [];
+  if (!caseRecord.orientationLocked) blockers.push("Lock the orientation after completing direction verification.");
+  if (state.reportVersions.some((report) => report.caseId === caseId)) blockers.push("A report already exists. Start the formal rectification workflow before creating new evidence.");
+
+  const readiness = getServiceReadiness(caseRecord);
+  if (!readiness.ready) {
+    const missing = readiness.checklist.filter((item) => !item.ready).map((item) => item.label).join(", ");
+    blockers.push(`Complete required information in Service setup: ${missing}.`);
+  }
+
+  const floors = state.floorWorkspaces.filter((floor) => floor.caseId === caseId);
+  if (!floors.length) blockers.push("Add at least one floor workspace and lock it.");
+  else if (floors.some((floor) => !floor.locked)) blockers.push("Lock every floor workspace after review.");
+
+  return blockers;
+}
+
+export function assertCaseReadyForEvaluation(state: AppState, caseId: string) {
+  const blockers = getCaseEvaluationBlockers(state, caseId);
+  if (blockers.length) throw new CaseReadinessError(`Evaluation is blocked. ${blockers.join(" ")}`);
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId)!;
+  const readiness = getServiceReadiness(caseRecord);
+  const floors = state.floorWorkspaces.filter((floor) => floor.caseId === caseId);
+
+  return { caseRecord, floors, readiness };
 }

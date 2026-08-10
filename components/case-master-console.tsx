@@ -2,7 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import type { AppState } from "@/lib/store";
-import { canonicalStageLabel, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import type { CanonicalServiceStage, CaseInputReadiness, VastuServiceType } from "@/lib/domain";
+import { canonicalStageLabel, getServiceReadiness, getServiceReadinessChecklist, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import { buildActionHeaders } from "@/lib/request-helpers";
+import { useSession } from "@/components/session-provider";
 
 type ChartAssetSummaryPayload = {
   summary: {
@@ -29,12 +32,30 @@ async function fetchChartSummary() {
   return response.json() as Promise<ChartAssetSummaryPayload>;
 }
 
+async function postAction(payload: Record<string, unknown>, role: string) {
+  const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(role as never), body: JSON.stringify(payload) });
+  const result = await response.json();
+  if (!response.ok || result.ok === false) throw new Error(typeof result.error === "string" ? result.error : result.error?.message ?? "The service setup could not be saved. Review the fields and try again.");
+  return result;
+}
+
 export function CaseMasterConsole() {
+  const { activeUser } = useSession();
   const [state, setState] = useState<AppState | null>(null);
   const [assetSummary, setAssetSummary] = useState<ChartAssetSummaryPayload["summary"] | null>(null);
   const [selectedClientId, setSelectedClientId] = useState("");
   const [message, setMessage] = useState("Loading the latest case snapshot...");
   const [busy, setBusy] = useState(false);
+  const [dirty, setDirty] = useState(false);
+  const [serviceType, setServiceType] = useState<VastuServiceType>("EXISTING_SPACE");
+  const [canonicalStage, setCanonicalStage] = useState<CanonicalServiceStage>("UNDERSTAND");
+  const [serviceTemplateVersion, setServiceTemplateVersion] = useState("uchit-service/v2");
+  const [scopeVersion, setScopeVersion] = useState("scope/v1");
+  const [inputReadiness, setInputReadiness] = useState<CaseInputReadiness>({});
+  const [drawingVersion, setDrawingVersion] = useState("");
+  const [drawingVerifiedAt, setDrawingVerifiedAt] = useState("");
+  const [drawingDiscrepancy, setDrawingDiscrepancy] = useState("");
+  const [drawingSuperseded, setDrawingSuperseded] = useState(false);
 
   async function refresh(preferredClientId?: string) {
     setBusy(true);
@@ -67,6 +88,47 @@ export function CaseMasterConsole() {
   const timeline = state?.timelineEvents.filter((item) => item.clientId === selectedClient?.id) ?? [];
   const service = caseRecord ? normalizeCaseService(caseRecord) : null;
   const serviceReadiness = caseRecord ? getServiceReadiness(caseRecord) : null;
+  const draftCase = caseRecord ? { ...caseRecord, serviceType, canonicalStage, serviceTemplateVersion, scopeVersion, inputReadiness, currentDrawing: serviceType === "NEW_CONSTRUCTION" ? { versionLabel: drawingVersion, verifiedAt: drawingVerifiedAt || undefined, discrepancy: drawingDiscrepancy || undefined, superseded: drawingSuperseded } : undefined } : null;
+  const draftChecklist = draftCase ? getServiceReadinessChecklist(draftCase) : [];
+
+  useEffect(() => {
+    if (!caseRecord) return;
+    const profile = normalizeCaseService(caseRecord);
+    setServiceType(profile.serviceType);
+    setCanonicalStage(profile.canonicalStage);
+    setServiceTemplateVersion(profile.serviceTemplateVersion);
+    setScopeVersion(profile.scopeVersion);
+    setInputReadiness(caseRecord.inputReadiness ?? {});
+    setDrawingVersion(caseRecord.currentDrawing?.versionLabel ?? "");
+    setDrawingVerifiedAt(caseRecord.currentDrawing?.verifiedAt?.slice(0, 10) ?? "");
+    setDrawingDiscrepancy(caseRecord.currentDrawing?.discrepancy ?? "");
+    setDrawingSuperseded(Boolean(caseRecord.currentDrawing?.superseded));
+    setDirty(false);
+  }, [caseRecord?.id, caseRecord?.serviceType, caseRecord?.canonicalStage, caseRecord?.serviceTemplateVersion, caseRecord?.scopeVersion, caseRecord?.inputReadiness, caseRecord?.currentDrawing]);
+
+  function changeService(next: VastuServiceType) {
+    if (next === serviceType) return;
+    if (Object.values(inputReadiness).some(Boolean) && !window.confirm("Changing the service clears the current readiness checklist because the required inputs are different. Continue?")) return;
+    setServiceType(next);
+    setInputReadiness({});
+    setDirty(true);
+  }
+
+  async function saveServiceSetup() {
+    if (!caseRecord) return;
+    setBusy(true);
+    setMessage("Saving service setup...");
+    try {
+      await postAction({ action: "case-service-configure", caseId: caseRecord.id, serviceType, canonicalStage, serviceTemplateVersion, scopeVersion, inputReadiness, currentDrawing: serviceType === "NEW_CONSTRUCTION" ? { versionLabel: drawingVersion, verifiedAt: drawingVerifiedAt || undefined, discrepancy: drawingDiscrepancy || undefined, superseded: drawingSuperseded } : undefined }, activeUser.role);
+      await refresh(selectedClient?.id);
+      setDirty(false);
+      setMessage("Service setup saved. Evaluation readiness has been refreshed.");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "The service setup could not be saved. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
 
   const snapshotChecklist = useMemo(
     () => [
@@ -153,24 +215,20 @@ export function CaseMasterConsole() {
 
       <div className="card span-12">
         <div className="eyebrow">Service setup</div>
-        <h3>{service ? serviceTypeLabel(service.serviceType) : "Open the case to choose a service"}</h3>
+        <h3>{service ? "Choose the service and confirm its required inputs" : "Open the case to choose a service"}</h3>
         {service && serviceReadiness ? (
           <>
-            <p className="subtle">Current stage: <strong>{canonicalStageLabel(service.canonicalStage)}</strong>. Inputs ready: {serviceReadiness.completed} of {serviceReadiness.total}.</p>
-            <div className="pill-row" aria-label="Service versions">
-              <span className="pill">Service template {service.serviceTemplateVersion}</span>
-              <span className="pill">Scope {service.scopeVersion}</span>
-              {caseRecord?.currentDrawing?.versionLabel ? <span className="pill">Drawing {caseRecord.currentDrawing.versionLabel}</span> : null}
+            <p className="subtle">Saved service: <strong>{serviceTypeLabel(service.serviceType)}</strong>. Current stage: <strong>{canonicalStageLabel(service.canonicalStage)}</strong>. Saved inputs ready: {serviceReadiness.completed} of {serviceReadiness.total}.</p>
+            <div className="two-col" style={{ marginTop: 14 }}>
+              <div className="field"><label htmlFor="service-type">Service</label><select id="service-type" value={serviceType} onChange={(event) => changeService(event.target.value as VastuServiceType)} disabled={busy}><option value="EXISTING_SPACE">Existing space assessment</option><option value="NEW_CONSTRUCTION">New construction planning</option></select></div>
+              <div className="field"><label htmlFor="service-stage">Current stage</label><select id="service-stage" value={canonicalStage} onChange={(event) => { setCanonicalStage(event.target.value as CanonicalServiceStage); setDirty(true); }} disabled={busy}>{(["UNDERSTAND", "VERIFY", "MAP", "EVALUATE", "PRIORITISE", "RECOMMEND", "IMPLEMENT"] as CanonicalServiceStage[]).map((stage) => <option value={stage} key={stage}>{canonicalStageLabel(stage)}</option>)}</select></div>
+              <div className="field"><label htmlFor="service-template-version">Service template version</label><input id="service-template-version" value={serviceTemplateVersion} onChange={(event) => { setServiceTemplateVersion(event.target.value); setDirty(true); }} disabled={busy} /></div>
+              <div className="field"><label htmlFor="scope-version">Scope version</label><input id="scope-version" value={scopeVersion} onChange={(event) => { setScopeVersion(event.target.value); setDirty(true); }} disabled={busy} /></div>
             </div>
-            <div className="list" style={{ marginTop: 14 }}>
-              {serviceReadiness.checklist.map((item) => (
-                <div className="list-item" key={item.key}>
-                  <strong>{item.label}</strong>
-                  <span className={`tag ${item.ready ? "good" : "warn"}`}>{item.ready ? "Ready" : "Needed"}</span>
-                  <span className="meta">{item.ready ? "Confirmed for this case" : item.guidance}</span>
-                </div>
-              ))}
-            </div>
+            <fieldset className="panel" style={{ marginTop: 14 }}><legend><strong>Required information</strong></legend>{draftChecklist.filter((item) => item.key !== "currentDrawingVerified").map((item) => <label key={item.key} className="list-item"><span><input type="checkbox" checked={Boolean(inputReadiness[item.key as keyof CaseInputReadiness])} onChange={(event) => { setInputReadiness((current) => ({ ...current, [item.key]: event.target.checked })); setDirty(true); }} disabled={busy} /> <strong>{item.label}</strong></span><span className="meta">{item.guidance}</span></label>)}</fieldset>
+            {serviceType === "NEW_CONSTRUCTION" ? <fieldset className="panel" style={{ marginTop: 14 }}><legend><strong>Current drawing</strong></legend><div className="two-col"><div className="field"><label htmlFor="drawing-version">Drawing version</label><input id="drawing-version" value={drawingVersion} onChange={(event) => { setDrawingVersion(event.target.value); setDirty(true); }} disabled={busy} /></div><div className="field"><label htmlFor="drawing-verified-at">Verified date</label><input id="drawing-verified-at" type="date" value={drawingVerifiedAt} onChange={(event) => { setDrawingVerifiedAt(event.target.value); setDirty(true); }} disabled={busy} /></div></div><div className="field" style={{ marginTop: 10 }}><label htmlFor="drawing-discrepancy">Unresolved discrepancy</label><textarea id="drawing-discrepancy" value={drawingDiscrepancy} onChange={(event) => { setDrawingDiscrepancy(event.target.value); setDirty(true); }} disabled={busy} placeholder="Leave blank when the drawing is verified and consistent." /></div><label className="list-item"><span><input type="checkbox" checked={drawingSuperseded} onChange={(event) => { setDrawingSuperseded(event.target.checked); setDirty(true); }} disabled={busy} /> <strong>This drawing has been replaced</strong></span><span className="meta">Superseded drawings cannot make the case ready.</span></label></fieldset> : null}
+            <div className="workflow" style={{ marginTop: 14 }}><button type="button" className="button" onClick={saveServiceSetup} disabled={busy || !dirty} aria-busy={busy}>{busy ? "Saving..." : "Save service setup"}</button><span className={`tag ${dirty ? "warn" : "good"}`}>{dirty ? "Unsaved changes" : "Saved"}</span><span className="meta">Current form readiness: {draftChecklist.filter((item) => item.ready).length} of {draftChecklist.length}</span></div>
+            <details style={{ marginTop: 14 }}><summary>Saved readiness status</summary><div className="list">{serviceReadiness.checklist.map((item) => <div className="list-item" key={item.key}><strong>{item.label}</strong><span className={`tag ${item.ready ? "good" : "warn"}`}>{item.ready ? "Ready" : "Needed"}</span></div>)}</div></details>
           </>
         ) : <p className="subtle">Service details and the correct readiness checklist appear after the advance is approved and the case is opened.</p>}
       </div>

@@ -38,9 +38,10 @@ test("case setup and staff workspace expose service, stage, readiness, and versi
   const workspace = source("lib/case-workspace.ts");
   const workspaceUi = source("components/case-workspace.tsx");
   assert.match(master, /Service setup/);
-  assert.match(master, /Current stage:/);
+  assert.match(master, /Current stage/);
   assert.match(master, /Service template/);
-  assert.match(master, /serviceReadiness\.checklist\.map/);
+  assert.match(master, /const draftChecklist = draftCase \? getServiceReadinessChecklist\(draftCase\) : \[\]/);
+  assert.match(master, /Required information/);
   assert.match(workspace, /serviceType: serviceTypeLabel/);
   assert.match(workspace, /canonicalStage: canonicalStageLabel/);
   assert.match(workspace, /inputs ready/);

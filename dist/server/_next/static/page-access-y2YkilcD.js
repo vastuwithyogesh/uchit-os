@@ -1,0 +1,1 @@
+import{l as e}from"./headers-vasxVCva.js";import{E as t,o as n}from"./auth-DgI-DxVa.js";function r(e,n){return t.indexOf(e)>=t.indexOf(n)}async function i(t){let i=await n(await e());return{actor:i,allowed:r(i.role,t)}}export{i as t};

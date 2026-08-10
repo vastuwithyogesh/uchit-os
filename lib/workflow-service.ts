@@ -17,6 +17,7 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
+import { canonicalServiceStages, serviceTypes, type CanonicalServiceStage, type CaseDrawingReference, type CaseInputReadiness, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { MIN_ADVANCE_INR, DEFAULT_PROPOSAL_AMOUNT_INR, canCreateCase, generateUtilityEvaluation, lockWorkspace, qualifyLead, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
@@ -33,6 +34,109 @@ import {
   UTILITY_RULESET_FORMAT_VERSION,
   validateShaktiInputs
 } from "@/lib/evaluation-provenance";
+import { assertCaseReadyForEvaluation, getServiceReadinessChecklist, normalizeCaseService } from "@/lib/service-framework";
+
+export class WorkflowConflictError extends Error {
+  readonly statusCode = 409;
+
+  constructor(message: string) {
+    super(message);
+    this.name = "WorkflowConflictError";
+  }
+}
+
+const MAX_VERSION_LENGTH = 80;
+const MAX_DISCREPANCY_LENGTH = 500;
+const MAX_SNAPSHOT_NAME_LENGTH = 120;
+
+function boundedRequiredString(value: unknown, label: string, maxLength = MAX_VERSION_LENGTH) {
+  if (typeof value !== "string" || !value.trim() || value.trim().length > maxLength) {
+    throw new Error(`${label} is required and must be ${maxLength} characters or fewer.`);
+  }
+  return value.trim();
+}
+
+function optionalDate(value: unknown, label: string) {
+  if (value === undefined || value === null || value === "") return undefined;
+  if (typeof value !== "string" || value.length > 40 || Number.isNaN(Date.parse(value))) throw new Error(`${label} must be a valid date.`);
+  const parsed = new Date(value);
+  if (parsed.getTime() > Date.now() + 5 * 60 * 1000) throw new Error(`${label} cannot be in the future.`);
+  return parsed.toISOString();
+}
+
+export function configureCaseService(input: {
+  caseId: unknown;
+  serviceType: unknown;
+  canonicalStage: unknown;
+  serviceTemplateVersion: unknown;
+  scopeVersion: unknown;
+  inputReadiness: unknown;
+  currentDrawing?: unknown;
+  actor: AppUser;
+}) {
+  const state = getAppState();
+  const caseId = boundedRequiredString(input.caseId, "Case ID");
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
+  if (!caseRecord) throw new Error("Case not found.");
+  if (state.evaluationSnapshots.some((item) => item.caseId === caseId) || state.shaktiSnapshots.some((item) => item.caseId === caseId) || state.reportVersions.some((item) => item.caseId === caseId)) {
+    throw new WorkflowConflictError("Service setup is locked because evaluation or report evidence already exists. Start the formal rectification workflow before changing these inputs.");
+  }
+
+  if (typeof input.serviceType !== "string" || !serviceTypes.includes(input.serviceType as VastuServiceType)) throw new Error("Choose a valid service type.");
+  if (typeof input.canonicalStage !== "string" || !canonicalServiceStages.includes(input.canonicalStage as CanonicalServiceStage)) throw new Error("Choose a valid service stage.");
+  const serviceType = input.serviceType as VastuServiceType;
+  const canonicalStage = input.canonicalStage as CanonicalServiceStage;
+  const currentStage = normalizeCaseService(caseRecord).canonicalStage;
+  if (canonicalServiceStages.indexOf(canonicalStage) > canonicalServiceStages.indexOf(currentStage) + 1) throw new WorkflowConflictError("Complete the current service stage before moving further ahead.");
+
+  if (!input.inputReadiness || typeof input.inputReadiness !== "object" || Array.isArray(input.inputReadiness)) throw new Error("Input readiness must be a checklist object.");
+  const submittedReadiness = input.inputReadiness as Record<string, unknown>;
+  const templateCase = { ...caseRecord, serviceType };
+  const allowedKeys = new Set(getServiceReadinessChecklist(templateCase).filter((item) => item.key !== "currentDrawingVerified").map((item) => item.key));
+  for (const [key, value] of Object.entries(submittedReadiness)) {
+    if (!allowedKeys.has(key as keyof CaseInputReadiness)) throw new Error(`Unknown readiness item: ${key}.`);
+    if (typeof value !== "boolean") throw new Error(`Readiness item ${key} must be true or false.`);
+  }
+  const inputReadiness = Object.fromEntries(Object.entries(submittedReadiness)) as CaseInputReadiness;
+
+  let currentDrawing: CaseDrawingReference | undefined;
+  if (input.currentDrawing !== undefined && input.currentDrawing !== null) {
+    if (typeof input.currentDrawing !== "object" || Array.isArray(input.currentDrawing)) throw new Error("Current drawing must be a structured record.");
+    const drawing = input.currentDrawing as Record<string, unknown>;
+    const allowedDrawingKeys = new Set(["versionLabel", "receivedAt", "verifiedAt", "discrepancy", "superseded"]);
+    for (const key of Object.keys(drawing)) if (!allowedDrawingKeys.has(key)) throw new Error(`Unknown drawing field: ${key}.`);
+    if (drawing.superseded !== undefined && typeof drawing.superseded !== "boolean") throw new Error("Drawing superseded must be true or false.");
+    if (drawing.discrepancy !== undefined && (typeof drawing.discrepancy !== "string" || drawing.discrepancy.length > MAX_DISCREPANCY_LENGTH)) throw new Error(`Drawing discrepancy must be ${MAX_DISCREPANCY_LENGTH} characters or fewer.`);
+    currentDrawing = {
+      versionLabel: boundedRequiredString(drawing.versionLabel, "Drawing version"),
+      receivedAt: optionalDate(drawing.receivedAt, "Drawing received date"),
+      verifiedAt: optionalDate(drawing.verifiedAt, "Drawing verified date"),
+      discrepancy: typeof drawing.discrepancy === "string" && drawing.discrepancy.trim() ? drawing.discrepancy.trim() : undefined,
+      superseded: drawing.superseded === true
+    };
+    if (currentDrawing.receivedAt && currentDrawing.verifiedAt && new Date(currentDrawing.verifiedAt) < new Date(currentDrawing.receivedAt)) {
+      throw new Error("Drawing verification date cannot be earlier than the received date.");
+    }
+  }
+  if (serviceType === "NEW_CONSTRUCTION" && !currentDrawing) throw new Error("New construction requires a current drawing record.");
+
+  const serviceTemplateVersion = boundedRequiredString(input.serviceTemplateVersion, "Service template version");
+  const scopeVersion = boundedRequiredString(input.scopeVersion, "Scope version");
+
+  const nextConfiguration = { serviceType, canonicalStage, serviceTemplateVersion, scopeVersion, inputReadiness, currentDrawing };
+  const currentConfiguration = {
+    serviceType: caseRecord.serviceType,
+    canonicalStage: caseRecord.canonicalStage,
+    serviceTemplateVersion: caseRecord.serviceTemplateVersion,
+    scopeVersion: caseRecord.scopeVersion,
+    inputReadiness: caseRecord.inputReadiness ?? {},
+    currentDrawing: caseRecord.currentDrawing
+  };
+  if (deterministicContentHash(currentConfiguration) === deterministicContentHash(nextConfiguration)) return caseRecord;
+  Object.assign(caseRecord, nextConfiguration);
+  appendTimeline(caseRecord.clientId, "Service setup updated", `${input.actor.fullName} set ${serviceType} at ${canonicalStage}; template=${serviceTemplateVersion}; scope=${scopeVersion}.`, "Case", input.actor);
+  return caseRecord;
+}
 
 function nextId(prefix: string) {
   return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
@@ -50,7 +154,7 @@ function buildMeetingLink(provider: ReviewCallBookingRecord["provider"], clientI
   return `https://meet.google.com/${fragment.slice(0, 3)}-${fragment.slice(3, 6)}-${fragment.slice(6, 9)}`;
 }
 
-function appendTimeline(clientId: string, headline: string, details: string, category: string, actorRole?: AppUser["role"]) {
+function appendTimeline(clientId: string, headline: string, details: string, category: string, actor?: AppUser | AppUser["role"]) {
   const state = getAppState();
   const event: TimelineEvent = {
     id: nextId("event"),
@@ -59,7 +163,9 @@ function appendTimeline(clientId: string, headline: string, details: string, cat
     headline,
     details,
     happenedAt: new Date().toISOString(),
-    actorRole
+    actorRole: typeof actor === "string" ? actor : actor?.role,
+    actorId: typeof actor === "object" ? actor.id : undefined,
+    actorName: typeof actor === "object" ? actor.fullName : undefined
   };
 
   state.timelineEvents.unshift(event);
@@ -791,14 +897,18 @@ export async function prepareFinalReport(caseId: string, actor: AppUser) {
   return report;
 }
 
-export function createEvaluationSnapshot(caseId: string, snapshotName = "Residential tab evaluation", zoneCodes?: string[]) {
+export function createEvaluationSnapshot(caseId: string, snapshotName: unknown = "Residential tab evaluation", zoneCodes: unknown = undefined, actor: AppUser) {
   const state = getAppState();
-  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
-  if (!caseRecord) {
-    throw new Error("Case not found.");
-  }
-
-  const selectedZoneCodes = zoneCodes?.length ? zoneCodes : state.utilityRules.map((rule) => rule.zoneCode);
+  const { caseRecord } = assertCaseReadyForEvaluation(state, caseId);
+  const cleanSnapshotName = boundedRequiredString(snapshotName, "Snapshot name", MAX_SNAPSHOT_NAME_LENGTH);
+  if (zoneCodes !== undefined && !Array.isArray(zoneCodes)) throw new Error("Zone codes must be a list.");
+  const selectedZoneCodes = zoneCodes === undefined ? state.utilityRules.map((rule) => rule.zoneCode) : zoneCodes;
+  if (!Array.isArray(selectedZoneCodes) || selectedZoneCodes.length === 0) throw new Error("Choose at least one zone code.");
+  if (selectedZoneCodes.some((zoneCode) => typeof zoneCode !== "string" || !zoneCode.trim())) throw new Error("Every zone code must be a non-blank string.");
+  if (new Set(selectedZoneCodes).size !== selectedZoneCodes.length) throw new Error("Zone codes must not contain duplicates.");
+  const knownZoneCodes = new Set(state.utilityRules.map((rule) => rule.zoneCode));
+  const unknownZoneCode = selectedZoneCodes.find((zoneCode) => !knownZoneCodes.has(zoneCode));
+  if (unknownZoneCode) throw new Error(`Unknown zone code: ${unknownZoneCode}.`);
   const caseInputs = {
     caseId: caseRecord.id,
     caseStatus: caseRecord.status,
@@ -830,14 +940,20 @@ export function createEvaluationSnapshot(caseId: string, snapshotName = "Residen
     zoneCode: rule.zoneCode
   })));
 
+  const inputHash = deterministicContentHash({ caseInputs, snapshotName: cleanSnapshotName, selectedZoneCodes, sourceContentHash });
+  const existingSnapshot = state.evaluationSnapshots.find((item) => item.caseId === caseId);
+  if (existingSnapshot) {
+    if (existingSnapshot.provenance?.inputHash === inputHash) return existingSnapshot;
+    throw new WorkflowConflictError("A different Utility evaluation already exists for this case. Start formal rectification before creating another snapshot.");
+  }
   const snapshot: EvaluationSnapshotRecord = {
     id: nextId("eval"),
     caseId,
-    snapshotName,
+    snapshotName: cleanSnapshotName,
     sourceVersion: "residential-tab.csv",
     generatedMatrix,
     provenance: {
-      inputHash: deterministicContentHash({ caseInputs, selectedZoneCodes, sourceContentHash }),
+      inputHash,
       outputHash: deterministicContentHash(generatedMatrix),
       sourceContentHash,
       ruleSetFormatVersion: UTILITY_RULESET_FORMAT_VERSION,
@@ -848,16 +964,13 @@ export function createEvaluationSnapshot(caseId: string, snapshotName = "Residen
   };
 
   state.evaluationSnapshots.unshift(snapshot);
-  appendTimeline(caseRecord.clientId, "Utility evaluation snapshot generated", `${snapshotName} captured from the master rule table.`, "Evaluation", "CONSULTANT");
+  appendTimeline(caseRecord.clientId, "Utility evaluation snapshot generated", `${cleanSnapshotName} captured from the master rule table by ${actor.fullName}.`, "Evaluation", actor);
   return snapshot;
 }
 
-export function recordShaktiSnapshot(caseId: string, values: number[]) {
+export function recordShaktiSnapshot(caseId: string, values: number[], actor: AppUser) {
   const state = getAppState();
-  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
-  if (!caseRecord) {
-    throw new Error("Case not found.");
-  }
+  const { caseRecord } = assertCaseReadyForEvaluation(state, caseId);
 
   const inputValues = validateShaktiInputs(values);
   const ranking = rankShakti(inputValues);
@@ -871,6 +984,12 @@ export function recordShaktiSnapshot(caseId: string, values: number[]) {
       .sort((left, right) => left.id.localeCompare(right.id))
   };
   const output = { elementAverages: ranking.averages, rankedVerdicts: ranking.ranked, tieBreakUsed: ranking.tieBreakUsed };
+  const inputHash = deterministicContentHash({ caseInputs, inputValues });
+  const existingSnapshot = state.shaktiSnapshots.find((item) => item.caseId === caseId);
+  if (existingSnapshot) {
+    if (existingSnapshot.provenance?.inputHash === inputHash) return existingSnapshot;
+    throw new WorkflowConflictError("A different Shakti evaluation already exists for this case. Start formal rectification before creating another snapshot.");
+  }
   const snapshot: ShaktiSnapshotRecord = {
     id: nextId("shakti"),
     caseId,
@@ -879,7 +998,7 @@ export function recordShaktiSnapshot(caseId: string, values: number[]) {
     rankedVerdicts: ranking.ranked,
     tieBreakUsed: ranking.tieBreakUsed,
     provenance: {
-      inputHash: deterministicContentHash({ caseInputs, inputValues }),
+      inputHash,
       outputHash: deterministicContentHash(output),
       algorithmVersion: SHAKTI_ALGORITHM_VERSION,
       mappingVersion: SHAKTI_MAPPING_VERSION,
@@ -889,7 +1008,7 @@ export function recordShaktiSnapshot(caseId: string, values: number[]) {
   };
 
   state.shaktiSnapshots.unshift(snapshot);
-  appendTimeline(caseRecord.clientId, "Shakti snapshot generated", `Computed from ${values.length} input values.`, "Evaluation", "CONSULTANT");
+  appendTimeline(caseRecord.clientId, "Shakti snapshot generated", `Computed from ${values.length} input values by ${actor.fullName}.`, "Evaluation", actor);
   return snapshot;
 }
 

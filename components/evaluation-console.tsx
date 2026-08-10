@@ -6,6 +6,7 @@ import type { ReportVersionRecord, UtilityRule } from "@/lib/domain";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { isPreviewWatermarked, formatMoney } from "@/lib/workflows";
+import { getCaseEvaluationBlockers, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 
 async function fetchMaster() {
   const response = await fetch("/api/utility/master", { cache: "no-store" });
@@ -32,7 +33,7 @@ async function postAction(payload: Record<string, unknown>, role?: string) {
 
   const result = await response.json();
   if (!response.ok || result.ok === false) {
-    throw new Error(result.error ?? "Request failed");
+    throw new Error(typeof result.error === "string" ? result.error : result.error?.message ?? "The evaluation could not run. Review the readiness steps and try again.");
   }
   return result;
 }
@@ -50,6 +51,10 @@ export function EvaluationConsole() {
   const clients = state?.clients ?? [];
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const currentCase = state?.vastuCases?.find((item) => item.clientId === selectedClient?.id);
+  const readiness = currentCase ? getServiceReadiness(currentCase) : null;
+  const service = currentCase ? normalizeCaseService(currentCase) : null;
+  const evaluationBlockers = currentCase && state ? getCaseEvaluationBlockers(state, currentCase.id) : ["Open a case and save its service setup."];
+  const evaluationReady = Boolean(currentCase && evaluationBlockers.length === 0);
   const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
   const report = (reports.find((item) => item.isPreview) ?? reports[0] ?? null) as ReportVersionRecord | null;
   const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
@@ -137,7 +142,8 @@ export function EvaluationConsole() {
           <button type="button" className="button" onClick={() => refresh()} disabled={busy}>
             Reload master table
           </button>
-          <select value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} style={{ minWidth: 220 }}>
+          <label htmlFor="evaluation-client"><strong>Client</strong></label>
+          <select id="evaluation-client" value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} style={{ minWidth: 220 }}>
             {clients.map((client) => (
               <option key={client.id} value={client.id}>
                 {client.displayName}
@@ -152,14 +158,15 @@ export function EvaluationConsole() {
           <span className="pill">Snapshots {evaluationSnapshots.length}</span>
         </div>
         <div className="field" style={{ marginTop: 14 }}>
-          <label>Snapshot name</label>
-          <input value={snapshotName} onChange={(event) => setSnapshotName(event.target.value)} />
+          <label htmlFor="snapshot-name">Snapshot name</label>
+          <input id="snapshot-name" value={snapshotName} onChange={(event) => setSnapshotName(event.target.value)} />
         </div>
+        <div className="panel" style={{ marginTop: 14 }} aria-live="polite"><strong>{evaluationReady ? "Ready to run evaluation" : "Complete the case setup first"}</strong><div className="meta" style={{ marginTop: 6 }}>{service ? `${serviceTypeLabel(service.serviceType)} · ${readiness?.completed ?? 0} of ${readiness?.total ?? 0} required inputs ready.` : "Open a case and save its service setup."}</div>{!evaluationReady ? <ul>{evaluationBlockers.map((blocker) => <li key={blocker}>{blocker}</li>)}</ul> : null}{!evaluationReady ? <a className="button-secondary" href="/ops">Open case setup</a> : null}</div>
         <button
           type="button"
           className="button-secondary"
           style={{ marginTop: 10 }}
-          disabled={busy || !currentCase}
+          disabled={busy || !evaluationReady || !snapshotName.trim() || snapshotName.trim().length > 120}
           onClick={() => run({ action: "utility-evaluate", caseId: currentCase?.id, snapshotName }, "Utility evaluation snapshot saved.")}
         >
           Save utility snapshot
@@ -187,14 +194,14 @@ export function EvaluationConsole() {
           <span className="pill">Snapshots {shaktiSnapshots.length}</span>
         </div>
         <div className="field" style={{ marginTop: 14 }}>
-          <label>16 values</label>
-          <textarea value={shaktiValuesText} onChange={(event) => setShaktiValuesText(event.target.value)} />
+          <label htmlFor="shakti-values">16 values</label>
+          <textarea id="shakti-values" value={shaktiValuesText} onChange={(event) => setShaktiValuesText(event.target.value)} />
         </div>
         <button
           type="button"
           className="button-secondary"
           style={{ marginTop: 10 }}
-          disabled={busy || !currentCase || shaktiValues.length !== 16}
+          disabled={busy || !evaluationReady || shaktiValues.length !== 16}
           onClick={() => run({ action: "shakti-rank", caseId: currentCase?.id, values: shaktiValues }, "Shakti snapshot saved.")}
         >
           Save Shakti snapshot
@@ -241,7 +248,7 @@ export function EvaluationConsole() {
             <span className="meta">{formatMoney(51000)}</span>
           </div>
         </div>
-        <div className="footer-note">{message}</div>
+        <div className="footer-note" role={message.toLowerCase().includes("failed") || message.toLowerCase().includes("could not") ? "alert" : "status"} aria-live="polite">{message}</div>
       </div>
     </section>
   );
