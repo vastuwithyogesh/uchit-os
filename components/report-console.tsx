@@ -34,7 +34,7 @@ export function ReportConsole() {
   const { activeUser } = useSession();
   const [state, setState] = useState<AppState | null>(null);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Load the live state to inspect report versions.");
+  const [message, setMessage] = useState("Choose “Load reports” to begin.");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [approvalComment, setApprovalComment] = useState("Reviewed against the evaluation snapshot and report layout.");
 
@@ -73,9 +73,9 @@ export function ReportConsole() {
   ].filter(Boolean) as string[];
 
   const nextAction = (() => {
-    if (!currentCase) return "Open the case before the report flow can begin.";
-    if (!previewReport) return "Generate the Stage-A preview.";
-    if (!canPrepareFinalReport) return "Approve the balance so the final report can be prepared.";
+    if (!currentCase) return "Open a case before starting its report.";
+    if (!previewReport) return "Create the watermarked preview.";
+    if (!canPrepareFinalReport) return "Wait for the balance payment to be approved.";
     if (!finalReport) return "Prepare the final report now.";
     if (approvalCount < 2) return "Collect the remaining report approvals.";
     if (!verdictReadyByState) return "Clear the remaining verdict blockers.";
@@ -108,7 +108,8 @@ export function ReportConsole() {
     }
   }
 
-  async function run(action: Record<string, unknown>, successMessage: string) {
+  async function run(action: Record<string, unknown>, successMessage: string, confirmation?: string) {
+    if (confirmation && !window.confirm(confirmation)) return;
     setBusy(true);
     try {
       await postAction(action, activeUser.role);
@@ -124,35 +125,34 @@ export function ReportConsole() {
   return (
     <section className="section-grid">
       <div className="card span-8">
-        <div className="eyebrow">Report generation</div>
-        <h2>Stage-A preview, final report, approvals, and verdict release</h2>
-        <p className="subtle">
-          This page follows the full report chain: generate the preview, keep it watermarked while balance is pending, prepare the official report after payment, collect two approvals, and only then release the verdict.
-        </p>
+        <div className="eyebrow">Reports</div>
+        <h2>Finish and release a client report</h2>
+        <p className="subtle">Follow the steps in order. The final report cannot be released until payment and both approvals are complete.</p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
             <span className="stat-value">{previewReport ? "Yes" : "No"}</span>
-            <span className="stat-label">preview generated</span>
+            <span className="stat-label">preview ready</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{watermarkActive ? "On" : "Off"}</span>
-            <span className="stat-label">watermark state</span>
+            <span className="stat-label">preview watermark</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{approvalCount}</span>
-            <span className="stat-label">final approvals logged</span>
+            <span className="stat-label">approvals</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{verdictReadyByState ? "Ready" : "Blocked"}</span>
-            <span className="stat-label">verdict release state</span>
+            <span className="stat-label">ready to release</span>
           </div>
         </div>
         <div className="panel" style={{ marginTop: 16 }}>
           <div className="workflow">
-            <button className="button" type="button" onClick={() => refresh()} disabled={busy}>
-              Refresh report state
+            <button className={state ? "button-secondary" : "button"} type="button" onClick={() => refresh()} disabled={busy} aria-busy={busy}>
+              {state ? "Refresh" : "Load reports"}
             </button>
-            <select value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} style={{ minWidth: 220 }}>
+            <label htmlFor="report-client"><strong>Client</strong></label>
+            <select id="report-client" aria-label="Choose a client" value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} style={{ minWidth: 220 }}>
               {clients.map((client) => (
                 <option key={client.id} value={client.id}>
                   {client.displayName}
@@ -163,15 +163,15 @@ export function ReportConsole() {
           <div className="workflow" style={{ marginTop: 14 }}>
             <button
               type="button"
-              className="button-secondary"
+              className={!previewReport ? "button" : "button-secondary"}
               disabled={busy || !currentCase || !canEditFloorWorkspaces(activeUser)}
               onClick={() => run({ action: "preview-report", caseId: currentCase?.id }, "Stage-A preview generated")}
             >
-              Generate preview
+              Create preview
             </button>
             <button
               type="button"
-              className="button-secondary"
+              className={previewReport && canPrepareFinalReport && !finalReport ? "button" : "button-secondary"}
               disabled={busy || !currentCase || !canPrepareFinalReport || !canEditFloorWorkspaces(activeUser)}
               onClick={() => run({ action: "final-report-prepare", caseId: currentCase?.id }, "Final report prepared")}
             >
@@ -179,24 +179,24 @@ export function ReportConsole() {
             </button>
             <button
               type="button"
-              className="button-secondary"
+              className={Boolean(finalReport) && approvalCount < 2 ? "button" : "button-secondary"}
               disabled={busy || !canApproveCurrentReport}
-              onClick={() => run({ action: "report-approve", reportId: finalReport?.id, comment: approvalComment }, "Final report approved")}
+              onClick={() => run({ action: "report-approve", reportId: finalReport?.id, comment: approvalComment }, "Approval saved", "Approve this exact report version? This action is recorded in the permanent history.")}
             >
               Approve final report
             </button>
             <button
               type="button"
-              className="button"
+              className={canReleaseCurrentVerdict ? "button" : "button-secondary"}
               disabled={busy || !canReleaseCurrentVerdict}
-              onClick={() => run({ action: "verdict-release", reportId: finalReport?.id }, "Verdict released")}
+              onClick={() => run({ action: "verdict-release", reportId: finalReport?.id }, "Verdict released", "Release this final report to the client? It cannot be silently changed afterwards.")}
             >
-              Release verdict
+              Release final report
             </button>
           </div>
           {finalReport ? (
             <div style={{ marginTop: 14 }}>
-              <label htmlFor="approval-comment"><strong>Approval note</strong></label>
+              <label htmlFor="approval-comment"><strong>Why are you approving this report?</strong></label>
               <textarea id="approval-comment" value={approvalComment} onChange={(event) => setApprovalComment(event.target.value)} rows={3} style={{ width: "100%", marginTop: 6 }} />
             </div>
           ) : null}
@@ -262,7 +262,7 @@ export function ReportConsole() {
           <div className="panel-head">
             <div>
               <strong>Report archive</strong>
-              <div className="meta">This client’s current preview and official report trail</div>
+              <div className="meta">Every saved report version stays in this history.</div>
             </div>
           </div>
           <div className="list" style={{ marginTop: 12 }}>
@@ -276,11 +276,14 @@ export function ReportConsole() {
                   <div className="pill-row">
                     <span className={`tag ${report.isPreview ? "warn" : "good"}`}>{report.isPreview ? "Watermarked lane" : "Verdict lane"}</span>
                     <span className="pill">{report.approvals.length} approvals</span>
-                    {report.artifact ? <a className="button-secondary" href={report.artifact.downloadPath} target="_blank" rel="noreferrer">Open printable report</a> : <span className="pill">Legacy record</span>}
+                    {report.artifact ? <a className="button-secondary" href={report.artifact.downloadPath} target="_blank" rel="noreferrer">Open report</a> : <span className="pill">Older record</span>}
                     {report.watermarkText ? <span className="pill">{report.watermarkText}</span> : null}
                   </div>
-                  {report.artifact ? <span className="meta">SHA-256 {report.artifact.contentHash.slice(0, 16)}… · {report.artifact.templateVersion}</span> : null}
-                  {(report.approvalEvidence ?? []).map((approval) => <span className="meta" key={`${report.id}-${approval.actorId}`}>{approval.actorName} ({approval.actorRole}) · {new Date(approval.approvedAt).toLocaleString("en-IN")} · {approval.comment}</span>)}
+                  <details>
+                    <summary>Technical and approval details</summary>
+                    {report.artifact ? <span className="meta">File fingerprint: {report.artifact.contentHash} · Template: {report.artifact.templateVersion}</span> : null}
+                    {(report.approvalEvidence ?? []).map((approval) => <span className="meta" key={`${report.id}-${approval.actorId}`}>{approval.actorName} ({approval.actorRole}) · {new Date(approval.approvedAt).toLocaleString("en-IN")} · {approval.comment}</span>)}
+                  </details>
                 </div>
               ))
             ) : (
@@ -320,7 +323,7 @@ export function ReportConsole() {
             All verdict gates are clear for the current case.
           </div>
         )}
-        <div className="footer-note" style={{ marginTop: 12 }}>
+        <div className="footer-note" role={message.toLowerCase().includes("failed") ? "alert" : "status"} aria-live="polite" style={{ marginTop: 12 }}>
           {message}
         </div>
       </div>

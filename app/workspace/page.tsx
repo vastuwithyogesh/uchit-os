@@ -14,8 +14,8 @@ export default async function WorkspacePage() {
   try {
     const state = await loadStateFromPersistence();
     const items = buildCaseWorkspaceProjection(state, access.actor);
-    return <main className="page-shell"><SiteHeader title="Case Workspace" subtitle="What to do now and what happens next" /><CaseWorkspace items={items} /></main>;
+    return <main className="page-shell"><SiteHeader title="My Workspace" subtitle="See what needs attention and do the next task" /><CaseWorkspace items={items} /></main>;
   } catch {
-    return <main className="page-shell"><SiteHeader title="Case Workspace" subtitle="Your team queue" /><section className="workspace-state" role="alert"><h1>We could not load the workspace</h1><p>Your data has not been changed. Refresh the page to try again.</p></section></main>;
+    return <main className="page-shell"><SiteHeader title="My Workspace" subtitle="Your client tasks" /><section className="workspace-state" role="alert"><h1>We could not load your tasks</h1><p>Nothing has been changed. Refresh the page to try again. If it still does not load, ask an administrator for help.</p></section></main>;
   }
 }

@@ -35,7 +35,7 @@ export function ClientPortal() {
 
   useEffect(() => { void load(); }, [load]);
 
-  if (status === "loading") return <section className="card client-state" role="status" aria-live="polite"><h1>Loading your Vastu journey…</h1><p className="subtle">We are safely finding your case.</p></section>;
+  if (status === "loading") return <section className="card client-state" role="status" aria-live="polite" aria-busy="true"><h1>Loading your Vastu journey…</h1><p className="subtle">We are safely finding your case.</p></section>;
   if (status === "unlinked") return <section className="card client-state" role="status"><div className="eyebrow">Account not linked</div><h1>We need to connect your account</h1><p className="lede">{message}</p><p className="subtle">Share the email you use to sign in. Do not share your password.</p></section>;
   if (status === "error" || !portal) return <section className="card client-state" role="alert"><h1>Your journey could not be loaded</h1><p className="lede">{message}</p><button type="button" className="button" onClick={() => void load()}>Try again</button></section>;
 
@@ -58,8 +58,8 @@ export function ClientPortal() {
         <h2 id="progress-title">Where your case is now</h2>
         {portal.currentCase ? <>
           <p className="subtle">Case {portal.currentCase.caseNumber}</p>
-          <ol className="client-steps">
-            {portal.currentCase.progress.map((step, index) => <li key={`${step.label}-${index}`} className={step.state} aria-current={step.state === "current" ? "step" : undefined}><span>{step.state === "done" ? "✓" : index + 1}</span><strong>{step.label}</strong></li>)}
+          <ol className="client-steps" aria-label="Case progress">
+            {portal.currentCase.progress.map((step, index) => <li key={`${step.label}-${index}`} className={step.state} aria-current={step.state === "current" ? "step" : undefined}><span aria-hidden="true">{step.state === "done" ? "✓" : index + 1}</span><strong>{step.label}</strong><span className="meta">{step.state === "done" ? "Completed" : step.state === "current" ? "Current step" : "Coming next"}</span></li>)}
           </ol>
         </> : <div className="list-item"><strong>No case is open yet</strong><span className="meta">Your team will contact you with the next step.</span></div>}
       </section>
@@ -68,13 +68,13 @@ export function ClientPortal() {
         <div className="card">
           <div className="eyebrow">Appointments</div><h2>Your calls</h2>
           <div className="list">
-            {portal.appointments.length ? portal.appointments.map((item) => <div className="list-item" key={item.id}><strong>{date.format(new Date(item.scheduledAt))}</strong><span className="meta">{item.durationMinutes} minutes · {item.status}</span>{item.status !== "CANCELLED" ? <a className="button-secondary" href={item.meetingLink} target="_blank" rel="noreferrer">Join the call</a> : null}</div>) : <div className="list-item"><strong>No upcoming calls</strong><span className="meta">A scheduled call will appear here.</span></div>}
+            {portal.appointments.length ? portal.appointments.map((item) => <div className="list-item" key={item.id}><strong>{date.format(new Date(item.scheduledAt))}</strong><span className="meta">{item.durationMinutes} minutes · {item.status === "CANCELLED" ? "Cancelled" : "Scheduled"}</span>{item.status !== "CANCELLED" ? <a className="button-secondary" href={item.meetingLink} target="_blank" rel="noreferrer" aria-label={`Join call scheduled for ${date.format(new Date(item.scheduledAt))}`}>Join the call</a> : null}</div>) : <div className="list-item"><strong>No upcoming calls</strong><span className="meta">A scheduled call will appear here.</span></div>}
           </div>
         </div>
         <div className="card">
           <div className="eyebrow">Payments</div><h2>Your payment status</h2>
           <div className="list">
-            {portal.payments.length ? portal.payments.map((item) => <div className="list-item" key={item.id}><strong>{item.type === "ADVANCE" ? "Advance" : item.type === "BALANCE" ? "Balance" : "Additional payment"} · {money.format(item.amountInr)}</strong><span className={`tag ${item.status === "APPROVED" ? "good" : item.status === "FAILED" ? "bad" : "warn"}`}>{item.status === "APPROVED" ? "Confirmed" : item.status.toLowerCase()}</span></div>) : <div className="list-item"><strong>No payments recorded</strong><span className="meta">Payment status will appear after it is checked.</span></div>}
+            {portal.payments.length ? portal.payments.map((item) => <div className="list-item" key={item.id}><strong>{item.type === "ADVANCE" ? "Advance" : item.type === "BALANCE" ? "Balance" : "Additional payment"} · {money.format(item.amountInr)}</strong><span className={`tag ${item.status === "APPROVED" ? "good" : item.status === "FAILED" ? "bad" : "warn"}`}>{item.status === "APPROVED" ? "Confirmed" : item.status === "FAILED" ? "Needs attention" : "Being checked"}</span></div>) : <div className="list-item"><strong>No payments recorded</strong><span className="meta">Payment status will appear after it is checked.</span></div>}
           </div>
         </div>
       </section>
@@ -82,7 +82,7 @@ export function ClientPortal() {
       <section className="card">
         <div className="eyebrow">Reports</div><h2>Your Vastu reports</h2>
         <div className="list">
-          {portal.reports.length ? portal.reports.map((item) => <div className="list-item" key={item.id}><strong>{item.label}</strong><span className="meta">{item.kind === "PREVIEW" ? "Watermarked preview" : "Final verdict"} · {item.status}</span>{item.available && item.downloadPath ? <a className="button" href={item.downloadPath} target="_blank" rel="noreferrer">{item.kind === "PREVIEW" ? "Open preview" : "Download final report"}</a> : <span className="tag warn">Not ready yet</span>}</div>) : <div className="list-item"><strong>No report yet</strong><span className="meta">Your report will appear here when it is ready.</span></div>}
+          {portal.reports.length ? portal.reports.map((item) => <div className="list-item" key={item.id}><strong>{item.label}</strong><span className="meta">{item.kind === "PREVIEW" ? "Watermarked preview" : "Final report"}</span>{item.available && item.downloadPath ? <a className="button" href={item.downloadPath} target="_blank" rel="noreferrer" aria-label={`${item.kind === "PREVIEW" ? "Open preview" : "Download final report"}: ${item.label}`}>{item.kind === "PREVIEW" ? "Open preview" : "Download final report"}</a> : <><span className="tag warn">Not ready yet</span><span className="meta">We will show the report here as soon as it is ready.</span></>}</div>) : <div className="list-item"><strong>No report yet</strong><span className="meta">Your report will appear here when it is ready.</span></div>}
         </div>
       </section>
 

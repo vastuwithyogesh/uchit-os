@@ -8,22 +8,22 @@ export type PageAccessRule = {
 };
 
 export const pageAccessRules: PageAccessRule[] = [
-  { href: "/client", label: "My Vastu journey", minimumRole: "CLIENT" },
+  { href: "/client", label: "My Case", minimumRole: "CLIENT" },
+  { href: "/workspace", label: "Workspace", minimumRole: "SETTER" },
   { href: "/", label: "Overview", minimumRole: "SETTER" },
-  { href: "/workspace", label: "Case workspace", minimumRole: "SETTER" },
-  { href: "/crm", label: "CRM workbench", minimumRole: "SETTER" },
-  { href: "/timeline", label: "Timeline", minimumRole: "SETTER" },
-  { href: "/ops", label: "Ops", minimumRole: "CONSULTANT" },
+  { href: "/crm", label: "Clients", minimumRole: "SETTER" },
+  { href: "/timeline", label: "History", minimumRole: "SETTER" },
+  { href: "/ops", label: "Case Setup", minimumRole: "CONSULTANT" },
   { href: "/evaluation", label: "Evaluation", minimumRole: "CONSULTANT" },
-  { href: "/assets", label: "Assets", minimumRole: "CONSULTANT" },
-  { href: "/payment-proofs", label: "Proofs", minimumRole: "SETTER" },
+  { href: "/assets", label: "Files", minimumRole: "CONSULTANT" },
+  { href: "/payment-proofs", label: "Payments", minimumRole: "SETTER" },
   { href: "/reports", label: "Reports", minimumRole: "CONSULTANT" },
-  { href: "/models", label: "Models", minimumRole: "ADMIN" },
-  { href: "/diagnostics", label: "Diagnostics", minimumRole: "ADMIN" },
-  { href: "/integrity", label: "Integrity", minimumRole: "ADMIN" },
-  { href: "/state", label: "State", minimumRole: "SUPER_ADMIN" },
-  { href: "/admin", label: "Admin", minimumRole: "ADMIN" },
-  { href: "/bootstrap", label: "Bootstrap", minimumRole: "ADMIN" },
+  { href: "/models", label: "Data Model", minimumRole: "ADMIN" },
+  { href: "/diagnostics", label: "System Check", minimumRole: "ADMIN" },
+  { href: "/integrity", label: "Data Check", minimumRole: "ADMIN" },
+  { href: "/state", label: "System Data", minimumRole: "SUPER_ADMIN" },
+  { href: "/admin", label: "Team", minimumRole: "ADMIN" },
+  { href: "/bootstrap", label: "Setup", minimumRole: "ADMIN" },
   { href: "/settings", label: "Settings", minimumRole: "ADMIN" }
 ];
 

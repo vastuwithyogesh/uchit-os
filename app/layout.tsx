@@ -17,11 +17,11 @@ export async function generateMetadata(): Promise<Metadata> {
   return {
     metadataBase,
     title: {
-      default: "Uchit Vastu Client CRM + Evaluation Engine",
+      default: "Uchit Vastu Workspace",
       template: "%s | Uchit Vastu"
     },
     description:
-      "Role-aware lead intake, commercial approvals, payment gates, case operations, evaluation snapshots, report approvals, and verdict release for the Uchit Vastu workflow.",
+      "A simple, secure workspace for Uchit Vastu cases, evaluations, payments and reports.",
     openGraph: {
       title: "Uchit Vastu Client CRM + Evaluation Engine",
       description:

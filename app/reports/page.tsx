@@ -8,7 +8,7 @@ export default async function ReportsPage() {
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="Report Flow" subtitle="Preview, approvals, and verdict release" />
+        <SiteHeader title="Reports" subtitle="Prepare, approve, and release" />
         <AccessDeniedPanel area="Report flow" requiredRole="CONSULTANT" actorRole={access.actor.role} />
       </main>
     );
@@ -16,20 +16,20 @@ export default async function ReportsPage() {
 
   return (
     <main className="page-shell">
-      <SiteHeader title="Report Flow" subtitle="Preview, approvals, and verdict release" />
+      <SiteHeader title="Reports" subtitle="Prepare, approve, and release" />
 
       <section className="hero-panel" style={{ marginTop: 22 }}>
-        <div className="eyebrow">Report operations</div>
-        <h1>Track the Stage-A preview, final report approvals, and verdict release from one screen.</h1>
+        <div className="eyebrow">Simple report steps</div>
+        <h1>See what is done and what to do next.</h1>
         <p className="lede">
-          This is the report control surface for the whole release chain: preview first, watermark while balance is pending, final report after payment clearance, and verdict release only after two approvals.
+          Create the preview, confirm payment, collect two approvals, then release the final report.
         </p>
         <div className="hero-actions" style={{ marginTop: 14 }}>
           <a href="/ops" className="button">
-            Open operations console
+            Back to cases
           </a>
           <a href="/timeline" className="button-secondary">
-            Review the client trail
+            View client history
           </a>
         </div>
         <div className="pill-row" style={{ marginTop: 16 }}>

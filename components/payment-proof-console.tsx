@@ -50,7 +50,7 @@ export function PaymentProofConsole() {
     "balance-proof": null
   });
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Upload advance and balance screenshots here.");
+  const [message, setMessage] = useState("Choose a payment receipt, then upload it.");
 
   const assetsByKey = useMemo(
     () => Object.fromEntries((payload?.assets ?? []).map((asset) => [asset.key, asset])) as Record<PaymentProofKey, PaymentProofRecord | undefined>,
@@ -62,7 +62,7 @@ export function PaymentProofConsole() {
     try {
       const nextPayload = await fetchProofs();
       setPayload(nextPayload);
-      setMessage(nextPayload.summary.complete ? "Both proof slots are ready." : "One or more proof slots still need an upload.");
+      setMessage(nextPayload.summary.complete ? "Both payment receipts are uploaded." : "Upload the missing payment receipt shown below.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
     } finally {
@@ -102,27 +102,25 @@ export function PaymentProofConsole() {
   return (
     <section className="section-grid">
       <div className="card span-8">
-        <div className="eyebrow">Payment proof module</div>
-        <h2>Advance and balance screenshots</h2>
-        <p className="subtle">
-          This is the proof handoff lane for the commercial flow. Upload the advance proof when the client pays the minimum advance, and upload the balance proof when the final amount is cleared.
-        </p>
+        <div className="eyebrow">Payment receipts</div>
+        <h2>Upload proof of payment</h2>
+        <p className="subtle">First upload the advance receipt. After the final payment, upload the balance receipt.</p>
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
             <span className="stat-value">{payload?.summary.required ?? 2}</span>
-            <span className="stat-label">required proof slots</span>
+            <span className="stat-label">receipts needed</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{payload?.summary.uploaded ?? 0}</span>
-            <span className="stat-label">uploaded proofs</span>
+            <span className="stat-label">receipts uploaded</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{payload?.summary.pending ?? 2}</span>
-            <span className="stat-label">pending slots</span>
+            <span className="stat-label">still needed</span>
           </div>
           <div className="stat-card">
             <span className="stat-value">{payload?.summary.complete ? "Yes" : "No"}</span>
-            <span className="stat-label">proof lane complete</span>
+            <span className="stat-label">all uploaded</span>
           </div>
         </div>
         <div className="hero-actions" style={{ marginTop: 16 }}>
@@ -150,12 +148,14 @@ export function PaymentProofConsole() {
                   </div>
                   <span className={`tag ${asset ? "good" : "warn"}`}>{asset ? "Ready" : "Pending"}</span>
                 </div>
-                {asset?.url ? (
+                {asset?.url && asset.mimeType !== "application/pdf" ? (
                   <img
                     src={asset.url}
                     alt={asset.label}
                     style={{ width: "100%", marginTop: 12, borderRadius: 16, border: "1px solid var(--line)" }}
                   />
+                ) : asset?.url ? (
+                  <a className="button-secondary" href={asset.url} target="_blank" rel="noreferrer" style={{ marginTop: 12 }}>Open uploaded PDF</a>
                 ) : (
                   <div
                     style={{
@@ -175,20 +175,22 @@ export function PaymentProofConsole() {
                   </div>
                 )}
                 <div className="field" style={{ marginTop: 12 }}>
-                  <label>{uploadLabels[key]} image</label>
+                  <label htmlFor={`proof-${key}`}>Choose {uploadLabels[key].toLowerCase()}</label>
                   <input
+                    id={`proof-${key}`}
                     type="file"
-                    accept="image/*"
+                    accept="image/png,image/jpeg,image/webp,application/pdf"
                     disabled={busy}
                     onChange={(event) => setSelectedFiles((current) => ({ ...current, [key]: event.target.files?.[0] ?? null }))}
                   />
                 </div>
                 <div className="workflow" style={{ marginTop: 10 }}>
                   <button type="button" className="button-secondary" onClick={() => handleUpload(key)} disabled={busy || !file}>
-                    {asset ? "Replace image" : "Upload image"}
+                    {asset ? "Replace receipt" : "Upload receipt"}
                   </button>
                   {file ? <span className="pill">Selected: {file.name}</span> : null}
                 </div>
+                {asset ? <details style={{ marginTop: 10 }}><summary>File details</summary><span className="meta">{asset.fileName}{asset.sizeBytes ? ` · ${Math.ceil(asset.sizeBytes / 1024)} KB` : ""}</span>{asset.checksumSha256 ? <span className="meta">File fingerprint: {asset.checksumSha256}</span> : null}</details> : null}
               </div>
             );
           })}
@@ -196,8 +198,8 @@ export function PaymentProofConsole() {
       </div>
 
       <div className="card span-4">
-        <div className="eyebrow">Proof status</div>
-        <h2>What’s ready right now</h2>
+        <div className="eyebrow">Your next step</div>
+        <h2>{payload?.summary.complete ? "Receipts are complete" : "Upload the missing receipt"}</h2>
         <div className="list" style={{ marginTop: 14 }}>
           {(Object.keys(uploadLabels) as PaymentProofKey[]).map((key) => {
             const asset = assetsByKey[key];
@@ -211,12 +213,12 @@ export function PaymentProofConsole() {
           })}
         </div>
         <div className="panel" style={{ marginTop: 14 }}>
-          <strong>Workflow note</strong>
+          <strong>Why this is needed</strong>
           <div className="meta" style={{ marginTop: 6 }}>
-            Advance proof is used to open the case. Balance proof is used to unlock the final report flow.
+            The advance receipt opens the case. The balance receipt lets the report move to final approval.
           </div>
         </div>
-        <div className="footer-note">{message}</div>
+        <div className="footer-note" role="status" aria-live="polite">{message}</div>
       </div>
     </section>
   );
