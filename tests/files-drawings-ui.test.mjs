@@ -31,8 +31,23 @@ test("verification is deliberate, safe, and staff-only", () => {
   assert.ok((ui.match(/window\.confirm/g) ?? []).length >= 1);
   assert.match(ui, /revisionStatus === "VERIFIED" && \(blocker \|\| Boolean\(discrepancy\.trim\(\)\)\)/);
   assert.match(ui, /Resolve the blocker and discrepancy before verifying/);
-  assert.match(ui, /File paths stay hidden here/);
-  assert.match(ui, /<details><summary>Show/);
+  assert.match(ui, /Storage details stay hidden/);
+  assert.match(ui, /<details><summary>(?:File details|Alternatives and technical details|Show)/);
   assert.match(ui, /aria-live="polite"/);
   assert.doesNotMatch(ui, /payment|client-portal/i);
+});
+
+test("protected uploads are scoped, validated, and keep technical storage data hidden", () => {
+  const ui = source("components/files-drawings-console.tsx");
+  assert.match(ui, /fetch\("\/api\/case-files", \{ method: "POST"/);
+  assert.match(ui, /body\.set\("file", selectedFile\)/);
+  assert.match(ui, /body\.set\("caseId", activeCase\.id\)/);
+  assert.match(ui, /if \(requirement\.floorLabel\) body\.set\("floorLabel", requirement\.floorLabel\)/);
+  assert.match(ui, /application\/pdf.*image\/png.*image\/jpeg.*image\/webp/);
+  assert.match(ui, /20 \* 1024 \* 1024/);
+  assert.match(ui, /asset\.caseId !== activeCase\.id \|\| asset\.floorLabel !== requirement\.floorLabel/);
+  assert.match(ui, /setEvidenceRef\(asset\.evidenceRef\)/);
+  assert.match(ui, /Only uploads for this case and exact floor are shown/);
+  assert.match(ui, /<summary>File details<\/summary>/);
+  assert.doesNotMatch(ui.slice(ui.indexOf("return <section")), /checksumSha256|uploadedBy\.id|storageKey|objectKey/);
 });

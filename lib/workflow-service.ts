@@ -36,6 +36,7 @@ import {
 } from "@/lib/evaluation-provenance";
 import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
+import { assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -146,7 +147,7 @@ export function upsertImplementationTask(input: Record<string, unknown> & { acto
   if (existing) Object.assign(existing, next); else state.implementationTasks.unshift(next); caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1; appendTimeline(caseRecord.clientId, existing ? "Implementation task updated" : "Implementation task recorded", `${input.actor.fullName} recorded ${next.title} as ${next.status}.`, "Assessment", input.actor); return next;
 }
 
-export function upsertCaseDocument(input: Record<string, unknown> & { actor: AppUser }) {
+export async function upsertCaseDocument(input: Record<string, unknown> & { actor: AppUser }) {
   const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
   const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
   const retry = state.caseDocuments.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey);
@@ -171,6 +172,7 @@ export function upsertCaseDocument(input: Record<string, unknown> & { actor: App
   if (revisionStatus === "SUPERSEDED" && input.isCurrent) throw new Error("A superseded document cannot be current.");
   const discrepancy = input.discrepancy === undefined || input.discrepancy === "" ? undefined : boundedRequiredString(input.discrepancy, "Discrepancy", 1000);
   if (revisionStatus === "VERIFIED" && (input.blocker || discrepancy)) throw new WorkflowConflictError("Resolve blockers and discrepancies before verification.");
+  await assertCaseFileEvidenceScope(evidenceRef, { caseId, caseRevisionNumber: revisionNumber, serviceType, floorLabel });
   const stamp = audit(input.actor);
   const next = { id: existing?.id ?? nextId("document"), caseId, caseRevisionNumber: revisionNumber, serviceType, assetType, floorLabel, versionLabel, documentDate: optionalDate(input.documentDate, "Document date"), isCurrent: input.isCurrent as boolean, evidenceRef, discrepancy, blocker: input.blocker as boolean, reviewObservation: input.reviewObservation === undefined || input.reviewObservation === "" ? undefined : boundedRequiredString(input.reviewObservation, "Review observation", 2000), requiredChange: input.requiredChange === undefined || input.requiredChange === "" ? undefined : boundedRequiredString(input.requiredChange, "Required change", 2000), preferredAlternative: input.preferredAlternative === undefined || input.preferredAlternative === "" ? undefined : boundedRequiredString(input.preferredAlternative, "Preferred alternative", 1000), acceptableAlternative: input.acceptableAlternative === undefined || input.acceptableAlternative === "" ? undefined : boundedRequiredString(input.acceptableAlternative, "Acceptable alternative", 1000), ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), revisionStatus, idempotencyKey, version: (existing?.version ?? 0) + 1, received: existing?.received ?? stamp, verified: revisionStatus === "VERIFIED" ? (existing?.verified ?? stamp) : undefined, updated: stamp };
   if (next.isCurrent) for (const item of state.caseDocuments) if (item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.id !== next.id && item.assetType === assetType && (item.floorLabel ?? "") === (floorLabel ?? "") && item.isCurrent) { item.isCurrent = false; item.revisionStatus = "SUPERSEDED"; item.version += 1; item.updated = stamp; }

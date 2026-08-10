@@ -233,7 +233,7 @@ export async function POST(request: Request) {
         break;
       case "case-document-upsert":
         if (!canEvaluateCases(actor)) return deny("Only a consultant or administrator can record and verify case documents.");
-        response = { ok: true, document: upsertCaseDocument({ ...body, actor }) };
+        response = { ok: true, document: await upsertCaseDocument({ ...body, actor }) };
         break;
       case "floor-create":
         if (!canEditFloorWorkspaces(actor)) {
