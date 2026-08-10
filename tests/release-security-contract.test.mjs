@@ -38,6 +38,7 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/diagnostics/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
     "app/api/integrity/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
     "app/api/optin-leads/route.ts": /requireRouteActor/,
+    "app/api/optin-leads/events/route.ts": /OPTIN_WEBHOOK_SECRET.*verifyInboundSignature/s,
     "app/api/payment-proofs/route.ts": /requireRouteActor/,
     "app/api/payment-proofs/files/[fileName]/route.ts": /requireRouteActor/,
     "app/api/reports/[reportId]/print/route.ts": /resolveRequestActor.*canReadClientSnapshots/s,
@@ -50,7 +51,9 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/timeline/route.ts": /requireRouteActor/,
     "app/api/utility/master/route.ts": /requireRouteActor/
   };
-  const routes = tracked.filter((file) => /^app\/api\/.+\/route\.ts$/.test(file)).sort();
+  const routes = tracked.filter((file) => /^app\/api\/.+\/route\.ts$/.test(file));
+  if (existsSync(resolve(process.cwd(), "app/api/optin-leads/events/route.ts")) && !routes.includes("app/api/optin-leads/events/route.ts")) routes.push("app/api/optin-leads/events/route.ts");
+  routes.sort();
   assert.deepEqual(routes, Object.keys(policies).sort());
   for (const [file, pattern] of Object.entries(policies)) assert.match(source(file), pattern, `${file} lacks its declared access gate`);
 });

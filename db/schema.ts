@@ -95,4 +95,17 @@ ON case_file_assets(case_id, case_revision_number, service_type, created_at);
 
 CREATE INDEX IF NOT EXISTS idx_case_file_assets_floor
 ON case_file_assets(case_id, floor_label);
+
+CREATE TABLE IF NOT EXISTS inbound_optin_events (
+  event_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, source TEXT NOT NULL,
+  payload_hash TEXT NOT NULL, identity_hash TEXT NOT NULL, received_at TEXT NOT NULL,
+  outcome TEXT NOT NULL CHECK (outcome IN ('CREATED', 'UPDATED')),
+  submission_count INTEGER NOT NULL
+);
+
+CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_received
+ON inbound_optin_events(received_at);
+
+CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_identity
+ON inbound_optin_events(identity_hash, received_at);
 `;

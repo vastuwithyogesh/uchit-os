@@ -31,6 +31,8 @@ export type RuntimeEnv = {
   // local development can intentionally provide an empty environment.
   DB: D1DatabaseBinding;
   R2: R2BucketBinding;
+  /** Server-only inbound signing key. It is never serialized into AppState or client responses. */
+  OPTIN_WEBHOOK_SECRET?: string;
 };
 
 export function getRuntimeEnv() {

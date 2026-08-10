@@ -51,6 +51,23 @@ export const d1Migrations: readonly D1Migration[] = [
        WHERE updated_at = '2026-08-07T18:30:00.000Z'
        AND email IN ('aarav@uchitvastu.in', 'nandini@uchitvastu.in', 'rishi@uchitvastu.in', 'meera@uchitvastu.in')`
     ]
+  },
+  {
+    version: 5,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS optin_leads (
+        id TEXT PRIMARY KEY, identity_key TEXT NOT NULL UNIQUE, unique_client_id TEXT NOT NULL,
+        payload TEXT NOT NULL, imported_at TEXT NOT NULL, last_seen_at TEXT NOT NULL
+      )`,
+      `CREATE TABLE IF NOT EXISTS inbound_optin_events (
+        event_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, source TEXT NOT NULL,
+        payload_hash TEXT NOT NULL, identity_hash TEXT NOT NULL, received_at TEXT NOT NULL,
+        outcome TEXT NOT NULL CHECK (outcome IN ('CREATED', 'UPDATED')),
+        submission_count INTEGER NOT NULL
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_received ON inbound_optin_events(received_at)",
+      "CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_identity ON inbound_optin_events(identity_hash, received_at)"
+    ]
   }
 ];
 

@@ -24,6 +24,7 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/models", label: "Data Model", minimumRole: "ADMIN" },
   { href: "/diagnostics", label: "System Check", minimumRole: "ADMIN" },
   { href: "/insights", label: "Operations", minimumRole: "ADMIN" },
+  { href: "/integrations", label: "Integrations", minimumRole: "ADMIN" },
   { href: "/integrity", label: "Data Check", minimumRole: "ADMIN" },
   { href: "/state", label: "System Data", minimumRole: "SUPER_ADMIN" },
   { href: "/admin", label: "Team", minimumRole: "ADMIN" },
