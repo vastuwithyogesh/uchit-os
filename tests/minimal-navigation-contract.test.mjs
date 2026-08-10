@@ -7,8 +7,19 @@ test("the main navigation has one clear destination and an accessible More menu"
   assert.match(header, /item\.href === "\/client"/);
   assert.match(header, /item\.href === "\/workspace"/);
   assert.match(header, /<details className="nav-more">/);
-  assert.match(header, /<summary aria-label="Open more pages">/);
+  assert.match(header, /<summary aria-label="Open navigation menu">/);
+  assert.match(header, /nav-more-label">Menu/);
   assert.match(header, /aria-current=/);
+});
+
+test("the mobile menu stays above browser controls and remains scrollable", () => {
+  const css = source("app/globals.css");
+  assert.match(css, /inset:\s*12px 12px max\(12px, env\(safe-area-inset-bottom\)\)/);
+  assert.match(css, /z-index:\s*1000/);
+  assert.match(css, /overflow-y:\s*auto/);
+  assert.match(css, /overscroll-behavior:\s*contain/);
+  assert.match(css, /\.nav-more\[open\] > summary\s*\{[\s\S]*?position:\s*fixed[\s\S]*?z-index:\s*1001/);
+  assert.match(css, /@media \(max-width: 560px\)[\s\S]*?\.nav-more-menu\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
 });
 
 test("navigation labels use plain language", () => {
