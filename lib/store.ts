@@ -38,11 +38,15 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
+import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "@/lib/commercial-policy";
 
 export interface AppState {
   /** Read-only response metadata used for optimistic concurrency; not a domain collection. */
   persistenceRevision?: number | null;
   clients: typeof seedClients;
+  pipelineTransitions: import("@/lib/domain").PipelineTransitionRecord[];
+  commercialPolicy: import("@/lib/domain").CommercialPolicy;
+  commercialPolicyHistory: import("@/lib/domain").CommercialPolicy[];
   leadQualifications: LeadQualificationRecord[];
   commercialProposals: CommercialProposalRecord[];
   reviewCallBookings: ReviewCallBookingRecord[];
@@ -70,6 +74,9 @@ export interface AppState {
 
 export const createEmptyAppState = (): AppState => ({
   clients: [],
+  pipelineTransitions: [],
+  commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
+  commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
   leadQualifications: [],
   commercialProposals: [],
   reviewCallBookings: [],
@@ -97,6 +104,9 @@ export const createEmptyAppState = (): AppState => ({
 
 const createDemoAppState = (): AppState => ({
   clients: structuredClone(seedClients),
+  pipelineTransitions: [],
+  commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
+  commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
   leadQualifications: structuredClone(seedLeadQualifications),
   commercialProposals: structuredClone(seedCommercialProposals),
   reviewCallBookings: [],

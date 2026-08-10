@@ -3,6 +3,8 @@ export type UserRole = (typeof roles)[number];
 
 export const leadStages = ["NEW", "QUALIFYING", "QUALIFIED", "DISQUALIFIED", "CONVERTED"] as const;
 export type LeadStage = (typeof leadStages)[number];
+export const canonicalPipelineStages = ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"] as const;
+export type CanonicalPipelineStage = (typeof canonicalPipelineStages)[number];
 
 export const inboundLeadStatuses = ["NEW", "FILTERED", "QUALIFIED", "DISQUALIFIED", "DUPLICATE"] as const;
 export type InboundLeadStatus = (typeof inboundLeadStatuses)[number];
@@ -82,6 +84,24 @@ export interface ClientRecord {
   email: string;
   phone: string;
   stage: LeadStage;
+  recordVersion?: number;
+  pipelineStage?: CanonicalPipelineStage;
+  pipelineOwner?: { id: string; name: string; role: UserRole };
+  nextAction?: { summary: string; dueAt: string };
+}
+
+export interface PipelineTransitionRecord {
+  id: string; clientId: string; idempotencyKey: string;
+  beforeStage: CanonicalPipelineStage; afterStage: CanonicalPipelineStage;
+  owner: { id: string; name: string; role: UserRole }; nextAction?: { summary: string; dueAt: string };
+  correctionReason?: string; actor: { id: string; name: string; role: UserRole }; happenedAt: string;
+}
+
+export interface CommercialPolicy {
+  version: number; defaultProposalAmountInr: number; minimumAdvanceInr: number;
+  qualificationCallTargetMinutes: number; nextActionDueSoonHours: number; defaultReviewCallMinutes: number;
+  reason: string; updatedAt: string; updatedBy: { id: string; name: string; role: UserRole };
+  idempotencyKey: string;
 }
 
 export interface LeadQualificationRecord {

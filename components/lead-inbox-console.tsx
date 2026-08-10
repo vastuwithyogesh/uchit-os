@@ -187,7 +187,7 @@ export function LeadInboxConsole({
     const clientId = lead.convertedClientId ?? lead.uniqueClientId;
     setBusy(true);
     try {
-      await postAction({ action: "proposal-create", clientId, amountInr: 51000 }, activeUser.role);
+      await postAction({ action: "proposal-create", clientId }, activeUser.role);
       setMessage(`Proposal created for ${lead.fullName}.`);
       await refresh();
     } catch (error) {

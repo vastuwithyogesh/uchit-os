@@ -5,6 +5,7 @@ import type {
   AdvanceVerificationRecord,
   ClientRecord,
   CommercialProposalRecord,
+  CommercialPolicy,
   PaymentRecord,
   ReportVersionRecord,
   ReviewCallBookingRecord,
@@ -15,12 +16,13 @@ import { useSession } from "@/components/session-provider";
 import { getActiveCaseForClient } from "@/lib/service-framework";
 import { formatTimeStamp } from "@/lib/format";
 import { canApproveReport, canReleaseVerdict, canVerifyPayments } from "@/lib/permissions";
-import { DEFAULT_PROPOSAL_AMOUNT_INR, MIN_ADVANCE_INR, approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
+import { approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { prepareImageUpload } from "@/lib/image-upload";
 import type { PaymentProofRecord } from "@/lib/payment-proof-types";
 
 interface CommercialConsoleProps {
+  commercialPolicy: CommercialPolicy;
   clients: ClientRecord[];
   proposals: CommercialProposalRecord[];
   reviewCallBookings: ReviewCallBookingRecord[];
@@ -63,11 +65,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     next.setHours(10, 30, 0, 0);
     return next.toISOString().slice(0, 16);
   });
-  const [proofAmount, setProofAmount] = useState(MIN_ADVANCE_INR);
+  const [proofAmount, setProofAmount] = useState(props.commercialPolicy.minimumAdvanceInr);
   const [proofFileName, setProofFileName] = useState("");
   const [proofUrl, setProofUrl] = useState("");
   const [proofId, setProofId] = useState("");
-  const [balanceProofAmount, setBalanceProofAmount] = useState(40000);
+  const [balanceProofAmount, setBalanceProofAmount] = useState(Math.max(0, props.commercialPolicy.defaultProposalAmountInr - props.commercialPolicy.minimumAdvanceInr));
   const [balanceProofFileName, setBalanceProofFileName] = useState("");
   const [balanceProofUrl, setBalanceProofUrl] = useState("");
   const [balanceProofId, setBalanceProofId] = useState("");
@@ -82,6 +84,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
   const advanceVerifications = liveState?.advanceVerifications ?? props.advanceVerifications;
   const cases = liveState?.vastuCases ?? props.cases;
   const reports = liveState?.reportVersions ?? props.reports;
+  const commercialPolicy = liveState?.commercialPolicy ?? props.commercialPolicy;
 
   const activeClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const activeProposal = proposals.find((proposal) => proposal.clientId === activeClient?.id);
@@ -94,6 +97,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
   const activePayments = payments.filter((payment) => payment.clientId === activeClient?.id);
   const approval = activeCase && activeProposal ? approvalSummary(activeCase, activeProposal, activePayments) : null;
   const advancePayment = activePayments.find((payment) => payment.proposalId === activeProposal?.id && payment.type === "ADVANCE");
+  useEffect(() => {
+    const advance = activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr;
+    setProofAmount(advance);
+    setBalanceProofAmount(Math.max(0, (activeProposal?.amountInr ?? commercialPolicy.defaultProposalAmountInr) - (advancePayment?.amountInr ?? advance)));
+  }, [activeClient?.id, activeProposal?.id, activeProposal?.amountInr, activeProposal?.minAdvanceInr, advancePayment?.amountInr, commercialPolicy]);
   const balancePayment = activePayments.find((payment) => payment.caseId === activeCase?.id && payment.type === "BALANCE");
   const advanceVerified = Boolean(activeVerification?.proofAssetId && advancePayment?.proofAssetId);
   const approvalCount = activeReport?.isPreview ? 0 : activeReport?.approvals?.length ?? 0;
@@ -375,7 +383,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
                 type="button"
                 className="button-secondary"
                 disabled={busy || !activeClient}
-                onClick={() => run({ action: "proposal-create", amountInr: DEFAULT_PROPOSAL_AMOUNT_INR }, "Proposal drafted")}
+                onClick={() => run({ action: "proposal-create" }, "Proposal drafted")}
               >
                 Create proposal
               </button>
@@ -393,7 +401,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
                 type="button"
                 className="button-secondary"
                 disabled={busy || !activeProposal}
-                onClick={() => run({ action: "advance-pay", proposalId: activeProposal?.id, amountInr: MIN_ADVANCE_INR }, "Advance payment approved")}
+                onClick={() => run({ action: "advance-pay", proposalId: activeProposal?.id, amountInr: activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr }, "Advance payment approved")}
               >
                 Approve advance
               </button>
@@ -401,7 +409,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
                 type="button"
                 className="button-secondary"
                 disabled={busy || !activeCase}
-                onClick={() => run({ action: "balance-pay", caseId: activeCase?.id, amountInr: 40000 }, "Balance payment approved")}
+                onClick={() => run({ action: "balance-pay", caseId: activeCase?.id, amountInr: Math.max(0, (activeProposal?.amountInr ?? commercialPolicy.defaultProposalAmountInr) - (advancePayment?.amountInr ?? activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr)) }, "Balance payment approved")}
               >
                 Approve balance
               </button>
@@ -539,7 +547,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
           <div className="two-col" style={{ marginTop: 12 }}>
             <div className="field">
               <label>Advance amount</label>
-              <input type="number" min={MIN_ADVANCE_INR} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
+              <input type="number" min={activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr} value={proofAmount} onChange={(event) => setProofAmount(Number(event.target.value))} />
             </div>
             <div className="field">
               <label>Reference screenshot</label>
@@ -631,11 +639,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
         <div className="list" style={{ marginTop: 14 }}>
           <div className="list-item">
             <strong>Default proposal</strong>
-            <span className="meta">{formatMoney(DEFAULT_PROPOSAL_AMOUNT_INR)}</span>
+            <span className="meta">{formatMoney(commercialPolicy.defaultProposalAmountInr)} · policy v{commercialPolicy.version}</span>
           </div>
           <div className="list-item">
             <strong>Minimum advance</strong>
-            <span className="meta">{formatMoney(MIN_ADVANCE_INR)}</span>
+            <span className="meta">{formatMoney(commercialPolicy.minimumAdvanceInr)}</span>
           </div>
           <div className="list-item">
             <strong>Super-Admin approval</strong>

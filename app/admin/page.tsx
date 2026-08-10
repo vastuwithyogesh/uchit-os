@@ -1,6 +1,7 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { SiteHeader } from "@/components/site-header";
 import { AdminConsole } from "@/components/admin-console";
+import { CommercialPolicyEditor } from "@/components/commercial-policy-editor";
 import { requirePageAccess } from "@/lib/page-access";
 
 export default async function AdminPage() {
@@ -40,6 +41,7 @@ export default async function AdminPage() {
       </section>
 
       <AdminConsole />
+      <CommercialPolicyEditor />
     </main>
   );
 }

@@ -56,6 +56,8 @@ export function EvaluationConsole() {
   const evaluationBlockers = currentCase && state ? getCaseEvaluationBlockers(state, currentCase.id) : ["Open a case and save its service setup."];
   const evaluationReady = Boolean(currentCase && evaluationBlockers.length === 0);
   const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
+  const caseAmountInr = state?.commercialProposals.find((item) => item.clientId === selectedClient?.id)?.amountInr
+    ?? state?.commercialPolicy.defaultProposalAmountInr;
   const report = (reports.find((item) => item.isPreview) ?? reports[0] ?? null) as ReportVersionRecord | null;
   const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
   const shaktiSnapshots = state?.shaktiSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
@@ -245,7 +247,7 @@ export function EvaluationConsole() {
           </div>
           <div className="list-item">
             <strong>Case amount</strong>
-            <span className="meta">{formatMoney(51000)}</span>
+            <span className="meta">{caseAmountInr ? formatMoney(caseAmountInr) : "Not set"}</span>
           </div>
         </div>
         <div className="footer-note" role={message.toLowerCase().includes("failed") || message.toLowerCase().includes("could not") ? "alert" : "status"} aria-live="polite">{message}</div>

@@ -17,9 +17,9 @@ import {
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "@/lib/domain";
-import { alignmentStatuses, attentionClasses, canonicalServiceStages, caseDocumentTypes, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
+import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonicalServiceStages, caseDocumentTypes, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalPipelineStage, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
 import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
-import { MIN_ADVANCE_INR, DEFAULT_PROPOSAL_AMOUNT_INR, canCreateCase, generateUtilityEvaluation, lockWorkspace, qualifyLead, rankShakti } from "@/lib/workflows";
+import { canCreateCase, generateUtilityEvaluation, lockWorkspace, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
 import { formatMoney } from "@/lib/workflows";
 import { writeOptInLeadRecords } from "@/lib/optin-leads-store";
@@ -36,6 +36,7 @@ import {
 import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
 import { assertCaseFileEvidenceRefs, assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
+import { getAllowedPipelineTransitions, normalizeClientPipeline } from "@/lib/crm-pipeline";
 import { readPaymentProofForVerification } from "@/lib/payment-proof-assets.server";
 
 export class WorkflowConflictError extends Error {
@@ -99,6 +100,65 @@ function assessmentContext(caseIdValue: unknown, allowArtifact = false) {
 }
 
 function audit(actor: AppUser) { return { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, at: nowIso() }; }
+
+export function transitionClientPipeline(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  const clientId = boundedRequiredString(input.clientId, "Client ID");
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) throw new Error("Client not found.");
+  if (input.actor.role === "SETTER" && client.assignedSetterId && client.assignedSetterId !== input.actor.id) throw new WorkflowConflictError("Setters may update only clients assigned to them.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.pipelineTransitions.find((item) => item.clientId === clientId && item.idempotencyKey === idempotencyKey);
+  if (retry) return { client, transition: retry };
+  assertExpectedRecordVersion(client, input.expectedRecordVersion);
+  const beforeStage = normalizeClientPipeline(client).stage;
+  const afterStage = enumValue(input.pipelineStage, canonicalPipelineStages, "pipeline stage") as CanonicalPipelineStage;
+  const correction = input.correction === true;
+  const correctionReason = input.correctionReason === undefined || input.correctionReason === "" ? undefined : boundedRequiredString(input.correctionReason, "Correction reason", 500);
+  const isAdmin = input.actor.role === "ADMIN" || input.actor.role === "SUPER_ADMIN";
+  const allowed = getAllowedPipelineTransitions(beforeStage).includes(afterStage);
+  if (!allowed && !(correction && isAdmin && correctionReason && correctionReason.length >= 20)) throw new WorkflowConflictError("Pipeline stages cannot move backwards or skip steps. An administrator may record an explicit correction with a reason of at least 20 characters.");
+  if (correction && (!isAdmin || !correctionReason || correctionReason.length < 20)) throw new WorkflowConflictError("Administrative pipeline correction requires a reason of at least 20 characters.");
+  const ownerId = input.actor.id;
+  const ownerName = input.actor.fullName;
+  const ownerRole = input.actor.role;
+  const isTerminal = afterStage === "CLOSED_REFERRAL" || afterStage === "DISQUALIFIED";
+  let nextAction: { summary: string; dueAt: string } | undefined;
+  if (!isTerminal || input.nextAction !== undefined || input.nextActionDueAt !== undefined) {
+    const dueAt = optionalMilestoneDate(input.nextActionDueAt, "Next action due date");
+    if (!dueAt) throw new Error("Every active pipeline stage requires a dated next action.");
+    if (new Date(dueAt).getTime() <= Date.now()) throw new Error("Next action due date must be in the future.");
+    nextAction = { summary: boundedRequiredString(input.nextAction, "Next action", 500), dueAt };
+  }
+  const happenedAt = nowIso();
+  const transition = { id: nextId("pipeline"), clientId, idempotencyKey, beforeStage, afterStage, owner: { id: ownerId, name: ownerName, role: ownerRole }, nextAction, correctionReason: correction ? correctionReason : undefined, actor: { id: input.actor.id, name: input.actor.fullName, role: input.actor.role }, happenedAt };
+  Object.assign(client, { pipelineStage: afterStage, pipelineOwner: transition.owner, nextAction, recordVersion: (client.recordVersion ?? 0) + 1 });
+  state.pipelineTransitions.unshift(transition);
+  appendTimeline(clientId, "CRM pipeline updated", `${input.actor.fullName} moved ${beforeStage} to ${afterStage}; owner ${ownerName}; ${nextAction ? `next action due ${nextAction.dueAt}.` : "terminal stage has no next action."}${transition.correctionReason ? ` Correction: ${transition.correctionReason}` : ""}`, "CRM", input.actor);
+  return { client, transition };
+}
+
+function boundedPolicyInteger(value: unknown, label: string, minimum: number, maximum: number) {
+  if (!Number.isSafeInteger(value) || Number(value) < minimum || Number(value) > maximum) throw new Error(`${label} must be a whole number from ${minimum} to ${maximum}.`);
+  return Number(value);
+}
+
+export function updateCommercialPolicy(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  if (input.actor.role !== "SUPER_ADMIN") throw new Error("Only a Super-Admin can publish commercial policy.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const retry = state.commercialPolicyHistory.find((item) => item.idempotencyKey === idempotencyKey);
+  if (retry) return retry;
+  if (!Number.isSafeInteger(input.expectedPolicyVersion) || input.expectedPolicyVersion !== state.commercialPolicy.version) throw new WorkflowConflictError("Commercial policy changed. Refresh and retry with the current policy version.");
+  const reason = boundedRequiredString(input.reason, "Policy change reason", 500);
+  if (reason.length < 20) throw new Error("Policy change reason must be at least 20 characters.");
+  const policy = { version: state.commercialPolicy.version + 1, defaultProposalAmountInr: boundedPolicyInteger(input.defaultProposalAmountInr, "Default proposal amount", 1, 100_000_000), minimumAdvanceInr: boundedPolicyInteger(input.minimumAdvanceInr, "Minimum advance", 1, 100_000_000), qualificationCallTargetMinutes: boundedPolicyInteger(input.qualificationCallTargetMinutes, "Qualification call target", 1, 1440), nextActionDueSoonHours: boundedPolicyInteger(input.nextActionDueSoonHours, "Next-action due-soon threshold", 1, 720), defaultReviewCallMinutes: boundedPolicyInteger(input.defaultReviewCallMinutes, "Default review-call duration", 5, 480), reason, updatedAt: nowIso(), updatedBy: { id: input.actor.id, name: input.actor.fullName, role: input.actor.role }, idempotencyKey };
+  if (policy.minimumAdvanceInr > policy.defaultProposalAmountInr) throw new Error("Minimum advance cannot exceed the default proposal amount.");
+  state.commercialPolicy = policy;
+  state.commercialPolicyHistory.unshift(policy);
+  appendTimeline("system", "Commercial policy updated", `${input.actor.fullName} published commercial policy v${policy.version}: ${reason}`, "Commercial", input.actor);
+  return policy;
+}
 
 export function upsertAssessmentObservation(input: Record<string, unknown> & { actor: AppUser }) {
   const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
@@ -452,7 +512,7 @@ export function recordLeadQualification(input: {
     clientId: input.clientId,
     score: input.score,
     notes: input.notes,
-    qualificationCallDueAt: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+    qualificationCallDueAt: new Date(Date.now() + state.commercialPolicy.qualificationCallTargetMinutes * 60 * 1000).toISOString(),
     qualificationCallCompletedAt: input.qualificationCallCompletedAt,
     deliverableTriggeredAt: input.score >= 80 && input.qualificationCallCompletedAt ? new Date().toISOString() : undefined,
     conversationalForm: input.conversationalForm
@@ -478,7 +538,7 @@ export function bookQualificationCall(input: {
   appendTimeline(
     input.clientId,
     "Qualification call booked",
-    `Qualification call scheduled for ${input.scheduledAt}. The 2-minute window remains the working SLA.`,
+    `Qualification call scheduled for ${input.scheduledAt}. The configured target is ${state.commercialPolicy.qualificationCallTargetMinutes} minutes.`,
     "Lead",
     input.actor.role
   );
@@ -647,7 +707,7 @@ export function qualifyInboundLead(inboundLeadId: string, actor: AppUser) {
     clientId,
     score: inboundLead.score,
     notes: inboundLead.notes || inboundLead.message || "Imported from CSV opt-in",
-    qualificationCallDueAt: new Date(Date.now() + 2 * 60 * 1000).toISOString(),
+    qualificationCallDueAt: new Date(Date.now() + state.commercialPolicy.qualificationCallTargetMinutes * 60 * 1000).toISOString(),
     qualificationCallCompletedAt: new Date().toISOString(),
     deliverableTriggeredAt: inboundLead.score >= 80 ? new Date().toISOString() : undefined,
     conversationalForm: [
@@ -706,18 +766,20 @@ export function updateInboundLeadStatus(inboundLeadId: string, status: InboundLe
   return inboundLead;
 }
 
-export function createCommercialProposal(clientId: string, amountInr = DEFAULT_PROPOSAL_AMOUNT_INR) {
+export function createCommercialProposal(clientId: string, amountInr?: number) {
   const state = getAppState();
+  const explicitAmount = amountInr ?? state.commercialPolicy.defaultProposalAmountInr;
+  if (!Number.isSafeInteger(explicitAmount) || explicitAmount <= 0) throw new Error("Proposal amount must be a positive whole INR amount.");
   const proposal: CommercialProposalRecord = {
     id: nextId("proposal"),
     clientId,
-    amountInr,
-    minAdvanceInr: MIN_ADVANCE_INR,
+    amountInr: explicitAmount,
+    minAdvanceInr: state.commercialPolicy.minimumAdvanceInr,
     status: "PENDING_APPROVAL"
   };
 
   state.commercialProposals.unshift(proposal);
-  appendTimeline(clientId, "Commercial proposal drafted", `Proposal prepared at ${formatMoney(amountInr)}.`, "Commercial", "ADMIN");
+  appendTimeline(clientId, "Commercial proposal drafted", `Proposal prepared at ${formatMoney(explicitAmount)} under commercial policy v${state.commercialPolicy.version}.`, "Commercial", "ADMIN");
   return proposal;
 }
 
@@ -741,7 +803,7 @@ export async function bookReviewCall(input: {
     proposalId: input.proposalId,
     provider: input.provider,
     scheduledAt: input.scheduledAt,
-    durationMinutes: input.durationMinutes ?? 30,
+    durationMinutes: input.durationMinutes ?? state.commercialPolicy.defaultReviewCallMinutes,
     meetingLink: buildMeetingLink(input.provider, input.clientId),
     calendarHoldId: `cal_${input.clientId}_${Date.now()}`,
     status: "BOOKED",

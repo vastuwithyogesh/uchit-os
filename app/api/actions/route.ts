@@ -42,6 +42,8 @@ import {
   upsertImplementationTask,
   upsertCaseDocument,
   upsertDeliveryMilestone,
+  transitionClientPipeline,
+  updateCommercialPolicy,
   updateInboundLeadStatus,
   verifyAdvanceProofAndOpenCase,
   verifyBalanceProof,
@@ -57,7 +59,7 @@ export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}));
   const action = body.action as string;
   const actor = await resolveRequestActor(request.headers, body.actorRole);
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert"]);
+  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "client-pipeline-transition", "commercial-policy-update"]);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -70,13 +72,24 @@ export async function POST(request: Request) {
     let response: unknown;
 
     if (concurrencyActions.has(action)) {
-      if (!("expectedRecordVersion" in body) || !("expectedRevision" in body)) {
+      const hasEntityVersion = action === "commercial-policy-update" ? "expectedPolicyVersion" in body : "expectedRecordVersion" in body;
+      if (!hasEntityVersion || !("expectedRevision" in body)) {
         return NextResponse.json({ ok: false, error: "The latest case and state versions are required. Refresh and try again." }, { status: 428 });
       }
       const latest = await loadStateSnapshotFromPersistence();
       rollbackState = structuredClone(latest.state);
       globalRevisionStale = body.expectedRevision !== latest.revision;
       expectedGlobalRevision = latest.revision ?? undefined;
+    }
+
+    const crmAllowedFields: Record<string, string[]> = {
+      "client-pipeline-transition": ["action", "actorRole", "clientId", "pipelineStage", "nextAction", "nextActionDueAt", "correction", "correctionReason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "commercial-policy-update": ["action", "actorRole", "defaultProposalAmountInr", "minimumAdvanceInr", "qualificationCallTargetMinutes", "nextActionDueSoonHours", "defaultReviewCallMinutes", "reason", "idempotencyKey", "expectedPolicyVersion", "expectedRevision"]
+    };
+    if (crmAllowedFields[action]) {
+      const allowed = new Set(crmAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown CRM field: ${unknown}.` }, { status: 400 });
     }
 
     const assessmentAllowedFields: Record<string, string[]> = {
@@ -116,6 +129,14 @@ export async function POST(request: Request) {
           return deny("This role cannot record lead qualification.");
         }
         response = { ok: true, lead: recordLeadQualification(body) };
+        break;
+      case "client-pipeline-transition":
+        if (!canTriggerDeliverables(actor)) return deny("Only assigned setters, consultants, or administrators can update the client pipeline.");
+        response = { ok: true, result: transitionClientPipeline({ ...body, actor }) };
+        break;
+      case "commercial-policy-update":
+        if (actor.role !== "SUPER_ADMIN") return deny("Only a Super-Admin can publish commercial policy.");
+        response = { ok: true, policy: updateCommercialPolicy({ ...body, actor }) };
         break;
       case "lead-qualify":
         if (!canTriggerDeliverables(actor)) {
@@ -162,7 +183,7 @@ export async function POST(request: Request) {
             proposalId: body.proposalId,
             provider: body.provider === "ZOOM" ? "ZOOM" : "GOOGLE_MEET",
             scheduledAt: String(body.scheduledAt ?? new Date().toISOString()),
-            durationMinutes: Number(body.durationMinutes ?? 30),
+            durationMinutes: body.durationMinutes === undefined ? undefined : Number(body.durationMinutes),
             actor
           })
         };

@@ -2,6 +2,8 @@ import type { AppState } from "@/lib/store";
 
 const collectionKeys = [
   "clients",
+  "pipelineTransitions",
+  "commercialPolicyHistory",
   "leadQualifications",
   "commercialProposals",
   "reviewCallBookings",
@@ -37,5 +39,6 @@ export function mergeAppState(base: AppState, snapshot: AppState): AppState {
       (merged as unknown as Record<string, unknown>)[key] = base[key];
     }
   }
+  if (!partialSnapshot.commercialPolicy || typeof partialSnapshot.commercialPolicy !== "object") merged.commercialPolicy = base.commercialPolicy;
   return merged;
 }
