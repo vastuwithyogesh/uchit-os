@@ -1,5 +1,6 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { CaseMasterConsole } from "@/components/case-master-console";
+import { FounderRouteIntro } from "@/components/founder-route-intro";
 import { SiteHeader } from "@/components/site-header";
 import { WorkflowConsole } from "@/components/workflow-console";
 import { requirePageAccess } from "@/lib/page-access";
@@ -19,13 +20,15 @@ export default async function OpsPage() {
     <main className="page-shell">
       <SiteHeader title="Workflow Console" subtitle="Case operations and release controls" />
 
-      <section className="hero-panel" style={{ marginTop: 22 }}>
-        <div className="eyebrow">Operations spine</div>
-        <h1>Run approvals, case creation, preview generation, and verdict release from one controlled surface.</h1>
-        <p className="lede">
-          This page brings together the main working systems for consultants and admins so the case journey can be managed end to end with one shared audit trail.
-        </p>
-      </section>
+      <FounderRouteIntro
+        eyebrow="Case setup"
+        title="Prepare the active case before evaluation starts."
+        description="Confirm the commercial gate, project and floor context, then move only the current case revision forward. Every change remains auditable."
+        primaryAction={{ href: "/workspace", label: "Open my workspace" }}
+        secondaryAction={{ href: "/files", label: "Review evidence" }}
+        context="Founder Edition · active case and floor context"
+        status={{ label: "Case setup", tone: "ready" }}
+      />
 
       <CaseMasterConsole />
       <WorkflowConsole />

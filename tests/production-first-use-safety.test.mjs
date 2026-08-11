@@ -43,6 +43,6 @@ test("production data screens explain safe inspection and first use", () => {
   assert.doesNotMatch(bootstrapUi, /Sync state to persistence/);
   assert.match(stateUi, /Full production snapshot/);
   assert.doesNotMatch(stateUi, /restoring the demo|entire local app state/i);
-  assert.match(home, /Start by adding your first client/);
+  assert.match(home, /Start with your first client/);
   assert.match(home, /Add first client/);
 });

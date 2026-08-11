@@ -1,4 +1,5 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
+import { FounderRouteIntro } from "@/components/founder-route-intro";
 import { SiteHeader } from "@/components/site-header";
 import { EvaluationConsole } from "@/components/evaluation-console";
 import { ChartAssetBoard } from "@/components/chart-asset-board";
@@ -19,28 +20,23 @@ export default async function EvaluationPage() {
     <main className="page-shell">
       <SiteHeader title="Evaluation Engine" subtitle="Utility matrix and report template" />
 
-      <section className="hero-panel" style={{ marginTop: 22 }}>
-        <div className="eyebrow">Residential evaluation</div>
-        <h1>Review the case, then turn verified findings into a clear action plan.</h1>
-        <p className="lede">
-          Complete the technical evaluation here. When it is ready, open the action plan to record what you saw, what should change, and who will do it.
-        </p>
-        <div className="pill-row" style={{ marginTop: 16 }}>
-          <span className="pill">Residential rule source of truth</span>
-          <span className="pill">16-value Shakti input</span>
-          <span className="pill">±2 tie-break support</span>
-        </div>
-        <div className="hero-actions" style={{ marginTop: 14 }}>
-          <a href="/files" className="button">Open files and drawings</a>
-          <a href="/assessment" className="button">Open assessment workspace</a>
-          <a href="/assets" className="button">
-            Open chart uploads
-          </a>
-          <a href="/diagnostics" className="button-secondary">
-            View snapshot diagnostics
-          </a>
-        </div>
-      </section>
+      <FounderRouteIntro
+        eyebrow="Evaluation"
+        title="Complete the next verified evaluation input."
+        description="Open the exact floor context, confirm evidence and prerequisites, then review the deterministic evaluation output. Blocked methodology stays blocked until its approved input exists."
+        primaryAction={{ href: "/files", label: "Open files and drawings" }}
+        secondaryAction={{ href: "/assessment", label: "Open assessment workspace" }}
+        context="Founder Edition · direction and element layers only"
+        status={{ label: "Review prerequisites", tone: "attention" }}
+      >
+        <details className="route-secondary-links">
+          <summary>More evaluation tools</summary>
+          <div className="route-link-list">
+            <a href="/assets" className="button-secondary">Open chart uploads</a>
+            <a href="/diagnostics" className="button-secondary">View system check</a>
+          </div>
+        </details>
+      </FounderRouteIntro>
 
       <EvaluationConsole />
       <ChartAssetBoard />

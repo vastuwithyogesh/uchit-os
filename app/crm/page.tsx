@@ -3,6 +3,7 @@ import { CrmWorkbench } from "@/components/crm-workbench";
 import { CrmPipelineBoard } from "@/components/crm-pipeline-board";
 import { ClientIntakeForm } from "@/components/client-intake-form";
 import { CommercialConsole } from "@/components/commercial-console";
+import { FounderRouteIntro } from "@/components/founder-route-intro";
 import { LeadInboxConsole } from "@/components/lead-inbox-console";
 import { SiteHeader } from "@/components/site-header";
 import { requirePageAccess } from "@/lib/page-access";
@@ -25,50 +26,25 @@ export default async function CrmPage() {
     <main className="page-shell">
       <SiteHeader title="CRM Workbench" subtitle="Lead flow, approvals, and workspace control" />
 
-      <section className="hero-panel" style={{ marginTop: 22 }}>
-        <div className="eyebrow">Lead operations</div>
-        <h1>Import website opt-in leads, filter them, and qualify the right ones into the CRM.</h1>
-        <p className="lede">
-          This page is now centered on the real intake flow: download the CSV from your website dashboard, upload it here, filter the rows, and qualify the leads that are ready.
-        </p>
-        <div className="stat-grid" style={{ marginTop: 22 }}>
-          <div className="stat-card">
-            <span className="stat-value">{state.clients.length}</span>
-            <span className="stat-label">Active clients</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{state.optInLeads.length}</span>
-            <span className="stat-label">Opt-in leads imported</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{state.reviewCallBookings.length}</span>
-            <span className="stat-label">Review calls booked</span>
-          </div>
-          <div className="stat-card">
-            <span className="stat-value">{state.advanceVerifications.length}</span>
-            <span className="stat-label">Advance proofs verified</span>
-          </div>
+      <FounderRouteIntro
+        eyebrow="Client flow"
+        title="Move one client from first contact to a confirmed case."
+        description="Keep opt-in, qualification, scope, payment and case creation in one auditable sequence. The server remains the source of truth for every transition."
+        primaryAction={{ href: "#client-intake", label: "Start client intake" }}
+        secondaryAction={{ href: "/timeline", label: "Open client history" }}
+        context={`Founder Edition · ${state.clients.length} clients · ${state.vastuCases.length} cases`}
+        status={{ label: state.clients.length ? "Ready for intake" : "Attention needed", tone: state.clients.length ? "ready" : "attention" }}
+      >
+        <div className="stat-grid route-stat-grid" aria-label="CRM summary">
+          <div className="stat-card"><span className="stat-value">{state.clients.length}</span><span className="stat-label">clients</span></div>
+          <div className="stat-card"><span className="stat-value">{state.optInLeads.length}</span><span className="stat-label">opt-ins</span></div>
+          <div className="stat-card"><span className="stat-value">{state.reviewCallBookings.length}</span><span className="stat-label">review calls</span></div>
+          <div className="stat-card"><span className="stat-value">{state.advanceVerifications.length}</span><span className="stat-label">advance proofs</span></div>
         </div>
-        <div className="panel" style={{ marginTop: 18 }}>
-          <div className="panel-head">
-            <div>
-              <strong>Current operating snapshot</strong>
-              <div className="meta">This is the live state the team is working from right now.</div>
-            </div>
-            <span className="tag neutral">CRM workbench</span>
-          </div>
-          <div className="pill-row" style={{ marginTop: 12 }}>
-            <span className="pill">Leads {state.leadQualifications.length}</span>
-            <span className="pill">Proposals {state.commercialProposals.length}</span>
-            <span className="pill">Cases {state.vastuCases.length}</span>
-            <span className="pill">Reports {state.reportVersions.length}</span>
-            <span className="pill">Outreach logs {state.timelineEvents.filter((event) => event.category === "Outreach").length}</span>
-          </div>
-        </div>
-      </section>
+      </FounderRouteIntro>
 
       <CrmPipelineBoard />
-      <ClientIntakeForm />
+      <div id="client-intake"><ClientIntakeForm /></div>
       <LeadInboxConsole
         leadQualifications={state.leadQualifications}
         proposals={state.commercialProposals}

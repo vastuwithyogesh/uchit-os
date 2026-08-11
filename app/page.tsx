@@ -1,4 +1,5 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
+import { FounderRouteIntro } from "@/components/founder-route-intro";
 import { SiteHeader } from "@/components/site-header";
 import { buildCaseWorkspaceProjection } from "@/lib/case-workspace";
 import { requirePageAccess } from "@/lib/page-access";
@@ -26,32 +27,28 @@ export default async function HomePage() {
       <main className="page-shell">
         <SiteHeader title="Uchit Vastu" subtitle="Your work, in one place" />
 
-        <section className="hero">
-          <div className="hero-panel">
-            <div className="eyebrow">Staff home</div>
-            <h1>{hasNoClients ? "Start by adding your first client" : firstItem ? "Start with the next client task" : "You are all caught up"}</h1>
-            <p className="lede">
-              {hasNoClients
-                ? "Import website opt-ins or add a client in the Clients area. The workspace will then show one clear next step at a time."
-                : firstItem
-                ? "The workspace puts urgent work first and explains what to do, what is waiting, and what happens after."
-                : "There are no client tasks in your queue. New work will appear here when it is assigned to you."}
-            </p>
-            <div className="hero-actions">
-              <a href={hasNoClients ? "/crm" : "/workspace"} className="button">{hasNoClients ? "Add first client" : "Open my workspace"}</a>
-              <a href={hasNoClients ? "/workspace" : "/crm"} className="button-secondary">{hasNoClients ? "View empty workspace" : "Add or find a client"}</a>
-            </div>
+        <FounderRouteIntro
+          eyebrow="Founder home"
+          title={hasNoClients ? "Start with your first client" : firstItem ? "Start with the next client task" : "You are all caught up"}
+          description={
+            hasNoClients
+              ? "Add a client to begin. The Founder workspace will then keep one clear next action in view."
+              : firstItem
+              ? "Urgent work is brought forward with its blocker, owner and recovery path."
+              : "There are no open Founder tasks right now. New work will appear here when it is ready."
+          }
+          primaryAction={{ href: hasNoClients ? "/crm" : "/workspace", label: hasNoClients ? "Add first client" : "Open my workspace" }}
+          secondaryAction={{ href: hasNoClients ? "/workspace" : "/crm", label: hasNoClients ? "View empty workspace" : "Find a client" }}
+          context={`Founder Edition · ${work.filter((item) => item.stage !== "Complete").length} open tasks`}
+          status={{ label: firstItem ? "Attention now" : "Ready", tone: firstItem ? "attention" : "ready" }}
+        >
+          <div className="stat-grid route-stat-grid" aria-label="Work summary">
+            <div className="stat-card"><span className="stat-value">{needsAttention.length}</span><span className="stat-label">need attention</span></div>
+            <div className="stat-card"><span className="stat-value">{work.filter((item) => item.sla === "OVERDUE").length}</span><span className="stat-label">past due</span></div>
+            <div className="stat-card"><span className="stat-value">{work.filter((item) => item.stage !== "Complete").length}</span><span className="stat-label">in progress</span></div>
+            <div className="stat-card"><span className="stat-value">{work.filter((item) => item.stage === "Complete").length}</span><span className="stat-label">completed</span></div>
           </div>
-
-          <aside className="hero-side">
-            <div className="stat-grid" aria-label="Work summary">
-              <div className="stat-card"><span className="stat-value">{needsAttention.length}</span><span className="stat-label">need attention</span></div>
-              <div className="stat-card"><span className="stat-value">{work.filter((item) => item.sla === "OVERDUE").length}</span><span className="stat-label">past due</span></div>
-              <div className="stat-card"><span className="stat-value">{work.filter((item) => item.stage !== "Complete").length}</span><span className="stat-label">still in progress</span></div>
-              <div className="stat-card"><span className="stat-value">{work.filter((item) => item.stage === "Complete").length}</span><span className="stat-label">completed</span></div>
-            </div>
-          </aside>
-        </section>
+        </FounderRouteIntro>
 
         {firstItem ? (
           <section className="card" aria-labelledby="next-task-title">

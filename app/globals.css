@@ -1653,3 +1653,261 @@ input[type="file"] {
     display: none;
   }
 }
+
+/* Founder Edition v2: calm, task-led surfaces. Keep this final block small and
+   shared so route components do not need one-off visual rules. */
+:root {
+  --bg: #f7f5f2;
+  --bg-soft: #efede9;
+  --panel: #ffffff;
+  --panel-strong: #ffffff;
+  --text: #111111;
+  --muted: #626262;
+  --line: #dedbd6;
+  --line-strong: #c8c4be;
+  --accent: #2d2d2d;
+  --accent-2: #7a5d32;
+  --brass: #b08d57;
+  --shadow: none;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+}
+
+.page-shell {
+  max-width: 1320px;
+  padding: 18px 24px 72px;
+}
+
+.topbar,
+.hero-panel,
+.card,
+.glass,
+.panel,
+.stat-card,
+.list-item,
+.timeline-item,
+.workflow-step,
+.stepper-item,
+.workspace-item,
+.workspace-state {
+  box-shadow: none;
+  backdrop-filter: none;
+}
+
+.topbar {
+  position: sticky;
+  top: 14px;
+  z-index: 30;
+  background: var(--panel);
+  border-color: var(--line);
+}
+
+.brand-context strong {
+  font-size: 0.96rem;
+  letter-spacing: -0.01em;
+}
+
+.brand-context .meta {
+  color: var(--muted);
+}
+
+.route-intro {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(220px, 300px);
+  gap: 28px;
+  align-items: end;
+  margin-top: 22px;
+  padding: 34px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+}
+
+.route-intro-copy {
+  min-width: 0;
+}
+
+.route-intro h1 {
+  max-width: 18ch;
+  margin-top: 10px;
+  font-size: clamp(2.1rem, 4vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.045em;
+}
+
+.route-intro .lede {
+  max-width: 62ch;
+  margin-top: 16px;
+}
+
+.context-line {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: baseline;
+  margin: 18px 0 0;
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+.context-line-label {
+  color: var(--accent-2);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+}
+
+.route-intro-side {
+  display: grid;
+  gap: 14px;
+  justify-items: stretch;
+}
+
+.route-intro-side .status-neutral,
+.route-intro-side .status-attention,
+.route-intro-side .status-blocked,
+.route-intro-side .status-ready,
+.route-intro-side .status-approved,
+.route-intro-side .status-released {
+  justify-content: center;
+}
+
+.route-intro-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.route-intro-actions .button,
+.route-intro-actions .button-secondary {
+  width: 100%;
+}
+
+.route-stat-grid {
+  margin-top: 24px;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+
+.route-stat-grid .stat-card {
+  padding: 14px;
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+  border-color: var(--line);
+}
+
+.route-stat-grid .stat-value {
+  font-size: 1.45rem;
+}
+
+.route-quiet-pills {
+  margin-top: 20px;
+}
+
+.route-secondary-links {
+  margin-top: 22px;
+}
+
+.route-link-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 12px;
+}
+
+.hero-actions .button,
+.hero-actions .button-secondary,
+.route-intro-actions .button,
+.route-intro-actions .button-secondary {
+  box-shadow: none;
+}
+
+.button,
+.button-secondary,
+.button-success,
+.button-danger {
+  box-shadow: none !important;
+}
+
+.button:hover,
+.button-secondary:hover,
+.button-success:hover,
+.button-danger:hover {
+  transform: none;
+  filter: none;
+  border-color: var(--line-strong);
+}
+
+.status-neutral,
+.status-attention,
+.status-blocked,
+.status-ready,
+.status-approved,
+.status-released {
+  background: transparent;
+}
+
+.status-neutral::before,
+.status-attention::before,
+.status-blocked::before,
+.status-ready::before,
+.status-approved::before,
+.status-released::before {
+  width: 7px;
+  height: 7px;
+  margin-right: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+details:not(.nav-more) {
+  border-top: 1px solid var(--line);
+  padding-top: 10px;
+}
+
+details:not(.nav-more) > summary {
+  color: var(--accent-2);
+  font-size: 0.86rem;
+}
+
+.section-grid,
+.hero,
+.panel-grid,
+.workspace-list,
+.timeline,
+.workflow {
+  margin-top: 22px;
+}
+
+@media (max-width: 820px) {
+  .page-shell {
+    padding: 12px 14px 48px;
+  }
+
+  .topbar {
+    top: 8px;
+  }
+
+  .route-intro {
+    grid-template-columns: 1fr;
+    gap: 22px;
+    padding: 24px 20px;
+  }
+
+  .route-intro h1 {
+    max-width: none;
+    font-size: clamp(2rem, 10vw, 3rem);
+  }
+
+  .context-line {
+    display: grid;
+    gap: 4px;
+  }
+
+  .route-stat-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
