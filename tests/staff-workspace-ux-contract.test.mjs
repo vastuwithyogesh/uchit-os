@@ -4,8 +4,8 @@ import { source } from "./helpers/source-contracts.mjs";
 
 test("staff home makes the workspace the primary action and avoids stale launch copy", () => {
   const page = source("app/page.tsx");
-  assert.match(page, /Open my workspace/);
-  assert.match(page, /Do this next/);
+  assert.match(page, /FounderScorecard/);
+  assert.match(page, /buildFounderScorecard/);
   assert.doesNotMatch(page, /Saturday, August 8, 2026|Launch readiness|Sites-ready local build|loose scaffold/);
 });
 

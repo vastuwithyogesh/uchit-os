@@ -1006,6 +1006,198 @@ h3,
   box-shadow: none;
 }
 
+/* Founder v4: one-project scorecard and floor-first progress. */
+.founder-scorecard {
+  display: grid;
+  gap: 28px;
+  margin-top: 24px;
+}
+
+.founder-scorecard-header {
+  display: grid;
+  grid-template-columns: minmax(0, 1.35fr) minmax(240px, 0.65fr);
+  gap: 28px;
+  padding: clamp(22px, 4vw, 38px);
+}
+
+.founder-scorecard-header h1 {
+  max-width: 17ch;
+  margin-top: 10px;
+  font-size: clamp(2rem, 4vw, 4.2rem);
+  line-height: 0.98;
+}
+
+.founder-scorecard-header .lede {
+  max-width: 62ch;
+}
+
+.founder-scorecard-header-next {
+  display: grid;
+  align-content: center;
+  gap: 10px;
+  padding: 20px;
+  border-left: 2px solid var(--brass);
+  background: var(--bg-soft);
+}
+
+.founder-scorecard-header-next strong {
+  font-size: 1.12rem;
+}
+
+.founder-scorecard-header-next .button {
+  justify-self: start;
+  margin-top: 4px;
+}
+
+.founder-scorecard-section-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.founder-scorecard-section-heading h2 {
+  margin-top: 4px;
+  font-size: clamp(1.4rem, 2.6vw, 2rem);
+}
+
+.founder-floor-chips {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.founder-floor-chip {
+  display: flex;
+  min-height: 68px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.founder-floor-chip:hover,
+.founder-scorecard-module-active {
+  border-color: var(--brass);
+}
+
+.founder-floor-chip > span:first-child {
+  display: grid;
+  gap: 4px;
+}
+
+.founder-floor-chip small {
+  color: var(--muted);
+}
+
+.founder-floor-chip .status-pill {
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 0.68rem;
+}
+
+.founder-floor-chip-needs_regeneration { border-color: color-mix(in srgb, var(--status-blocked) 42%, var(--line)); }
+.founder-floor-chip-complete { border-color: color-mix(in srgb, var(--status-approved) 42%, var(--line)); }
+
+.founder-scorecard-empty {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  padding: 18px;
+  border: 1px dashed var(--line-strong);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+}
+
+.founder-scorecard-empty p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.founder-scorecard-modules {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.founder-scorecard-module {
+  gap: 12px;
+  padding: 18px 20px;
+  border-radius: var(--radius-md);
+}
+
+.founder-scorecard-module-active {
+  background: #fffdf9;
+}
+
+.founder-scorecard-module[data-tone="needs-regeneration"] {
+  border-color: color-mix(in srgb, var(--status-blocked) 48%, var(--line));
+}
+
+.founder-scorecard-explanation {
+  max-width: 72ch;
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.founder-scorecard-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.founder-scorecard-details {
+  margin-top: 0;
+}
+
+.founder-scorecard-details p {
+  margin: 8px 0 0;
+  overflow-wrap: anywhere;
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+@media (max-width: 820px) {
+  .founder-scorecard-header {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+
+  .founder-scorecard-header-next {
+    border-top: 2px solid var(--brass);
+    border-left: 0;
+  }
+
+  .founder-scorecard-section-heading {
+    display: grid;
+    align-items: start;
+    gap: 6px;
+  }
+
+  .founder-scorecard-actions,
+  .founder-scorecard-empty {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .founder-scorecard-actions > a,
+  .founder-scorecard-empty > a {
+    width: 100%;
+  }
+
+  .founder-floor-chip {
+    min-height: 72px;
+  }
+}
+
 @media (max-width: 820px) {
   .founder-step-card-heading {
     display: grid;
