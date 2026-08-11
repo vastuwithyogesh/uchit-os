@@ -1198,6 +1198,281 @@ h3,
   }
 }
 
+/* Unified CRM workspace: a calm list/detail surface with optional stage board. */
+.unified-leads-workspace {
+  display: grid;
+  gap: 18px;
+  margin-top: 24px;
+  padding: 28px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-xl);
+  background: var(--panel);
+}
+
+.unified-leads-header,
+.unified-leads-controls,
+.unified-leads-context,
+.unified-lead-detail-meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+
+.unified-leads-header {
+  justify-content: space-between;
+  gap: 22px;
+}
+
+.unified-leads-header h2 {
+  margin: 6px 0 0;
+  font-size: clamp(1.65rem, 3vw, 2.35rem);
+  letter-spacing: -0.035em;
+}
+
+.unified-leads-header p {
+  max-width: 66ch;
+  margin: 8px 0 0;
+}
+
+.unified-leads-context {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.unified-leads-controls {
+  align-items: end;
+  padding: 14px 0 4px;
+  border-top: 1px solid var(--line);
+}
+
+.unified-leads-controls .field {
+  min-width: min(100%, 190px);
+  flex: 1 1 190px;
+}
+
+.unified-leads-view-toggle {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.unified-leads-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(300px, 0.75fr);
+  gap: 20px;
+  align-items: start;
+}
+
+.unified-leads-list {
+  display: grid;
+  gap: 8px;
+  min-width: 0;
+}
+
+.unified-lead-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(120px, 0.7fr);
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  padding: 15px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--panel);
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+
+.unified-lead-row:hover,
+.unified-lead-row.is-selected {
+  border-color: var(--brass);
+  background: #fbfaf8;
+}
+
+.unified-lead-row-main,
+.unified-lead-row-meta {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.unified-lead-row-main strong,
+.unified-lead-row-main span,
+.unified-lead-row-meta span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.unified-lead-row-main span,
+.unified-lead-row-meta span {
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.unified-lead-detail {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  padding: 22px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: #fbfaf8;
+}
+
+.unified-lead-detail h3 {
+  margin: 0;
+  font-size: 1.45rem;
+  letter-spacing: -0.025em;
+}
+
+.unified-lead-fields {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+}
+
+.unified-lead-fields div {
+  display: grid;
+  grid-template-columns: 110px minmax(0, 1fr);
+  gap: 10px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--line);
+}
+
+.unified-lead-fields dt {
+  color: var(--muted);
+  font-size: 0.78rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.unified-lead-fields dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.unified-lead-action {
+  display: grid;
+  gap: 10px;
+}
+
+.unified-lead-action .button {
+  width: 100%;
+}
+
+.unified-lead-history {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding-left: 18px;
+}
+
+.unified-lead-history li {
+  display: grid;
+  gap: 3px;
+}
+
+.unified-lead-history span {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.unified-leads-reload {
+  justify-self: start;
+}
+
+.unified-lead-stage {
+  display: grid;
+  gap: 8px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: #fbfaf8;
+}
+
+.unified-lead-stage h3 {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  margin: 0;
+  color: var(--charcoal, #2d2d2d);
+  font-size: 0.9rem;
+}
+
+.unified-lead-stage h3 span {
+  color: var(--muted);
+  font-weight: 500;
+}
+
+.view-board .unified-leads-list {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: start;
+}
+
+.view-board .unified-lead-row {
+  grid-template-columns: 1fr;
+}
+
+.crm-advanced-tools {
+  margin-top: 18px;
+  padding-top: 16px;
+}
+
+.crm-advanced-stack {
+  display: grid;
+  gap: 22px;
+  padding-top: 20px;
+}
+
+@media (max-width: 900px) {
+  .unified-leads-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .unified-lead-detail {
+    position: static;
+  }
+}
+
+@media (max-width: 640px) {
+  .unified-leads-workspace {
+    padding: 20px 16px;
+  }
+
+  .unified-leads-header {
+    align-items: flex-start;
+  }
+
+  .unified-leads-controls {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .unified-leads-controls .field:first-child {
+    grid-column: 1 / -1;
+  }
+
+  .unified-leads-view-toggle {
+    grid-column: 1 / -1;
+    margin-left: 0;
+  }
+
+  .unified-lead-row {
+    grid-template-columns: 1fr auto;
+  }
+
+  .unified-lead-row-meta {
+    grid-column: 1 / -1;
+  }
+
+  .view-board .unified-leads-list {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* Founder v5 sequential workflow: one calm task per page. */
 .header-flow-label {
   color: var(--accent-2);

@@ -1,6 +1,6 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { CrmWorkbench } from "@/components/crm-workbench";
-import { CrmPipelineBoard } from "@/components/crm-pipeline-board";
+import { UnifiedLeadsWorkspace } from "@/components/unified-leads-workspace";
 import { ClientIntakeForm } from "@/components/client-intake-form";
 import { CommercialConsole } from "@/components/commercial-console";
 import { FounderRouteIntro } from "@/components/founder-route-intro";
@@ -30,7 +30,7 @@ export default async function CrmPage() {
         eyebrow="Client flow"
         title="Move one client from first contact to a confirmed case."
         description="Keep opt-in, qualification, scope, payment and case creation in one auditable sequence. The server remains the source of truth for every transition."
-        primaryAction={{ href: "#client-intake", label: "Start client intake" }}
+        primaryAction={{ href: "#unified-leads-title", label: "Open lead workspace" }}
         secondaryAction={{ href: "/timeline", label: "Open client history" }}
         context={`Founder Edition · ${state.clients.length} clients · ${state.vastuCases.length} cases`}
         status={{ label: state.clients.length ? "Ready for intake" : "Attention needed", tone: state.clients.length ? "ready" : "attention" }}
@@ -43,38 +43,44 @@ export default async function CrmPage() {
         </div>
       </FounderRouteIntro>
 
-      <CrmPipelineBoard />
-      <div id="client-intake"><ClientIntakeForm /></div>
-      <LeadInboxConsole
-        leadQualifications={state.leadQualifications}
-        proposals={state.commercialProposals}
-        reviewCallBookings={state.reviewCallBookings}
-      />
+      <UnifiedLeadsWorkspace />
 
-      <CrmWorkbench
-        commercialPolicy={state.commercialPolicy}
-        clients={state.clients}
-        leads={state.leadQualifications}
-        proposals={state.commercialProposals}
-        payments={state.payments}
-        cases={state.vastuCases}
-        floors={state.floorWorkspaces}
-        reports={state.reportVersions}
-        utilityRules={state.utilityRules}
-        templates={state.whatsappTemplates}
-        timeline={state.timelineEvents}
-      />
+      <details id="crm-advanced-tools" className="founder-technical-details crm-advanced-tools">
+        <summary>More options · intake, qualification, commercial and payment tools</summary>
+        <div className="details-body crm-advanced-stack">
+          <div id="client-intake"><ClientIntakeForm /></div>
+          <LeadInboxConsole
+            leadQualifications={state.leadQualifications}
+            proposals={state.commercialProposals}
+            reviewCallBookings={state.reviewCallBookings}
+          />
 
-      <CommercialConsole
-        commercialPolicy={state.commercialPolicy}
-        clients={state.clients}
-        proposals={state.commercialProposals}
-        reviewCallBookings={state.reviewCallBookings}
-        payments={state.payments}
-        advanceVerifications={state.advanceVerifications}
-        cases={state.vastuCases}
-        reports={state.reportVersions}
-      />
+          <CrmWorkbench
+            commercialPolicy={state.commercialPolicy}
+            clients={state.clients}
+            leads={state.leadQualifications}
+            proposals={state.commercialProposals}
+            payments={state.payments}
+            cases={state.vastuCases}
+            floors={state.floorWorkspaces}
+            reports={state.reportVersions}
+            utilityRules={state.utilityRules}
+            templates={state.whatsappTemplates}
+            timeline={state.timelineEvents}
+          />
+
+          <CommercialConsole
+            commercialPolicy={state.commercialPolicy}
+            clients={state.clients}
+            proposals={state.commercialProposals}
+            reviewCallBookings={state.reviewCallBookings}
+            payments={state.payments}
+            advanceVerifications={state.advanceVerifications}
+            cases={state.vastuCases}
+            reports={state.reportVersions}
+          />
+        </div>
+      </details>
     </main>
   );
 }
