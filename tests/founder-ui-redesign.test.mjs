@@ -23,7 +23,7 @@ test("priority Founder routes use the shared one-task intro", () => {
   ]) {
     const text = read(file);
     if (file === "app/page.tsx") {
-      assert.match(text, /FounderScorecard/, `${file} uses the Founder scorecard`);
+      assert.match(text, /FounderFlowHome/, `${file} uses the Founder flow`);
       assert.match(text, /buildFounderScorecard/, `${file} derives the scorecard server-side`);
       continue;
     }

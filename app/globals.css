@@ -1198,6 +1198,269 @@ h3,
   }
 }
 
+/* Founder v5 sequential workflow: one calm task per page. */
+.header-flow-label {
+  color: var(--accent-2);
+  font-size: 0.76rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.founder-flow-home,
+.founder-flow-page {
+  width: min(100%, 920px);
+  margin: 0 auto;
+  overflow-x: hidden;
+}
+
+.founder-flow-home-surface,
+.founder-flow-surface {
+  border: 1px solid var(--line);
+  border-radius: 24px;
+  background: var(--surface);
+  padding: clamp(28px, 6vw, 72px);
+}
+
+.founder-flow-home-surface {
+  min-height: min(620px, calc(100vh - 210px));
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+
+.founder-flow-kicker,
+.founder-flow-step-number,
+.founder-flow-progress-current {
+  color: var(--accent-2);
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+
+.founder-flow-context {
+  color: var(--muted);
+  font-size: 0.95rem;
+  margin-top: 10px;
+}
+
+.founder-flow-progress-meter {
+  height: 5px;
+  margin: 30px 0 54px;
+  overflow: hidden;
+  border-radius: 999px;
+  background: var(--line);
+}
+
+.founder-flow-progress-meter span {
+  display: block;
+  height: 100%;
+  min-width: 5px;
+  border-radius: inherit;
+  background: var(--accent);
+}
+
+.founder-flow-step-number {
+  margin-bottom: 12px;
+}
+
+.founder-flow-home h1,
+.founder-flow-surface h1 {
+  max-width: 720px;
+  margin: 0;
+  color: var(--ink);
+  font-size: clamp(2.25rem, 6vw, 5rem);
+  letter-spacing: -0.045em;
+  line-height: 0.98;
+}
+
+.founder-flow-home-description,
+.founder-flow-description {
+  max-width: 620px;
+  margin: 22px 0 0;
+  color: var(--muted);
+  font-size: 1.1rem;
+  line-height: 1.65;
+}
+
+.founder-flow-continue,
+.founder-flow-primary {
+  width: fit-content;
+  min-width: 160px;
+  margin-top: 34px;
+}
+
+.founder-flow-home-note {
+  margin: 16px 4px 0;
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.founder-flow-progress {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin: 0 0 18px;
+}
+
+.founder-flow-progress-previous-menu {
+  position: relative;
+  border: 0 !important;
+  padding: 0 !important;
+}
+
+.founder-flow-progress-previous-menu summary {
+  min-height: 44px;
+  display: inline-flex;
+  align-items: center;
+  color: var(--accent-2);
+  cursor: pointer;
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.founder-flow-progress-previous-menu > div {
+  position: absolute;
+  z-index: 2;
+  right: 0;
+  top: 46px;
+  display: grid;
+  min-width: 240px;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  background: var(--surface);
+  padding: 8px;
+}
+
+.founder-flow-progress-item {
+  min-height: 44px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  color: var(--ink);
+  text-decoration: none;
+}
+
+.founder-flow-progress-item span {
+  color: var(--accent-2);
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.founder-flow-progress-item:hover {
+  background: var(--surface-soft);
+}
+
+.founder-flow-surface[data-tone="blocked"],
+.founder-flow-surface[data-tone="needs-regeneration"] {
+  border-color: var(--danger);
+}
+
+.founder-flow-surface[data-tone="ready"],
+.founder-flow-surface[data-tone="approved"],
+.founder-flow-surface[data-tone="released"] {
+  border-color: var(--accent);
+}
+
+.founder-flow-status {
+  max-width: 680px;
+  margin-top: 30px;
+  padding: 16px 18px;
+  border-left: 3px solid currentColor;
+}
+
+.founder-flow-status p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+.founder-flow-inputs {
+  max-width: 680px;
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid var(--line);
+}
+
+.founder-flow-inputs ul {
+  margin: 10px 0 0;
+  padding-left: 1.2rem;
+  color: var(--muted);
+  line-height: 1.75;
+}
+
+.founder-flow-success {
+  max-width: 680px;
+  margin-top: 24px;
+  padding: 14px 16px;
+  border: 1px solid var(--accent);
+  color: var(--accent-2);
+}
+
+.founder-flow-action-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 34px;
+}
+
+.founder-flow-action-bar .founder-flow-primary {
+  margin-top: 0;
+}
+
+.founder-flow-details {
+  max-width: 680px;
+  margin-top: 36px;
+}
+
+.founder-flow-details p {
+  max-width: 600px;
+  color: var(--muted);
+  line-height: 1.6;
+}
+
+@media (max-width: 820px) {
+  .founder-flow-home-surface,
+  .founder-flow-surface {
+    border-radius: 18px;
+    padding: 28px 20px;
+  }
+
+  .founder-flow-home-surface {
+    min-height: auto;
+  }
+
+  .founder-flow-home h1,
+  .founder-flow-surface h1 {
+    font-size: clamp(2.15rem, 12vw, 3.4rem);
+  }
+
+  .founder-flow-progress {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .founder-flow-progress-previous-menu > div {
+    position: static;
+    min-width: min(100%, 300px);
+    margin-top: 4px;
+  }
+
+  .founder-flow-action-bar {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .founder-flow-action-bar > a {
+    width: 100%;
+  }
+}
+
 @media (max-width: 820px) {
   .founder-step-card-heading {
     display: grid;

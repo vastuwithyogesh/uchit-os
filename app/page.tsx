@@ -1,5 +1,5 @@
 import { AccessDeniedPanel } from "@/components/access-denied-panel";
-import { FounderScorecard } from "@/components/founder-scorecard";
+import { FounderFlowHome } from "@/components/founder-flow";
 import { SiteHeader } from "@/components/site-header";
 import { buildFounderScorecard } from "@/lib/founder-scorecard";
 import { requirePageAccess } from "@/lib/page-access";
@@ -10,7 +10,7 @@ export default async function HomePage() {
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="Uchit Vastu" subtitle="Founder scorecard" />
+        <SiteHeader title="Uchit Vastu" subtitle="Founder workflow" minimal />
         <AccessDeniedPanel area="Founder scorecard" requiredRole="SETTER" actorRole={access.actor.role} />
       </main>
     );
@@ -21,14 +21,14 @@ export default async function HomePage() {
     const scorecard = buildFounderScorecard(state, access.actor);
     return (
       <main className="page-shell">
-        <SiteHeader title="Founder scorecard" subtitle="One project, one next step" />
-        <FounderScorecard scorecard={scorecard} />
+        <SiteHeader title="Founder workflow" subtitle="One module at a time" minimal />
+        <FounderFlowHome scorecard={scorecard} />
       </main>
     );
   } catch {
     return (
       <main className="page-shell">
-        <SiteHeader title="Founder scorecard" subtitle="One project, one next step" />
+        <SiteHeader title="Founder workflow" subtitle="One module at a time" minimal />
         <section className="workspace-state" role="alert">
           <h1>We could not load the scorecard</h1>
           <p>Nothing has been changed. Refresh this page to try again. If it still does not load, open System check for recovery guidance.</p>

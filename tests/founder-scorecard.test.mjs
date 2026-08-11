@@ -5,10 +5,11 @@ import { resolve } from "node:path";
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 
-test("Founder home is a scorecard, not a dense dashboard", () => {
+test("Founder home opens a focused sequential flow, not a dense dashboard", () => {
   const page = read("app/page.tsx");
-  assert.match(page, /FounderScorecard/);
+  assert.match(page, /FounderFlowHome/);
   assert.match(page, /buildFounderScorecard/);
+  assert.doesNotMatch(page, /<FounderScorecard/);
   assert.doesNotMatch(page, /Other work areas|Common tasks/);
 });
 

@@ -5,7 +5,7 @@ import { RoleSwitcher } from "@/components/role-switcher";
 import { useSession } from "@/components/session-provider";
 import { getAccessiblePageRules } from "@/lib/access-policy";
 
-export function SiteHeader({ title, subtitle }: { title: string; subtitle: string }) {
+export function SiteHeader({ title, subtitle, minimal = false }: { title: string; subtitle: string; minimal?: boolean }) {
   const { activeUser, isLocalDemo, sessionStatus, sessionError, retrySession } = useSession();
   const pathname = usePathname();
   const visibleNavigation = sessionStatus === "ready" ? getAccessiblePageRules(activeUser.role) : [];
@@ -29,7 +29,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
           <span className="meta">{subtitle}</span>
         </div>
       </div>
-      <nav className="nav" aria-label="Main navigation">
+      {!minimal ? <nav className="nav" aria-label="Main navigation">
         {primaryNavigation.map((item) => (
           <a key={item.href} href={item.href} className={pathname === item.href ? "active" : undefined} aria-current={pathname === item.href ? "page" : undefined}>
             {item.label}
@@ -58,7 +58,7 @@ export function SiteHeader({ title, subtitle }: { title: string; subtitle: strin
             </div>
           </details>
         ) : null}
-      </nav>
+      </nav> : <span className="header-flow-label">Founder workflow</span>}
       <div className="header-session">
         {sessionStatus === "loading" ? <div className="pill" role="status">Signing you in...</div> : null}
         {sessionStatus === "error" ? (
