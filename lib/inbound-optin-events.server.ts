@@ -1,5 +1,6 @@
 import { migrateD1 } from "../db/migrations.ts";
 import type { InboundLeadRecord } from "./domain.ts";
+import { buildStableClientId } from "./lead-import.ts";
 import type { D1DatabaseBinding } from "./runtime-env.ts";
 
 export const OPTIN_EVENT_SCHEMA_VERSION = "uchit-optin/v1";
@@ -93,7 +94,6 @@ export async function verifyInboundSignature(rawBody: Uint8Array, timestampHeade
 }
 
 function identityFor(event: OptinEvent) { return event.contact.email ? `email:${event.contact.email}` : `phone:${event.contact.phone!.replace(/\D/g, "")}`; }
-function stableClientId(identity: string) { let hash = 2166136261; for (let i = 0; i < identity.length; i += 1) { hash ^= identity.charCodeAt(i); hash = Math.imul(hash, 16777619); } return `UC-${(hash >>> 0).toString(36).padStart(8, "0").slice(0, 10).toUpperCase()}`; }
 
 export async function ingestInboundOptinEvent(db: D1DatabaseBinding, event: OptinEvent, rawBody: Uint8Array, receivedAt: string) {
   await migrateD1(db);
@@ -109,7 +109,7 @@ export async function ingestInboundOptinEvent(db: D1DatabaseBinding, event: Opti
   const existing = row ? JSON.parse(row.payload) as InboundLeadRecord : undefined;
   const submissionCount = (existing?.submissionCount ?? 0) + 1;
   const outcome = existing ? "UPDATED" : "CREATED";
-  const lead: InboundLeadRecord = existing ? { ...existing } : { id: `inbound_${crypto.randomUUID()}`, uniqueClientId: stableClientId(identity), identityKey: identity, fullName: event.contact.fullName, email: event.contact.email ?? "", phone: event.contact.phone?.replace(/\D/g, "") ?? "", city: "", source: event.source, score: 0, message: "", status: "NEW", importedAt: receivedAt, firstSeenAt: event.occurredAt.slice(0, 10), lastSeenAt: event.occurredAt.slice(0, 10), submissionCount: 1, duplicateCount: 0, isReturningLead: false };
+  const lead: InboundLeadRecord = existing ? { ...existing } : { id: `inbound_${crypto.randomUUID()}`, uniqueClientId: buildStableClientId(identity), identityKey: identity, fullName: event.contact.fullName, email: event.contact.email ?? "", phone: event.contact.phone?.replace(/\D/g, "") ?? "", city: "", source: event.source, score: 0, message: "", status: "NEW", importedAt: receivedAt, firstSeenAt: event.occurredAt.slice(0, 10), lastSeenAt: event.occurredAt.slice(0, 10), submissionCount: 1, duplicateCount: 0, isReturningLead: false };
   lead.fullName = event.contact.fullName; lead.email = event.contact.email ?? lead.email; lead.phone = event.contact.phone?.replace(/\D/g, "") ?? lead.phone; lead.source = event.source; lead.message = event.message ?? lead.message; lead.utmSource = event.attribution?.utmSource; lead.utmMedium = event.attribution?.utmMedium; lead.utmCampaign = event.attribution?.utmCampaign; lead.utmTerm = event.attribution?.utmTerm; lead.utmContent = event.attribution?.utmContent; lead.lastSeenAt = event.occurredAt.slice(0, 10); lead.submissionCount = submissionCount; lead.duplicateCount = Math.max(0, submissionCount - 1); lead.isReturningLead = submissionCount > 1;
   try {
     await db.batch([

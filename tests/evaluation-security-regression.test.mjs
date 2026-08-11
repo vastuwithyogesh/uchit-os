@@ -40,7 +40,7 @@ test("artifacted reports block both engines with conflict semantics", () => {
   assert.match(blockers, /report\.caseId === caseId && report\.artifact/);
   assert.match(blockers, /formal rectification workflow/);
   assert.match(functionBody(framework, "assertCaseReadyForEvaluation"), /getCaseEvaluationBlockers/);
-  assert.match(actions, /error\.statusCode === 409 \|\| error\.statusCode === 428/);
+  assert.match(actions, /\[400, 401, 403, 404, 409, 428, 503\]\.includes\(Number\(error\.statusCode\)\)/);
 });
 
 test("drawing dates reject future values and invalid chronology", () => {

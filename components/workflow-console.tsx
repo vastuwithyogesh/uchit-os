@@ -8,12 +8,14 @@ import { buildActionHeaders } from "@/lib/request-helpers";
 import { canApproveCommercialProposal, canApproveReport, canEditFloorWorkspaces, canReleaseVerdict } from "@/lib/permissions";
 import { canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
 
+type FounderBootstrapState = AppState & { foundation?: { isFounderEdition?: boolean } };
+
 async function fetchState() {
   const response = await fetch("/api/bootstrap", { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Failed to load workflow state");
   }
-  return response.json() as Promise<AppState>;
+  return response.json() as Promise<FounderBootstrapState>;
 }
 
 async function postAction(payload: Record<string, unknown>, role?: string) {
@@ -32,13 +34,11 @@ async function postAction(payload: Record<string, unknown>, role?: string) {
 
 export function WorkflowConsole() {
   const { activeUser } = useSession();
-  const [state, setState] = useState<AppState | null>(null);
+  const [state, setState] = useState<FounderBootstrapState | null>(null);
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Load the live workflow state to continue.");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [newFloorLabel, setNewFloorLabel] = useState("First floor");
-  const [evidenceName, setEvidenceName] = useState("north-arrow-plan.pdf");
-  const [orientationReason, setOrientationReason] = useState("Orientation locked after consultant review. Regeneration requested.");
   const [evaluationName, setEvaluationName] = useState("Residential tab evaluation");
   const [shaktiValuesText, setShaktiValuesText] = useState("9,8,8,7,6,9,8,7,6,7,8,9,8,7,6,8");
 
@@ -80,7 +80,10 @@ export function WorkflowConsole() {
       balancePayment?.status === "APPROVED" &&
       Boolean(balancePayment.proofAssetId)
   );
-  const approvalCount = finalReport?.approvals?.length ?? 0;
+  const isFounderEdition = state?.foundation?.isFounderEdition === true;
+  const founderReviewDone = Boolean(finalReport?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_REVIEWED"));
+  const founderApprovalDone = Boolean(finalReport?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_APPROVED"));
+  const approvalCount = isFounderEdition ? Number(founderReviewDone) + Number(founderApprovalDone) : finalReport?.approvals?.length ?? 0;
   const verdictReadyByState = Boolean(
     caseRecord &&
       finalReport &&
@@ -98,7 +101,7 @@ export function WorkflowConsole() {
     caseRecord && !evaluationReady ? "Utility and Shakti snapshots are still incomplete." : null,
     caseRecord && !previewReport ? "Stage-A preview has not been generated yet." : null,
     caseRecord && !finalReportCanPrepare ? "Balance is not approved yet, so the final report remains locked." : null,
-    finalReport && approvalCount < 2 ? "Two report approvals are still required." : null,
+    finalReport && approvalCount < 2 ? (isFounderEdition ? "Founder review and Founder approval are still required." : "Two report approvals are still required.") : null,
     finalReport && !verdictReadyByState ? "Verdict release is still blocked by payment or approval gates." : null
   ].filter(Boolean) as string[];
 
@@ -113,7 +116,7 @@ export function WorkflowConsole() {
     if (!previewReport) return "Generate the Stage-A preview to start the report chain.";
     if (!finalReportCanPrepare) return "Approve the balance payment to unlock the final report.";
     if (!finalReport) return "Prepare the final report now that payment is clear.";
-    if (approvalCount < 2) return "Collect the remaining report approvals.";
+    if (approvalCount < 2) return isFounderEdition ? (founderReviewDone ? "Record Founder approval." : "Record Founder review.") : "Collect the remaining report approvals.";
     if (!verdictReadyByState) return "Clear the remaining verdict blockers before release.";
     return "All release gates are clear. The verdict can now be released.";
   })();
@@ -170,7 +173,18 @@ export function WorkflowConsole() {
   async function run(action: Record<string, unknown>, successMessage: string) {
     setBusy(true);
     try {
-      await postAction(action, activeUser.role);
+      const actionName = String(action.action ?? "");
+      const protectedEntity = ["proposal-approve", "case-create", "advance-proof-verify"].includes(actionName) ? proposal
+        : actionName === "floor-create" ? caseRecord
+        : actionName === "balance-proof-verify" ? caseRecord
+          : ["report-approve", "verdict-release"].includes(actionName) ? finalReport : undefined;
+      let payload = action;
+      if (["proposal-approve", "case-create", "advance-proof-verify", "balance-proof-verify", "report-approve", "verdict-release", "floor-create"].includes(actionName)) {
+        if (state?.persistenceRevision === undefined || state.persistenceRevision === null || !protectedEntity) throw new Error("Reload the latest record before this protected action.");
+        payload = { ...action, expectedRecordVersion: protectedEntity.recordVersion ?? 0, expectedRevision: state.persistenceRevision,
+          idempotencyKey: `founder:${actionName}:${protectedEntity.id}:${protectedEntity.recordVersion ?? 0}:${String(action.proofId ?? "none")}` };
+      }
+      await postAction(payload, activeUser.role);
       await refresh(selectedClient?.id);
       setMessage(successMessage);
     } catch (error) {
@@ -378,33 +392,11 @@ export function WorkflowConsole() {
             Mark ready
           </button>
         </div>
-        <div className="field" style={{ marginTop: 12 }}>
-          <label>Evidence file name</label>
-          <input value={evidenceName} onChange={(event) => setEvidenceName(event.target.value)} />
+        <div className="panel" style={{ marginTop: 12 }}>
+          <strong>Plans, evidence, and orientation</strong>
+          <p className="meta">Use the protected spatial workflow for plan versions, full-colour marked evidence, Google Earth evidence, and exact orientation.</p>
+          <a className="button" href="/spatial">Open spatial setup</a>
         </div>
-        <div className="workflow" style={{ marginTop: 10 }}>
-          <button
-            className="button-secondary"
-            type="button"
-            disabled={busy || !selectedFloor || !canEditFloorWorkspaces(activeUser)}
-            onClick={() => run({ action: "floor-evidence-add", floorId: selectedFloor?.id, fileName: evidenceName }, "Evidence added to the floor workspace.")}
-          >
-            Add evidence
-          </button>
-        </div>
-        <div className="field" style={{ marginTop: 12 }}>
-          <label>Orientation lock note</label>
-          <textarea value={orientationReason} onChange={(event) => setOrientationReason(event.target.value)} />
-        </div>
-        <button
-          className="button"
-          type="button"
-          disabled={busy || !caseRecord || !canEditFloorWorkspaces(activeUser)}
-          style={{ marginTop: 10 }}
-          onClick={() => run({ action: "orientation-lock", caseId: caseRecord?.id, reason: orientationReason }, "Orientation locked and regeneration requested.")}
-        >
-          Lock orientation
-        </button>
       </div>
 
       <div className="card span-4">

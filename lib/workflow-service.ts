@@ -4,6 +4,7 @@ import {
   CommercialProposalRecord,
   ClientRecord,
   EvaluationSnapshotRecord,
+  UtilityGraphVerdictRecord,
   InboundLeadStatus,
   InboundLeadRecord,
   FloorWorkspaceRecord,
@@ -33,11 +34,15 @@ import {
   UTILITY_RULESET_FORMAT_VERSION,
   validateShaktiInputs
 } from "@/lib/evaluation-provenance";
-import { assertCaseReadyForEvaluation, getActiveCaseForClient, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
+import { assertCaseReadyForEvaluation, getActiveCaseForClient, getCaseEvaluationBlockers, getServiceReadinessChecklist, normalizeCaseService, serviceDocumentRequirements } from "@/lib/service-framework";
 import { artifactStillMatches } from "@/lib/report-artifacts";
 import { assertCaseFileEvidenceRefs, assertCaseFileEvidenceScope } from "@/lib/case-file-assets.server";
 import { getAllowedPipelineTransitions, normalizeClientPipeline } from "@/lib/crm-pipeline";
 import { readPaymentProofForVerification } from "@/lib/payment-proof-assets.server";
+import { getMethodologyReadiness } from "@/lib/methodology-readiness";
+import { getUtilityMasterMethodologyBinding, resolveUtilityMasterRows, utilityMasterRuleId, UTILITY_MASTER_SOURCE_VERSION, UTILITY_MASTER_WORKBOOK_HASH } from "@/lib/utility-master";
+import { calculateUtilityGraphVerdict, UtilityVerdictValidationError } from "@/lib/utility-verdict";
+import { getStageAFloorReviewBlockers, recordStageAFloorCheckpoint } from "@/lib/founder-regeneration";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -54,7 +59,7 @@ const MAX_SNAPSHOT_NAME_LENGTH = 120;
 
 function boundedRequiredString(value: unknown, label: string, maxLength = MAX_VERSION_LENGTH) {
   if (typeof value !== "string" || !value.trim() || value.trim().length > maxLength) {
-    throw new Error(`${label} is required and must be ${maxLength} characters or fewer.`);
+    throw new Error(`${label} is required and must be a non-blank string of ${maxLength} characters or fewer.`);
   }
   return value.trim();
 }
@@ -89,14 +94,17 @@ function boundedRefs(value: unknown, label: string) {
   return refs;
 }
 
-function assessmentContext(caseIdValue: unknown, allowArtifact = false) {
+function assessmentContext(caseIdValue: unknown, floorIdValue?: unknown, allowArtifact = false) {
   const state = getAppState();
   const caseId = boundedRequiredString(caseIdValue, "Case ID");
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) throw new Error("Case not found.");
   if (getActiveCaseForClient(state, caseRecord.clientId)?.id !== caseId) throw new WorkflowConflictError("This is not the active case revision. Open the latest revision before recording assessment work.");
-  if (!allowArtifact && state.reportVersions.some((item) => item.caseId === caseId && item.artifact)) throw new WorkflowConflictError("Assessment work is locked by an immutable report. Start formal rectification to continue.");
-  return { state, caseRecord, caseId, serviceType: normalizeCaseService(caseRecord).serviceType, revisionNumber: caseRecord.revisionNumber ?? 1 };
+  const floorId = floorIdValue === undefined ? undefined : boundedRequiredString(floorIdValue, "Floor ID", 160);
+  const floor = floorId ? state.floorWorkspaces.find((item) => item.id === floorId && item.caseId === caseId && item.projectId === caseRecord.projectId) : undefined;
+  if (floorId && !floor) throw new WorkflowConflictError("Assessment floor does not belong to the active project and case.");
+  if (!allowArtifact && state.reportVersions.some((item) => item.caseId === caseId && item.artifact && (!floorId || !item.floorId || item.floorId === floorId))) throw new WorkflowConflictError("Assessment work is locked by an immutable report for this floor. Start formal rectification to continue.");
+  return { state, caseRecord, caseId, floor, floorId, serviceType: normalizeCaseService(caseRecord).serviceType, revisionNumber: caseRecord.revisionNumber ?? 1 };
 }
 
 function audit(actor: AppUser) { return { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, at: nowIso() }; }
@@ -232,18 +240,21 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
 }
 
 export function upsertAssessmentObservation(input: Record<string, unknown> & { actor: AppUser }) {
-  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  const { state, caseRecord, caseId, floor, floorId, serviceType, revisionNumber } = assessmentContext(input.caseId, input.floorId);
+  if (!floor || !floorId || !floor.locked) throw new WorkflowConflictError("Choose a locked floor before recording an assessment observation.");
   const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
-  const retry = state.assessmentObservations.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey);
+  const retry = state.assessmentObservations.find((item) => item.caseId === caseId && item.floorId === floorId && item.idempotencyKey === idempotencyKey);
   if (retry) return retry;
   assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
   const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Observation ID");
-  const existing = recordId ? state.assessmentObservations.find((item) => item.id === recordId && item.caseId === caseId) : undefined;
+  const existing = recordId ? state.assessmentObservations.find((item) => item.id === recordId && item.caseId === caseId && item.floorId === floorId) : undefined;
   if (recordId && !existing) throw new Error("Observation not found on this case revision.");
   const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references");
+  const floorEvidenceRefs = new Set([...floor.evidenceUploads, ...state.spatialEvidenceVersions.filter((item) => item.caseId === caseId && item.floorId === floorId && item.status === "CURRENT").map((item) => item.protectedFileRef)]);
+  if (!evidenceRefs.length || evidenceRefs.some((ref) => !floorEvidenceRefs.has(ref))) throw new WorkflowConflictError("Every observation evidence reference must belong to the selected floor and a current evidence version.");
   if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new observation for different evidence.");
   const stamp = audit(input.actor);
-  const next = { id: existing?.id ?? nextId("observation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, title: boundedRequiredString(input.title, "Observation title", 160), observation: boundedRequiredString(input.observation, "Observation", 2000), alignmentStatus: enumValue(input.alignmentStatus, alignmentStatuses, "alignment status") as AlignmentStatus, energyStatus: enumValue(input.energyStatus, energyStatuses, "energy status") as EnergyStatus, placementStatus: enumValue(input.placementStatus, placementStatuses, "placement status") as PlacementStatus, evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
+  const next = { id: existing?.id ?? nextId("observation"), caseId, floorId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, title: boundedRequiredString(input.title, "Observation title", 160), observation: boundedRequiredString(input.observation, "Observation", 2000), alignmentStatus: enumValue(input.alignmentStatus, alignmentStatuses, "alignment status") as AlignmentStatus, energyStatus: enumValue(input.energyStatus, energyStatuses, "energy status") as EnergyStatus, placementStatus: enumValue(input.placementStatus, placementStatuses, "placement status") as PlacementStatus, evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
   if (existing) Object.assign(existing, next); else state.assessmentObservations.unshift(next);
   caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, existing ? "Assessment observation updated" : "Assessment observation recorded", `${input.actor.fullName} recorded ${next.title} on case revision ${revisionNumber}.`, "Assessment", input.actor);
@@ -251,30 +262,32 @@ export function upsertAssessmentObservation(input: Record<string, unknown> & { a
 }
 
 export function upsertRecommendation(input: Record<string, unknown> & { actor: AppUser }) {
-  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  const { state, caseRecord, caseId, floor, floorId, serviceType, revisionNumber } = assessmentContext(input.caseId, input.floorId);
+  if (!floor || !floorId) throw new WorkflowConflictError("Choose a floor before recording a recommendation.");
   const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
-  const retry = state.recommendations.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey); if (retry) return retry;
+  const retry = state.recommendations.find((item) => item.caseId === caseId && item.floorId === floorId && item.idempotencyKey === idempotencyKey); if (retry) return retry;
   assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
   const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Recommendation ID");
-  const existing = recordId ? state.recommendations.find((item) => item.id === recordId && item.caseId === caseId) : undefined; if (recordId && !existing) throw new Error("Recommendation not found on this case revision.");
+  const existing = recordId ? state.recommendations.find((item) => item.id === recordId && item.caseId === caseId && item.floorId === floorId) : undefined; if (recordId && !existing) throw new Error("Recommendation not found on this floor and case revision.");
   const observationIds = boundedRefs(input.observationIds, "Observation links");
-  if (observationIds.some((id) => !state.assessmentObservations.some((item) => item.id === id && item.caseId === caseId))) throw new Error("Every observation link must belong to this case revision.");
+  if (observationIds.some((id) => !state.assessmentObservations.some((item) => item.id === id && item.caseId === caseId && item.floorId === floorId))) throw new Error("Every observation link must belong to this floor and case revision.");
   const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references");
   if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new recommendation for different evidence.");
   const stamp = audit(input.actor);
-  const next = { id: existing?.id ?? nextId("recommendation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, title: boundedRequiredString(input.title, "Recommendation title", 160), rationale: boundedRequiredString(input.rationale, "Rationale", 2000), action: boundedRequiredString(input.recommendedAction, "Recommended action", 2000), decisionPriority: enumValue(input.decisionPriority, decisionPriorities, "decision priority") as DecisionPriority, attentionClass: enumValue(input.attentionClass, attentionClasses, "attention class") as AttentionClass, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, level: enumValue(input.level, recommendationLevels, "recommendation level") as RecommendationLevel, observationIds, evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
+  const next = { id: existing?.id ?? nextId("recommendation"), caseId, floorId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, title: boundedRequiredString(input.title, "Recommendation title", 160), rationale: boundedRequiredString(input.rationale, "Rationale", 2000), action: boundedRequiredString(input.recommendedAction, "Recommended action", 2000), decisionPriority: enumValue(input.decisionPriority, decisionPriorities, "decision priority") as DecisionPriority, attentionClass: enumValue(input.attentionClass, attentionClasses, "attention class") as AttentionClass, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, level: enumValue(input.level, recommendationLevels, "recommendation level") as RecommendationLevel, observationIds, evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
   if (existing) Object.assign(existing, next); else state.recommendations.unshift(next); caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, existing ? "Recommendation updated" : "Recommendation recorded", `${input.actor.fullName} recorded ${next.title} at ${next.level}.`, "Assessment", input.actor); return next;
 }
 
 export function upsertImplementationTask(input: Record<string, unknown> & { actor: AppUser }) {
-  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
-  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120); const retry = state.implementationTasks.find((item) => item.caseId === caseId && item.idempotencyKey === idempotencyKey); if (retry) return retry;
+  const { state, caseRecord, caseId, floor, floorId, serviceType, revisionNumber } = assessmentContext(input.caseId, input.floorId);
+  if (!floor || !floorId) throw new WorkflowConflictError("Choose a floor before assigning an implementation task.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120); const retry = state.implementationTasks.find((item) => item.caseId === caseId && item.floorId === floorId && item.idempotencyKey === idempotencyKey); if (retry) return retry;
   assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
-  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Implementation task ID"); const existing = recordId ? state.implementationTasks.find((item) => item.id === recordId && item.caseId === caseId) : undefined; if (recordId && !existing) throw new Error("Implementation task not found on this case revision.");
-  const recommendationId = boundedRequiredString(input.recommendationId, "Recommendation ID"); if (!state.recommendations.some((item) => item.id === recommendationId && item.caseId === caseId)) throw new Error("Recommendation must belong to this case revision.");
+  const recordId = input.recordId === undefined ? undefined : boundedRequiredString(input.recordId, "Implementation task ID"); const existing = recordId ? state.implementationTasks.find((item) => item.id === recordId && item.caseId === caseId && item.floorId === floorId) : undefined; if (recordId && !existing) throw new Error("Implementation task not found on this floor and case revision.");
+  const recommendationId = boundedRequiredString(input.recommendationId, "Recommendation ID"); if (!state.recommendations.some((item) => item.id === recommendationId && item.caseId === caseId && item.floorId === floorId)) throw new Error("Recommendation must belong to this floor and case revision.");
   const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references"); if (existing && deterministicContentHash(existing.evidenceRefs) !== deterministicContentHash(evidenceRefs)) throw new WorkflowConflictError("Evidence references are immutable. Create a new task for different evidence."); const stamp = audit(input.actor);
-  const next = { id: existing?.id ?? nextId("implementation"), caseId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, recommendationId, title: boundedRequiredString(input.title, "Task title", 160), notes: input.notes === undefined || input.notes === "" ? undefined : boundedRequiredString(input.notes, "Task notes", 2000), status: enumValue(input.status, implementationStatuses, "implementation status") as ImplementationStatus, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
+  const next = { id: existing?.id ?? nextId("implementation"), caseId, floorId, caseRevisionNumber: revisionNumber, serviceType, version: (existing?.version ?? 0) + 1, idempotencyKey, recommendationId, title: boundedRequiredString(input.title, "Task title", 160), notes: input.notes === undefined || input.notes === "" ? undefined : boundedRequiredString(input.notes, "Task notes", 2000), status: enumValue(input.status, implementationStatuses, "implementation status") as ImplementationStatus, implementationHorizon: enumValue(input.implementationHorizon, implementationHorizons, "implementation horizon") as ImplementationHorizon, ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), evidenceRefs, created: existing?.created ?? stamp, updated: stamp };
   if (existing) Object.assign(existing, next); else state.implementationTasks.unshift(next); caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1; appendTimeline(caseRecord.clientId, existing ? "Implementation task updated" : "Implementation task recorded", `${input.actor.fullName} recorded ${next.title} as ${next.status}.`, "Assessment", input.actor); return next;
 }
 
@@ -303,9 +316,10 @@ export async function upsertCaseDocument(input: Record<string, unknown> & { acto
   if (revisionStatus === "SUPERSEDED" && input.isCurrent) throw new Error("A superseded document cannot be current.");
   const discrepancy = input.discrepancy === undefined || input.discrepancy === "" ? undefined : boundedRequiredString(input.discrepancy, "Discrepancy", 1000);
   if (revisionStatus === "VERIFIED" && (input.blocker || discrepancy)) throw new WorkflowConflictError("Resolve blockers and discrepancies before verification.");
-  await assertCaseFileEvidenceScope(evidenceRef, { caseId, caseRevisionNumber: revisionNumber, serviceType, floorLabel });
+  const organisationId = caseRecord.organisationId ?? input.actor.organisationId ?? "local-demo-organisation";
+  await assertCaseFileEvidenceScope(evidenceRef, { organisationId, caseId, caseRevisionNumber: revisionNumber, serviceType, floorLabel });
   const stamp = audit(input.actor);
-  const next = { id: existing?.id ?? nextId("document"), caseId, caseRevisionNumber: revisionNumber, serviceType, assetType, floorLabel, versionLabel, documentDate: optionalDate(input.documentDate, "Document date"), isCurrent: input.isCurrent as boolean, evidenceRef, discrepancy, blocker: input.blocker as boolean, reviewObservation: input.reviewObservation === undefined || input.reviewObservation === "" ? undefined : boundedRequiredString(input.reviewObservation, "Review observation", 2000), requiredChange: input.requiredChange === undefined || input.requiredChange === "" ? undefined : boundedRequiredString(input.requiredChange, "Required change", 2000), preferredAlternative: input.preferredAlternative === undefined || input.preferredAlternative === "" ? undefined : boundedRequiredString(input.preferredAlternative, "Preferred alternative", 1000), acceptableAlternative: input.acceptableAlternative === undefined || input.acceptableAlternative === "" ? undefined : boundedRequiredString(input.acceptableAlternative, "Acceptable alternative", 1000), ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), revisionStatus, idempotencyKey, version: (existing?.version ?? 0) + 1, received: existing?.received ?? stamp, verified: revisionStatus === "VERIFIED" ? (existing?.verified ?? stamp) : undefined, updated: stamp };
+  const next = { id: existing?.id ?? nextId("document"), caseId, caseRevisionNumber: revisionNumber, serviceType, assetType, floorLabel, versionLabel, documentDate: optionalDate(input.documentDate, "Document date"), isCurrent: input.isCurrent as boolean, evidenceRef, discrepancy, blocker: input.blocker as boolean, reviewObservation: input.reviewObservation === undefined || input.reviewObservation === "" ? undefined : boundedRequiredString(input.reviewObservation, "Review observation", 2000), requiredChange: input.requiredChange === undefined || input.requiredChange === "" ? undefined : boundedRequiredString(input.requiredChange, "Required change", 2000), preferredAlternative: input.preferredAlternative === undefined || input.preferredAlternative === "" ? undefined : boundedRequiredString(input.preferredAlternative, "Preferred alternative", 1000), acceptableAlternative: input.acceptableAlternative === undefined || input.acceptableAlternative === "" ? undefined : boundedRequiredString(input.acceptableAlternative, "Acceptable alternative", 1000), ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), revisionStatus, ...(assetType === "MANUAL_UTILITY_SHEET" ? { founderApprovalStatus: "PENDING" as const, founderApprovedAt: undefined, founderApprovedByActorUserId: undefined } : {}), idempotencyKey, version: (existing?.version ?? 0) + 1, received: existing?.received ?? stamp, verified: revisionStatus === "VERIFIED" ? (existing?.verified ?? stamp) : undefined, updated: stamp };
   if (next.isCurrent) for (const item of state.caseDocuments) if (item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.id !== next.id && item.assetType === assetType && (item.floorLabel ?? "") === (floorLabel ?? "") && item.isCurrent) { item.isCurrent = false; item.revisionStatus = "SUPERSEDED"; item.version += 1; item.updated = stamp; }
   if (existing) Object.assign(existing, next); else state.caseDocuments.unshift(next);
   caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
@@ -327,7 +341,7 @@ function optionalMilestoneDate(value: unknown, label: string) {
 }
 
 export async function upsertDeliveryMilestone(input: Record<string, unknown> & { actor: AppUser }) {
-  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId, true);
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId, undefined, true);
   const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
   const retry = state.deliveryMilestones.find((item) => item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.idempotencyKey === idempotencyKey);
   if (retry) return retry;
@@ -348,7 +362,8 @@ export async function upsertDeliveryMilestone(input: Record<string, unknown> & {
   const evidenceRefs = boundedRefs(input.evidenceRefs, "Evidence references");
   if (existing && existing.evidenceRefs.some((reference) => !evidenceRefs.includes(reference))) throw new WorkflowConflictError("Milestone evidence is immutable and append-only; existing references cannot be removed or replaced.");
   if (status === "COMPLETED" && evidenceRefs.length === 0) throw new Error("Completed milestones require protected evidence.");
-  await assertCaseFileEvidenceRefs(evidenceRefs, { caseId, caseRevisionNumber: revisionNumber, serviceType });
+  const organisationId = caseRecord.organisationId ?? input.actor.organisationId ?? "local-demo-organisation";
+  await assertCaseFileEvidenceRefs(evidenceRefs, { organisationId, caseId, caseRevisionNumber: revisionNumber, serviceType });
   let drawingRef: { caseDocumentId: string; version: number } | undefined;
   if (input.drawingRef !== undefined && input.drawingRef !== null) {
     if (typeof input.drawingRef !== "object" || Array.isArray(input.drawingRef)) throw new Error("Drawing reference must identify a case document and version.");
@@ -515,6 +530,12 @@ export async function approveCaseRectification(input: { requestId: unknown; expe
     currentDrawing: undefined
   };
   state.vastuCases.unshift(successor);
+  const successorProject = successor.projectId ? state.projects.find((item) => item.id === successor.projectId) : undefined;
+  if (successorProject) {
+    successorProject.activeCaseId = successor.id;
+    successorProject.status = "IN_PROGRESS";
+    successorProject.completedAt = undefined;
+  }
   const matchesAfter = await Promise.all(protectedReports.map((report) => artifactStillMatches(state, report)));
   if (matchesAfter.some((matches) => !matches)) {
     state.vastuCases = state.vastuCases.filter((item) => item.id !== successor.id);
@@ -529,7 +550,7 @@ export async function approveCaseRectification(input: { requestId: unknown; expe
 }
 
 function nextId(prefix: string) {
-  return `${prefix}_${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}_${crypto.randomUUID()}`;
 }
 
 function nowIso() {
@@ -770,11 +791,11 @@ export function qualifyInboundLead(inboundLeadId: string, actor: AppUser) {
     };
   }
 
-  const clientId = inboundLead.uniqueClientId || `client_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+  const clientId = inboundLead.uniqueClientId || nextId("client");
   const client = upsertClientShellFromInboundLead(inboundLead, actor);
 
   const qualification: LeadQualificationRecord = {
-    id: `lead_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+    id: nextId("lead"),
     clientId,
     score: inboundLead.score,
     notes: inboundLead.notes || inboundLead.message || "Imported from CSV opt-in",
@@ -837,20 +858,42 @@ export function updateInboundLeadStatus(inboundLeadId: string, status: InboundLe
   return inboundLead;
 }
 
-export function createCommercialProposal(clientId: string, amountInr?: number) {
+export function createCommercialProposal(clientId: string, amountInr?: number, actor?: AppUser, idempotencyKey?: string, expectedRecordVersion?: number) {
   const state = getAppState();
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) throw new Error("Client not found.");
+  if (expectedRecordVersion !== undefined && expectedRecordVersion !== (client.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The client changed before the proposal was created. Refresh and review the latest record.");
+  }
+  if (idempotencyKey) {
+    const replay = state.commercialProposals.find((item) => item.clientId === clientId && item.idempotencyKey === idempotencyKey);
+    if (replay) return replay;
+  }
   const explicitAmount = amountInr ?? state.commercialPolicy.defaultProposalAmountInr;
   if (!Number.isSafeInteger(explicitAmount) || explicitAmount <= 0) throw new Error("Proposal amount must be a positive whole INR amount.");
+  if (explicitAmount < state.commercialPolicy.minimumAdvanceInr) throw new Error("Proposal amount cannot be lower than the current minimum advance.");
+  const capturedAt = nowIso();
   const proposal: CommercialProposalRecord = {
     id: nextId("proposal"),
     clientId,
     amountInr: explicitAmount,
     minAdvanceInr: state.commercialPolicy.minimumAdvanceInr,
-    status: "PENDING_APPROVAL"
+    status: "PENDING_APPROVAL",
+    policyVersion: state.commercialPolicy.version,
+    termsSnapshot: {
+      totalFeeInr: explicitAmount,
+      minimumAdvanceInr: state.commercialPolicy.minimumAdvanceInr,
+      currency: "INR",
+      policyVersion: state.commercialPolicy.version,
+      capturedAt
+    },
+    createdAt: capturedAt,
+    createdByActorUserId: actor?.id,
+    idempotencyKey
   };
 
   state.commercialProposals.unshift(proposal);
-  appendTimeline(clientId, "Commercial proposal drafted", `Proposal prepared at ${formatMoney(explicitAmount)} under commercial policy v${state.commercialPolicy.version}.`, "Commercial", "ADMIN");
+  appendTimeline(clientId, "Commercial proposal drafted", `Proposal prepared at ${formatMoney(explicitAmount)} under commercial policy v${state.commercialPolicy.version}.`, "Commercial", actor ?? "ADMIN");
   return proposal;
 }
 
@@ -920,15 +963,19 @@ export async function completeReviewCall(input: {
   return booking;
 }
 
-export function approveCommercialProposal(proposalId: string, reviewer: AppUser) {
+export function approveCommercialProposal(proposalId: string, reviewer: AppUser, expectedRecordVersion?: number) {
   const state = getAppState();
   const proposal = state.commercialProposals.find((item) => item.id === proposalId);
   if (!proposal) {
     throw new Error("Proposal not found.");
   }
+  if (expectedRecordVersion !== undefined && expectedRecordVersion !== (proposal.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The proposal changed before approval. Refresh and review the exact commercial terms.");
+  }
   if (reviewer.role !== "SUPER_ADMIN") {
     throw new Error("Only a Super-Admin can approve the commercial proposal.");
   }
+  if (proposal.status === "APPROVED" && proposal.reviewerId === reviewer.id) return proposal;
 
   proposal.status = "APPROVED";
   proposal.reviewerId = reviewer.id;
@@ -978,11 +1025,17 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   amountInr: number;
   proofId: string;
   actor: AppUser;
+  idempotencyKey?: string;
+  expectedRecordVersion?: number;
+  allowSameActorVerification?: boolean;
 }) {
   const state = getAppState();
   const proposal = state.commercialProposals.find((item) => item.id === input.proposalId);
   if (!proposal) {
     throw new Error("Proposal not found.");
+  }
+  if (input.expectedRecordVersion !== undefined && input.expectedRecordVersion !== (proposal.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The proposal changed before advance confirmation. Refresh and review the latest terms.");
   }
   if (proposal.status !== "APPROVED") {
     throw new Error("The commercial proposal must be approved before advance proof can be verified.");
@@ -995,7 +1048,16 @@ export async function verifyAdvanceProofAndOpenCase(input: {
     proposalId: input.proposalId
   });
   if (!proof?.id) throw new Error("Choose an uploaded advance proof for this client and proposal.");
-  if (proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  if (!input.allowSameActorVerification && proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  if (input.idempotencyKey) {
+    const replay = state.advanceVerifications.find((item) => item.proposalId === input.proposalId && item.idempotencyKey === input.idempotencyKey);
+    if (replay) {
+      if (replay.proofAssetId !== proof.id || replay.amountInr !== input.amountInr) throw new WorkflowConflictError("This advance confirmation key was already used with different evidence or terms.");
+      const replayPayment = state.payments.find((item) => item.id === replay.paymentId);
+      if (!replayPayment) throw new WorkflowConflictError("The confirmed advance is missing its payment record.");
+      return { payment: replayPayment, verification: replay, caseRecord: replay.caseId ? state.vastuCases.find((item) => item.id === replay.caseId) : undefined };
+    }
+  }
   const existingVerification = state.advanceVerifications.find((item) => item.clientId === input.clientId && item.proposalId === input.proposalId);
   if (existingVerification?.proofAssetId === proof.id) {
     const existingPayment = state.payments.find((item) => item.id === existingVerification.paymentId);
@@ -1014,6 +1076,7 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   payment.referenceScreenshotFileName = proof.fileName;
   payment.verifiedBy = input.actor.fullName;
   payment.verifiedAt = nowIso();
+  payment.idempotencyKey = input.idempotencyKey;
   payment.verificationNote = "Scoped receipt uploaded and checked against the approved advance amount.";
 
   const verification: AdvanceVerificationRecord = {
@@ -1027,21 +1090,18 @@ export async function verifyAdvanceProofAndOpenCase(input: {
     verifiedAt: payment.verifiedAt!,
     paymentId: payment.id,
     proofAssetId: proof.id,
-    status: "VERIFIED"
+    status: "VERIFIED",
+    idempotencyKey: input.idempotencyKey
   };
 
   state.advanceVerifications.unshift(verification);
 
   let caseRecord = state.vastuCases.find((item) => item.clientId === input.clientId && item.proposalId === input.proposalId);
   if (!caseRecord) {
-    try {
-      caseRecord = createVastuCase(input.clientId, input.proposalId, input.actor);
-      verification.caseId = caseRecord.id;
-      verification.status = "CASE_OPENED";
-      appendTimeline(input.clientId, "Advance verified and case opened", `Scoped receipt checked. Case ${caseRecord.caseNumber} opened automatically.`, "Payments", input.actor);
-    } catch (error) {
-      appendTimeline(input.clientId, "Advance verified", "Advance was checked, but automatic case opening could not complete.", "Payments", input.actor);
-    }
+    caseRecord = createVastuCase(input.clientId, input.proposalId, input.actor);
+    verification.caseId = caseRecord.id;
+    verification.status = "CASE_OPENED";
+    appendTimeline(input.clientId, "Advance verified and case opened", `Scoped receipt checked. Case ${caseRecord.caseNumber} opened automatically.`, "Payments", input.actor);
   } else {
     verification.caseId = caseRecord.id;
     verification.status = "CASE_OPENED";
@@ -1051,11 +1111,14 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   return { payment, verification, caseRecord };
 }
 
-export function createVastuCase(clientId: string, proposalId: string, actor: AppUser) {
+export function createVastuCase(clientId: string, proposalId: string, actor: AppUser, expectedRecordVersion?: number) {
   const state = getAppState();
   const proposal = state.commercialProposals.find((item) => item.id === proposalId);
   if (!proposal) {
     throw new Error("Proposal not found.");
+  }
+  if (expectedRecordVersion !== undefined && expectedRecordVersion !== (proposal.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The proposal changed before case creation. Refresh and review the confirmed advance.");
   }
   if (proposal.clientId !== clientId) throw new Error("The proposal does not belong to this client.");
 
@@ -1075,11 +1138,13 @@ export function createVastuCase(clientId: string, proposalId: string, actor: App
   }
 
   const caseNumber = `UV-${new Date().getFullYear()}-${String(state.vastuCases.length + 1).padStart(3, "0")}`;
+  const projectId = nextId("project");
   const nextCase = {
     id: nextId("case"),
     caseNumber,
     clientId,
     proposalId,
+    projectId,
     status: "CASE_CREATED",
     reportStatus: "DRAFT",
     orientationLocked: false,
@@ -1088,9 +1153,18 @@ export function createVastuCase(clientId: string, proposalId: string, actor: App
   } satisfies (typeof state.vastuCases)[number];
 
   state.vastuCases.unshift(nextCase);
+  state.projects.unshift({
+    id: projectId,
+    clientId,
+    activeCaseId: nextCase.id,
+    propertyName: "Property project",
+    status: "IN_PROGRESS",
+    createdAt: nowIso()
+  });
   const primaryFloor: FloorWorkspaceRecord = {
     id: nextId("floor"),
     caseId: nextCase.id,
+    projectId,
     floorLabel: "Ground floor",
     status: "DRAFT",
     locked: false,
@@ -1102,12 +1176,16 @@ export function createVastuCase(clientId: string, proposalId: string, actor: App
   return nextCase;
 }
 
-export function addFloorWorkspace(caseId: string, floorLabel: string, actor: AppUser) {
+export function addFloorWorkspace(caseId: string, floorLabel: string, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: string) {
   const state = getAppState();
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) {
     throw new Error("Case not found.");
   }
+  assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
+  const retry = state.floorWorkspaces.find((workspace) => workspace.caseId === caseId && workspace.idempotencyKey === stableKey);
+  if (retry) return retry;
 
   const normalizedLabel = String(floorLabel ?? "").trim();
   if (!normalizedLabel) {
@@ -1121,16 +1199,34 @@ export function addFloorWorkspace(caseId: string, floorLabel: string, actor: App
     return existing;
   }
 
+  let projectId = caseRecord.projectId;
+  if (!projectId) {
+    const project = {
+      id: nextId("project"),
+      clientId: caseRecord.clientId,
+      activeCaseId: caseRecord.id,
+      propertyName: "Property project",
+      status: "IN_PROGRESS" as const,
+      createdAt: nowIso()
+    };
+    state.projects.unshift(project);
+    projectId = project.id;
+    caseRecord.projectId = projectId;
+  }
+
   const workspace: FloorWorkspaceRecord = {
     id: nextId("floor"),
     caseId,
+    projectId,
     floorLabel: normalizedLabel,
     status: "DRAFT",
     locked: false,
-    evidenceUploads: []
+    evidenceUploads: [],
+    idempotencyKey: stableKey
   };
 
   state.floorWorkspaces.unshift(workspace);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   caseRecord.status = caseRecord.orientationLocked ? caseRecord.status : "FLOOR_WORKSPACE_ACTIVE";
   appendTimeline(caseRecord.clientId, "Floor workspace created", `${normalizedLabel} added to the case workspace.`, "Workspace", actor.role);
   return workspace;
@@ -1214,6 +1310,9 @@ export function approveBalancePayment(clientId: string, caseId: string, amountIn
   if (caseRecord.clientId !== clientId) throw new Error("The case does not belong to this client.");
   const activeCase = getActiveCaseForClient(state, clientId);
   if (activeCase?.id !== caseId) throw new WorkflowConflictError("Balance proof must be verified against the active case revision.");
+  if (caseRecord.stageAVerdictStatus !== "PRESENTED" || !caseRecord.verdictPresentedAt) {
+    throw new WorkflowConflictError("Balance confirmation is blocked until the exact Stage A verdict version has been presented and recorded.");
+  }
   const proposal = state.commercialProposals.find((item) => item.id === caseRecord.proposalId && item.clientId === clientId);
   if (!proposal) throw new Error("The approved proposal for this case was not found.");
   const approvedAdvance = state.payments
@@ -1253,11 +1352,17 @@ export async function verifyBalanceProof(input: {
   amountInr: number;
   proofId: string;
   actor: AppUser;
+  idempotencyKey?: string;
+  expectedRecordVersion?: number;
+  allowSameActorVerification?: boolean;
 }) {
   const state = getAppState();
   const caseRecord = state.vastuCases.find((item) => item.id === input.caseId);
   if (!caseRecord) {
     throw new Error("Case not found.");
+  }
+  if (input.expectedRecordVersion !== undefined && input.expectedRecordVersion !== (caseRecord.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The case changed before balance confirmation. Refresh and review the latest state.");
   }
 
   const proof = await readPaymentProofForVerification(input.proofId, {
@@ -1266,7 +1371,14 @@ export async function verifyBalanceProof(input: {
     caseId: input.caseId
   });
   if (!proof?.id) throw new Error("Choose an uploaded balance proof for this client and active case.");
-  if (proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  if (!input.allowSameActorVerification && proof.uploadedById === input.actor.id) throw new WorkflowConflictError("The person who uploaded payment proof cannot verify the same proof.");
+  if (input.idempotencyKey) {
+    const replay = state.payments.find((item) => item.caseId === input.caseId && item.type === "BALANCE" && item.idempotencyKey === input.idempotencyKey);
+    if (replay) {
+      if (replay.proofAssetId !== proof.id || replay.amountInr !== input.amountInr) throw new WorkflowConflictError("This balance confirmation key was already used with different evidence or terms.");
+      return { payment: replay, caseRecord };
+    }
+  }
   const existingPayment = state.payments.find((item) => item.clientId === input.clientId && item.caseId === input.caseId && item.type === "BALANCE" && item.status === "APPROVED");
   if (existingPayment?.proofAssetId === proof.id) return { payment: existingPayment, caseRecord };
   if (existingPayment) throw new WorkflowConflictError("This case already has a different verified balance proof.");
@@ -1277,6 +1389,7 @@ export async function verifyBalanceProof(input: {
   payment.referenceScreenshotFileName = proof.fileName;
   payment.verifiedBy = input.actor.fullName;
   payment.verifiedAt = nowIso();
+  payment.idempotencyKey = input.idempotencyKey;
   payment.verificationNote = "Scoped balance receipt uploaded and checked before unlocking the final report flow.";
 
   appendTimeline(
@@ -1290,36 +1403,89 @@ export async function verifyBalanceProof(input: {
   return { payment, caseRecord };
 }
 
-export async function generatePreviewReport(caseId: string, actor: AppUser) {
-  const state = getAppState();
-  const caseRecord = state.vastuCases.find((item) => item.id === caseId);
-  if (!caseRecord) {
-    throw new Error("Case not found.");
-  }
+export async function generatePreviewReport(caseId: string, floorIdValue: unknown, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: unknown) {
+  const { state, caseRecord, floor } = evaluationFloorContext(caseId, floorIdValue);
+  assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
   if (caseRecord.status === "VERDICT_RELEASED") {
     throw new Error("Cannot generate a preview for a released verdict.");
   }
+  if (!state.evaluationSnapshots.some((item) => item.caseId === caseId && item.floorId === floor.id) || !state.shaktiSnapshots.some((item) => item.caseId === caseId && item.floorId === floor.id)) {
+    throw new WorkflowConflictError("Stage A preview requires completed Utility and Shakti evaluation snapshots for this floor.");
+  }
+  if (caseRecord.organisationId && !(state.utilityVerdicts ?? []).some((item) => item.caseId === caseId && item.floorId === floor.id && item.status === "APPROVED" && state.evaluationSnapshots.some((evaluation) => evaluation.id === item.utilityEvaluationSnapshotId && evaluation.caseId === caseId && evaluation.floorId === floor.id))) {
+    throw new WorkflowConflictError("Stage A preview requires at least one approved Utility bar-graph verdict for this exact floor.");
+  }
+  const existingPreview = state.reportVersions.find((item) => item.caseId === caseId && item.floorId === floor.id && item.isPreview && item.artifact?.immutable);
+  if (existingPreview?.idempotencyKey === stableKey) return existingPreview;
+  if (existingPreview) throw new WorkflowConflictError("An immutable preview already exists for this floor. Use formal rectification for a new version.");
 
   const report: ReportVersionRecord = {
       id: nextId("report"),
       caseId,
-      versionLabel: "Stage-A Preview",
+      floorId: floor.id,
+      versionLabel: `${floor.floorLabel} · Stage-A Preview`,
       isPreview: true,
       status: "PAYMENT_BLOCKED",
       watermarkText: "Preview only. Balance pending.",
+      idempotencyKey: stableKey,
       approvals: []
     } satisfies ReportVersionRecord;
   const { createArtifactManifest, PREVIEW_WATERMARK } = await import("@/lib/report-artifacts");
   report.watermarkText = PREVIEW_WATERMARK;
   report.artifact = await createArtifactManifest(state, report, actor);
   state.reportVersions.unshift(report);
-  caseRecord.reportStatus = "PAYMENT_BLOCKED";
+  floor.reportStatus = "PAYMENT_BLOCKED";
+  floor.stageAVerdictStatus = "READY";
+  floor.stageAVerdictVersion = report.versionLabel;
+  floor.recordVersion = (floor.recordVersion ?? 0) + 1;
+  const allFloorsReady = state.floorWorkspaces.filter((item) => item.caseId === caseId).every((item) => item.stageAVerdictStatus === "READY" || item.stageAVerdictStatus === "PRESENTED");
+  caseRecord.reportStatus = allFloorsReady ? "PAYMENT_BLOCKED" : caseRecord.reportStatus;
+  caseRecord.status = allFloorsReady ? "STAGE_A_READY" : caseRecord.status;
+  caseRecord.stageAVerdictStatus = allFloorsReady ? "READY" : caseRecord.stageAVerdictStatus;
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
 
-  appendTimeline(caseRecord.clientId, "Stage-A preview generated", "Watermarked preview ready for the team.", "Reports", actor);
+  appendTimeline(caseRecord.clientId, "Stage-A floor preview generated", `${floor.floorLabel} watermarked preview is ready for Founder review.`, "Reports", actor);
   return report;
 }
 
-export async function prepareFinalReport(caseId: string, actor: AppUser) {
+export function recordStageAVerdictPresentation(input: { caseId: string; floorId: unknown; note: unknown; actor: AppUser; idempotencyKey: unknown; expectedRecordVersion?: number }) {
+  const state = getAppState();
+  const caseRecord = state.vastuCases.find((item) => item.id === input.caseId);
+  if (!caseRecord) throw new Error("Case not found.");
+  const floorId = boundedRequiredString(input.floorId, "Floor ID", 160);
+  const floor = state.floorWorkspaces.find((item) => item.id === floorId && item.caseId === input.caseId && item.projectId === caseRecord.projectId);
+  if (!floor) throw new WorkflowConflictError("Stage A presentation floor does not belong to the active project and case.");
+  if (input.expectedRecordVersion !== undefined && input.expectedRecordVersion !== (caseRecord.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The case changed before verdict presentation was recorded. Refresh and review the latest Stage A version.");
+  }
+  const key = boundedRequiredString(input.idempotencyKey, "Idempotency key", 160);
+  if (floor.verdictPresentationIdempotencyKey === key && floor.stageAVerdictStatus === "PRESENTED") return caseRecord;
+  if (floor.stageAVerdictStatus === "PRESENTED") throw new WorkflowConflictError("A different Stage A presentation is already recorded for this floor revision.");
+  const note = boundedRequiredString(input.note, "Presentation note", 500);
+  if (note.length < 20) throw new Error("Presentation note must contain at least 20 characters.");
+  const preview = state.reportVersions.find((item) => item.caseId === input.caseId && item.floorId === floor.id && item.isPreview && item.artifact?.immutable);
+  if (!preview || !preview.watermarkText) throw new WorkflowConflictError("Present the immutable watermarked Stage A preview before recording the verdict presentation.");
+  floor.stageAVerdictStatus = "PRESENTED";
+  floor.stageAVerdictVersion = preview.versionLabel;
+  floor.verdictPresentedAt = nowIso();
+  floor.verdictPresentedByActorUserId = input.actor.id;
+  floor.verdictPresentationIdempotencyKey = key;
+  floor.recordVersion = (floor.recordVersion ?? 0) + 1;
+  const allFloorsPresented = state.floorWorkspaces.filter((item) => item.caseId === input.caseId).every((item) => item.stageAVerdictStatus === "PRESENTED");
+  caseRecord.stageAVerdictStatus = allFloorsPresented ? "PRESENTED" : "READY";
+  caseRecord.stageAVerdictVersion = allFloorsPresented ? `All ${state.floorWorkspaces.filter((item) => item.caseId === input.caseId).length} floor verdicts presented` : caseRecord.stageAVerdictVersion;
+  caseRecord.verdictPresentedAt = allFloorsPresented ? nowIso() : caseRecord.verdictPresentedAt;
+  caseRecord.verdictPresentedByActorUserId = allFloorsPresented ? input.actor.id : caseRecord.verdictPresentedByActorUserId;
+  caseRecord.verdictPresentationNote = allFloorsPresented ? note : caseRecord.verdictPresentationNote;
+  caseRecord.verdictPresentationIdempotencyKey = allFloorsPresented ? key : caseRecord.verdictPresentationIdempotencyKey;
+  caseRecord.status = allFloorsPresented ? "BALANCE_PENDING" : "STAGE_A_READY";
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, "Stage A floor verdict presented", `${preview.versionLabel} was presented by ${input.actor.fullName}. ${note}`, "Reports", input.actor);
+  return caseRecord;
+}
+
+export async function prepareFinalReport(caseId: string, floorIdValue: unknown, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: unknown) {
   const state = getAppState();
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord) {
@@ -1328,85 +1494,130 @@ export async function prepareFinalReport(caseId: string, actor: AppUser) {
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Final report can only be prepared after the balance is approved.");
   }
+  assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
+  const floorId = boundedRequiredString(floorIdValue, "Floor ID", 160);
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
+  const floor = state.floorWorkspaces.find((item) => item.id === floorId && item.caseId === caseId && item.projectId === caseRecord.projectId);
+  if (!floor || floor.stageAVerdictStatus !== "PRESENTED") throw new WorkflowConflictError("Prepare the official report only after this floor's immutable Stage A preview has been presented.");
   const balancePayment = state.payments.find((item) => item.caseId === caseId && item.type === "BALANCE" && item.status === "APPROVED");
-  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Final report preparation requires exact scoped balance proof verified by a different person.");
+  if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Final report preparation requires exact scoped and confirmed balance proof.");
 
-  const existing = state.reportVersions.find((item) => item.caseId === caseId && !item.isPreview && item.status !== "RELEASED");
-  if (existing?.artifact?.immutable) {
-    throw new Error("This report version is immutable. Create a new revision instead of changing it.");
-  }
+  const existing = state.reportVersions.find((item) => item.caseId === caseId && item.floorId === floor.id && !item.isPreview);
+  if (existing?.idempotencyKey === stableKey) return existing;
+  if (existing?.artifact?.immutable) throw new Error("This floor report version is immutable. Create a new revision through formal rectification instead of changing it.");
   const report: ReportVersionRecord = {
       id: nextId("report"),
       caseId,
-      versionLabel: "Official Verdict Report",
+      floorId: floor.id,
+      versionLabel: `${floor.floorLabel} · Official Verdict Report`,
       isPreview: false,
       status: "READY_FOR_APPROVAL",
+      idempotencyKey: stableKey,
       approvals: []
     } satisfies ReportVersionRecord;
   const { createArtifactManifest } = await import("@/lib/report-artifacts");
   report.artifact = await createArtifactManifest(state, report, actor);
   state.reportVersions.unshift(report);
 
+  floor.reportStatus = "READY_FOR_APPROVAL";
+  floor.recordVersion = (floor.recordVersion ?? 0) + 1;
   caseRecord.reportStatus = "READY_FOR_APPROVAL";
   caseRecord.status = "REPORT_APPROVAL_PENDING";
-  appendTimeline(caseRecord.clientId, "Final report prepared", `Official verdict report prepared by ${actor.fullName}.`, "Reports", actor);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, "Final floor report prepared", `${floor.floorLabel} official verdict report prepared by ${actor.fullName}.`, "Reports", actor);
   return report;
 }
 
-export function createEvaluationSnapshot(caseId: string, snapshotName: unknown = "Residential tab evaluation", zoneCodes: unknown = undefined, actor: AppUser) {
+function evaluationFloorContext(caseId: string, floorIdValue: unknown, regenerationTarget?: "UTILITY_EVALUATION" | "SHAKTI_EVALUATION") {
   const state = getAppState();
-  const { caseRecord } = assertCaseReadyForEvaluation(state, caseId);
+  const floorId = boundedRequiredString(floorIdValue, "Floor ID", 160);
+  const ignoredTargets = regenerationTarget ? ["UTILITY_EVALUATION", "SHAKTI_EVALUATION", "FINDING", "DRAFT_REPORT"] : undefined;
+  const regenerationBlockers = regenerationTarget ? getCaseEvaluationBlockers(state, caseId, floorId, { ignoreRegenerationTargetTypes: ignoredTargets }) : [];
+  if (regenerationBlockers.length) throw new WorkflowConflictError(`Evaluation regeneration is blocked. ${regenerationBlockers.join(" ")}`);
+  const { caseRecord, floors } = regenerationTarget
+    ? { caseRecord: state.vastuCases.find((item) => item.id === caseId)!, floors: state.floorWorkspaces.filter((item) => item.caseId === caseId && item.id === floorId) }
+    : assertCaseReadyForEvaluation(state, caseId, floorId);
+  const floor = floors[0];
+  if (!floor || floor.id !== floorId || floor.projectId !== caseRecord.projectId) throw new WorkflowConflictError("Evaluation floor does not belong to the active project and case.");
+  const plan = state.planVersions.find((item) => item.caseId === caseId && item.floorId === floorId && item.status === "CURRENT");
+  const orientation = state.orientationVersions.find((item) => item.caseId === caseId && item.status === "LOCKED");
+  const markedEvidence = state.spatialEvidenceVersions.find((item) => item.caseId === caseId && item.floorId === floorId && item.planVersionId === plan?.id && item.kind === "HAND_MARKED_PLAN" && item.status === "CURRENT" && item.fullColour);
+  if (!plan || !orientation || !markedEvidence) throw new WorkflowConflictError("Current plan, locked orientation, and full-colour marked evidence are required for this floor evaluation.");
+  return { state, caseRecord, floor, plan, orientation, markedEvidence };
+}
+
+export function createEvaluationSnapshot(caseId: string, floorIdValue: unknown, snapshotName: unknown = "Residential tab evaluation", zoneCodes: unknown = undefined, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: unknown, utilityInputs?: unknown) {
+  const { state, caseRecord, floor, plan, orientation } = evaluationFloorContext(caseId, floorIdValue, "UTILITY_EVALUATION");
+  assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
+  if (!actor.organisationId) throw new WorkflowConflictError("Utility evaluation is blocked until an organisation-scoped methodology version is active.");
+  const genericMethodology = getMethodologyReadiness(state, actor.organisationId, "UTILITY");
+  if (!genericMethodology.ready) throw new WorkflowConflictError(`Utility evaluation is ${genericMethodology.status}: ${genericMethodology.reason}`);
+  const methodology = getUtilityMasterMethodologyBinding(state, actor.organisationId);
+  if (!methodology.ready || !methodology.version) throw new WorkflowConflictError(`Utility evaluation is ${methodology.status}: ${methodology.reason}. Blocked — Methodology Input Required.`);
+  if (typeof snapshotName !== "string" || !snapshotName.trim()) throw new Error("Snapshot name must be a non-blank string.");
   const cleanSnapshotName = boundedRequiredString(snapshotName, "Snapshot name", MAX_SNAPSHOT_NAME_LENGTH);
   if (zoneCodes !== undefined && !Array.isArray(zoneCodes)) throw new Error("Zone codes must be a list.");
-  const selectedZoneCodes = zoneCodes === undefined ? state.utilityRules.map((rule) => rule.zoneCode) : zoneCodes;
-  if (!Array.isArray(selectedZoneCodes) || selectedZoneCodes.length === 0) throw new Error("Choose at least one zone code.");
-  if (selectedZoneCodes.some((zoneCode) => typeof zoneCode !== "string" || !zoneCode.trim())) throw new Error("Every zone code must be a non-blank string.");
-  if (new Set(selectedZoneCodes).size !== selectedZoneCodes.length) throw new Error("Zone codes must not contain duplicates.");
-  const knownZoneCodes = new Set(state.utilityRules.map((rule) => rule.zoneCode));
-  const unknownZoneCode = selectedZoneCodes.find((zoneCode) => !knownZoneCodes.has(zoneCode));
-  if (unknownZoneCode) throw new Error(`Unknown zone code: ${unknownZoneCode}.`);
+  const rawInputs = utilityInputs ?? (Array.isArray(zoneCodes) ? zoneCodes.map((zoneCode) => {
+    if (typeof zoneCode !== "string" || !zoneCode.includes("|")) throw new Error(`Unknown zone code: ${String(zoneCode)}. Use UtilityMaster utilityName|directionCode inputs.`);
+    const [utilityName, directionCode] = zoneCode.split("|");
+    return { utilityName, directionCode };
+  }) : undefined);
+  if (!Array.isArray(rawInputs) || rawInputs.length === 0 || rawInputs.length > 64) throw new Error("Choose one to 64 UtilityMaster utility and direction inputs.");
+  const inputKeys = new Set<string>();
+  const selectedInputs = rawInputs.map((item) => {
+    if (!item || typeof item !== "object" || Array.isArray(item)) throw new Error("Each UtilityMaster input must be an object.");
+    const value = item as Record<string, unknown>;
+    if (Object.keys(value).some((key) => !["utilityName", "directionCode"].includes(key))) throw new Error("Unsupported UtilityMaster input field.");
+    const utilityName = boundedRequiredString(value.utilityName, "Utility name", 120);
+    const directionCode = boundedRequiredString(value.directionCode, "Direction code", 40);
+    const key = `${utilityName}\u0000${directionCode}`;
+    if (inputKeys.has(key)) throw new Error("UtilityMaster inputs must not contain duplicates.");
+    inputKeys.add(key);
+    return { utilityName, directionCode };
+  });
+  const resolved = selectedInputs.map((input) => ({ input, result: resolveUtilityMasterRows(input.utilityName, input.directionCode) }));
+  // REVIEW_REQUIRED and BLOCKED_METHOD_INPUT are terminal safety states here; never guess a source row.
+  const unresolved = resolved.find((item) => item.result.status !== "APPROVED");
+  if (unresolved) throw new WorkflowConflictError(`${unresolved.result.status}: ${unresolved.result.reason}`);
+  const sourceRows = resolved.flatMap((item) => item.result.rows);
+  const sourceRuleRefs = sourceRows.map((row) => utilityMasterRuleId(row));
   const caseInputs = {
     caseId: caseRecord.id,
     caseStatus: caseRecord.status,
     orientationLocked: caseRecord.orientationLocked,
-    floors: state.floorWorkspaces
-      .filter((floor) => floor.caseId === caseId)
-      .map(({ id, floorLabel, status, locked }) => ({ id, floorLabel, status, locked }))
-      .sort((left, right) => left.id.localeCompare(right.id))
+    floors: [{ id: floor.id, floorLabel: floor.floorLabel, status: floor.status, locked: floor.locked }]
   };
-  const generatedMatrix = generateUtilityEvaluation(
-    state.utilityRules,
-    selectedZoneCodes.map((zoneCode) => ({ zoneCode }))
-  ).map((entry) => ({
-    code: entry.zoneCode,
-    verdict: entry.verdict,
-    confidence: entry.confidence,
-    ...(state.utilityRules.find((rule) => rule.zoneCode === entry.zoneCode)?.id
-      ? { ruleId: state.utilityRules.find((rule) => rule.zoneCode === entry.zoneCode)!.id }
-      : {})
+  const generatedMatrix = sourceRows.map((row) => ({
+    code: `${row.utilityName}|${row.directionCode}`,
+    verdict: row.outcome,
+    utilityName: row.utilityName,
+    directionCode: row.directionCode,
+    attributeText: row.attributeText,
+    sourceRowNumber: row.rowNumber,
+    ruleId: utilityMasterRuleId(row),
+    status: "APPROVED" as const
   }));
-  const selectedRuleIds = generatedMatrix.flatMap((entry) => (entry.ruleId ? [entry.ruleId] : []));
-  const sourceContentHash = deterministicContentHash(state.utilityRules.map((rule) => ({
-    confidence: rule.confidence,
-    description: rule.description,
-    id: rule.id,
-    sourceCsvRow: rule.sourceCsvRow,
-    tabName: rule.tabName,
-    verdict: rule.verdict,
-    zoneCode: rule.zoneCode
-  })));
-
-  const inputHash = deterministicContentHash({ caseInputs, snapshotName: cleanSnapshotName, selectedZoneCodes, sourceContentHash });
-  const existingSnapshot = state.evaluationSnapshots.find((item) => item.caseId === caseId);
+  const sourceContentHash = UTILITY_MASTER_WORKBOOK_HASH;
+  const inputHash = deterministicContentHash({ caseInputs, floorId: floor.id, planVersionId: plan.id, orientationVersionId: orientation.id, snapshotName: cleanSnapshotName, selectedInputs, sourceContentHash, sourceVersion: UTILITY_MASTER_SOURCE_VERSION, methodologyVersionId: methodology.version.id, methodologyContentHash: methodology.version.contentHash });
+  const existingSnapshot = state.evaluationSnapshots.find((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id);
   if (existingSnapshot) {
     if (existingSnapshot.provenance?.inputHash === inputHash) return existingSnapshot;
     throw new WorkflowConflictError("A different Utility evaluation already exists for this case. Start formal rectification before creating another snapshot.");
   }
+  const historicalSnapshots = state.evaluationSnapshots.filter((item) => item.caseId === caseId && item.floorId === floor.id);
+  if (historicalSnapshots.length && !historicalSnapshots.some((snapshot) => state.dependencyInvalidations.some((item) => item.caseId === caseId && item.floorId === floor.id && item.targetType === "UTILITY_EVALUATION" && item.targetId === snapshot.id && item.status === "REPLACEMENT_REQUIRED"))) {
+    throw new WorkflowConflictError("Require a replacement on the affected Utility evaluation before generating a new version.");
+  }
   const snapshot: EvaluationSnapshotRecord = {
     id: nextId("eval"),
     caseId,
+    floorId: floor.id,
+    planVersionId: plan.id,
+    orientationVersionId: orientation.id,
+    idempotencyKey: stableKey,
     snapshotName: cleanSnapshotName,
-    sourceVersion: "residential-tab.csv",
+    sourceVersion: `${methodology.version.label} · ${UTILITY_MASTER_SOURCE_VERSION}`,
     generatedMatrix,
     provenance: {
       inputHash,
@@ -1414,19 +1625,80 @@ export function createEvaluationSnapshot(caseId: string, snapshotName: unknown =
       sourceContentHash,
       ruleSetFormatVersion: UTILITY_RULESET_FORMAT_VERSION,
       algorithmVersion: UTILITY_EVALUATION_ALGORITHM_VERSION,
+      methodologyVersionId: methodology.version.id,
+      methodologyContentHash: methodology.version.contentHash,
       caseInputs,
-      selectedRuleIds
+      selectedRuleIds: sourceRuleRefs,
+      sourceRuleRefs,
+      sourceWorkbookHash: UTILITY_MASTER_WORKBOOK_HASH,
+      sourceWorkbookVersion: UTILITY_MASTER_SOURCE_VERSION,
+      explainabilityStatus: "APPROVED"
     }
   };
 
   state.evaluationSnapshots.unshift(snapshot);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, "Utility evaluation snapshot generated", `${cleanSnapshotName} captured from the master rule table by ${actor.fullName}.`, "Evaluation", actor);
   return snapshot;
 }
 
-export function recordShaktiSnapshot(caseId: string, values: number[], actor: AppUser) {
-  const state = getAppState();
-  const { caseRecord } = assertCaseReadyForEvaluation(state, caseId);
+export function createUtilityVerdict(input: {
+  caseId: string; floorId: unknown; utilityEvaluationSnapshotId: unknown; element: unknown; directionSet: unknown; bars: unknown;
+  redLine: unknown; balanceLine: unknown; blueLine: unknown; actor: AppUser; expectedRecordVersion?: unknown; idempotencyKey?: unknown;
+}) {
+  if (input.actor.role !== "SUPER_ADMIN" || (input.actor.organisationId && input.actor.organisationCapability !== "organisation_owner")) throw new WorkflowConflictError("Only the Founder organisation owner can frame Utility verdicts.");
+  const { state, caseRecord, floor, plan, orientation } = evaluationFloorContext(input.caseId, input.floorId, "UTILITY_EVALUATION");
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const stableKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 160);
+  const snapshotId = boundedRequiredString(input.utilityEvaluationSnapshotId, "Utility evaluation snapshot ID", 160);
+  const snapshot = state.evaluationSnapshots.find((item) => item.id === snapshotId && item.caseId === caseRecord.id && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id);
+  if (!snapshot) throw new WorkflowConflictError("The Utility evaluation snapshot must belong to this exact case, floor, current plan, and locked orientation.");
+  if (snapshot.provenance?.explainabilityStatus !== "APPROVED" || snapshot.provenance.sourceWorkbookHash !== UTILITY_MASTER_WORKBOOK_HASH) throw new WorkflowConflictError("Only an approved UtilityMaster evaluation can produce a Utility verdict.");
+  const graph = calculateUtilityGraphVerdict({
+    element: input.element as string,
+    directionSet: input.directionSet as string[],
+    bars: input.bars as Array<{ directionCode: string; value: number }>,
+    lines: { extension: input.redLine as number, balance: input.balanceLine as number, exhaustion: input.blueLine as number }
+  });
+  const sourceEntries = snapshot.generatedMatrix.filter((entry) => entry.status === "APPROVED" && entry.directionCode && graph.frozenInput.directionSet.includes(entry.directionCode));
+  if (sourceEntries.length === 0 || sourceEntries.some((entry) => !entry.ruleId)) throw new WorkflowConflictError("Every Utility verdict direction must bind to an approved UtilityMaster source rule.");
+  const sourceRuleIds = sourceEntries.flatMap((entry) => entry.ruleId ? [entry.ruleId] : []);
+  const sourceRowNumbers = sourceEntries.flatMap((entry) => entry.sourceRowNumber === undefined ? [] : [entry.sourceRowNumber]);
+  const inputHash = deterministicContentHash({ graphInputHash: graph.inputHash, snapshotId, snapshotInputHash: snapshot.provenance.inputHash, methodologyVersionId: snapshot.provenance.methodologyVersionId, methodologyContentHash: snapshot.provenance.methodologyContentHash, sourceRuleIds });
+  const existing = state.utilityVerdicts.find((item) => item.caseId === caseRecord.id && item.floorId === floor.id && item.utilityEvaluationSnapshotId === snapshot.id && item.element === graph.frozenInput.element);
+  if (existing) {
+    if (existing.inputHash === inputHash) return existing;
+    throw new WorkflowConflictError("A different Utility verdict already exists for this element. Start formal rectification before replacing it.");
+  }
+  const historical = state.utilityVerdicts.filter((item) => item.caseId === caseRecord.id && item.floorId === floor.id && item.element === graph.frozenInput.element);
+  if (historical.length && !historical.some((item) => state.dependencyInvalidations.some((invalidation) => invalidation.targetType === "UTILITY_VERDICT" && invalidation.targetId === item.id && ["REPLACEMENT_REQUIRED", "REGENERATED", "READY_FOR_REVIEW"].includes(invalidation.status)))) {
+    throw new WorkflowConflictError("A prior Utility verdict exists for this element. Resolve its regeneration record before creating a replacement.");
+  }
+  const verdict: UtilityGraphVerdictRecord = {
+    id: nextId("utility-verdict"), organisationId: caseRecord.organisationId ?? input.actor.organisationId, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 0,
+    utilityEvaluationSnapshotId: snapshot.id, caseId: caseRecord.id, floorId: floor.id, planVersionId: plan.id, orientationVersionId: orientation.id,
+    element: graph.frozenInput.element, directionSet: graph.frozenInput.directionSet, bars: graph.frozenInput.bars,
+    lines: { extension: graph.frozenInput.lines.extension, balance: graph.frozenInput.lines.balance, exhaustion: graph.frozenInput.lines.exhaustion },
+    ...(graph.verdict ? { verdict: graph.verdict, solutionFraming: graph.solutionFraming } : {}), status: graph.status,
+    triggeredDirections: graph.triggeredDirections, matchedConditions: graph.matchedConditions, explanation: graph.explanation,
+    sourceRuleIds, sourceRowNumbers, methodologyVersionId: snapshot.provenance.methodologyVersionId!, methodologyContentHash: snapshot.provenance.methodologyContentHash!,
+    utilityWorkbookHash: UTILITY_MASTER_WORKBOOK_HASH, utilityWorkbookVersion: UTILITY_MASTER_SOURCE_VERSION,
+    inputHash, outputHash: deterministicContentHash({ graphOutputHash: graph.outputHash, inputHash }), idempotencyKey: stableKey, createdAt: nowIso()
+  };
+  state.utilityVerdicts.unshift(verdict);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, "Utility bar-graph verdict framed", `${graph.frozenInput.element} evaluated with frozen UtilityMaster source ${UTILITY_MASTER_SOURCE_VERSION}; status ${graph.status}.`, "Evaluation", input.actor);
+  return verdict;
+}
+
+export function recordShaktiSnapshot(caseId: string, floorIdValue: unknown, values: number[], actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: unknown) {
+  const { state, caseRecord, floor, plan, orientation } = evaluationFloorContext(caseId, floorIdValue, "SHAKTI_EVALUATION");
+  assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
+  if (!actor.organisationId) throw new WorkflowConflictError("Shakti evaluation is blocked until an organisation-scoped methodology version is active.");
+  const methodology = getMethodologyReadiness(state, actor.organisationId, "SHAKTI_ELEMENT");
+  // Blocked — Methodology Input Required is the explicit Founder safety state.
+  if (!methodology.ready || !methodology.version) throw new WorkflowConflictError(`Shakti evaluation is Blocked — Methodology Input Required. ${methodology.reason}`);
 
   const inputValues = validateShaktiInputs(values);
   const ranking = rankShakti(inputValues);
@@ -1434,21 +1706,26 @@ export function recordShaktiSnapshot(caseId: string, values: number[], actor: Ap
     caseId: caseRecord.id,
     caseStatus: caseRecord.status,
     orientationLocked: caseRecord.orientationLocked,
-    floors: state.floorWorkspaces
-      .filter((floor) => floor.caseId === caseId)
-      .map(({ id, floorLabel, status, locked }) => ({ id, floorLabel, status, locked }))
-      .sort((left, right) => left.id.localeCompare(right.id))
+    floors: [{ id: floor.id, floorLabel: floor.floorLabel, status: floor.status, locked: floor.locked }]
   };
   const output = { elementAverages: ranking.averages, rankedVerdicts: ranking.ranked, tieBreakUsed: ranking.tieBreakUsed };
-  const inputHash = deterministicContentHash({ caseInputs, inputValues });
-  const existingSnapshot = state.shaktiSnapshots.find((item) => item.caseId === caseId);
+  const inputHash = deterministicContentHash({ caseInputs, floorId: floor.id, planVersionId: plan.id, orientationVersionId: orientation.id, inputValues, methodologyVersionId: methodology.version.id, methodologyContentHash: methodology.version.contentHash });
+  const existingSnapshot = state.shaktiSnapshots.find((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id);
   if (existingSnapshot) {
     if (existingSnapshot.provenance?.inputHash === inputHash) return existingSnapshot;
     throw new WorkflowConflictError("A different Shakti evaluation already exists for this case. Start formal rectification before creating another snapshot.");
   }
+  const historicalSnapshots = state.shaktiSnapshots.filter((item) => item.caseId === caseId && item.floorId === floor.id);
+  if (historicalSnapshots.length && !historicalSnapshots.some((snapshot) => state.dependencyInvalidations.some((item) => item.caseId === caseId && item.floorId === floor.id && item.targetType === "SHAKTI_EVALUATION" && item.targetId === snapshot.id && item.status === "REPLACEMENT_REQUIRED"))) {
+    throw new WorkflowConflictError("Require a replacement on the affected Shakti evaluation before generating a new version.");
+  }
   const snapshot: ShaktiSnapshotRecord = {
     id: nextId("shakti"),
     caseId,
+    floorId: floor.id,
+    planVersionId: plan.id,
+    orientationVersionId: orientation.id,
+    idempotencyKey: stableKey,
     inputValues,
     elementAverages: ranking.averages,
     rankedVerdicts: ranking.ranked,
@@ -1457,6 +1734,8 @@ export function recordShaktiSnapshot(caseId: string, values: number[], actor: Ap
       inputHash,
       outputHash: deterministicContentHash(output),
       algorithmVersion: SHAKTI_ALGORITHM_VERSION,
+      methodologyVersionId: methodology.version.id,
+      methodologyContentHash: methodology.version.contentHash,
       mappingVersion: SHAKTI_MAPPING_VERSION,
       roundingVersion: SHAKTI_ROUNDING_VERSION,
       caseInputs
@@ -1464,11 +1743,15 @@ export function recordShaktiSnapshot(caseId: string, values: number[], actor: Ap
   };
 
   state.shaktiSnapshots.unshift(snapshot);
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, "Shakti snapshot generated", `Computed from ${values.length} input values by ${actor.fullName}.`, "Evaluation", actor);
   return snapshot;
 }
 
-export function approveReport(reportId: string, actor: AppUser, comment = "Reviewed and approved") {
+export type ReportApprovalExecutionPolicy = { mode: "FOUNDER" | "TEAM"; creatorMayApprove: boolean };
+const TEAM_REPORT_APPROVAL_POLICY: ReportApprovalExecutionPolicy = { mode: "TEAM", creatorMayApprove: false };
+
+export function approveReport(reportId: string, actor: AppUser, comment = "Reviewed and approved", policy = TEAM_REPORT_APPROVAL_POLICY, expectedRecordVersion?: number, idempotencyKey?: unknown) {
   const state = getAppState();
   const report = state.reportVersions.find((item) => item.id === reportId);
   if (!report) {
@@ -1477,6 +1760,9 @@ export function approveReport(reportId: string, actor: AppUser, comment = "Revie
   const caseRecord = state.vastuCases.find((item) => item.id === report.caseId);
   if (!caseRecord) {
     throw new Error("Case not found.");
+  }
+  if (expectedRecordVersion !== undefined && expectedRecordVersion !== (report.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The report changed before approval. Refresh and review the exact report version.");
   }
   if (report.isPreview) {
     throw new Error("Preview reports cannot be approved as final verdict reports.");
@@ -1490,22 +1776,51 @@ export function approveReport(reportId: string, actor: AppUser, comment = "Revie
     throw new Error("Report is not in an approvable state.");
   }
   if (!report.artifact?.immutable) throw new Error("This legacy report has no immutable artifact and cannot receive new approvals.");
-  if (report.artifact.createdBy.id === actor.id) throw new Error("The report creator cannot approve their own report.");
-  if (report.approvalEvidence?.some((item) => item.actorId === actor.id) || report.approvals.includes(actor.id)) throw new Error("This person has already approved this report version.");
+  if (!policy.creatorMayApprove && report.artifact.createdBy.id === actor.id) throw new Error("The report creator cannot approve their own report.");
   const cleanComment = comment.trim();
   if (cleanComment.length < 3) throw new Error("Approval comment must explain the review decision.");
+
+  if (policy.mode === "FOUNDER") {
+    const evidence = report.approvalEvidence ?? [];
+    const checkpoint = evidence.some((item) => item.checkpoint === "FOUNDER_REVIEWED") ? "FOUNDER_APPROVED" : "FOUNDER_REVIEWED";
+    const stableKey = typeof idempotencyKey === "string" && idempotencyKey.trim() ? idempotencyKey.trim() : `founder:${report.id}:${checkpoint}:${actor.id}`;
+    if (state.stageAFloorApprovalCheckpoints.some((item) => item.reportId === report.id && item.idempotencyKey === stableKey)) return report;
+    if (evidence.some((item) => item.checkpoint === checkpoint)) throw new WorkflowConflictError("This Founder checkpoint is already recorded for the report version.");
+    recordStageAFloorCheckpoint(state, report, checkpoint, actor, cleanComment, stableKey);
+    report.approvals = Array.from(new Set([...(report.approvals ?? []), actor.id]));
+    report.approvalEvidence = [...evidence, { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, approvedAt: nowIso(), comment: cleanComment, artifactHash: report.artifact.contentHash, checkpoint }];
+    const founderApproved = checkpoint === "FOUNDER_APPROVED";
+    report.status = founderApproved ? "APPROVED" : "READY_FOR_APPROVAL";
+    const floor = report.floorId ? state.floorWorkspaces.find((item) => item.id === report.floorId && item.caseId === report.caseId) : undefined;
+    if (floor) {
+      floor.reportStatus = report.status;
+      floor.recordVersion = (floor.recordVersion ?? 0) + 1;
+    }
+    const caseFloors = state.floorWorkspaces.filter((item) => item.caseId === report.caseId);
+    const allFloorsApproved = floor ? caseFloors.length > 0 && caseFloors.every((item) => item.reportStatus === "APPROVED" || item.reportStatus === "RELEASED") : founderApproved;
+    caseRecord.reportStatus = allFloorsApproved ? "APPROVED" : "READY_FOR_APPROVAL";
+    caseRecord.status = allFloorsApproved ? "REPORT_APPROVED" : "REPORT_APPROVAL_PENDING";
+    report.recordVersion = (report.recordVersion ?? 0) + 1;
+    caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+    appendTimeline(caseRecord.clientId, founderApproved ? "Founder approval recorded" : "Founder review recorded", `${actor.fullName} recorded ${checkpoint.toLowerCase().replaceAll("_", " ")} for the immutable report version.`, "Reports", actor);
+    return report;
+  }
+
+  if (report.approvalEvidence?.some((item) => item.actorId === actor.id) || report.approvals.includes(actor.id)) throw new Error("This person has already approved this report version.");
 
   report.approvals = Array.from(new Set([...(report.approvals ?? []), actor.id]));
   report.approvalEvidence = [...(report.approvalEvidence ?? []), { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, approvedAt: nowIso(), comment: cleanComment, artifactHash: report.artifact.contentHash }];
   report.status = report.approvals.length >= 2 ? "APPROVED" : "READY_FOR_APPROVAL";
   caseRecord.reportStatus = report.status;
   caseRecord.status = (report.approvals ?? []).length >= 2 ? "REPORT_APPROVED" : "REPORT_APPROVAL_PENDING";
+  report.recordVersion = (report.recordVersion ?? 0) + 1;
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
 
   appendTimeline(caseRecord.clientId, "Report approved", `${actor.fullName} signed off the report version.`, "Reports", actor);
   return report;
 }
 
-export function releaseVerdict(reportId: string, actor: AppUser) {
+export function releaseVerdict(reportId: string, actor: AppUser, policy = TEAM_REPORT_APPROVAL_POLICY, expectedRecordVersion?: number, idempotencyKey?: unknown, pdfReleaseAuthorized = false) {
   const state = getAppState();
   const report = state.reportVersions.find((item) => item.id === reportId);
   if (!report) {
@@ -1515,24 +1830,60 @@ export function releaseVerdict(reportId: string, actor: AppUser) {
   if (!caseRecord) {
     throw new Error("Case not found.");
   }
+  if ((report.artifact?.templateVersion === "uchit-verdict/v3" || report.artifact?.templateVersion === "uchit-verdict/v4") && !pdfReleaseAuthorized) {
+    throw new WorkflowConflictError("Founder Edition v3 release must use the protected PDF verification and atomic release workflow.");
+  }
+  if (expectedRecordVersion !== undefined && expectedRecordVersion !== (report.recordVersion ?? 0)) {
+    throw new WorkflowConflictError("The report changed before release. Refresh and review the exact approved version.");
+  }
   if (!caseRecord.balanceApproved || !caseRecord.fullPaymentApproved) {
     throw new Error("Verdict release is blocked until the balance is approved.");
   }
   const balancePayment = state.payments.find((item) => item.caseId === caseRecord.id && item.type === "BALANCE" && item.status === "APPROVED");
   if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Verdict release requires exact scoped balance proof.");
-  if (report.status !== "APPROVED" || caseRecord.reportStatus !== "APPROVED") {
+  if (report.status !== "APPROVED") {
     throw new Error("Verdict release requires an approved report.");
   }
-  if ((report.approvals ?? []).length < 2) {
+  if (policy.mode === "FOUNDER") {
+    const evidence = report.approvalEvidence ?? [];
+    for (const checkpoint of ["FOUNDER_REVIEWED", "FOUNDER_APPROVED"] as const) {
+      const approval = evidence.find((item) => item.checkpoint === checkpoint);
+      if (!approval || approval.artifactHash !== report.artifact?.contentHash) throw new Error(`Verdict release requires ${checkpoint.toLowerCase().replaceAll("_", " ")} on this immutable artifact.`);
+    }
+    const stableKey = typeof idempotencyKey === "string" && idempotencyKey.trim() ? idempotencyKey.trim() : `founder:${report.id}:RELEASED:${actor.id}`;
+    if (state.stageAFloorApprovalCheckpoints.some((item) => item.reportId === report.id && item.idempotencyKey === stableKey)) return report;
+    if (evidence.some((item) => item.checkpoint === "RELEASED")) throw new WorkflowConflictError("This report version has already been released.");
+    const blockers = getStageAFloorReviewBlockers(state, report);
+    if (blockers.length) throw new WorkflowConflictError(`Release is blocked. ${blockers.join(" ")}`);
+    recordStageAFloorCheckpoint(state, report, "RELEASED", actor, "Released after Founder approval and full payment clearance.", stableKey);
+    report.approvalEvidence = [...evidence, { actorId: actor.id, actorName: actor.fullName, actorRole: actor.role, approvedAt: nowIso(), comment: "Released after Founder approval and full payment clearance.", artifactHash: report.artifact!.contentHash, checkpoint: "RELEASED" }];
+  } else if ((report.approvals ?? []).length < 2) {
     throw new Error("Verdict release requires two report approvals.");
   }
-  if (!report.artifact?.immutable || (report.approvalEvidence?.length ?? 0) < 2) throw new Error("Verdict release requires two evidenced approvals on an immutable artifact.");
-  if (new Set(report.approvalEvidence?.map((item) => item.actorId)).size < 2) throw new Error("Verdict release requires two distinct approvers.");
-  if (report.approvalEvidence?.some((item) => item.actorId === report.artifact?.createdBy.id || item.artifactHash !== report.artifact?.contentHash)) throw new Error("Approval evidence does not match the immutable artifact.");
+  if (!report.artifact?.immutable || (report.approvalEvidence?.length ?? 0) < 2) throw new Error("Verdict release requires evidenced approval checkpoints on an immutable artifact.");
+  if (policy.mode === "TEAM" && new Set(report.approvalEvidence?.map((item) => item.actorId)).size < 2) throw new Error("Verdict release requires two distinct approvers.");
+  if (report.approvalEvidence?.some((item) => (!policy.creatorMayApprove && item.actorId === report.artifact?.createdBy.id) || item.artifactHash !== report.artifact?.contentHash)) throw new Error("Approval evidence does not match the immutable artifact.");
 
-  caseRecord.status = "VERDICT_RELEASED";
-  caseRecord.reportStatus = "RELEASED";
   report.status = "RELEASED";
+  const floor = report.floorId ? state.floorWorkspaces.find((item) => item.id === report.floorId && item.caseId === report.caseId) : undefined;
+  if (floor) {
+    floor.reportStatus = "RELEASED";
+    floor.recordVersion = (floor.recordVersion ?? 0) + 1;
+    if (!state.remedialWorkflowReservations.some((item) => item.stageAReportId === report.id)) {
+      state.remedialWorkflowReservations.unshift({
+        id: nextId("remedial-reservation"), organisationId: caseRecord.organisationId ?? actor.organisationId,
+        createdByActorUserId: actor.id, updatedByActorUserId: actor.id, recordVersion: 1,
+        projectId: floor.projectId ?? caseRecord.projectId ?? "", caseId: caseRecord.id, floorId: floor.id,
+        stageAReportId: report.id, status: "BLOCKED_METHOD_INPUT", createdAt: nowIso()
+      });
+    }
+  }
+  const caseFloors = state.floorWorkspaces.filter((item) => item.caseId === report.caseId);
+  const allFloorsReleased = floor ? caseFloors.length > 0 && caseFloors.every((item) => item.reportStatus === "RELEASED") : true;
+  caseRecord.status = allFloorsReleased ? "VERDICT_RELEASED" : "REPORT_APPROVAL_PENDING";
+  caseRecord.reportStatus = allFloorsReleased ? "RELEASED" : "READY_FOR_APPROVAL";
+  report.recordVersion = (report.recordVersion ?? 0) + 1;
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, "Verdict released", `Released by ${actor.fullName} after approvals.`, "Reports", actor);
   return report;
 }

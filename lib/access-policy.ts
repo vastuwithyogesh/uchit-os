@@ -17,6 +17,8 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/evaluation", label: "Evaluation", minimumRole: "CONSULTANT" },
   { href: "/assessment", label: "Action Plan", minimumRole: "CONSULTANT" },
   { href: "/files", label: "Files & Drawings", minimumRole: "CONSULTANT" },
+  { href: "/spatial", label: "Spatial Setup", minimumRole: "CONSULTANT" },
+  { href: "/site", label: "Site Analysis", minimumRole: "CONSULTANT" },
   { href: "/delivery", label: "Delivery", minimumRole: "CONSULTANT" },
   { href: "/assets", label: "Report Charts", minimumRole: "CONSULTANT" },
   { href: "/payment-proofs", label: "Payments", minimumRole: "SETTER" },
@@ -26,6 +28,7 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/insights", label: "Operations", minimumRole: "ADMIN" },
   { href: "/integrations", label: "Integrations", minimumRole: "ADMIN" },
   { href: "/integrity", label: "Data Check", minimumRole: "ADMIN" },
+  { href: "/methodology", label: "Methodology", minimumRole: "SUPER_ADMIN" },
   { href: "/state", label: "System Data", minimumRole: "SUPER_ADMIN" },
   { href: "/admin", label: "Team", minimumRole: "ADMIN" },
   { href: "/bootstrap", label: "Data Readiness", minimumRole: "ADMIN" },
@@ -38,7 +41,7 @@ export function canRoleAccess(role: UserRole, minimumRole: UserRole) {
 
 export function getAccessiblePageRules(role: UserRole) {
   if (role === "CLIENT") {
-    return pageAccessRules.filter((item) => item.href === "/client");
+    return [];
   }
 
   return pageAccessRules.filter((item) => item.href !== "/client" && canRoleAccess(role, item.minimumRole));

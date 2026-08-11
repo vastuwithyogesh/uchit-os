@@ -1,0 +1,24 @@
+{
+  "sourceVersion": "uchit-aou/v1",
+  "workbookContentHash": "22a10fe6dff4a9e4d450c9a1c6f302f20268e722950e37a8068dc0c0f61c44e1",
+  "sheet": "aou",
+  "range": "A1:I6",
+  "rangeHash": "0ea634e467629dcfdd2fe97f612a6b04292e994a4b9067a30f0dd9c33526f230",
+  "sourceStatus": "APPROVED_SOURCE",
+  "displayCopyStatus": "DRAFT",
+  "columns": ["Element", "Attributes", "Directions", "Colours", "Shapes", "Metals", "Activities", "Utilites", "Objects"],
+  "explicitDirectionGroups": {
+    "Water": ["NNW", "N", "NNE", "NE"],
+    "Air": ["ENE", "E", "ESE"],
+    "Fire": ["SE", "SSE", "S"],
+    "Earth": ["SSW", "SW"],
+    "Space": ["WSW", "W", "WNW", "NW"]
+  },
+  "rows": [
+    {"rowNumber": 2, "element": "Earth", "cells": {"Attributes": "Stationary, Stability, Solid, Heavy, Storage, owners area", "Directions": "SSW to SW", "Colours": "Yellow, Beige, Cream", "Shapes": "Square", "Metals": "Brass, Brass Alloys", "Activities": "RestRoom, Toilet, (disposable), Storage Room, Heavy& Immovable Stuff,over head watertanks, Long timeStorage, stairs good but only for one floor.", "Utilites": "Cupboards, Heavy Almirahs, ReFrigerator, ExtraStorage.", "Objects": "Desert Scenes with couple of camels , Metal squares, Shelves, squarebases, Yellowvases with white flowers."}},
+    {"rowNumber": 3, "element": "Water", "cells": {"Attributes": "Fluid, Flowing,Adaptive, Emotional,Observer, retainer,Birth giving,Resources, Healing,Cleanser, Logistics,Widespread, Nutrientcurator, Nurturer,Mother, Cloudiness of thoughts.", "Directions": "NNW to NE", "Colours": "Blue, Black", "Shapes": "Wavy", "Metals": "Aluminum,Silver, Lead", "Activities": "Pooja(except NNW and N), water activity : Storage of clean clothes and food in dresing and family lounge area or crockery cabinet", "Utilites": "Fountain, RO,Water Tank. Aquarium", "Objects": "Water scenepaintings,Expensive carpets,Silver articles ofdecor., water fountain , picture of lord indra , sculpture of Kuber ji"}},
+    {"rowNumber": 4, "element": "Fire", "cells": {"Attributes": "Fire, Heat crunching,cutting, Illuminating,Security, Strength,Spark.", "Directions": "SE to S", "Colours": "Red, Orange(pink toDark Red)", "Shapes": "Triangles", "Metals": "Iron Alloys,Copper,Gold", "Activities": "Cutting,Cooking ( pantry room ) , Heating(microwave,gas stove, geyser ) Relaxing ( lounge room ), Sleeping , Main electric board -MCV", "Utilites": "Stove, Grinder,Spices,Generators\n,Invertors, Tools.", "Objects": "Fire, Flames Scene,Yajna, In formsof paintings orsculpture. , triangular show piece of cooper"}},
+    {"rowNumber": 5, "element": "Air", "cells": {"Attributes": "Movement, detailing, aesthetics, design, motivator, coordinator, playful, unable to sit at one place, eagerness, Friends, Kids, Siblings(younger).\nNetworking, Helpful.", "Directions": "ENE to ESE", "Colours": "Green, Brown", "Shapes": "Oval, Rectangle", "Metals": "Stainless Steel", "Activities": "drawing area/room, Dance and music room, Play area, Hobby area, Reading place, Social interaction place, lounge area", "Utilites": "Fans, A/C, Mixer, Washing machine, Blowers, Small trees, Bamboos, Small garden, Flowers, Ventilation Shafts, Planters, Electrical Meter and Switch boards.", "Objects": "Souvenirs, Small gifts, Animals, Small gadgets, Pens, Calligraphy, Small kids playing, paintings, Art work of nature (Landscapes plants and trees). Brass surya dev sculpture"}},
+    {"rowNumber": 6, "element": "Space", "cells": {"Attributes": "The omnipresent,\nall manifested in the sky, and becomes dissolved in the sky only, it is the space element all around the grass, top, bottom, walls. It also seems to be said because you can point out that it is empty space but also invisible, also invisible. The sky element is mysterious.", "Directions": "WSW to NW", "Colours": "Transparent, White, Grey", "Shapes": "Round and Dot", "Metals": "Iron and Platinum", "Activities": "Skill ( learn and practice here), Beneficial Games, Thinking Power, Creativity, Music Practice, Resting Room., lounge , do not talk trash here - zone of manifestation", "Utilites": "Wall Clock, Watches, Safe, sooks.", "Objects": "Globe, Galaxy Scene, Road Maps, Pictures of Stars, Picture of Sky, High Peak Mountain, Himalaya without water, chessboard"}}
+  ]
+}

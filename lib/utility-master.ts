@@ -1,8 +1,72 @@
-import { readFile } from "node:fs/promises";
-import { join } from "node:path";
 import type { UtilityRule } from "./domain.ts";
-import { utilityRules as seedUtilityRules } from "./seed.ts";
 import { deterministicContentHash } from "./evaluation-provenance.ts";
+import workbookSource from "../data/utility-master.v1.json" with { type: "json" };
+
+export const UTILITY_MASTER_SOURCE_VERSION = workbookSource.sourceVersion;
+export const UTILITY_MASTER_WORKBOOK_HASH = workbookSource.workbookHash;
+export const UTILITY_MASTER_ROW_COUNT = 737;
+export const UTILITY_MASTER_UTILITY_COUNT = 46;
+export const UTILITY_MASTER_ADAPTER_VERSION = "utility-master-adapter/v1";
+
+export interface UtilityMasterRow {
+  rowNumber: number;
+  utilityName: string;
+  directionCode: string;
+  attributeText: string;
+  outcome: "GOOD" | "BAD" | "OK-OK";
+}
+
+export interface UtilityMasterSource {
+  sourceVersion: string;
+  workbookHash: string;
+  rows: UtilityMasterRow[];
+}
+
+const utilityMasterRows = (workbookSource.rows as UtilityMasterRow[]).map((row) => ({ ...row }));
+
+if (utilityMasterRows.length !== UTILITY_MASTER_ROW_COUNT || new Set(utilityMasterRows.map((row) => row.utilityName)).size !== UTILITY_MASTER_UTILITY_COUNT) {
+  throw new Error("UtilityMaster workbook source failed its approved row and utility-count contract.");
+}
+
+export function getUtilityMasterSource(): UtilityMasterSource {
+  return { sourceVersion: UTILITY_MASTER_SOURCE_VERSION, workbookHash: UTILITY_MASTER_WORKBOOK_HASH, rows: utilityMasterRows.map((row) => ({ ...row })) };
+}
+
+const unresolvedDirectionCodes = new Set(["E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8", "N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "BRAHMSTHAN", "ENW"]);
+const blockedDuplicatePairs = new Set(["SERVANT ROOM\u0000SSE", "BAR\u0000SSE", "BOREWELL\u0000SSE"]);
+
+export function resolveUtilityMasterRows(utilityNameValue: unknown, directionCodeValue: unknown) {
+  const utilityName = typeof utilityNameValue === "string" ? utilityNameValue.trim() : "";
+  const directionCode = typeof directionCodeValue === "string" ? directionCodeValue.trim() : "";
+  if (!utilityName || !directionCode) return { status: "REVIEW_REQUIRED" as const, reason: "Utility name and direction code are required.", rows: [] as UtilityMasterRow[] };
+  const rows = utilityMasterRows.filter((row) => row.utilityName === utilityName && row.directionCode === directionCode);
+  if (!rows.length) return { status: "REVIEW_REQUIRED" as const, reason: "No approved UtilityMaster row exists for this utility and direction.", rows };
+  if (blockedDuplicatePairs.has(`${utilityName}\u0000${directionCode}`) || rows.length > 1) {
+    return { status: "BLOCKED_METHOD_INPUT" as const, reason: "The UtilityMaster contains conflicting or duplicate rows; owner resolution is required.", rows };
+  }
+  if (unresolvedDirectionCodes.has(directionCode)) {
+    return { status: "REVIEW_REQUIRED" as const, reason: "This source direction code has unresolved semantic binding and cannot be automatically interpreted.", rows };
+  }
+  return { status: "APPROVED" as const, reason: "One exact approved UtilityMaster row matched.", rows };
+}
+
+export function utilityMasterRuleId(row: UtilityMasterRow) {
+  return `utilitymaster-row-${row.rowNumber}-${deterministicContentHash({ attributeText: row.attributeText, directionCode: row.directionCode, outcome: row.outcome, utilityName: row.utilityName }).slice(7, 23)}`;
+}
+
+export function getUtilityMasterMethodologyBinding(state: { methodologyVersions: Array<{ organisationId?: string; module: string; lifecycleStatus: string; executionAdapterVersion?: string; sourceAssetVersion?: string; sourceAssetHash?: string; contentHash: string; id: string; label: string }> ; methodologyRules: Array<{ organisationId?: string; methodologyVersionId: string; decisionStatus: string }>; methodologyGoldenFixtures: Array<{ organisationId?: string; methodologyVersionId: string; decisionStatus: string }> }, organisationId: string) {
+  const version = state.methodologyVersions.find((item) => item.organisationId === organisationId && item.module === "UTILITY" && item.lifecycleStatus === "ACTIVE");
+  if (!version) return { ready: false as const, status: "BLOCKED_METHOD_INPUT" as const, reason: "No active approved Utility methodology version exists." };
+  const rules = state.methodologyRules.filter((item) => item.organisationId === organisationId && item.methodologyVersionId === version.id);
+  const fixtures = state.methodologyGoldenFixtures.filter((item) => item.organisationId === organisationId && item.methodologyVersionId === version.id);
+  if (!rules.length || rules.some((item) => item.decisionStatus !== "APPROVED") || !fixtures.length || fixtures.some((item) => item.decisionStatus !== "APPROVED")) {
+    return { ready: false as const, status: "REVIEW_REQUIRED" as const, reason: "Utility methodology rules and golden fixtures are not all approved.", version };
+  }
+  if (version.executionAdapterVersion !== UTILITY_MASTER_ADAPTER_VERSION || version.sourceAssetVersion !== UTILITY_MASTER_SOURCE_VERSION || version.sourceAssetHash !== UTILITY_MASTER_WORKBOOK_HASH) {
+    return { ready: false as const, status: "BLOCKED_METHOD_INPUT" as const, reason: "The active Utility methodology is not bound to the approved UtilityMaster workbook hash, source version, and adapter.", version };
+  }
+  return { ready: true as const, status: "APPROVED" as const, reason: "Approved UtilityMaster binding is active.", version, rules, fixtures };
+}
 
 function parseCsvLine(line: string) {
   const values: string[] = [];
@@ -92,30 +156,6 @@ export function parseUtilityRulesCsv(csvText: string): UtilityRule[] {
       sourceCsvRow
     };
   });
-}
-
-export async function readResidentialUtilityRules() {
-  const candidatePaths = [
-    join(process.cwd(), "data", "residential-tab.csv"),
-    join(process.cwd(), "outputs", "uchit-vastu", "data", "residential-tab.csv")
-  ];
-
-  for (const filePath of candidatePaths) {
-    try {
-      const csvText = await readFile(filePath, "utf8");
-      const parsedRules = parseUtilityRulesCsv(csvText);
-      if (parsedRules.length > 0) {
-        return parsedRules;
-      }
-    } catch (error) {
-      if ((error as NodeJS.ErrnoException).code !== "ENOENT") {
-        throw error;
-      }
-      // Try the next location only when this candidate does not exist.
-    }
-  }
-
-  return structuredClone(seedUtilityRules);
 }
 
 export function groupUtilityRulesByVerdict(rules: UtilityRule[]) {

@@ -32,12 +32,14 @@ interface CommercialConsoleProps {
   reports: ReportVersionRecord[];
 }
 
+type FounderBootstrapState = AppState & { foundation?: { isFounderEdition?: boolean } };
+
 async function fetchState() {
   const response = await fetch("/api/bootstrap", { cache: "no-store" });
   if (!response.ok) {
     throw new Error("Failed to load commercial state");
   }
-  return response.json() as Promise<AppState>;
+  return response.json() as Promise<FounderBootstrapState>;
 }
 
 async function postAction(payload: Record<string, unknown>, role?: string) {
@@ -57,7 +59,7 @@ async function postAction(payload: Record<string, unknown>, role?: string) {
 
 export function CommercialConsole(props: CommercialConsoleProps) {
   const { activeUser } = useSession();
-  const [liveState, setLiveState] = useState<AppState | null>(null);
+  const [liveState, setLiveState] = useState<FounderBootstrapState | null>(null);
   const [selectedClientId, setSelectedClientId] = useState(props.clients[0]?.id ?? "");
   const [meetingProvider, setMeetingProvider] = useState<ReviewCallBookingRecord["provider"]>("GOOGLE_MEET");
   const [meetingTime, setMeetingTime] = useState(() => {
@@ -74,6 +76,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
   const [balanceProofUrl, setBalanceProofUrl] = useState("");
   const [balanceProofId, setBalanceProofId] = useState("");
   const [reviewOutcomeNote, setReviewOutcomeNote] = useState("Client attended the review call and is ready for the next step.");
+  const [verdictPresentationNote, setVerdictPresentationNote] = useState("Stage A findings and the watermarked verdict preview were presented and discussed with the client.");
   const [busy, setBusy] = useState(false);
   const [message, setMessage] = useState("Use the controls below to move the commercial flow forward.");
 
@@ -104,7 +107,10 @@ export function CommercialConsole(props: CommercialConsoleProps) {
   }, [activeClient?.id, activeProposal?.id, activeProposal?.amountInr, activeProposal?.minAdvanceInr, advancePayment?.amountInr, commercialPolicy]);
   const balancePayment = activePayments.find((payment) => payment.caseId === activeCase?.id && payment.type === "BALANCE");
   const advanceVerified = Boolean(activeVerification?.proofAssetId && advancePayment?.proofAssetId);
-  const approvalCount = activeReport?.isPreview ? 0 : activeReport?.approvals?.length ?? 0;
+  const isFounderEdition = liveState?.foundation?.isFounderEdition === true;
+  const founderReviewDone = Boolean(activeReport?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_REVIEWED"));
+  const founderApprovalDone = Boolean(activeReport?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_APPROVED"));
+  const approvalCount = isFounderEdition ? Number(founderReviewDone) + Number(founderApprovalDone) : activeReport?.isPreview ? 0 : activeReport?.approvals?.length ?? 0;
   const canPrepareFinalReport = Boolean(
     activeCase &&
       activeCase.balanceApproved &&
@@ -152,11 +158,11 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     !activeProposal ? "Create the proposal first." : null,
     activeProposal && activeProposal.status !== "APPROVED" ? "The proposal still needs Super-Admin approval." : null,
     activeProposal && !activeBooking ? "Book the review call before collecting the advance." : null,
-    activeProposal && !advanceVerified ? "Upload and independently verify the scoped advance receipt to open the case." : null,
+    activeProposal && !advanceVerified ? "Upload and confirm the scoped advance receipt to open the case." : null,
     activeProposal && !caseGateOpen ? "Advance exists, but it does not yet clear the minimum gate." : null,
     activeCase && !balancePayment ? "Balance payment is not recorded yet." : null,
     activeCase && !canPrepareFinalReport ? "Balance approval still blocks the final report." : null,
-    activeReport && !activeReport.isPreview && approvalCount < 2 ? "Two report approvals are still required." : null,
+    activeReport && !activeReport.isPreview && approvalCount < 2 ? (isFounderEdition ? "Founder review and Founder approval are still required." : "Two report approvals are still required.") : null,
     activeReport && !activeReport.isPreview && !verdictReadyByState ? "Verdict release is still blocked by payment or approval gates." : null
   ].filter(Boolean) as string[];
 
@@ -164,12 +170,12 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     if (!activeProposal) return "Create the proposal for this client.";
     if (activeProposal.status !== "APPROVED") return "Get the proposal approved by a Super-Admin.";
     if (!activeBooking) return "Book the review call and send the meeting link.";
-    if (!advanceVerified) return "Upload the advance receipt, then have a different administrator verify it.";
+    if (!advanceVerified) return isFounderEdition ? "Upload and confirm the advance receipt." : "Upload the advance receipt, then have a different administrator verify it.";
     if (!activeCase) return "Open the case now that the advance rule is satisfied.";
     if (!balancePayment) return "Collect and verify the balance payment.";
     if (!canPrepareFinalReport) return "Finish balance approval to unlock the final report.";
     if (!activeReport || activeReport.isPreview) return "Prepare the final report.";
-    if (approvalCount < 2) return "Collect the remaining report approvals.";
+    if (approvalCount < 2) return isFounderEdition ? (founderReviewDone ? "Record Founder approval." : "Record Founder review.") : "Collect the remaining report approvals.";
     if (!verdictReadyByState) return "Clear the remaining release blockers.";
     return "All gates are clear. The verdict can now be released.";
   })();
@@ -236,7 +242,20 @@ export function CommercialConsole(props: CommercialConsoleProps) {
 
     setBusy(true);
     try {
-      await postAction({ ...action, clientId: activeClient.id }, activeUser.role);
+      const actionName = String(action.action ?? "");
+      const protectedEntity = actionName === "proposal-create" ? activeClient
+        : ["proposal-approve", "case-create", "advance-proof-verify"].includes(actionName) ? activeProposal
+          : ["stage-a-present", "balance-proof-verify"].includes(actionName) ? activeCase
+            : ["report-approve", "verdict-release"].includes(actionName) ? activeReport : undefined;
+      const protectedActions = ["proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "stage-a-present", "balance-proof-verify", "report-approve", "verdict-release"];
+      let payload: Record<string, unknown> = { ...action, clientId: activeClient.id };
+      if (protectedActions.includes(actionName)) {
+        if (liveState?.persistenceRevision === undefined || liveState.persistenceRevision === null || !protectedEntity) throw new Error("Reload the latest record before this protected action.");
+        const evidencePart = String(action.proofId ?? "none");
+        payload = { ...payload, expectedRecordVersion: protectedEntity.recordVersion ?? 0, expectedRevision: liveState.persistenceRevision,
+          idempotencyKey: `founder:${actionName}:${protectedEntity.id}:${protectedEntity.recordVersion ?? 0}:${evidencePart}` };
+      }
+      await postAction(payload, activeUser.role);
       await refresh(activeClient.id);
       setMessage(successMessage);
     } catch (error) {
@@ -431,7 +450,16 @@ export function CommercialConsole(props: CommercialConsoleProps) {
               >
                 Generate preview
               </button>
+              <button
+                type="button"
+                className="button-secondary"
+                disabled={busy || !activeCase || !reports.some((item) => item.caseId === activeCase.id && item.isPreview) || activeCase.stageAVerdictStatus === "PRESENTED"}
+                onClick={() => run({ action: "stage-a-present", caseId: activeCase?.id, note: verdictPresentationNote }, "Stage A verdict presentation recorded")}
+              >
+                Record verdict presentation
+              </button>
             </div>
+            {activeCase ? <div className="field" style={{ marginTop: 12 }}><label htmlFor="verdict-presentation-note">Presentation note</label><textarea id="verdict-presentation-note" value={verdictPresentationNote} onChange={(event) => setVerdictPresentationNote(event.target.value)} /></div> : null}
             <div className="workflow" style={{ marginTop: 12 }}>
               <button
                 type="button"
@@ -608,7 +636,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
             <button
               type="button"
               className="button"
-              disabled={busy || !canVerifyPayments(activeUser) || !activeCase || !(balanceProofId || balancePayment?.proofAssetId)}
+              disabled={busy || !canVerifyPayments(activeUser) || !activeCase || activeCase.stageAVerdictStatus !== "PRESENTED" || !(balanceProofId || balancePayment?.proofAssetId)}
               onClick={() =>
                 run(
                   {

@@ -9,6 +9,10 @@ interface Fetcher {
 interface Env {
   DB?: D1DatabaseBinding;
   R2?: R2BucketBinding;
+  /** Server-only inbound integration secret. Never serialize this binding. */
+  OPTIN_WEBHOOK_SECRET?: string;
+  /** Server-only owner secret used to encrypt immutable final PDFs. */
+  PDF_OWNER_SECRET?: string;
   ASSETS: Fetcher;
   IMAGES: {
     input(stream: ReadableStream): {

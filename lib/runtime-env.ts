@@ -33,6 +33,8 @@ export type RuntimeEnv = {
   R2: R2BucketBinding;
   /** Server-only inbound signing key. It is never serialized into AppState or client responses. */
   OPTIN_WEBHOOK_SECRET?: string;
+  /** Server-only owner secret used to encrypt immutable final PDFs. */
+  PDF_OWNER_SECRET?: string;
 };
 
 export function getRuntimeEnv() {

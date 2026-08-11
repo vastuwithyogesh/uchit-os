@@ -7,7 +7,7 @@ test("case workspace is staff-only and appears in staff navigation", () => {
   const policy = source("lib/access-policy.ts");
   assert.match(page, /requirePageAccess\("SETTER"\)/);
   assert.match(policy, /href: "\/workspace"[\s\S]*minimumRole: "SETTER"/);
-  assert.match(functionBody(policy, "getAccessiblePageRules"), /item\.href === "\/client"/);
+  assert.match(functionBody(policy, "getAccessiblePageRules"), /role === "CLIENT"[\s\S]*return \[\]/);
 });
 
 test("workspace projection limits setter visibility and remains read-only", () => {

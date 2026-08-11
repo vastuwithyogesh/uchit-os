@@ -6,6 +6,7 @@ import type { CommercialProposalRecord, InboundLeadRecord, LeadQualificationReco
 import { canTriggerDeliverables } from "@/lib/permissions";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { formatShortDate } from "@/lib/format";
+import type { AppState } from "@/lib/store";
 
 type LeadInboxPayload = {
   leads: InboundLeadRecord[];
@@ -187,7 +188,13 @@ export function LeadInboxConsole({
     const clientId = lead.convertedClientId ?? lead.uniqueClientId;
     setBusy(true);
     try {
-      await postAction({ action: "proposal-create", clientId }, activeUser.role);
+      const latestResponse = await fetch("/api/bootstrap", { cache: "no-store" });
+      if (!latestResponse.ok) throw new Error("Reload the latest client before creating the proposal.");
+      const latest = await latestResponse.json() as AppState;
+      const client = latest.clients.find((item) => item.id === clientId);
+      if (!client || latest.persistenceRevision === undefined || latest.persistenceRevision === null) throw new Error("The latest client version is unavailable. Reload and try again.");
+      await postAction({ action: "proposal-create", clientId, expectedRecordVersion: client.recordVersion ?? 0,
+        expectedRevision: latest.persistenceRevision, idempotencyKey: `founder:proposal-create:${client.id}:${client.recordVersion ?? 0}` }, activeUser.role);
       setMessage(`Proposal created for ${lead.fullName}.`);
       await refresh();
     } catch (error) {

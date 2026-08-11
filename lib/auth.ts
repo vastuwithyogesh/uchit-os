@@ -51,6 +51,10 @@ export function getUserByRole(role: UserRole) {
 
 const initialOwnerEmails = new Set(["iyogesh2020@gmail.com"]);
 
+export function isInitialOrganisationOwnerEmail(email: string) {
+  return initialOwnerEmails.has(email.trim().toLowerCase());
+}
+
 export const SESSION_API_VERSION = 1 as const;
 
 export class AuthenticationError extends Error {
@@ -125,6 +129,18 @@ async function getRoleForAuthenticatedEmail(email: string) {
     : null;
 }
 
+async function getRoleForActiveMembership(userId: string): Promise<UserRole | null> {
+  const db = await ensureStaffRoleAssignmentsTable();
+  if (!db) return null;
+  const result = await db.prepare(`SELECT m.role FROM organisation_memberships m
+    JOIN organisations o ON o.id=m.organisation_id
+    WHERE m.user_id=? AND m.status='ACTIVE' AND o.status='ACTIVE' ORDER BY m.created_at`)
+    .bind(userId).all<{ role: string }>();
+  const memberships = result.results ?? [];
+  if (memberships.length !== 1) return null;
+  return roles.includes(memberships[0].role as UserRole) ? memberships[0].role as UserRole : null;
+}
+
 async function ensureStaffRoleAssignmentsTable() {
   const env = getRuntimeEnv();
   if (!env.DB) {
@@ -150,6 +166,10 @@ export async function resolveRequestActor(headers: Headers, demoRole?: string | 
   }
 
   const { id: authenticatedUserId, email: authenticatedEmail } = readAuthenticatedIdentity(headers);
+  const membershipRole = await getRoleForActiveMembership(authenticatedUserId);
+  if (membershipRole) {
+    return hydrateAuthenticatedActor(getUserByRole(membershipRole), headers);
+  }
   const mappedRole = await getRoleForAuthenticatedEmail(authenticatedEmail);
   if (mappedRole) {
     return hydrateAuthenticatedActor(getUserByRole(mappedRole), headers);

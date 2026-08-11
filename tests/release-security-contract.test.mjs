@@ -29,6 +29,7 @@ test("tracked source contains no obvious committed credential values", () => {
 test("every API route declares an authentication or ownership gate", () => {
   const policies = {
     "app/api/actions/route.ts": /resolveRequestActor/,
+    "app/api/audit/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/bootstrap/route.ts": /requireRouteActor/,
     "app/api/case-files/route.ts": /requireRouteActor\(request, "CONSULTANT"\)/,
     "app/api/case-files/[assetId]/route.ts": /requireRouteActor\(request, "CONSULTANT"\)/,
@@ -36,11 +37,14 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/client/portal/route.ts": /resolveRequestActor.*buildClientPortalView/s,
     "app/api/client/reports/[reportId]/route.ts": /resolveRequestActor.*findOwnedClient/s,
     "app/api/diagnostics/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
+    "app/api/foundation/access/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
+    "app/api/foundation/policy/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/integrity/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
     "app/api/optin-leads/route.ts": /requireRouteActor/,
     "app/api/optin-leads/events/route.ts": /OPTIN_WEBHOOK_SECRET.*verifyInboundSignature/s,
     "app/api/payment-proofs/route.ts": /requireRouteActor/,
     "app/api/payment-proofs/files/[fileName]/route.ts": /requireRouteActor/,
+    "app/api/reports/[reportId]/pdf/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/reports/[reportId]/print/route.ts": /resolveRequestActor.*canReadClientSnapshots/s,
     "app/api/seed/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
     "app/api/session/route.ts": /resolveRequestActor/,

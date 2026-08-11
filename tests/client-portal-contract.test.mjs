@@ -31,6 +31,8 @@ test("client navigation is isolated from staff navigation", () => {
   const policy = source("lib/access-policy.ts");
   const accessible = functionBody(policy, "getAccessiblePageRules");
   assert.match(accessible, /role === "CLIENT"/);
-  assert.match(accessible, /item\.href === "\/client"/);
+  assert.match(accessible, /return \[\]/);
   assert.match(accessible, /item\.href !== "\/client"/);
+  assert.match(source("app/client/page.tsx"), /Delivery intentionally disabled/);
+  assert.match(source("app/api/client/portal/route.ts"), /CLIENT_DELIVERY_ENABLED = false/);
 });

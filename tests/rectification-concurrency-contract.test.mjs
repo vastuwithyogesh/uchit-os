@@ -61,7 +61,8 @@ test("sensitive actions require case and global optimistic concurrency", () => {
 
 test("bootstrap exposes the global concurrency token without changing the state envelope", () => {
   assert.match(bootstrap, /loadStateSnapshotFromPersistence/);
-  assert.match(bootstrap, /\.\.\.snapshot\.state, persistenceRevision: snapshot\.revision/);
+  assert.match(bootstrap, /\.\.\.scopedState, persistenceRevision: snapshot\.revision/);
+  assert.match(bootstrap, /projectOrganisationState\(snapshot\.state, context\.organisation\.id\)/);
   assert.match(store, /persistenceRevision\?: number \| null/);
 });
 

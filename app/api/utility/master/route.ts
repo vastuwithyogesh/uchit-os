@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { requireRouteActor } from "@/lib/auth";
-import { groupUtilityRulesByVerdict, readResidentialUtilityRules } from "@/lib/utility-master";
+import { getUtilityMasterSource, groupUtilityRulesByVerdict } from "@/lib/utility-master";
+import { readResidentialUtilityRules } from "@/lib/legacy-utility-rules.server";
 
 export async function GET(request: Request) {
   try {
@@ -11,12 +12,16 @@ export async function GET(request: Request) {
 
     const rules = await readResidentialUtilityRules();
     const grouped = groupUtilityRulesByVerdict(rules);
+    const utilityMaster = getUtilityMasterSource();
 
     return NextResponse.json({
       rules,
+      utilityMaster: { sourceVersion: utilityMaster.sourceVersion, workbookHash: utilityMaster.workbookHash, rows: utilityMaster.rows },
       grouped,
       counts: {
         total: rules.length,
+        utilityMasterRows: utilityMaster.rows.length,
+        utilityMasterUtilities: new Set(utilityMaster.rows.map((row) => row.utilityName)).size,
         good: grouped.GOOD.length,
         bad: grouped.BAD.length,
         okOk: grouped["OK-OK"].length
