@@ -9,9 +9,12 @@ export function SiteHeader({ title, subtitle, minimal = false }: { title: string
   const { activeUser, isLocalDemo, sessionStatus, sessionError, retrySession } = useSession();
   const pathname = usePathname();
   const visibleNavigation = sessionStatus === "ready" ? getAccessiblePageRules(activeUser.role) : [];
-  const primaryNavigation = visibleNavigation.filter((item) =>
-    activeUser.role === "CLIENT" ? item.href === "/client" : item.href === "/workspace"
-  );
+  const primaryHrefs = activeUser.role === "CLIENT"
+    ? ["/client"]
+    : ["/", "/crm", "/lead-pipeline", "/clients-cases", "/founder/06", "/reports"];
+  const primaryNavigation = primaryHrefs
+    .map((href) => visibleNavigation.find((item) => item.href === href))
+    .filter((item): item is (typeof visibleNavigation)[number] => Boolean(item));
   const moreNavigation = visibleNavigation.filter((item) => !primaryNavigation.includes(item));
   const adminNavigation = moreNavigation.filter((item) => item.minimumRole === "ADMIN" || item.minimumRole === "SUPER_ADMIN");
   const workNavigation = moreNavigation.filter((item) => !adminNavigation.includes(item));

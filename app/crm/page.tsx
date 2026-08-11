@@ -14,7 +14,7 @@ export default async function CrmPage() {
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="CRM Workbench" subtitle="Lead flow, approvals, and workspace control" />
+        <SiteHeader title="Leads" subtitle="Opt-ins, profiles, and next action" />
         <AccessDeniedPanel area="CRM workbench" requiredRole="SETTER" actorRole={access.actor.role} />
       </main>
     );
@@ -24,7 +24,7 @@ export default async function CrmPage() {
 
   return (
     <main className="page-shell">
-      <SiteHeader title="CRM Workbench" subtitle="Lead flow, approvals, and workspace control" />
+      <SiteHeader title="Leads" subtitle="Opt-ins, profiles, and next action" />
 
       <FounderRouteIntro
         eyebrow="Client flow"
@@ -43,7 +43,7 @@ export default async function CrmPage() {
         </div>
       </FounderRouteIntro>
 
-      <UnifiedLeadsWorkspace />
+      <UnifiedLeadsWorkspace mode="leads" />
 
       <details id="crm-advanced-tools" className="founder-technical-details crm-advanced-tools">
         <summary>More options · intake, qualification, commercial and payment tools</summary>

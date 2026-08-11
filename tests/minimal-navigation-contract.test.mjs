@@ -4,8 +4,8 @@ import { source } from "./helpers/source-contracts.mjs";
 
 test("the main navigation has one clear destination and an accessible More menu", () => {
   const header = source("components/site-header.tsx");
-  assert.match(header, /item\.href === "\/client"/);
-  assert.match(header, /item\.href === "\/workspace"/);
+  assert.match(header, /primaryHrefs/);
+  assert.match(header, /activeUser\.role === "CLIENT"/);
   assert.match(header, /<details className="nav-more">/);
   assert.match(header, /<summary aria-label="Open navigation menu">/);
   assert.match(header, /nav-more-label">Menu/);
@@ -43,7 +43,7 @@ test("the mobile menu stays above browser controls and remains scrollable", () =
 
 test("navigation labels use plain language", () => {
   const policy = source("lib/access-policy.ts");
-  for (const label of ["My Case", "Workspace", "Clients", "History", "Case Setup", "Files & Drawings", "Report Charts", "Payments", "System Check"]) {
+  for (const label of ["My Case", "Workspace", "Leads", "Lead Pipeline", "Clients & Cases", "History", "Case Setup", "Files & Drawings", "Report Charts", "Payments", "System Check"]) {
     assert.match(policy, new RegExp(`label: "${label}"`));
   }
   assert.doesNotMatch(policy, /label: "(?:CRM workbench|Ops|Proofs|Diagnostics|Integrity|State|Bootstrap)"/);
