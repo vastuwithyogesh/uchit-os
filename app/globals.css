@@ -950,6 +950,13 @@ h3,
   align-self: start;
 }
 
+.section-grid[aria-labelledby="methodology-title"] > .card,
+.section-grid[aria-labelledby="spatial-title"] > .card,
+.section-grid[aria-labelledby="evaluation-title"] > .card {
+  border-color: var(--line);
+  box-shadow: none;
+}
+
 .founder-support-surface .footer-note {
   margin-top: 14px;
 }

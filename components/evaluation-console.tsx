@@ -122,7 +122,8 @@ export function EvaluationConsole() {
 
   return (
     <section className="section-grid">
-      <div className={`card ${evaluationReady ? "span-8" : "span-12"}`}>
+      <div className={`card founder-work-surface ${evaluationReady ? "span-8" : "span-12"}`}>
+        <div className="founder-context-bar" aria-label="Current evaluation context"><span>Evaluation</span><span aria-hidden="true">→</span><strong>{selectedClient?.displayName ?? "Choose a client"}</strong><span aria-hidden="true">→</span><span>{selectedFloor?.floorLabel ?? "Floor"}</span></div>
         <div className="eyebrow">Case evaluation</div>
         <h2>{evaluationReady ? "Run the verified case evaluation" : "Complete setup before evaluating"}</h2>
         <p className="subtle">
@@ -202,7 +203,7 @@ export function EvaluationConsole() {
         </details>
       </div>
 
-      {evaluationReady ? <div className="card span-4">
+      {evaluationReady ? <div className="card span-4 founder-support-surface">
         <div className="eyebrow">Shakti engine</div>
         <h2>16-value ranking snapshot</h2>
         <div className="pill-row" style={{ marginTop: 14 }}>
