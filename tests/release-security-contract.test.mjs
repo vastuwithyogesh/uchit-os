@@ -40,6 +40,8 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/foundation/access/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/foundation/policy/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/integrity/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
+    "app/api/integrations/lovable/events/route.ts": /verifyInboundSignature.*parseLovableIntegrationEvent/s,
+    "app/api/integrations/lovable/reconcile/route.ts": /requireRouteActor\(request, "SUPER_ADMIN"\)/,
     "app/api/optin-leads/route.ts": /requireRouteActor/,
     "app/api/optin-leads/events/route.ts": /OPTIN_WEBHOOK_SECRET.*verifyInboundSignature/s,
     "app/api/payment-proofs/route.ts": /requireRouteActor/,

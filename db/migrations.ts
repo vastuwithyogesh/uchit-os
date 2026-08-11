@@ -165,6 +165,92 @@ export const d1Migrations: readonly D1Migration[] = [
       )`,
       "CREATE INDEX IF NOT EXISTS idx_final_pdf_events_scope ON final_pdf_artifact_events(organisation_id,report_version_id,occurred_at)"
     ]
+  },
+  {
+    version: 9,
+    statements: [
+      "ALTER TABLE optin_leads ADD COLUMN organisation_id TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN external_source_id TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN source_record_type TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN source_record_id TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN external_client_code TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN sync_status TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN last_synced_at TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN source_event_id TEXT",
+      "ALTER TABLE optin_leads ADD COLUMN record_version INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE inbound_optin_events ADD COLUMN organisation_id TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN external_source_id TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN source_record_type TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN source_record_id TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN external_client_code TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN sync_status TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN last_synced_at TEXT",
+      "ALTER TABLE inbound_optin_events ADD COLUMN record_version INTEGER NOT NULL DEFAULT 0",
+      "ALTER TABLE audit_events ADD COLUMN source_system TEXT",
+      "ALTER TABLE audit_events ADD COLUMN source_record_type TEXT",
+      "ALTER TABLE audit_events ADD COLUMN source_record_id TEXT",
+      "ALTER TABLE audit_events ADD COLUMN integration_event_id TEXT",
+      "CREATE INDEX IF NOT EXISTS idx_optin_leads_external_link ON optin_leads(organisation_id,external_source_id,source_record_type,source_record_id)",
+      "CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_external ON inbound_optin_events(organisation_id,external_source_id,source_record_type,source_record_id)",
+      "CREATE INDEX IF NOT EXISTS idx_audit_integration_source ON audit_events(organisation_id,source_system,source_record_type,source_record_id,occurred_at)",
+      `CREATE TABLE IF NOT EXISTS external_sources (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, source_system TEXT NOT NULL,
+        source_environment TEXT NOT NULL, source_key TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE','PAUSED','RETIRED')),
+        inbound_mode TEXT NOT NULL CHECK (inbound_mode IN ('SIGNED_WEBHOOK','POLL','COHOSTED_API')),
+        config_version INTEGER NOT NULL DEFAULT 1, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,source_system,source_environment), UNIQUE (organisation_id,source_key)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_external_sources_org_status ON external_sources(organisation_id,status)",
+      `CREATE TABLE IF NOT EXISTS external_client_links (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, external_source_id TEXT NOT NULL,
+        source_record_type TEXT NOT NULL, source_record_id TEXT NOT NULL, external_client_code TEXT,
+        client_id TEXT NOT NULL, match_method TEXT NOT NULL CHECK (match_method IN ('EXACT_EMAIL','EXACT_PHONE','MANUAL','NEW_CLIENT')),
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE','REVIEW_REQUIRED','REVOKED')), identity_hash TEXT,
+        source_created_at TEXT, last_seen_at TEXT, last_synced_at TEXT,
+        record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (external_source_id,source_record_type,source_record_id)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_external_client_links_org_client ON external_client_links(organisation_id,client_id,status)",
+      "CREATE INDEX IF NOT EXISTS idx_external_client_links_external_code ON external_client_links(external_source_id,external_client_code)",
+      `CREATE TABLE IF NOT EXISTS integration_events (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, external_source_id TEXT NOT NULL,
+        event_id TEXT NOT NULL, source_record_type TEXT NOT NULL, source_record_id TEXT NOT NULL,
+        event_type TEXT NOT NULL, source_actor_id TEXT, occurred_at TEXT NOT NULL, received_at TEXT NOT NULL,
+        payload_hash TEXT NOT NULL, identity_hash TEXT,
+        status TEXT NOT NULL CHECK (status IN ('RECEIVED','APPLIED','REPLAYED','REVIEW_REQUIRED','FAILED','DEAD_LETTER')),
+        retry_count INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT, last_error_code TEXT, processed_at TEXT,
+        request_id TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (external_source_id,event_id)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_integration_events_org_time ON integration_events(organisation_id,received_at)",
+      "CREATE INDEX IF NOT EXISTS idx_integration_events_record ON integration_events(external_source_id,source_record_type,source_record_id,received_at)",
+      `CREATE TABLE IF NOT EXISTS integration_outbox (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, external_source_id TEXT NOT NULL,
+        target_system TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, event_type TEXT NOT NULL,
+        canonical_revision INTEGER, payload_version TEXT NOT NULL, payload_hash TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING','SENT','FAILED','DEAD_LETTER')),
+        attempt_count INTEGER NOT NULL DEFAULT 0, next_attempt_at TEXT, last_error_code TEXT,
+        idempotency_key TEXT NOT NULL, sent_at TEXT, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,idempotency_key)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_integration_outbox_pending ON integration_outbox(organisation_id,status,next_attempt_at)",
+      `CREATE TABLE IF NOT EXISTS integration_conflicts (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, external_source_id TEXT NOT NULL,
+        integration_event_id TEXT, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL, field_name TEXT NOT NULL,
+        canonical_hash TEXT, incoming_hash TEXT,
+        status TEXT NOT NULL CHECK (status IN ('REVIEW_REQUIRED','ACCEPT_CANONICAL','ACCEPT_INCOMING','RESOLVED')),
+        reason TEXT NOT NULL, resolved_by_actor_id TEXT, resolved_at TEXT, created_at TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_integration_conflicts_open ON integration_conflicts(organisation_id,status,created_at)",
+      `CREATE TABLE IF NOT EXISTS integration_cursors (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, external_source_id TEXT NOT NULL,
+        cursor TEXT, observed_at TEXT, updated_at TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,external_source_id)
+      )`
+    ]
   }
 ];
 
@@ -199,6 +285,32 @@ export async function migrateD1(db: D1DatabaseBinding): Promise<void> {
         const appliedAt = new Date().toISOString();
         await db.batch([
           db.prepare("CREATE INDEX IF NOT EXISTS idx_case_file_assets_org_scope ON case_file_assets(organisation_id,case_id,case_revision_number,service_type,floor_label,created_at)"),
+          db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)").bind(migration.version, appliedAt)
+        ]);
+        continue;
+      }
+    }
+    if (migration.version === 9) {
+      const [optinColumns, inboundColumns, auditColumns, tables] = await Promise.all([
+        db.prepare("PRAGMA table_info(optin_leads)").all<{ name: string }>(),
+        db.prepare("PRAGMA table_info(inbound_optin_events)").all<{ name: string }>(),
+        db.prepare("PRAGMA table_info(audit_events)").all<{ name: string }>(),
+        db.prepare("SELECT name FROM sqlite_master WHERE type='table' AND name IN ('external_sources','external_client_links','integration_events','integration_outbox','integration_conflicts','integration_cursors')").all<{ name: string }>()
+      ]);
+      const has = (result: { results?: Array<{ name: string }> }, required: readonly string[]) => {
+        const names = new Set((result.results ?? []).map((row) => row.name));
+        return required.every((name) => names.has(name));
+      };
+      const v9ColumnsPresent = has(optinColumns, ["organisation_id", "external_source_id", "source_record_type", "source_record_id", "external_client_code", "sync_status", "last_synced_at", "source_event_id", "record_version"])
+        && has(inboundColumns, ["organisation_id", "external_source_id", "source_record_type", "source_record_id", "external_client_code", "sync_status", "last_synced_at", "record_version"])
+        && has(auditColumns, ["source_system", "source_record_type", "source_record_id", "integration_event_id"]);
+      const v9TablesPresent = has(tables, ["external_sources", "external_client_links", "integration_events", "integration_outbox", "integration_conflicts", "integration_cursors"]);
+      if (v9ColumnsPresent && v9TablesPresent) {
+        const appliedAt = new Date().toISOString();
+        await db.batch([
+          db.prepare("CREATE INDEX IF NOT EXISTS idx_optin_leads_external_link ON optin_leads(organisation_id,external_source_id,source_record_type,source_record_id)"),
+          db.prepare("CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_external ON inbound_optin_events(organisation_id,external_source_id,source_record_type,source_record_id)"),
+          db.prepare("CREATE INDEX IF NOT EXISTS idx_audit_integration_source ON audit_events(organisation_id,source_system,source_record_type,source_record_id,occurred_at)"),
           db.prepare("INSERT OR IGNORE INTO schema_migrations (version, applied_at) VALUES (?, ?)").bind(migration.version, appliedAt)
         ]);
         continue;

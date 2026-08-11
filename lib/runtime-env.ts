@@ -33,6 +33,13 @@ export type RuntimeEnv = {
   R2: R2BucketBinding;
   /** Server-only inbound signing key. It is never serialized into AppState or client responses. */
   OPTIN_WEBHOOK_SECRET?: string;
+  /** Dormant Lovable wrapper configuration; activation requires explicit approval. */
+  LOVABLE_INTEGRATION_SECRET?: string;
+  LOVABLE_INTEGRATION_ENABLED?: string;
+  LOVABLE_INTEGRATION_ACTIVATION?: string;
+  LOVABLE_INTEGRATION_ENVIRONMENT?: string;
+  LOVABLE_INTEGRATION_SOURCE_KEY?: string;
+  LOVABLE_INTEGRATION_OUTBOUND_URL?: string;
   /** Server-only owner secret used to encrypt immutable final PDFs. */
   PDF_OWNER_SECRET?: string;
 };

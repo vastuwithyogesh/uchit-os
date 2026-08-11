@@ -22,18 +22,27 @@ class FakeD1 {
     if (/CREATE TABLE IF NOT EXISTS case_file_assets/i.test(sql)) { this.tables.add("case_file_assets"); this.columns.set("case_file_assets", new Set(["id", "evidence_ref", "case_id", "case_revision_number", "service_type", "floor_label", "object_key", "checksum_sha256", "status"])); }
     if (/CREATE TABLE IF NOT EXISTS staff_role_assignments/i.test(sql)) this.tables.add("staff_role_assignments");
     if (/CREATE TABLE IF NOT EXISTS staff_role_assignment_audit/i.test(sql)) this.tables.add("staff_role_assignment_audit");
-    if (/CREATE TABLE IF NOT EXISTS optin_leads/i.test(sql)) this.tables.add("optin_leads");
-    if (/CREATE TABLE IF NOT EXISTS inbound_optin_events/i.test(sql)) this.tables.add("inbound_optin_events");
+    if (/CREATE TABLE IF NOT EXISTS optin_leads/i.test(sql)) { this.tables.add("optin_leads"); this.columns.set("optin_leads", new Set(["id", "identity_key", "unique_client_id", "payload", "imported_at", "last_seen_at"])); }
+    if (/CREATE TABLE IF NOT EXISTS inbound_optin_events/i.test(sql)) { this.tables.add("inbound_optin_events"); this.columns.set("inbound_optin_events", new Set(["event_id", "occurred_at", "source", "payload_hash", "identity_hash", "received_at", "outcome", "submission_count"])); }
     if (/CREATE TABLE IF NOT EXISTS organisations/i.test(sql)) this.tables.add("organisations");
     if (/CREATE TABLE IF NOT EXISTS organisation_memberships/i.test(sql)) this.tables.add("organisation_memberships");
     if (/CREATE TABLE IF NOT EXISTS workflow_policies/i.test(sql)) this.tables.add("workflow_policies");
     if (/CREATE TABLE IF NOT EXISTS approval_policies/i.test(sql)) this.tables.add("approval_policies");
     if (/CREATE TABLE IF NOT EXISTS audit_events/i.test(sql)) this.tables.add("audit_events");
+    if (/CREATE TABLE IF NOT EXISTS audit_events/i.test(sql)) this.columns.set("audit_events", new Set(["id", "organisation_id", "actor_user_id", "actor_display_name", "action", "entity_type", "entity_id", "case_id", "project_id", "floor_id", "before_hash", "after_hash", "reason", "request_id", "idempotency_key", "occurred_at", "previous_audit_hash", "event_hash"]));
     if (/CREATE TABLE IF NOT EXISTS user_access_requests/i.test(sql)) this.tables.add("user_access_requests");
     if (/CREATE TABLE IF NOT EXISTS ownership_transfer_requests/i.test(sql)) this.tables.add("ownership_transfer_requests");
     if (/CREATE TABLE IF NOT EXISTS final_pdf_artifacts/i.test(sql)) this.tables.add("final_pdf_artifacts");
     if (/CREATE TABLE IF NOT EXISTS final_pdf_artifact_events/i.test(sql)) this.tables.add("final_pdf_artifact_events");
+    if (/CREATE TABLE IF NOT EXISTS external_sources/i.test(sql)) this.tables.add("external_sources");
+    if (/CREATE TABLE IF NOT EXISTS external_client_links/i.test(sql)) this.tables.add("external_client_links");
+    if (/CREATE TABLE IF NOT EXISTS integration_events/i.test(sql)) this.tables.add("integration_events");
+    if (/CREATE TABLE IF NOT EXISTS integration_outbox/i.test(sql)) this.tables.add("integration_outbox");
+    if (/CREATE TABLE IF NOT EXISTS integration_conflicts/i.test(sql)) this.tables.add("integration_conflicts");
+    if (/CREATE TABLE IF NOT EXISTS integration_cursors/i.test(sql)) this.tables.add("integration_cursors");
     if (/ALTER TABLE case_file_assets ADD COLUMN organisation_id/i.test(sql)) this.columns.get("case_file_assets").add("organisation_id");
+    const addColumn = sql.match(/ALTER TABLE (optin_leads|inbound_optin_events|audit_events) ADD COLUMN (\w+)/i);
+    if (addColumn) this.columns.get(addColumn[1])?.add(addColumn[2]);
     const index = sql.match(/CREATE INDEX IF NOT EXISTS (\w+)/i); if (index) this.indexes.add(index[1]);
     if (/INSERT OR IGNORE INTO schema_migrations/i.test(sql)) this.applied.add(Number(values[0]));
     return { meta: { changes: 1 }, success: true };
@@ -46,20 +55,23 @@ class FakeD1 {
   }
 }
 
-test("v1 through v8 migrate an empty database and repeat without drift", async () => {
+test("v1 through v9 migrate an empty database and repeat without drift", async () => {
   const db = new FakeD1();
   await migrateD1(db);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.ok(db.tables.has("app_state_snapshot"));
   assert.ok(db.tables.has("case_file_assets"));
   assert.ok(db.tables.has("staff_role_assignments"));
   assert.ok(db.tables.has("staff_role_assignment_audit"));
   assert.ok(db.tables.has("optin_leads"));
   assert.ok(db.tables.has("inbound_optin_events"));
-  for (const table of ["organisations", "organisation_memberships", "workflow_policies", "approval_policies", "audit_events", "user_access_requests", "ownership_transfer_requests", "final_pdf_artifacts", "final_pdf_artifact_events"]) assert.ok(db.tables.has(table));
+  for (const table of ["organisations", "organisation_memberships", "workflow_policies", "approval_policies", "audit_events", "user_access_requests", "ownership_transfer_requests", "final_pdf_artifacts", "final_pdf_artifact_events", "external_sources", "external_client_links", "integration_events", "integration_outbox", "integration_conflicts", "integration_cursors"]) assert.ok(db.tables.has(table));
   assert.ok(db.columns.get("app_state_snapshot").has("revision"));
   assert.ok(db.columns.get("case_file_assets").has("organisation_id"));
-  for (const index of ["idx_case_file_assets_floor", "idx_case_file_assets_scope", "idx_case_file_assets_org_scope", "idx_inbound_optin_events_identity", "idx_inbound_optin_events_received", "idx_staff_role_audit_target_time", "idx_audit_org_time", "idx_audit_entity", "idx_access_requests_target_state", "idx_final_pdf_scope", "idx_final_pdf_events_scope"]) assert.ok(db.indexes.has(index));
+  for (const column of ["organisation_id", "external_source_id", "source_record_type", "source_record_id", "external_client_code", "sync_status", "last_synced_at", "source_event_id", "record_version"]) assert.ok(db.columns.get("optin_leads").has(column));
+  for (const column of ["organisation_id", "external_source_id", "source_record_type", "source_record_id", "external_client_code", "sync_status", "last_synced_at", "record_version"]) assert.ok(db.columns.get("inbound_optin_events").has(column));
+  for (const column of ["source_system", "source_record_type", "source_record_id", "integration_event_id"]) assert.ok(db.columns.get("audit_events").has(column));
+  for (const index of ["idx_case_file_assets_floor", "idx_case_file_assets_scope", "idx_case_file_assets_org_scope", "idx_inbound_optin_events_identity", "idx_inbound_optin_events_received", "idx_inbound_optin_events_external", "idx_optin_leads_external_link", "idx_staff_role_audit_target_time", "idx_audit_org_time", "idx_audit_entity", "idx_audit_integration_source", "idx_access_requests_target_state", "idx_final_pdf_scope", "idx_final_pdf_events_scope", "idx_external_sources_org_status", "idx_external_client_links_org_client", "idx_external_client_links_external_code", "idx_integration_events_org_time", "idx_integration_events_record", "idx_integration_outbox_pending", "idx_integration_conflicts_open"]) assert.ok(db.indexes.has(index));
   const before = JSON.stringify({ applied: [...db.applied], tables: [...db.tables], indexes: [...db.indexes], revision: db.revision });
   await migrateD1(db);
   assert.equal(JSON.stringify({ applied: [...db.applied], tables: [...db.tables], indexes: [...db.indexes], revision: db.revision }), before);
@@ -69,12 +81,12 @@ test("production-like v2 schema adopts migration markers without changing revisi
   const db = new FakeD1({ revisionColumn: true, revision: 37, applied: [1] });
   await migrateD1(db);
   assert.equal(db.revision, 37);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   assert.ok(db.tables.has("case_file_assets"));
 });
 
 test("migration list is deterministic and Sites packages the db directory", async () => {
-  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8]);
+  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9]);
   const prepare = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../scripts/prepare-sites.mjs", import.meta.url), "utf8"));
   assert.match(prepare, /"db"/);
 });

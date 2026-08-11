@@ -13,6 +13,116 @@ export interface OrganisationOwnedRecord {
   recordVersion?: number;
 }
 
+/**
+ * Dormant integration metadata. These contracts are intentionally additive;
+ * no external provider is enabled by defining them.
+ */
+export const integrationSourceStatuses = ["ACTIVE", "PAUSED", "RETIRED"] as const;
+export type IntegrationSourceStatus = (typeof integrationSourceStatuses)[number];
+export const integrationInboundModes = ["SIGNED_WEBHOOK", "POLL", "COHOSTED_API"] as const;
+export type IntegrationInboundMode = (typeof integrationInboundModes)[number];
+export const integrationLinkStatuses = ["ACTIVE", "REVIEW_REQUIRED", "REVOKED"] as const;
+export type IntegrationLinkStatus = (typeof integrationLinkStatuses)[number];
+export const integrationMatchMethods = ["EXACT_EMAIL", "EXACT_PHONE", "MANUAL", "NEW_CLIENT"] as const;
+export type IntegrationMatchMethod = (typeof integrationMatchMethods)[number];
+export const integrationEventStatuses = ["RECEIVED", "APPLIED", "REPLAYED", "REVIEW_REQUIRED", "FAILED", "DEAD_LETTER"] as const;
+export type IntegrationEventStatus = (typeof integrationEventStatuses)[number];
+export const integrationOutboxStatuses = ["PENDING", "SENT", "FAILED", "DEAD_LETTER"] as const;
+export type IntegrationOutboxStatus = (typeof integrationOutboxStatuses)[number];
+export const integrationConflictStatuses = ["REVIEW_REQUIRED", "ACCEPT_CANONICAL", "ACCEPT_INCOMING", "RESOLVED"] as const;
+export type IntegrationConflictStatus = (typeof integrationConflictStatuses)[number];
+
+export interface ExternalSourceRecord extends OrganisationOwnedRecord {
+  id: string;
+  sourceSystem: string;
+  sourceEnvironment: string;
+  sourceKey: string;
+  status: IntegrationSourceStatus;
+  inboundMode: IntegrationInboundMode;
+  configVersion: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ExternalClientLinkRecord extends OrganisationOwnedRecord {
+  id: string;
+  externalSourceId: string;
+  sourceRecordType: string;
+  sourceRecordId: string;
+  externalClientCode?: string;
+  clientId: string;
+  matchMethod: IntegrationMatchMethod;
+  status: IntegrationLinkStatus;
+  identityHash?: string;
+  sourceCreatedAt?: string;
+  lastSeenAt?: string;
+  lastSyncedAt?: string;
+}
+
+export interface IntegrationEventRecord extends OrganisationOwnedRecord {
+  id: string;
+  externalSourceId: string;
+  eventId: string;
+  sourceRecordType: string;
+  sourceRecordId: string;
+  eventType: string;
+  sourceActorId?: string;
+  occurredAt: string;
+  receivedAt: string;
+  payloadHash: string;
+  identityHash?: string;
+  status: IntegrationEventStatus;
+  retryCount: number;
+  nextAttemptAt?: string;
+  lastErrorCode?: string;
+  processedAt?: string;
+  requestId: string;
+}
+
+export interface IntegrationOutboxRecord extends OrganisationOwnedRecord {
+  id: string;
+  externalSourceId: string;
+  targetSystem: string;
+  entityType: string;
+  entityId: string;
+  eventType: string;
+  canonicalRevision?: number;
+  payloadVersion: string;
+  payloadHash: string;
+  status: IntegrationOutboxStatus;
+  attemptCount: number;
+  nextAttemptAt?: string;
+  lastErrorCode?: string;
+  idempotencyKey: string;
+  sentAt?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface IntegrationConflictRecord extends OrganisationOwnedRecord {
+  id: string;
+  externalSourceId: string;
+  integrationEventId?: string;
+  entityType: string;
+  entityId: string;
+  fieldName: string;
+  canonicalHash?: string;
+  incomingHash?: string;
+  status: IntegrationConflictStatus;
+  reason: string;
+  resolvedByActorId?: string;
+  resolvedAt?: string;
+  createdAt: string;
+}
+
+export interface IntegrationCursorRecord extends OrganisationOwnedRecord {
+  id: string;
+  externalSourceId: string;
+  cursor?: string;
+  observedAt?: string;
+  updatedAt: string;
+}
+
 export const leadStages = ["NEW", "QUALIFYING", "QUALIFIED", "DISQUALIFIED", "CONVERTED"] as const;
 export type LeadStage = (typeof leadStages)[number];
 export const canonicalPipelineStages = ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"] as const;
@@ -109,6 +219,7 @@ export interface PipelineTransitionRecord extends OrganisationOwnedRecord {
   beforeStage: CanonicalPipelineStage; afterStage: CanonicalPipelineStage;
   owner: { id: string; name: string; role: UserRole }; nextAction?: { summary: string; dueAt: string };
   correctionReason?: string; actor: { id: string; name: string; role: UserRole }; happenedAt: string;
+  sourceSystem?: string; sourceRecordType?: string; sourceRecordId?: string; integrationEventId?: string;
 }
 
 export interface CommercialPolicy {
@@ -174,6 +285,14 @@ export interface InboundLeadRecord extends OrganisationOwnedRecord {
   qualifiedAt?: string;
   convertedClientId?: string;
   notes?: string;
+  sourceSystem?: string;
+  externalSourceId?: string;
+  sourceRecordType?: string;
+  sourceRecordId?: string;
+  externalClientCode?: string;
+  syncStatus?: "RECEIVED" | "APPLIED" | "REVIEW_REQUIRED" | "FAILED";
+  lastSyncedAt?: string;
+  sourceEventId?: string;
 }
 
 export interface CommercialProposalRecord extends OrganisationOwnedRecord {

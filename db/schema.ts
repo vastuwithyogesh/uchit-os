@@ -5,11 +5,22 @@ CREATE TABLE IF NOT EXISTS optin_leads (
   unique_client_id TEXT NOT NULL,
   payload TEXT NOT NULL,
   imported_at TEXT NOT NULL,
-  last_seen_at TEXT NOT NULL
+  last_seen_at TEXT NOT NULL,
+  organisation_id TEXT,
+  external_source_id TEXT,
+  source_record_type TEXT,
+  source_record_id TEXT,
+  external_client_code TEXT,
+  sync_status TEXT,
+  last_synced_at TEXT,
+  source_event_id TEXT,
+  record_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_optin_leads_last_seen_at
 ON optin_leads(last_seen_at);
+CREATE INDEX IF NOT EXISTS idx_optin_leads_external_link
+ON optin_leads(organisation_id,external_source_id,source_record_type,source_record_id);
 
 CREATE TABLE IF NOT EXISTS review_call_bookings (
   id TEXT PRIMARY KEY,
@@ -102,7 +113,15 @@ CREATE TABLE IF NOT EXISTS inbound_optin_events (
   event_id TEXT PRIMARY KEY, occurred_at TEXT NOT NULL, source TEXT NOT NULL,
   payload_hash TEXT NOT NULL, identity_hash TEXT NOT NULL, received_at TEXT NOT NULL,
   outcome TEXT NOT NULL CHECK (outcome IN ('CREATED', 'UPDATED')),
-  submission_count INTEGER NOT NULL
+  submission_count INTEGER NOT NULL,
+  organisation_id TEXT,
+  external_source_id TEXT,
+  source_record_type TEXT,
+  source_record_id TEXT,
+  external_client_code TEXT,
+  sync_status TEXT,
+  last_synced_at TEXT,
+  record_version INTEGER NOT NULL DEFAULT 0
 );
 
 CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_received
@@ -110,6 +129,8 @@ ON inbound_optin_events(received_at);
 
 CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_identity
 ON inbound_optin_events(identity_hash, received_at);
+CREATE INDEX IF NOT EXISTS idx_inbound_optin_events_external
+ON inbound_optin_events(organisation_id,external_source_id,source_record_type,source_record_id);
 
 CREATE TABLE IF NOT EXISTS organisations (
   id TEXT PRIMARY KEY, name TEXT NOT NULL, status TEXT NOT NULL,
@@ -145,10 +166,13 @@ CREATE TABLE IF NOT EXISTS audit_events (
   actor_display_name TEXT NOT NULL, action TEXT NOT NULL, entity_type TEXT NOT NULL, entity_id TEXT NOT NULL,
   case_id TEXT, project_id TEXT, floor_id TEXT, before_hash TEXT, after_hash TEXT, reason TEXT NOT NULL,
   request_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, occurred_at TEXT NOT NULL,
-  previous_audit_hash TEXT, event_hash TEXT NOT NULL UNIQUE, UNIQUE (organisation_id,idempotency_key)
+  previous_audit_hash TEXT, event_hash TEXT NOT NULL UNIQUE, UNIQUE (organisation_id,idempotency_key),
+  source_system TEXT, source_record_type TEXT, source_record_id TEXT, integration_event_id TEXT
 );
 CREATE INDEX IF NOT EXISTS idx_audit_org_time ON audit_events(organisation_id,occurred_at);
 CREATE INDEX IF NOT EXISTS idx_audit_entity ON audit_events(organisation_id,entity_type,entity_id,occurred_at);
+CREATE INDEX IF NOT EXISTS idx_audit_integration_source
+ON audit_events(organisation_id,source_system,source_record_type,source_record_id,occurred_at);
 
 CREATE TABLE IF NOT EXISTS user_access_requests (
   id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, target_user_id TEXT NOT NULL, target_email TEXT NOT NULL,
@@ -193,4 +217,132 @@ CREATE TABLE IF NOT EXISTS final_pdf_artifact_events (
 );
 CREATE INDEX IF NOT EXISTS idx_final_pdf_events_scope
 ON final_pdf_artifact_events(organisation_id,report_version_id,occurred_at);
+
+CREATE TABLE IF NOT EXISTS external_sources (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  source_system TEXT NOT NULL,
+  source_environment TEXT NOT NULL,
+  source_key TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('ACTIVE','PAUSED','RETIRED')),
+  inbound_mode TEXT NOT NULL CHECK (inbound_mode IN ('SIGNED_WEBHOOK','POLL','COHOSTED_API')),
+  config_version INTEGER NOT NULL DEFAULT 1,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  record_version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organisation_id,source_system,source_environment),
+  UNIQUE (organisation_id,source_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_external_sources_org_status
+ON external_sources(organisation_id,status);
+
+CREATE TABLE IF NOT EXISTS external_client_links (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  external_source_id TEXT NOT NULL,
+  source_record_type TEXT NOT NULL,
+  source_record_id TEXT NOT NULL,
+  external_client_code TEXT,
+  client_id TEXT NOT NULL,
+  match_method TEXT NOT NULL CHECK (match_method IN ('EXACT_EMAIL','EXACT_PHONE','MANUAL','NEW_CLIENT')),
+  status TEXT NOT NULL CHECK (status IN ('ACTIVE','REVIEW_REQUIRED','REVOKED')),
+  identity_hash TEXT,
+  source_created_at TEXT,
+  last_seen_at TEXT,
+  last_synced_at TEXT,
+  record_version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (external_source_id,source_record_type,source_record_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_external_client_links_org_client
+ON external_client_links(organisation_id,client_id,status);
+CREATE INDEX IF NOT EXISTS idx_external_client_links_external_code
+ON external_client_links(external_source_id,external_client_code);
+
+CREATE TABLE IF NOT EXISTS integration_events (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  external_source_id TEXT NOT NULL,
+  event_id TEXT NOT NULL,
+  source_record_type TEXT NOT NULL,
+  source_record_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  source_actor_id TEXT,
+  occurred_at TEXT NOT NULL,
+  received_at TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  identity_hash TEXT,
+  status TEXT NOT NULL CHECK (status IN ('RECEIVED','APPLIED','REPLAYED','REVIEW_REQUIRED','FAILED','DEAD_LETTER')),
+  retry_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT,
+  last_error_code TEXT,
+  processed_at TEXT,
+  request_id TEXT NOT NULL,
+  record_version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (external_source_id,event_id)
+);
+
+CREATE INDEX IF NOT EXISTS idx_integration_events_org_time
+ON integration_events(organisation_id,received_at);
+CREATE INDEX IF NOT EXISTS idx_integration_events_record
+ON integration_events(external_source_id,source_record_type,source_record_id,received_at);
+
+CREATE TABLE IF NOT EXISTS integration_outbox (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  external_source_id TEXT NOT NULL,
+  target_system TEXT NOT NULL,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  event_type TEXT NOT NULL,
+  canonical_revision INTEGER,
+  payload_version TEXT NOT NULL,
+  payload_hash TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('PENDING','SENT','FAILED','DEAD_LETTER')),
+  attempt_count INTEGER NOT NULL DEFAULT 0,
+  next_attempt_at TEXT,
+  last_error_code TEXT,
+  idempotency_key TEXT NOT NULL,
+  sent_at TEXT,
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  record_version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organisation_id,idempotency_key)
+);
+
+CREATE INDEX IF NOT EXISTS idx_integration_outbox_pending
+ON integration_outbox(organisation_id,status,next_attempt_at);
+
+CREATE TABLE IF NOT EXISTS integration_conflicts (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  external_source_id TEXT NOT NULL,
+  integration_event_id TEXT,
+  entity_type TEXT NOT NULL,
+  entity_id TEXT NOT NULL,
+  field_name TEXT NOT NULL,
+  canonical_hash TEXT,
+  incoming_hash TEXT,
+  status TEXT NOT NULL CHECK (status IN ('REVIEW_REQUIRED','ACCEPT_CANONICAL','ACCEPT_INCOMING','RESOLVED')),
+  reason TEXT NOT NULL,
+  resolved_by_actor_id TEXT,
+  resolved_at TEXT,
+  created_at TEXT NOT NULL,
+  record_version INTEGER NOT NULL DEFAULT 1
+);
+
+CREATE INDEX IF NOT EXISTS idx_integration_conflicts_open
+ON integration_conflicts(organisation_id,status,created_at);
+
+CREATE TABLE IF NOT EXISTS integration_cursors (
+  id TEXT PRIMARY KEY,
+  organisation_id TEXT NOT NULL,
+  external_source_id TEXT NOT NULL,
+  cursor TEXT,
+  observed_at TEXT,
+  updated_at TEXT NOT NULL,
+  record_version INTEGER NOT NULL DEFAULT 1,
+  UNIQUE (organisation_id,external_source_id)
+);
 `;
