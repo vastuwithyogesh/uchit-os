@@ -3,8 +3,12 @@ import { ClientAccountUnlinkedError, ClientPortalAccessError, findOwnedClient } 
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { artifactStillMatches } from "@/lib/report-artifacts";
 import { renderPrintableReport } from "@/lib/report-html";
+const CLIENT_DELIVERY_ENABLED = false as const;
 
 export async function GET(request: Request, context: { params: Promise<{ reportId: string }> }) {
+  if (!CLIENT_DELIVERY_ENABLED) {
+    return new Response("Client report delivery is disabled during Founder Edition.", { status: 403, headers: { "cache-control": "private, no-store" } });
+  }
   try {
     const actor = await resolveRequestActor(request.headers);
     const state = await loadStateFromPersistence();

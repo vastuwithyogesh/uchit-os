@@ -11,6 +11,9 @@ export async function GET(request: Request, context: { params: Promise<{ reportI
   const state = await loadStateFromPersistence();
   const report = state.reportVersions.find((item) => item.id === reportId);
   if (!report) return new Response("Report not found", { status: 404 });
+  if (report.isPreview) return new Response("Internal previews cannot be opened through a printable or downloadable route.", { status: 403, headers: { "cache-control": "private, no-store" } });
+  if (report.artifact?.templateVersion === "uchit-verdict/v3" || report.artifact?.templateVersion === "uchit-verdict/v4") return new Response("Founder Edition v3/v4 reports are available only through the protected PDF export and print route.", { status: 409, headers: { "cache-control": "private, no-store", "x-content-type-options": "nosniff" } });
+  if (report.status !== "RELEASED") return new Response("Official report export and printing are blocked until Founder approval and release.", { status: 403, headers: { "cache-control": "private, no-store" } });
   if (!report.artifact) return new Response("This legacy report has no printable immutable artifact", { status: 409 });
   if (!await artifactStillMatches(state, report)) return new Response("Artifact integrity check failed", { status: 409 });
   return new Response(renderPrintableReport(state, report), {

@@ -21,6 +21,12 @@
   --radius-lg: 16px;
   --radius-md: 12px;
   --radius-sm: 10px;
+  --status-neutral: #626262;
+  --status-attention: #9a6517;
+  --status-blocked: #9f2d2d;
+  --status-ready: #315f4a;
+  --status-approved: #25516b;
+  --status-released: #6f5429;
 }
 
 * {
@@ -604,6 +610,12 @@ h3,
     grid-template-columns: 1fr;
   }
 }
+
+.aou-review .summary { white-space: pre-wrap; overflow-wrap: anywhere; }
+.checkbox-row { display: flex; gap: 10px; align-items: flex-start; min-height: 44px; }
+.checkbox-row input { width: 20px; height: 20px; flex: 0 0 auto; }
+.button-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 16px; }
+.status-line { min-height: 24px; }
 
 /* Minimal shared shell and predictable interaction rules */
 :where(a, button, input, textarea, select, summary):focus-visible {
@@ -1503,6 +1515,34 @@ input[type="file"] {
   border-radius: var(--radius-sm);
   background: var(--bg-soft);
 }
+
+/* Shared Founder status language: small, text-led indicators rather than
+   decorative fills. Components can use one class consistently across queues,
+   payments, evidence and reports without changing their data contracts. */
+.status-neutral,
+.status-attention,
+.status-blocked,
+.status-ready,
+.status-approved,
+.status-released {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 4px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  font-size: 0.78rem;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.status-neutral { color: var(--status-neutral); }
+.status-attention { color: var(--status-attention); }
+.status-blocked { color: var(--status-blocked); }
+.status-ready { color: var(--status-ready); }
+.status-approved { color: var(--status-approved); }
+.status-released { color: var(--status-released); }
 
 .footer-note[role="alert"] {
   color: var(--bad);

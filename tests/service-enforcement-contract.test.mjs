@@ -37,8 +37,20 @@ test("service setup is locked after evaluation snapshots or an artifacted report
 });
 
 test("both evaluation engines use the same fail-closed readiness assertion", () => {
-  assert.match(functionBody(workflow, "createEvaluationSnapshot"), /assertCaseReadyForEvaluation\(state, caseId\)/);
-  assert.match(functionBody(workflow, "recordShaktiSnapshot"), /assertCaseReadyForEvaluation\(state, caseId\)/);
+  for (const functionName of ["createEvaluationSnapshot", "recordShaktiSnapshot"]) {
+    const body = functionBody(workflow, functionName);
+    assert.match(body, /evaluationFloorContext\(caseId, floorIdValue, "(?:UTILITY_EVALUATION|SHAKTI_EVALUATION)"\)/);
+    assert.match(body, /floorId: floor\.id/);
+    assert.match(body, /planVersionId: plan\.id/);
+    assert.match(body, /orientationVersionId: orientation\.id/);
+  }
+  const context = functionBody(workflow, "evaluationFloorContext");
+  assert.match(context, /assertCaseReadyForEvaluation\(state, caseId, floorId\)/);
+  assert.match(context, /item\.floorId === floorId && item\.status === "CURRENT"/);
+  assert.match(context, /item\.caseId === caseId && item\.status === "LOCKED"/);
+  assert.match(context, /item\.planVersionId === plan\?\.id/);
+  assert.match(context, /item\.kind === "HAND_MARKED_PLAN"/);
+  assert.match(context, /item\.fullColour/);
 });
 
 test("evaluation readiness requires orientation, complete inputs, and locked floors", () => {
@@ -50,5 +62,5 @@ test("evaluation readiness requires orientation, complete inputs, and locked flo
   const assertion = functionBody(framework, "assertCaseReadyForEvaluation");
   assert.match(assertion, /getCaseEvaluationBlockers/);
   assert.match(assertion, /CaseReadinessError/);
-  assert.match(actions, /error\.statusCode === 409 \|\| error\.statusCode === 428/);
+  assert.match(actions, /\[400, 401, 403, 404, 409, 428, 503\]\.includes\(Number\(error\.statusCode\)\)/);
 });

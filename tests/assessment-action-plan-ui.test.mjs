@@ -16,7 +16,9 @@ test("assessment workspace follows the active case and exact write contracts", (
 
 test("guided workflow uses verified evidence, confirmations, and server-safe owner roles", () => {
   const workspace = source("components/assessment-action-plan.tsx");
-  assert.match(workspace, /floor\.locked/);
+  assert.match(workspace, /selectedFloor\?\.locked/);
+  assert.match(workspace, /floorId: selectedFloor\.id/);
+  assert.match(workspace, /item\.floorId === selectedFloor\?\.id/);
   assert.match(workspace, /No evidence from a locked floor is available/);
   assert.ok((workspace.match(/window\.confirm/g) ?? []).length >= 3);
   for (const role of ["CLIENT", "CONSULTANT", "ARCHITECT", "STRUCTURAL_ENGINEER", "MEP_ENGINEER", "INTERIOR_DESIGNER", "CONTRACTOR", "SITE_TEAM"]) assert.match(workspace, new RegExp(`value="${role}"`));

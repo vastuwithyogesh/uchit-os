@@ -1,14 +1,29 @@
 import { NextResponse } from "next/server";
-import { isExplicitLocalDemo, requireRouteActor } from "@/lib/auth";
+import { isExplicitLocalDemo, isInitialOrganisationOwnerEmail, requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence, loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
+import { FoundationAccessError, resolveActiveOrganisationContext } from "@/lib/foundation.server";
+import { projectOrganisationState } from "@/lib/foundation";
 
 export async function GET(request: Request) {
   const access = await requireRouteActor(request, "SETTER");
   if (!access.ok) {
     return access.response;
   }
-  const snapshot = await loadStateSnapshotFromPersistence();
-  return NextResponse.json({ ...snapshot.state, persistenceRevision: snapshot.revision });
+  try {
+    const context = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
+    const snapshot = await loadStateSnapshotFromPersistence();
+    const scopedState = projectOrganisationState(snapshot.state, context.organisation.id);
+    return NextResponse.json({ ...scopedState, persistenceRevision: snapshot.revision, foundation: {
+      organisation: context.organisation,
+      membership: context.membership,
+      workflowPolicyVersion: context.workflowPolicy.version,
+      approvalPolicyVersion: context.approvalPolicy.version,
+      isFounderEdition: context.isFounderEdition
+    } }, { headers: { "Cache-Control": "private, no-store", Vary: "oai-authenticated-user-id, oai-authenticated-user-email" } });
+  } catch (error) {
+    if (error instanceof FoundationAccessError) return NextResponse.json({ ok: false, error: error.message }, { status: error.statusCode, headers: { "Cache-Control": "private, no-store" } });
+    throw error;
+  }
 }
 
 export async function POST(request: Request) {

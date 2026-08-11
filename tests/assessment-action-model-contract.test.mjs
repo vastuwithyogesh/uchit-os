@@ -41,11 +41,13 @@ test("every write binds to active revision, actor, service, and immutable eviden
   const context = functionBody(workflow, "assessmentContext");
   assert.match(context, /getActiveCaseForClient/);
   assert.match(context, /item\.artifact/);
+  assert.match(context, /item\.id === floorId && item\.caseId === caseId/);
   for (const name of ["upsertAssessmentObservation", "upsertRecommendation", "upsertImplementationTask"]) {
     const body = functionBody(workflow, name);
     assert.match(body, /idempotencyKey/);
     assert.match(body, /assertExpectedRecordVersion/);
     assert.match(body, /caseRevisionNumber: revisionNumber/);
+    assert.match(body, /floorId/);
     assert.match(body, /Evidence references are immutable/);
     assert.match(body, /recordVersion/);
     assert.match(body, /appendTimeline/);
@@ -54,9 +56,9 @@ test("every write binds to active revision, actor, service, and immutable eviden
 });
 
 test("links stay within one case revision and tasks have bounded responsibility", () => {
-  assert.match(functionBody(workflow, "upsertRecommendation"), /item\.id === id && item\.caseId === caseId/);
+  assert.match(functionBody(workflow, "upsertRecommendation"), /item\.id === id && item\.caseId === caseId && item\.floorId === floorId/);
   const task = functionBody(workflow, "upsertImplementationTask");
-  assert.match(task, /item\.id === recommendationId && item\.caseId === caseId/);
+  assert.match(task, /item\.id === recommendationId && item\.caseId === caseId && item\.floorId === floorId/);
   assert.match(task, /ownerRole: enumValue\(input\.ownerRole, responsibilityRoles/);
   assert.match(task, /boundedRequiredString\(input\.ownerName, "Responsibility owner name", 120\)/);
   assert.match(domain, /"ARCHITECT".*"STRUCTURAL_ENGINEER".*"MEP_ENGINEER".*"INTERIOR_DESIGNER".*"CONTRACTOR".*"SITE_TEAM"/s);

@@ -4,7 +4,7 @@ This document records the source-controlled release gates. It does not certify l
 
 ## Current release scope
 
-The current launch target is an internal staff pilot for SUPER_ADMIN, ADMIN and CONSULTANT users. Client accounts, client-portal acceptance, outbound client messages and external integrations are deferred. This narrower scope does not weaken authentication, payment, evidence, report approval or data-protection controls.
+The current launch target is an internal Founder Edition pilot for one organisation owner (`SUPER_ADMIN`, Yogesh). Team memberships, client accounts, client-portal acceptance, outbound client messages, Lovable integration and public delivery are deferred. Founder approval is intentionally one-step for this edition; future multi-step approval records remain in the foundation. This narrower scope does not weaken authentication, payment, evidence, report approval or data-protection controls.
 
 ## Automated gates
 
@@ -32,3 +32,7 @@ The current launch target is an internal staff pilot for SUPER_ADMIN, ADMIN and 
 - A controlled staff rehearsal completes lead → case → protected upload → evaluation → assessment → immutable report → two-person release → post-delivery follow-up without using live client data.
 
 Any unresolved item above is a release blocker. Deployment requires explicit production authority after these checks are evidenced.
+
+## Founder Edition override for this pilot
+
+The older staff-pilot bullets above are retained as historical context only. For the current Founder pilot, use `docs/founder-deployment-readiness.md` as the operative checklist: migrations must be v1 through v8, one Founder approval is the active policy, two-floor synthetic isolation is required, and client delivery remains disabled. A second administrator or two-person release is a later Team Edition acceptance item, not a reason to create a second Founder actor now.

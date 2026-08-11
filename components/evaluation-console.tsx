@@ -45,22 +45,25 @@ export function EvaluationConsole() {
   const [message, setMessage] = useState("Load the master table to inspect the residential rules.");
   const [busy, setBusy] = useState(false);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedFloorId, setSelectedFloorId] = useState("");
   const [snapshotName, setSnapshotName] = useState("Residential tab evaluation");
   const [shaktiValuesText, setShaktiValuesText] = useState("9,8,8,7,6,9,8,7,6,7,8,9,8,7,6,8");
 
   const clients = state?.clients ?? [];
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
   const currentCase = state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined;
+  const floors = state?.floorWorkspaces.filter((item) => item.caseId === currentCase?.id && (!currentCase?.projectId || item.projectId === currentCase.projectId)) ?? [];
+  const selectedFloor = floors.find((item) => item.id === selectedFloorId) ?? floors[0];
   const readiness = currentCase ? getServiceReadiness(currentCase) : null;
   const service = currentCase ? normalizeCaseService(currentCase) : null;
-  const evaluationBlockers = currentCase && state ? getCaseEvaluationBlockers(state, currentCase.id) : ["Open a case and save its service setup."];
+  const evaluationBlockers = currentCase && state && selectedFloor ? getCaseEvaluationBlockers(state, currentCase.id, selectedFloor.id) : ["Open a case and select one floor."];
   const evaluationReady = Boolean(currentCase && evaluationBlockers.length === 0);
   const reports = state?.reportVersions?.filter((item) => item.caseId === currentCase?.id) ?? [];
   const caseAmountInr = state?.commercialProposals.find((item) => item.clientId === selectedClient?.id)?.amountInr
     ?? state?.commercialPolicy.defaultProposalAmountInr;
   const report = (reports.find((item) => item.isPreview) ?? reports[0] ?? null) as ReportVersionRecord | null;
-  const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
-  const shaktiSnapshots = state?.shaktiSnapshots?.filter((item) => item.caseId === currentCase?.id) ?? [];
+  const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id && item.floorId === selectedFloor?.id) ?? [];
+  const shaktiSnapshots = state?.shaktiSnapshots?.filter((item) => item.caseId === currentCase?.id && item.floorId === selectedFloor?.id) ?? [];
   const shaktiValues = useMemo(
     () =>
       shaktiValuesText
@@ -100,7 +103,9 @@ export function EvaluationConsole() {
   async function run(action: Record<string, unknown>, successMessage: string) {
     setBusy(true);
     try {
-      await postAction(action, activeUser.role);
+      if (!state || state.persistenceRevision === undefined || state.persistenceRevision === null || !currentCase || !selectedFloor) throw new Error("Reload the latest case and select one floor before evaluating.");
+      await postAction({ ...action, floorId: selectedFloor.id, expectedRecordVersion: currentCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision,
+        idempotencyKey: `floor-evaluation:${String(action.action)}:${currentCase.id}:${selectedFloor.id}:${currentCase.recordVersion ?? 0}` }, activeUser.role);
       await refresh(selectedClient?.id);
       setMessage(successMessage);
     } catch (error) {
@@ -113,6 +118,7 @@ export function EvaluationConsole() {
   useEffect(() => {
     refresh().catch(() => undefined);
   }, []);
+  useEffect(() => { if (floors.length && !floors.some((item) => item.id === selectedFloorId)) setSelectedFloorId(floors[0].id); }, [floors, selectedFloorId]);
 
   return (
     <section className="section-grid">
@@ -152,6 +158,10 @@ export function EvaluationConsole() {
               </option>
             ))}
           </select>
+          <label htmlFor="evaluation-floor"><strong>Floor</strong></label>
+          <select id="evaluation-floor" value={selectedFloor?.id ?? ""} onChange={(event) => setSelectedFloorId(event.target.value)}>
+            {floors.map((item) => <option key={item.id} value={item.id}>{item.floorLabel}</option>)}
+          </select>
         </div>
         <div className="pill-row" style={{ marginTop: 14 }}>
           <span className="pill">GOOD {grouped.GOOD.length}</span>
@@ -169,7 +179,7 @@ export function EvaluationConsole() {
           className="button-secondary"
           style={{ marginTop: 10 }}
           disabled={busy || !evaluationReady || !snapshotName.trim() || snapshotName.trim().length > 120}
-          onClick={() => run({ action: "utility-evaluate", caseId: currentCase?.id, snapshotName }, "Utility evaluation snapshot saved.")}
+          onClick={() => run({ action: "utility-evaluate", caseId: currentCase?.id, snapshotName }, "Utility evaluation snapshot saved for this floor.")}
         >
           Save utility snapshot
         </button>
@@ -208,7 +218,7 @@ export function EvaluationConsole() {
           className="button-secondary"
           style={{ marginTop: 10 }}
           disabled={busy || !evaluationReady || shaktiValues.length !== 16}
-          onClick={() => run({ action: "shakti-rank", caseId: currentCase?.id, values: shaktiValues }, "Shakti snapshot saved.")}
+          onClick={() => run({ action: "shakti-rank", caseId: currentCase?.id, values: shaktiValues }, "Shakti snapshot saved for this floor.")}
         >
           Save Shakti snapshot
         </button>

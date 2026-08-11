@@ -14,12 +14,17 @@ import {
   vastuCases as seedVastuCases,
   whatsappLogs as seedWhatsappLogs,
   whatsappTemplates as seedWhatsappTemplates
-} from "@/lib/seed";
-import {
+} from "./seed.ts";
+import type {
   CommercialProposalRecord,
   AdvanceVerificationRecord,
   EvaluationSnapshotRecord,
+  UtilityGraphVerdictRecord,
   FloorWorkspaceRecord,
+  SiteAnalysisRecord,
+  SiteAnalysisApprovalRecord,
+  PostSiteFindingsRecord,
+  PostSiteFindingsApprovalRecord,
   LeadQualificationRecord,
   PaymentRecord,
   ReviewCallBookingRecord,
@@ -29,6 +34,7 @@ import {
   Recommendation,
   ImplementationTask,
   CaseDocumentRecord,
+  ManualSheetApprovalRecord,
   DeliveryMilestone,
   ClientIntakeProfile,
   ShaktiSnapshotRecord,
@@ -36,18 +42,34 @@ import {
   UtilityRule,
   InboundLeadRecord,
   VastuCaseRecord,
+  VastuProjectRecord,
+  PlanVersionRecord,
+  SpatialEvidenceVersionRecord,
+  OrientationVersionRecord,
+  OpeningMappingRecord,
+  SpaceMappingRecord,
+  DependencyInvalidationRecord,
+  RegenerationResolutionRecord,
+  StageAFloorReviewSnapshotRecord,
+  StageAFloorApprovalCheckpointRecord,
+  RemedialWorkflowReservation,
+  MethodologyVersionRecord,
+  MethodologyRuleRecord,
+  MethodologyGoldenFixtureRecord,
+  AouMethodologyVersionRecord,
+  AouReferenceRowRecord,
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
-} from "@/lib/domain";
-import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "@/lib/commercial-policy";
+} from "./domain.ts";
+import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
 
 export interface AppState {
   /** Read-only response metadata used for optimistic concurrency; not a domain collection. */
   persistenceRevision?: number | null;
   clients: typeof seedClients;
-  pipelineTransitions: import("@/lib/domain").PipelineTransitionRecord[];
-  commercialPolicy: import("@/lib/domain").CommercialPolicy;
-  commercialPolicyHistory: import("@/lib/domain").CommercialPolicy[];
+  pipelineTransitions: import("./domain.ts").PipelineTransitionRecord[];
+  commercialPolicy: import("./domain.ts").CommercialPolicy;
+  commercialPolicyHistory: import("./domain.ts").CommercialPolicy[];
   clientIntakeProfiles: ClientIntakeProfile[];
   leadQualifications: LeadQualificationRecord[];
   commercialProposals: CommercialProposalRecord[];
@@ -55,15 +77,37 @@ export interface AppState {
   payments: PaymentRecord[];
   advanceVerifications: AdvanceVerificationRecord[];
   vastuCases: VastuCaseRecord[];
+  projects: VastuProjectRecord[];
   floorWorkspaces: FloorWorkspaceRecord[];
+  siteAnalyses: SiteAnalysisRecord[];
+  siteAnalysisApprovals: SiteAnalysisApprovalRecord[];
+  postSiteFindings: PostSiteFindingsRecord[];
+  postSiteFindingsApprovals: PostSiteFindingsApprovalRecord[];
+  planVersions: PlanVersionRecord[];
+  spatialEvidenceVersions: SpatialEvidenceVersionRecord[];
+  orientationVersions: OrientationVersionRecord[];
+  openingMappings: OpeningMappingRecord[];
+  spaceMappings: SpaceMappingRecord[];
+  dependencyInvalidations: DependencyInvalidationRecord[];
+  regenerationResolutions: RegenerationResolutionRecord[];
+  stageAFloorReviews: StageAFloorReviewSnapshotRecord[];
+  stageAFloorApprovalCheckpoints: StageAFloorApprovalCheckpointRecord[];
+  remedialWorkflowReservations: RemedialWorkflowReservation[];
+  methodologyVersions: MethodologyVersionRecord[];
+  methodologyRules: MethodologyRuleRecord[];
+  methodologyGoldenFixtures: MethodologyGoldenFixtureRecord[];
+  aouMethodologyVersions: AouMethodologyVersionRecord[];
+  aouReferenceRows: AouReferenceRowRecord[];
   reportVersions: ReportVersionRecord[];
   rectificationRequests: RectificationRequestRecord[];
   assessmentObservations: AssessmentObservation[];
   recommendations: Recommendation[];
   implementationTasks: ImplementationTask[];
   caseDocuments: CaseDocumentRecord[];
+  manualSheetApprovals: ManualSheetApprovalRecord[];
   deliveryMilestones: DeliveryMilestone[];
   evaluationSnapshots: EvaluationSnapshotRecord[];
+  utilityVerdicts: UtilityGraphVerdictRecord[];
   mapping32D: typeof seedMapping32D;
   mapping16D: typeof seedMapping16D;
   utilityRules: UtilityRule[];
@@ -86,15 +130,37 @@ export const createEmptyAppState = (): AppState => ({
   payments: [],
   advanceVerifications: [],
   vastuCases: [],
+  projects: [],
   floorWorkspaces: [],
+  siteAnalyses: [],
+  siteAnalysisApprovals: [],
+  postSiteFindings: [],
+  postSiteFindingsApprovals: [],
+  planVersions: [],
+  spatialEvidenceVersions: [],
+  orientationVersions: [],
+  openingMappings: [],
+  spaceMappings: [],
+  dependencyInvalidations: [],
+  regenerationResolutions: [],
+  stageAFloorReviews: [],
+  stageAFloorApprovalCheckpoints: [],
+  remedialWorkflowReservations: [],
+  methodologyVersions: [],
+  methodologyRules: [],
+  methodologyGoldenFixtures: [],
+  aouMethodologyVersions: [],
+  aouReferenceRows: [],
   reportVersions: [],
   rectificationRequests: [],
   assessmentObservations: [],
   recommendations: [],
   implementationTasks: [],
   caseDocuments: [],
+  manualSheetApprovals: [],
   deliveryMilestones: [],
   evaluationSnapshots: [],
+  utilityVerdicts: [],
   mapping32D: [],
   mapping16D: [],
   utilityRules: [],
@@ -117,15 +183,37 @@ const createDemoAppState = (): AppState => ({
   payments: structuredClone(seedPayments),
   advanceVerifications: [],
   vastuCases: structuredClone(seedVastuCases),
+  projects: [],
   floorWorkspaces: structuredClone(seedFloorWorkspaces),
+  siteAnalyses: [],
+  siteAnalysisApprovals: [],
+  postSiteFindings: [],
+  postSiteFindingsApprovals: [],
+  planVersions: [],
+  spatialEvidenceVersions: [],
+  orientationVersions: [],
+  openingMappings: [],
+  spaceMappings: [],
+  dependencyInvalidations: [],
+  regenerationResolutions: [],
+  stageAFloorReviews: [],
+  stageAFloorApprovalCheckpoints: [],
+  remedialWorkflowReservations: [],
+  methodologyVersions: [],
+  methodologyRules: [],
+  methodologyGoldenFixtures: [],
+  aouMethodologyVersions: [],
+  aouReferenceRows: [],
   reportVersions: structuredClone(seedReportVersions),
   rectificationRequests: [],
   assessmentObservations: [],
   recommendations: [],
   implementationTasks: [],
   caseDocuments: [],
+  manualSheetApprovals: [],
   deliveryMilestones: [],
   evaluationSnapshots: structuredClone(seedEvaluationSnapshots),
+  utilityVerdicts: [],
   mapping32D: structuredClone(seedMapping32D),
   mapping16D: structuredClone(seedMapping16D),
   utilityRules: structuredClone(seedUtilityRules),

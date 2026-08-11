@@ -1,6 +1,18 @@
 export const roles = ["CLIENT", "SETTER", "CONSULTANT", "ADMIN", "SUPER_ADMIN"] as const;
 export type UserRole = (typeof roles)[number];
 
+/**
+ * Additive ownership metadata for the Founder Edition migration. Legacy
+ * snapshot rows intentionally keep these fields optional until they are
+ * adopted into the founder organisation; all new protected writes stamp them.
+ */
+export interface OrganisationOwnedRecord {
+  organisationId?: string;
+  createdByActorUserId?: string;
+  updatedByActorUserId?: string;
+  recordVersion?: number;
+}
+
 export const leadStages = ["NEW", "QUALIFYING", "QUALIFIED", "DISQUALIFIED", "CONVERTED"] as const;
 export type LeadStage = (typeof leadStages)[number];
 export const canonicalPipelineStages = ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"] as const;
@@ -73,9 +85,11 @@ export interface AppUser {
   email: string;
   role: UserRole;
   color: string;
+  organisationId?: string;
+  organisationCapability?: string;
 }
 
-export interface ClientRecord {
+export interface ClientRecord extends OrganisationOwnedRecord {
   id: string;
   displayName: string;
   city: string;
@@ -90,7 +104,7 @@ export interface ClientRecord {
   nextAction?: { summary: string; dueAt: string };
 }
 
-export interface PipelineTransitionRecord {
+export interface PipelineTransitionRecord extends OrganisationOwnedRecord {
   id: string; clientId: string; idempotencyKey: string;
   beforeStage: CanonicalPipelineStage; afterStage: CanonicalPipelineStage;
   owner: { id: string; name: string; role: UserRole }; nextAction?: { summary: string; dueAt: string };
@@ -106,7 +120,7 @@ export interface CommercialPolicy {
 
 export const decisionMakerStatuses = ["SOLE", "JOINT", "NOT_DECISION_MAKER"] as const;
 export type DecisionMakerStatus = (typeof decisionMakerStatuses)[number];
-export interface ClientIntakeProfile {
+export interface ClientIntakeProfile extends OrganisationOwnedRecord {
   clientId: string; version: number; idempotencyKey: string;
   contactPreference?: { whatsapp?: string; preferredLanguage?: string; preferredContactWindow?: string };
   businessContext?: { company?: string; industry?: string; designation?: string; vision?: string };
@@ -117,7 +131,7 @@ export interface ClientIntakeProfile {
   created: AssessmentAudit; updated: AssessmentAudit;
 }
 
-export interface LeadQualificationRecord {
+export interface LeadQualificationRecord extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
   score: number;
@@ -128,7 +142,7 @@ export interface LeadQualificationRecord {
   conversationalForm: Array<{ label: string; answer: string }>;
 }
 
-export interface InboundLeadRecord {
+export interface InboundLeadRecord extends OrganisationOwnedRecord {
   id: string;
   uniqueClientId: string;
   identityKey: string;
@@ -162,17 +176,27 @@ export interface InboundLeadRecord {
   notes?: string;
 }
 
-export interface CommercialProposalRecord {
+export interface CommercialProposalRecord extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
   amountInr: number;
   minAdvanceInr: number;
   status: CommercialProposalStatus;
+  policyVersion?: number;
+  termsSnapshot?: {
+    totalFeeInr: number;
+    minimumAdvanceInr: number;
+    currency: "INR";
+    policyVersion: number;
+    capturedAt: string;
+  };
+  createdAt?: string;
+  idempotencyKey?: string;
   reviewerId?: string;
   superAdminApprovedAt?: string;
 }
 
-export interface ReviewCallBookingRecord {
+export interface ReviewCallBookingRecord extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
   proposalId: string;
@@ -186,7 +210,7 @@ export interface ReviewCallBookingRecord {
   bookedAt: string;
 }
 
-export interface PaymentRecord {
+export interface PaymentRecord extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
   proposalId?: string;
@@ -201,9 +225,10 @@ export interface PaymentRecord {
   verifiedAt?: string;
   verificationNote?: string;
   proofAssetId?: string;
+  idempotencyKey?: string;
 }
 
-export interface AdvanceVerificationRecord {
+export interface AdvanceVerificationRecord extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
   proposalId: string;
@@ -216,18 +241,26 @@ export interface AdvanceVerificationRecord {
   proofAssetId?: string;
   caseId?: string;
   status: "VERIFIED" | "CASE_OPENED";
+  idempotencyKey?: string;
 }
 
-export interface VastuCaseRecord {
+export interface VastuCaseRecord extends OrganisationOwnedRecord {
   id: string;
   caseNumber: string;
   clientId: string;
   proposalId: string;
+  projectId?: string;
   status: VastuCaseStatus;
   reportStatus: ReportStatus;
   orientationLocked: boolean;
   balanceApproved: boolean;
   fullPaymentApproved: boolean;
+  stageAVerdictStatus?: "DRAFT" | "READY" | "PRESENTED";
+  stageAVerdictVersion?: string;
+  verdictPresentedAt?: string;
+  verdictPresentedByActorUserId?: string;
+  verdictPresentationNote?: string;
+  verdictPresentationIdempotencyKey?: string;
   /** Additive service metadata; legacy snapshots normalize safely to existing-space v1. */
   serviceType?: VastuServiceType;
   canonicalStage?: CanonicalServiceStage;
@@ -242,7 +275,86 @@ export interface VastuCaseRecord {
   revisionNumber?: number;
 }
 
-export interface RectificationRequestRecord {
+export interface VastuProjectRecord extends OrganisationOwnedRecord {
+  id: string;
+  clientId: string;
+  activeCaseId: string;
+  propertyName: string;
+  status: "IN_PROGRESS" | "COMPLETE";
+  assignedConsultantUserId?: string;
+  createdAt: string;
+  completedAt?: string;
+}
+
+export interface PlanVersionRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; versionLabel: string;
+  status: "DRAFT" | "CURRENT" | "SUPERSEDED"; protectedFileRef: string;
+  idempotencyKey: string; createdAt: string; supersededAt?: string;
+}
+
+export interface SpatialEvidenceVersionRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId?: string; planVersionId?: string;
+  kind: "HAND_MARKED_PLAN" | "GOOGLE_EARTH_ORIENTATION" | "SITE_PHOTO" | "OTHER";
+  /** Explicit Founder-confirmed evidence classifications; legacy rows remain STANDARD/undefined. */
+  classification?: "STANDARD" | "MARKED_32D_CHAKRA_V1" | "MARKED_16D_MAPPING_V1";
+  /** Manual gridding evidence purpose only; it never implies computed geometry or a methodology result. */
+  manualEvidencePurpose?: "BRAHMASTHAN_GRID" | "MARMAA_GRID" | "ENERGY_GRAPH";
+  has32SectorChakra?: boolean;
+  has16DirectionMapping?: boolean;
+  protectedFileRef: string; fullColour: boolean; status: "CURRENT" | "SUPERSEDED";
+  idempotencyKey: string; createdAt: string; supersededAt?: string;
+}
+
+export interface OrientationVersionRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; exactDegree: number;
+  googleEarthEvidenceVersionId: string; status: "DRAFT" | "LOCKED" | "SUPERSEDED";
+  lockedAt?: string; lockedByActorUserId?: string; lockReason?: string;
+  idempotencyKey: string; createdAt: string;
+}
+
+export interface OpeningMappingRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; planVersionId: string;
+  orientationVersionId: string; kind: "MAIN_ENTRANCE" | "ENTRANCE" | "WINDOW";
+  markerX: number; markerY: number; verified: boolean;
+  methodologyStatus: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT" | "NEEDS_REGENERATION";
+  methodologyVersionId?: string; directionCode?: string; evidenceVersionId: string;
+  idempotencyKey: string; createdAt: string;
+}
+
+export interface DependencyInvalidationRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId?: string;
+  targetType: "OPENING_MAPPING" | "SPACE_MAPPING" | "UTILITY_EVALUATION" | "UTILITY_VERDICT" | "SHAKTI_EVALUATION" | "FINDING" | "DRAFT_REPORT";
+  targetId: string;
+  causeType?: "ORIENTATION" | "PLAN" | "EVIDENCE" | "MAPPING" | "METHODOLOGY" | "EVALUATION" | "SITE_ANALYSIS";
+  sourceVersionId?: string;
+  /** Legacy orientation invalidations retain this field for historical compatibility. */
+  causedByOrientationVersionId?: string;
+  replacementVersionId?: string;
+  dependencyLinks?: string[];
+  status: "NEEDS_REGENERATION" | "REPLACEMENT_REQUIRED" | "REGENERATED" | "READY_FOR_REVIEW";
+  reason: string; createdAt: string; createdByActorUserId?: string; updatedAt?: string;
+  resolutionIdempotencyKey?: string;
+}
+
+export interface RegenerationResolutionRecord extends OrganisationOwnedRecord {
+  id: string; invalidationId: string; projectId: string; caseId: string; floorId: string;
+  fromStatus: DependencyInvalidationRecord["status"];
+  toStatus: DependencyInvalidationRecord["status"];
+  sourceVersionId: string; replacementVersionId?: string; dependencyLinks: string[];
+  actorUserId: string; actorDisplayName: string; actorRole: UserRole;
+  reason: string; idempotencyKey: string; occurredAt: string;
+}
+
+export interface SpaceMappingRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; planVersionId: string;
+  orientationVersionId: string; spaceLabel: string; directionCode?: string;
+  polygon: Array<{ x: number; y: number }>; verified: boolean; evidenceVersionId: string;
+  methodologyVersionId?: string; idempotencyKey: string;
+  methodologyStatus: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT" | "NEEDS_REGENERATION";
+  createdAt: string;
+}
+
+export interface RectificationRequestRecord extends OrganisationOwnedRecord {
   id: string;
   predecessorCaseId: string;
   clientId: string;
@@ -274,7 +386,7 @@ export const implementationStatuses = ["NOT_STARTED", "PLANNED", "IN_PROGRESS", 
 export type ImplementationStatus = (typeof implementationStatuses)[number];
 export const responsibilityRoles = ["CLIENT", "CONSULTANT", "ARCHITECT", "STRUCTURAL_ENGINEER", "MEP_ENGINEER", "INTERIOR_DESIGNER", "CONTRACTOR", "SITE_TEAM"] as const;
 export type ResponsibilityRole = (typeof responsibilityRoles)[number];
-export const caseDocumentTypes = ["DIMENSIONED_PLAN", "LOCATION_MAP", "PHOTO_VIDEO", "ENTRANCE_ACCESS", "CURRENT_USE", "STRUCTURE_SERVICES", "FURNITURE_EQUIPMENT", "CLIENT_PRIORITIES", "SURVEY_BOUNDARY", "ROADS_ACCESS", "DEVELOPMENT_CONTROLS", "INTENT_ROOM_BRIEF", "USER_HIERARCHY_MOVEMENT", "ARCHITECTURAL_DRAWING", "EQUIPMENT_SERVICES", "FUTURE_NEEDS", "PROJECT_TEAM", "MILESTONES"] as const;
+export const caseDocumentTypes = ["DIMENSIONED_PLAN", "LOCATION_MAP", "PHOTO_VIDEO", "ENTRANCE_ACCESS", "CURRENT_USE", "STRUCTURE_SERVICES", "FURNITURE_EQUIPMENT", "CLIENT_PRIORITIES", "SURVEY_BOUNDARY", "ROADS_ACCESS", "DEVELOPMENT_CONTROLS", "INTENT_ROOM_BRIEF", "USER_HIERARCHY_MOVEMENT", "ARCHITECTURAL_DRAWING", "EQUIPMENT_SERVICES", "FUTURE_NEEDS", "PROJECT_TEAM", "MILESTONES", "MANUAL_UTILITY_SHEET"] as const;
 export type CaseDocumentType = (typeof caseDocumentTypes)[number];
 export const documentRevisionStatuses = ["RECEIVED", "UNDER_REVIEW", "CHANGES_REQUIRED", "VERIFIED", "SUPERSEDED"] as const;
 export type DocumentRevisionStatus = (typeof documentRevisionStatuses)[number];
@@ -286,43 +398,51 @@ export interface AssessmentAudit {
   at: string;
 }
 
-export interface AssessmentObservation {
-  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+export interface AssessmentObservation extends OrganisationOwnedRecord {
+  id: string; caseId: string; floorId?: string; caseRevisionNumber: number; serviceType: VastuServiceType;
   version: number; idempotencyKey: string; title: string; observation: string;
   alignmentStatus: AlignmentStatus; energyStatus: EnergyStatus; placementStatus: PlacementStatus;
   evidenceRefs: readonly string[]; created: AssessmentAudit; updated: AssessmentAudit;
 }
 
-export interface Recommendation {
-  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+export interface Recommendation extends OrganisationOwnedRecord {
+  id: string; caseId: string; floorId?: string; caseRevisionNumber: number; serviceType: VastuServiceType;
   version: number; idempotencyKey: string; title: string; rationale: string; action: string;
   decisionPriority: DecisionPriority; attentionClass: AttentionClass; implementationHorizon: ImplementationHorizon;
   level: RecommendationLevel; observationIds: readonly string[]; evidenceRefs: readonly string[];
   created: AssessmentAudit; updated: AssessmentAudit;
 }
 
-export interface ImplementationTask {
-  id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
+export interface ImplementationTask extends OrganisationOwnedRecord {
+  id: string; caseId: string; floorId?: string; caseRevisionNumber: number; serviceType: VastuServiceType;
   version: number; idempotencyKey: string; recommendationId: string; title: string; notes?: string;
   status: ImplementationStatus; implementationHorizon: ImplementationHorizon; evidenceRefs: readonly string[];
   ownerRole: ResponsibilityRole; ownerName: string;
   created: AssessmentAudit; updated: AssessmentAudit;
 }
 
-export interface CaseDocumentRecord {
+export interface CaseDocumentRecord extends OrganisationOwnedRecord {
   id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
   assetType: CaseDocumentType; floorLabel?: string; versionLabel: string; documentDate?: string;
   isCurrent: boolean; evidenceRef: string; discrepancy?: string; blocker: boolean;
   reviewObservation?: string; requiredChange?: string; preferredAlternative?: string; acceptableAlternative?: string;
   ownerRole: ResponsibilityRole; ownerName: string; revisionStatus: DocumentRevisionStatus;
+  founderApprovalStatus?: "PENDING" | "APPROVED"; founderApprovedAt?: string; founderApprovedByActorUserId?: string;
   idempotencyKey: string; version: number; received: AssessmentAudit; verified?: AssessmentAudit; updated: AssessmentAudit;
+}
+
+export interface ManualSheetApprovalRecord extends OrganisationOwnedRecord {
+  id: string; documentId: string; projectId: string; caseId: string; floorId: string;
+  documentVersion: number; checkpoint: "FOUNDER_APPROVED"; actorUserId: string; actorDisplayName: string; actorRole: UserRole;
+  reason: string; priorStatus: "PENDING" | "APPROVED"; currentStatus: "APPROVED";
+  occurredAt: string; idempotencyKey: string;
 }
 
 export const deliveryMilestoneKinds = ["REVIEW_ROUND", "FINAL_COMPLIANCE_CHECK", "CONSTRUCTION_CHECKPOINT", "CLARIFICATION", "FOLLOW_UP", "OPTIONAL_VERIFICATION"] as const;
 export type DeliveryMilestoneKind = (typeof deliveryMilestoneKinds)[number];
 export const deliveryMilestoneStatuses = ["PLANNED", "READY", "IN_PROGRESS", "BLOCKED", "COMPLETED", "DEFERRED"] as const;
 export type DeliveryMilestoneStatus = (typeof deliveryMilestoneStatuses)[number];
-export interface DeliveryMilestone {
+export interface DeliveryMilestone extends OrganisationOwnedRecord {
   id: string; caseId: string; caseRevisionNumber: number; serviceType: VastuServiceType;
   kind: DeliveryMilestoneKind; sequence: number; roundLabel: string; title: string;
   status: DeliveryMilestoneStatus; dueDate?: string; completedAt?: string;
@@ -333,23 +453,154 @@ export interface DeliveryMilestone {
   created: AssessmentAudit; updated: AssessmentAudit;
 }
 
-export interface FloorWorkspaceRecord {
+export interface FloorWorkspaceRecord extends OrganisationOwnedRecord {
   id: string;
   caseId: string;
+  projectId?: string;
   floorLabel: string;
   status: FloorStatus;
   locked: boolean;
   regenerationReason?: string;
   evidenceUploads: string[];
+  idempotencyKey?: string;
+  stageAVerdictStatus?: "DRAFT" | "READY" | "PRESENTED";
+  stageAVerdictVersion?: string;
+  verdictPresentedAt?: string;
+  verdictPresentedByActorUserId?: string;
+  verdictPresentationIdempotencyKey?: string;
+  reportStatus?: ReportStatus;
+  deliveredAt?: string;
 }
 
-export interface ReportVersionRecord {
+export const siteAnalysisEvidenceTypes = ["VIDEO_ANALYSIS", "PHYSICAL_VISIT"] as const;
+export type SiteAnalysisEvidenceType = (typeof siteAnalysisEvidenceTypes)[number];
+export const siteAnalysisStatuses = ["DRAFT", "FOUNDER_REVIEWED", "FOUNDER_APPROVED"] as const;
+export type SiteAnalysisStatus = (typeof siteAnalysisStatuses)[number];
+
+export interface SiteAnalysisRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string;
+  caseRevisionNumber: number; floorRevisionNumber: number; version: number; supersedesId?: string;
+  stageAVerdictReportId: string; stageAVerdictVersion: string; upstreamEvaluationVersionId: string;
+  evidenceType: SiteAnalysisEvidenceType; evidenceRefs: string[]; capturedAt: string;
+  visitMetadata?: string;
+  observations: {
+    site: string; entrance: string; surroundings: string; light: string;
+    ventilation: string; airflow: string; neighbouringEffects: string; relevantObservations: string;
+  };
+  status: SiteAnalysisStatus; needsRegeneration?: boolean; regenerationReason?: string;
+  idempotencyKey: string; contentHash: string; createdAt: string;
+  createdByActorUserId: string; createdByActorName: string;
+}
+
+export interface SiteAnalysisApprovalRecord extends OrganisationOwnedRecord {
+  id: string; analysisId: string; projectId: string; caseId: string; floorId: string;
+  analysisVersion: number; checkpoint: "FOUNDER_REVIEWED" | "FOUNDER_APPROVED";
+  actorUserId: string; actorDisplayName: string; actorRole: UserRole;
+  reason: string; priorStatus: SiteAnalysisStatus; currentStatus: SiteAnalysisStatus;
+  policyVersion?: number; occurredAt: string; idempotencyKey: string;
+}
+
+export const postSiteFindingsStatuses = ["DRAFT", "FOUNDER_REVIEWED", "FOUNDER_APPROVED"] as const;
+export type PostSiteFindingsStatus = (typeof postSiteFindingsStatuses)[number];
+
+export interface PostSiteFindingsRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string;
+  caseRevisionNumber: number; floorRevisionNumber: number; version: number; supersedesId?: string;
+  siteAnalysisId: string; upstreamReportId: string; upstreamEvaluationVersionId?: string; needsRegeneration?: boolean; regenerationReason?: string;
+  differences: string; corrections: string; newFindings: string; additionalObservations: string;
+  status: PostSiteFindingsStatus; idempotencyKey: string; contentHash: string; createdAt: string;
+  createdByActorUserId: string; createdByActorName: string;
+}
+
+export interface PostSiteFindingsApprovalRecord extends OrganisationOwnedRecord {
+  id: string; findingsId: string; projectId: string; caseId: string; floorId: string;
+  findingsVersion: number; checkpoint: "FOUNDER_REVIEWED" | "FOUNDER_APPROVED";
+  actorUserId: string; actorDisplayName: string; actorRole: UserRole;
+  reason: string; priorStatus: PostSiteFindingsStatus; currentStatus: PostSiteFindingsStatus;
+  policyVersion?: number; occurredAt: string; idempotencyKey: string;
+}
+
+export interface RemedialWorkflowReservation extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; stageAReportId: string;
+  status: "BLOCKED_METHOD_INPUT" | "READY_FOR_CONFIGURATION" | "DRAFT";
+  methodologyVersionId?: string; createdAt: string;
+}
+
+export const methodologyModules = ["DIRECTION_32", "DIRECTION_16", "SITE_ENVIRONMENT", "UTILITY", "SHAKTI_ELEMENT", "AOU_REFERENCE", "STAGE_B_REMEDIAL"] as const;
+export type MethodologyModule = (typeof methodologyModules)[number];
+export const methodologyDecisionStatuses = ["APPROVED", "CONFIGURABLE", "REVIEW_REQUIRED", "BLOCKED_METHOD_INPUT", "DEFERRED", "NEEDS_REGENERATION"] as const;
+export type MethodologyDecisionStatus = (typeof methodologyDecisionStatuses)[number];
+
+export interface MethodologyVersionRecord extends OrganisationOwnedRecord {
+  id: string; module: MethodologyModule; version: number; label: string;
+  lifecycleStatus: "DRAFT" | "ACTIVE" | "RETIRED";
+  executionAdapterVersion?: string;
+  sourceLabel: string; sourceAssetVersion?: string; sourceAssetHash?: string; contentHash: string; reason: string; idempotencyKey: string;
+  createdAt: string; createdByActorUserId: string; approvedAt?: string; approvedByActorUserId?: string;
+}
+
+export interface MethodologyRuleRecord extends OrganisationOwnedRecord {
+  id: string; methodologyVersionId: string; ruleKey: string; sourceReference: string;
+  decisionStatus: MethodologyDecisionStatus; conditionJson: unknown; outcomeJson: unknown;
+  contentHash: string; idempotencyKey: string; createdAt: string; createdByActorUserId: string;
+}
+
+export interface MethodologyGoldenFixtureRecord extends OrganisationOwnedRecord {
+  id: string; methodologyVersionId: string; fixtureKey: string; inputJson: unknown; expectedOutputJson: unknown;
+  decisionStatus: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT";
+  contentHash: string; idempotencyKey: string; createdAt: string; createdByActorUserId: string;
+}
+
+export const aouRowStatuses = ["DRAFT", "REVIEW_REQUIRED", "APPROVED", "RETIRED", "BLOCKED_METHOD_INPUT"] as const;
+export type AouRowStatus = (typeof aouRowStatuses)[number];
+
+/** AOU is a separate, versioned framing reference; it never drives Utility execution. */
+export interface AouMethodologyVersionRecord extends OrganisationOwnedRecord {
+  id: string; version: number; label: string; lifecycleStatus: "DRAFT" | "ACTIVE" | "RETIRED";
+  sourceLabel: string; sourceWorkbookHash?: string; sourceRangeHash?: string; sourceSheetRange?: string; contentHash: string; reason: string; idempotencyKey: string;
+  createdAt: string; createdByActorUserId: string; approvedAt?: string; approvedByActorUserId?: string;
+}
+
+export interface AouReferenceRowRecord extends OrganisationOwnedRecord {
+  id: string; methodologyVersionId: string; rowKey: string; sourceRowNumber: number; element: string; directionScope?: string[];
+  sourceCells: { Element: string; Attributes: string; Directions: string; Colours: string; Shapes: string; Metals: string; Activities: string; Utilites: string; Objects: string };
+  sourceCellReferences: { Element: string; Attributes: string; Directions: string; Colours: string; Shapes: string; Metals: string; Activities: string; Utilites: string; Objects: string };
+  attributes?: string; directions?: string; colours?: string; shapes?: string; metals?: string;
+  activities?: string; utilities?: string; objects?: string; status: AouRowStatus;
+  sourceReference: string; contentHash: string; idempotencyKey: string; createdAt: string; createdByActorUserId: string;
+  approvedAt?: string; approvedByActorUserId?: string;
+  displayCopy?: {
+    version: number; status: "DRAFT" | "APPROVED"; attributes?: string; directions?: string; colours?: string;
+    shapes?: string; metals?: string; activities?: string; utilities?: string; objects?: string;
+    contentHash: string; reason: string; idempotencyKey: string; createdAt: string; createdByActorUserId: string;
+    approvedAt?: string; approvedByActorUserId?: string; approvalReason?: string; approvalIdempotencyKey?: string;
+  };
+}
+
+export interface AouSnapshotRow {
+  rowKey: string; element: string; directionScope?: string[]; attributes?: string; directions?: string;
+  colours?: string; shapes?: string; metals?: string; activities?: string; utilities?: string; objects?: string;
+  sourceReference: string; contentHash: string; copyLayer: "SOURCE" | "APPROVED_DISPLAY";
+  displayCopyVersion?: number; displayCopyStatus: "DRAFT" | "APPROVED";
+}
+
+export interface AouVerdictReferenceSnapshot {
+  methodologyVersionId: string; methodologyContentHash: string; selectedRowIds: string[];
+  methodologyVersionLabel: string; sourceVersion: string; sourceWorkbookHash: string; sourceRangeHash: string;
+  selectedRows: AouSnapshotRow[];
+  appendixRows: AouSnapshotRow[];
+  snapshotHash: string;
+}
+
+export interface ReportVersionRecord extends OrganisationOwnedRecord {
   id: string;
   caseId: string;
+  floorId?: string;
   versionLabel: string;
   isPreview: boolean;
   status: ReportStatus;
   watermarkText?: string;
+  idempotencyKey?: string;
   approvals: string[];
   /** Structured evidence is additive so legacy snapshots with approvals[] remain readable. */
   approvalEvidence?: ReportApprovalEvidence[];
@@ -363,6 +614,23 @@ export interface ReportApprovalEvidence {
   approvedAt: string;
   comment: string;
   artifactHash: string;
+  checkpoint?: "FOUNDER_REVIEWED" | "FOUNDER_APPROVED" | "RELEASED";
+}
+
+export interface StageAFloorReviewSnapshotRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; reportId: string;
+  reportVersion: string; planVersionId: string; evidenceVersionIds: string[];
+  orientationVersionId: string; mappingVersionIds: string[]; evaluationVersionIds: string[];
+  methodologyVersionIds: string[]; snapshotHash: string; reportArtifactHash: string;
+  reviewerActorUserId: string; reviewerDisplayName: string;
+  status: "DRAFT"; reason: string; createdAt: string; idempotencyKey: string;
+}
+
+export interface StageAFloorApprovalCheckpointRecord extends OrganisationOwnedRecord {
+  id: string; reviewSnapshotId: string; projectId: string; caseId: string; floorId: string; reportId: string;
+  checkpoint: "FOUNDER_REVIEWED" | "FOUNDER_APPROVED" | "RELEASED";
+  snapshotHash: string; reportArtifactHash: string; actorUserId: string; actorDisplayName: string;
+  actorRole: UserRole; reason: string; idempotencyKey: string; occurredAt: string;
 }
 
 export interface ReportArtifactManifest {
@@ -372,7 +640,17 @@ export interface ReportArtifactManifest {
   createdBy: { id: string; name: string; role: UserRole };
   templateVersion: string;
   evaluationSnapshotId?: string;
+  utilityVerdictIds?: string[];
+  aouReferenceSnapshot?: AouVerdictReferenceSnapshot;
   shaktiSnapshotId?: string;
+  floorId?: string;
+  planVersionId?: string;
+  orientationVersionId?: string;
+  griddingEvidenceVersionIds?: string[];
+  handMarkedEvidenceVersionId?: string;
+  manualUtilitySheetDocumentId?: string;
+  siteAnalysisId?: string;
+  postSiteFindingsId?: string;
   contentHash: string;
   immutable: true;
   downloadPath: string;
@@ -385,12 +663,16 @@ export interface ClientSafeIntakeSnapshot {
   propertyType: string | null; propertyStatus: string | null; cityCountry: string | null; constraints: string | null;
 }
 
-export interface EvaluationSnapshotRecord {
+export interface EvaluationSnapshotRecord extends OrganisationOwnedRecord {
   id: string;
   caseId: string;
+  floorId?: string;
+  planVersionId?: string;
+  orientationVersionId?: string;
+  idempotencyKey?: string;
   snapshotName: string;
   sourceVersion: string;
-  generatedMatrix: Array<{ code: string; verdict: string; confidence: number; ruleId?: string }>;
+  generatedMatrix: Array<{ code: string; verdict: string; confidence?: number; ruleId?: string; utilityName?: string; directionCode?: string; attributeText?: string; sourceRowNumber?: number; status?: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT" }>;
   provenance?: EvaluationProvenance;
 }
 
@@ -407,10 +689,50 @@ export interface EvaluationProvenance {
   sourceContentHash?: string;
   ruleSetFormatVersion?: string;
   algorithmVersion: string;
+  methodologyVersionId?: string;
+  methodologyContentHash?: string;
   mappingVersion?: string;
   roundingVersion?: string;
   caseInputs: EvaluationCaseInputs;
   selectedRuleIds?: string[];
+  sourceRuleRefs?: string[];
+  sourceWorkbookHash?: string;
+  sourceWorkbookVersion?: string;
+  explainabilityStatus?: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT";
+}
+
+export const utilityVerdictStatuses = ["APPROVED", "REVIEW_REQUIRED", "BLOCKED_METHOD_INPUT"] as const;
+export type UtilityVerdictStatus = (typeof utilityVerdictStatuses)[number];
+export const utilityGraphVerdicts = ["SUPPRESS", "GROUND", "UPLIFT", "PROMOTE", "BALANCE"] as const;
+export type UtilityGraphVerdict = (typeof utilityGraphVerdicts)[number];
+
+export interface UtilityGraphVerdictRecord extends OrganisationOwnedRecord {
+  id: string;
+  utilityEvaluationSnapshotId: string;
+  caseId: string;
+  floorId: string;
+  planVersionId: string;
+  orientationVersionId: string;
+  element: string;
+  directionSet: string[];
+  bars: Array<{ directionCode: string; value: number }>;
+  lines: { extension: number; balance: number; exhaustion: number };
+  verdict?: UtilityGraphVerdict;
+  solutionFraming?: "Disha Balancer" | "Tattva Balancer" | "Disha Activation" | "Tattva Activation" | "Equaliser";
+  status: UtilityVerdictStatus;
+  triggeredDirections: string[];
+  matchedConditions: UtilityGraphVerdict[];
+  explanation: string;
+  sourceRuleIds: string[];
+  sourceRowNumbers: number[];
+  methodologyVersionId: string;
+  methodologyContentHash: string;
+  utilityWorkbookHash: string;
+  utilityWorkbookVersion: string;
+  inputHash: string;
+  outputHash: string;
+  idempotencyKey: string;
+  createdAt: string;
 }
 
 export interface MappingEntry32D {
@@ -438,9 +760,13 @@ export interface UtilityRule {
   sourceCsvRow: number;
 }
 
-export interface ShaktiSnapshotRecord {
+export interface ShaktiSnapshotRecord extends OrganisationOwnedRecord {
   id: string;
   caseId: string;
+  floorId?: string;
+  planVersionId?: string;
+  orientationVersionId?: string;
+  idempotencyKey?: string;
   inputValues: number[];
   elementAverages: Record<string, number>;
   rankedVerdicts: Array<{ element: string; score: number }>;
@@ -448,7 +774,7 @@ export interface ShaktiSnapshotRecord {
   provenance?: EvaluationProvenance;
 }
 
-export interface TimelineEvent {
+export interface TimelineEvent extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
   category: string;

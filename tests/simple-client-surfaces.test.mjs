@@ -14,7 +14,8 @@ test("client portal explains progress and uses plain payment states", () => {
 test("report actions explain irreversible decisions and hide technical evidence", () => {
   const reports = source("components/report-console.tsx");
   assert.match(reports, /window\.confirm/);
-  assert.match(reports, /Release this final report to the client/);
+  assert.match(reports, /Release this verified immutable PDF/);
+  assert.doesNotMatch(reports, /Release this final report to the client/);
   assert.match(reports, /<details>/);
   assert.match(reports, /File fingerprint/);
   assert.match(reports, /aria-live="polite"/);

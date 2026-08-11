@@ -64,7 +64,7 @@ test("only pre-delivery reviews freeze after artifact; post-delivery kinds remai
   assert.doesNotMatch(workflow.slice(workflow.indexOf("const preDeliveryMilestoneKinds"), workflow.indexOf("const drawingReviewKinds")), /CONSTRUCTION_CHECKPOINT|FOLLOW_UP/);
   const body = functionBody(workflow, "upsertDeliveryMilestone");
   assert.match(body, /preDeliveryMilestoneKinds\.has\(kind\).*item\.artifact/s);
-  assert.match(body, /assessmentContext\(input\.caseId, true\)/);
+  assert.match(body, /assessmentContext\(input\.caseId, undefined, true\)/);
 });
 
 test("client-safe delivery projection is deterministic and hides evidence references", () => {

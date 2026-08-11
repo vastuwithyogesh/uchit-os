@@ -1,0 +1,5165 @@
+{
+  "sourceVersion": "uchit-utilitymaster/v1",
+  "workbookHash": "e7be4e5d76290b9556fbc396d851ba3fe6634fc0b26fd058a4e53818e775644c",
+  "rows": [
+    {
+      "rowNumber": 2,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "N",
+      "attributeText": "MBA, IAS, kids will study subjects related to carrier, more focused with clear vision.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 3,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "NNE",
+      "attributeText": "Medical Science, Ayurveda, kids get more inclined to study Science.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 4,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "NE",
+      "attributeText": "Research, creative and designing studies.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 5,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "ENE",
+      "attributeText": "Comics, but kids will feel study is burden and attract more towards games.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 6,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "E",
+      "attributeText": "Political Science, kids would like to make more friends.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 7,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "ESE",
+      "attributeText": "Analytical Studies, kids will lose their concentration.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 8,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "SE",
+      "attributeText": "Accountancy, Kids will feel more aggressive to complete study.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 9,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "SSE",
+      "attributeText": "Health Education, kids will love to study Yoga, Fitness related books.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 10,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "S",
+      "attributeText": "This will make kids sleepy and easy going towards studies.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 11,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "SSW",
+      "attributeText": "Kids would not like to study rather waste their time on other activities.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 12,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "SW",
+      "attributeText": "Architects, Science, Music, kids will enhance their skills.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 13,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "WSW",
+      "attributeText": "Ideal zone to study, they feels naturally incline towards study and score good marks. .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 14,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "W",
+      "attributeText": "West Business Development, Kids will feel more aggressive to complete study.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 15,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "WNW",
+      "attributeText": "Studies will become reason for kids stress and depression",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 16,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "NW",
+      "attributeText": "Administration, kids will seek support of members to complete their studies",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 17,
+      "utilityName": "STUDY TABLE",
+      "directionCode": "NNW",
+      "attributeText": "Kids will concentrate on useless things like movies, music and lose concentration.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 18,
+      "utilityName": "HEATER",
+      "directionCode": "N",
+      "attributeText": "Block opportunities and money in life.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 19,
+      "utilityName": "HEATER",
+      "directionCode": "NNE",
+      "attributeText": "Lead to low immunity and health problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 20,
+      "utilityName": "HEATER",
+      "directionCode": "NE",
+      "attributeText": "Develop temperament issues and hamper peace of mind.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 21,
+      "utilityName": "HEATER",
+      "directionCode": "ENE",
+      "attributeText": "Efforts to get fun and joy end up in aggression and frustration.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 22,
+      "utilityName": "HEATER",
+      "directionCode": "E",
+      "attributeText": "Members are considered aggressive in social circle and get involved in social arguments.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 23,
+      "utilityName": "HEATER",
+      "directionCode": "ESE",
+      "attributeText": "Members will waste their time in over thinking and get into arguments with other members.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 24,
+      "utilityName": "HEATER",
+      "directionCode": "SE",
+      "attributeText": "Ideal zone, it improve inflow of cash and help in recovery of blocked payments.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 25,
+      "utilityName": "HEATER",
+      "directionCode": "SSE",
+      "attributeText": "Improve mental and emotional strength of members of family.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 26,
+      "utilityName": "HEATER",
+      "directionCode": "S",
+      "attributeText": "Ideal zone, help in sound sleep and receive appreciation from others.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 27,
+      "utilityName": "HEATER",
+      "directionCode": "SSW",
+      "attributeText": "When placed here it will not be used much and lead to expenses in life.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 28,
+      "utilityName": "HEATER",
+      "directionCode": "SW",
+      "attributeText": "Not advisable, become root cause of arguments and instability in relationships and work.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 29,
+      "utilityName": "HEATER",
+      "directionCode": "WSW",
+      "attributeText": "Kids in house get aggressive when asked to study and it burns away savings.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 30,
+      "utilityName": "HEATER",
+      "directionCode": "W",
+      "attributeText": "Restrict desirable results in life and gains.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 31,
+      "utilityName": "HEATER",
+      "directionCode": "WNW",
+      "attributeText": "Ideal zone, as it will help to burn block emotion and past life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 32,
+      "utilityName": "HEATER",
+      "directionCode": "NW",
+      "attributeText": "People would like to stay away from members, they feel members are aggressive.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 33,
+      "utilityName": "HEATER",
+      "directionCode": "NNW",
+      "attributeText": "Couple will end up in arguments while trying to fulfil their personal desires.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 34,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "N",
+      "attributeText": "Restrict Opportunities and Money.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 35,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "NNE",
+      "attributeText": "Feeling of heaviness always established in body.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 36,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "NE",
+      "attributeText": "Hamper growth, lack of wisdom and clarity in mind.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 37,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "ENE",
+      "attributeText": "Can be kept as members will develop feeling of joy when call visitors.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 38,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "E",
+      "attributeText": "Ideal as help them in fast social connectivity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 39,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "ESE",
+      "attributeText": "Not advisable as it create conflicts with difference in opinion among family members.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 40,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "SE",
+      "attributeText": "Good Zone, attract Money.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 41,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "SSE",
+      "attributeText": "Good Zone, enhance power and confidence.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 42,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "S",
+      "attributeText": "Good Zone, provide peace of mind, members love to serve food to each other.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 43,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "SSW",
+      "attributeText": "When kept here its rarely used.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 44,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "SW",
+      "attributeText": "Ideal zone, help in improvising presentation skills and stable carrier.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 45,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "WSW",
+      "attributeText": "Must not kept, it block focus and concentration of kids.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 46,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "W",
+      "attributeText": "Can be kept here as it will help in gains.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 47,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "WNW",
+      "attributeText": "Good Zone, gives inner confidence and block low moods.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 48,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "NW",
+      "attributeText": "Good Zone, it help members to get support when needed.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 49,
+      "utilityName": "CROCKERY CABIN",
+      "directionCode": "NNW",
+      "attributeText": "Must avoid, will lose attraction in relationship.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 50,
+      "utilityName": "INVERTOR",
+      "directionCode": "N",
+      "attributeText": "Block opportunities and make dependent on other for growth.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 51,
+      "utilityName": "INVERTOR",
+      "directionCode": "NNE",
+      "attributeText": "Creates health issues which need medical assistance at aby time.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 52,
+      "utilityName": "INVERTOR",
+      "directionCode": "NE",
+      "attributeText": "Restrict clarity of mind and depend on others to take decisions.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 53,
+      "utilityName": "INVERTOR",
+      "directionCode": "ENE",
+      "attributeText": "Will seek company of others for joy and happiness",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 54,
+      "utilityName": "INVERTOR",
+      "directionCode": "E",
+      "attributeText": "Keep asking for helps from social circle.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 55,
+      "utilityName": "INVERTOR",
+      "directionCode": "ESE",
+      "attributeText": "Can be kept here to come out of churning process.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 56,
+      "utilityName": "INVERTOR",
+      "directionCode": "SE",
+      "attributeText": "Its ok to keep it here.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 57,
+      "utilityName": "INVERTOR",
+      "directionCode": "SSE",
+      "attributeText": "Lose self-confidence and seek others to promote them.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 58,
+      "utilityName": "INVERTOR",
+      "directionCode": "S",
+      "attributeText": "Feeling of stress will be developed because of others.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 59,
+      "utilityName": "INVERTOR",
+      "directionCode": "SSW",
+      "attributeText": "Required frequent repair and will effect financially.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 60,
+      "utilityName": "INVERTOR",
+      "directionCode": "SW",
+      "attributeText": "Reluctant to use specific skills and ask others to do work for them.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 61,
+      "utilityName": "INVERTOR",
+      "directionCode": "WSW",
+      "attributeText": "Kids will help others to get notes and homework done.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 62,
+      "utilityName": "INVERTOR",
+      "directionCode": "W",
+      "attributeText": "Block Gains.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 63,
+      "utilityName": "INVERTOR",
+      "directionCode": "WNW",
+      "attributeText": "Will get shoulder to cry when needed.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 64,
+      "utilityName": "INVERTOR",
+      "directionCode": "NW",
+      "attributeText": "Ideal zone to keep invertor as when needed support will be available.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 65,
+      "utilityName": "INVERTOR",
+      "directionCode": "NNW",
+      "attributeText": "Will seek for partner outside home to fulfil desires.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 66,
+      "utilityName": "DUSTBIN",
+      "directionCode": "N",
+      "attributeText": "North Dispose opportunities and growth in carrier and life.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 67,
+      "utilityName": "DUSTBIN",
+      "directionCode": "NNE",
+      "attributeText": "Weak Immunity and lead to poor health.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 68,
+      "utilityName": "DUSTBIN",
+      "directionCode": "NE",
+      "attributeText": "Must not keep here, will dispose clarity of mind.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 69,
+      "utilityName": "DUSTBIN",
+      "directionCode": "ENE",
+      "attributeText": "Lack of Joy and Refreshment in Life.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 70,
+      "utilityName": "DUSTBIN",
+      "directionCode": "E",
+      "attributeText": "Break social association and people will think useless about members.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 71,
+      "utilityName": "DUSTBIN",
+      "directionCode": "ESE",
+      "attributeText": "Ideal place will control over thinking and over analysis.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 72,
+      "utilityName": "DUSTBIN",
+      "directionCode": "SE",
+      "attributeText": "Root cause of the blocked payments and cash inflow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 73,
+      "utilityName": "DUSTBIN",
+      "directionCode": "SSE",
+      "attributeText": "Lead to low confidence and strength.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 74,
+      "utilityName": "DUSTBIN",
+      "directionCode": "S",
+      "attributeText": "South Creates feeling of restlessness, insomnia.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 75,
+      "utilityName": "DUSTBIN",
+      "directionCode": "SSW",
+      "attributeText": "SSW Ideal zone to keep dustbin.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 76,
+      "utilityName": "DUSTBIN",
+      "directionCode": "SW",
+      "attributeText": "Will disturb relationship in family and skills.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 77,
+      "utilityName": "DUSTBIN",
+      "directionCode": "WSW",
+      "attributeText": "WSW Hamper studies of children in house and restrict thought process.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 78,
+      "utilityName": "DUSTBIN",
+      "directionCode": "W",
+      "attributeText": "Dispose gains in life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 79,
+      "utilityName": "DUSTBIN",
+      "directionCode": "WNW",
+      "attributeText": "Ideal zone, will dispose negative thoughts and blocked emotions.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 80,
+      "utilityName": "DUSTBIN",
+      "directionCode": "NW",
+      "attributeText": "NW Effect feeling of support from banking and financial sector, also between members.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 81,
+      "utilityName": "DUSTBIN",
+      "directionCode": "NNW",
+      "attributeText": "Lead to extra marital affairs.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 82,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "N",
+      "attributeText": "Will confuse about carrier and opportunities will drain.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 83,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "NNE",
+      "attributeText": "Drains always good health.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 84,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "NE",
+      "attributeText": "Cause anxiety, headache, and overthinking of useless thoughts.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 85,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "ENE",
+      "attributeText": "Creates one after other issues in life and fell joyless in life.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 86,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "E",
+      "attributeText": "Overthinking about social status and how other think about them.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 87,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "ESE",
+      "attributeText": "Ideal zone, as it reduce over churning process in mind and keep clam.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 88,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "SE",
+      "attributeText": "Will drain cash.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 89,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "SSE",
+      "attributeText": "Over concerns about physical and mental strength.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 90,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "S",
+      "attributeText": "drain peace of mind, even at bed time member will keep thinking.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 91,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "SSW",
+      "attributeText": "Machine will required frequent repair BUT waste of money will stop.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 92,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "SW",
+      "attributeText": "Over possessive about family matters and relationship, think a lot.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 93,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "WSW",
+      "attributeText": "Confuse kids in studies and slow down there pick up power.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 94,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "W",
+      "attributeText": "Drain gains in life.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 95,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "WNW",
+      "attributeText": "Ideal place, will remove emotional blockage.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 96,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "NW",
+      "attributeText": "Good and Positive exercise when kept here to get support.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 97,
+      "utilityName": "WASHING MACHINE",
+      "directionCode": "NNW",
+      "attributeText": "Drains attraction between husband and wife.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 98,
+      "utilityName": "LAPTOP",
+      "directionCode": "N",
+      "attributeText": "Best to explore carrier rand new opportunities.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 99,
+      "utilityName": "LAPTOP",
+      "directionCode": "NNE",
+      "attributeText": "Placement lead to vital information related to health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 100,
+      "utilityName": "LAPTOP",
+      "directionCode": "NE",
+      "attributeText": "Will use more to watch religious videos and articles.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 101,
+      "utilityName": "LAPTOP",
+      "directionCode": "ENE",
+      "attributeText": "Members will enjoy watching movies, songs or play games.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 102,
+      "utilityName": "LAPTOP",
+      "directionCode": "E",
+      "attributeText": "Can be kept to get global associations.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 103,
+      "utilityName": "LAPTOP",
+      "directionCode": "ESE",
+      "attributeText": "Ideal to do data entry, research and analysis.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 104,
+      "utilityName": "LAPTOP",
+      "directionCode": "SE",
+      "attributeText": "Good for CA's or accounting purpose.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 105,
+      "utilityName": "LAPTOP",
+      "directionCode": "SSE",
+      "attributeText": "Ideal for those who want to work for long hours without feeling tiered.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 106,
+      "utilityName": "LAPTOP",
+      "directionCode": "S",
+      "attributeText": "Good for management and admin work.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 107,
+      "utilityName": "LAPTOP",
+      "directionCode": "SSW",
+      "attributeText": "Frequent repair is required in computer and of no use outcome when browse.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 108,
+      "utilityName": "LAPTOP",
+      "directionCode": "SW",
+      "attributeText": "Ideal for designing and skill work, also good to find perfect partner in life for marriage.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 109,
+      "utilityName": "LAPTOP",
+      "directionCode": "WSW",
+      "attributeText": "Kids can watch educational lessons on computer, also good for new project reports. .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 110,
+      "utilityName": "LAPTOP",
+      "directionCode": "W",
+      "attributeText": "Ideal for share market people and bosses",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 111,
+      "utilityName": "LAPTOP",
+      "directionCode": "WNW",
+      "attributeText": "Best to overcome from low mood, or write an emotional script.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 112,
+      "utilityName": "LAPTOP",
+      "directionCode": "NW",
+      "attributeText": "Help in providing support related sources when kept here.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 113,
+      "utilityName": "LAPTOP",
+      "directionCode": "NNW",
+      "attributeText": "Undesired surfing area must avoid.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 114,
+      "utilityName": "STAIRS",
+      "directionCode": "N",
+      "attributeText": "Generates opportunity and growth.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 115,
+      "utilityName": "STAIRS",
+      "directionCode": "NNE",
+      "attributeText": "Improvise health and immunity",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 116,
+      "utilityName": "STAIRS",
+      "directionCode": "NE",
+      "attributeText": "Provides more clarity and opportunities in life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 117,
+      "utilityName": "STAIRS",
+      "directionCode": "ENE",
+      "attributeText": "Bring happiness, joy in life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 118,
+      "utilityName": "STAIRS",
+      "directionCode": "E",
+      "attributeText": "Establish more social connections.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 119,
+      "utilityName": "STAIRS",
+      "directionCode": "ESE",
+      "attributeText": "Reduce anxiety and stress.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 120,
+      "utilityName": "STAIRS",
+      "directionCode": "SE",
+      "attributeText": "Control aggression.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 121,
+      "utilityName": "STAIRS",
+      "directionCode": "SSE",
+      "attributeText": "Increase metal and physical strength.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 122,
+      "utilityName": "STAIRS",
+      "directionCode": "S",
+      "attributeText": "Increase name and fame.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 123,
+      "utilityName": "STAIRS",
+      "directionCode": "SSW",
+      "attributeText": "To reduce wastage of money and efforts.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 124,
+      "utilityName": "STAIRS",
+      "directionCode": "SW",
+      "attributeText": "Provide stability and skill.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 125,
+      "utilityName": "STAIRS",
+      "directionCode": "WSW",
+      "attributeText": "Increase ability of know how.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 126,
+      "utilityName": "STAIRS",
+      "directionCode": "W",
+      "attributeText": "Help in gains and growth in life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 127,
+      "utilityName": "STAIRS",
+      "directionCode": "WNW",
+      "attributeText": "Help to main emotional balance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 128,
+      "utilityName": "STAIRS",
+      "directionCode": "NW",
+      "attributeText": "Help in facilitating support when required.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 129,
+      "utilityName": "STAIRS",
+      "directionCode": "NNW",
+      "attributeText": "Help in building foundation of strong relationship.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 130,
+      "utilityName": "KITCHEN",
+      "directionCode": "N",
+      "attributeText": "Hamper carrier and growth, food cooked here not good in taste.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 131,
+      "utilityName": "KITCHEN",
+      "directionCode": "NNE",
+      "attributeText": "Lead to adverse effects on health of residents.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 132,
+      "utilityName": "KITCHEN",
+      "directionCode": "NE",
+      "attributeText": "Must avoid in this zone, lead to aggression and confuse mind.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 133,
+      "utilityName": "KITCHEN",
+      "directionCode": "ENE",
+      "attributeText": "Members will crave for fun and joy in life.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 134,
+      "utilityName": "KITCHEN",
+      "directionCode": "E",
+      "attributeText": "Gives average results in this zone.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 135,
+      "utilityName": "KITCHEN",
+      "directionCode": "ESE",
+      "attributeText": "Disturb relationships and may lead to diabetes and hypertension.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 136,
+      "utilityName": "KITCHEN",
+      "directionCode": "SE",
+      "attributeText": "Ideal zone, improve inflow of cash and recover blocked payments, however members may become aggressive.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 137,
+      "utilityName": "KITCHEN",
+      "directionCode": "SSE",
+      "attributeText": "Another good zone, it develops confidence and strength, also food cooked is delicious.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 138,
+      "utilityName": "KITCHEN",
+      "directionCode": "S",
+      "attributeText": "It brings name and fame, members live relax and comfortable life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 139,
+      "utilityName": "KITCHEN",
+      "directionCode": "SSW",
+      "attributeText": "Must avoid, bring clashes between family and increase wastage of money.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 140,
+      "utilityName": "KITCHEN",
+      "directionCode": "SW",
+      "attributeText": "Leads to delay marriage disturb relationship and instability.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 141,
+      "utilityName": "KITCHEN",
+      "directionCode": "WSW",
+      "attributeText": "Affect savings and child high temperament with low interest in studies.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 142,
+      "utilityName": "KITCHEN",
+      "directionCode": "W",
+      "attributeText": "Ideal location, improvise gains in life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 143,
+      "utilityName": "KITCHEN",
+      "directionCode": "WNW",
+      "attributeText": "Wife keeps complaining about habits and nature of husband otherwise its ok.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 144,
+      "utilityName": "KITCHEN",
+      "directionCode": "NW",
+      "attributeText": "Affect support in life, not advisable.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 145,
+      "utilityName": "KITCHEN",
+      "directionCode": "NNW",
+      "attributeText": "Create disturbance in members.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 146,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "N",
+      "attributeText": "Ideal for Yaksh Sadna, Laxmi and Ganesh Pujan.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 147,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "NNE",
+      "attributeText": "Ideal for Shiv Pariwar and Dhanvantri ji and Ashwani Kumars.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 148,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "NE",
+      "attributeText": "Ideal zone, members get blessed, get mental clarity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 149,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "ENE",
+      "attributeText": "Here member will get recharged quickly after prayers.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 150,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "E",
+      "attributeText": "Good for politicians, get blessing to receive name and fame in society.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 151,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "ESE",
+      "attributeText": "Recommended for stock brokers only.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 152,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "SE",
+      "attributeText": "Only Maa Durga puja should be done here.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 153,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "SSE",
+      "attributeText": "Must worship Hanumanji here to gain power and confidence.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 154,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "S",
+      "attributeText": "Maa Kali puja can be done here, its ideal zone for deep and relax meditation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 155,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "SSW",
+      "attributeText": "Except of Aghori types of puja all other puja's must be avoided.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 156,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "SW",
+      "attributeText": "Vishvakarma Ji Puja can be done here, rest should be avoided.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 157,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "WSW",
+      "attributeText": "Maa Saraswati gives knowledge and wisdom when worshiped here.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 158,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "W",
+      "attributeText": "Ideal zone for Guru's, Bhu Devi,Sai Baba, rest must be avoided.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 159,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "WNW",
+      "attributeText": "Yakhsni Puja can be performed here, must avoid other zones.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 160,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "NW",
+      "attributeText": "Ideal for Ancestral Puja.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 161,
+      "utilityName": "POOJA ROOM",
+      "directionCode": "NNW",
+      "attributeText": "Tantrik Puja is advisable, other must be avoided.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 162,
+      "utilityName": "STORAGE",
+      "directionCode": "N",
+      "attributeText": "Must avoid as it will hamper carrier and growth of resident.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 163,
+      "utilityName": "STORAGE",
+      "directionCode": "NNE",
+      "attributeText": "Affect health of members, must avoid.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 164,
+      "utilityName": "STORAGE",
+      "directionCode": "NE",
+      "attributeText": "Must avoid as it will lead to blockage of mind.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 165,
+      "utilityName": "STORAGE",
+      "directionCode": "ENE",
+      "attributeText": "Member feel pleased in collection of useless articles.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 166,
+      "utilityName": "STORAGE",
+      "directionCode": "E",
+      "attributeText": "Hamper social association by developing feeling of importance for society.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 167,
+      "utilityName": "STORAGE",
+      "directionCode": "ESE",
+      "attributeText": "Good place to store as it reduces anxiety and unwanted flow of thoughts.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 168,
+      "utilityName": "STORAGE",
+      "directionCode": "SE",
+      "attributeText": "Always slowdown in flow of money.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 169,
+      "utilityName": "STORAGE",
+      "directionCode": "SSE",
+      "attributeText": "Advisable as here it will give confidence, power and strength.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 170,
+      "utilityName": "STORAGE",
+      "directionCode": "S",
+      "attributeText": "Advisable as here it will relax mind and remove unwanted fear.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 171,
+      "utilityName": "STORAGE",
+      "directionCode": "SSW",
+      "attributeText": "Unwanted stuff can be stored here however, useful and valuable good must not store here.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 172,
+      "utilityName": "STORAGE",
+      "directionCode": "SW",
+      "attributeText": "Valuables can be stored here, avoid junk, damaged and waste goods.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 173,
+      "utilityName": "STORAGE",
+      "directionCode": "WSW",
+      "attributeText": "Good place to store here but avoid junk and waste goods.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 174,
+      "utilityName": "STORAGE",
+      "directionCode": "W",
+      "attributeText": "Iron safe can be placed but no junk and waste good here.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 175,
+      "utilityName": "STORAGE",
+      "directionCode": "WNW",
+      "attributeText": "Ideal location, will block low moods.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 176,
+      "utilityName": "STORAGE",
+      "directionCode": "NW",
+      "attributeText": "Another ideal zone, will secure banking position and support.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 177,
+      "utilityName": "STORAGE",
+      "directionCode": "NNW",
+      "attributeText": "Must avoid as female in reduce attraction among members.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 178,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "N",
+      "attributeText": "Most of discussion will related to carrier and growth and members will advise each other on carrier matters.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 179,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "NNE",
+      "attributeText": "Mostly discuss about taking care of their health and always think of better health.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 180,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "NE",
+      "attributeText": "Brainstorming session will be fruitful; members will talk more on religious topics, creative talks.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 181,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "ENE",
+      "attributeText": "Best place as this zone give refreshment in life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 182,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "E",
+      "attributeText": "Will compare their life style with neighbour or society.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 183,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "ESE",
+      "attributeText": "Will talk in details even on small topics, imbalance here will lead to arguments.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 184,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "SE",
+      "attributeText": "Discussion could be heated and argumentative which will affect love and affection.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 185,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "SSE",
+      "attributeText": "Will enhance low mood of family member by chatting with other members of family.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 186,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "S",
+      "attributeText": "Good place to relax, members would like to take nap here than getting into discussion.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 187,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "SSW",
+      "attributeText": "Discussion here will hardly reach to any conclusion and feeling to waste of time develops among members.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 188,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "SW",
+      "attributeText": "Sitting here, elders will follow and talk more about ancestors and advise younger to show same for them.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 189,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "WSW",
+      "attributeText": "Members would love to share their knowledge and experience and help youngers in WSW development of their skills.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 190,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "W",
+      "attributeText": "Members will always talk about strengthen relationships, wealth, profits",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 191,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "WNW",
+      "attributeText": "Members will share their feelings and get relief from blocked mind and past and get too emotional that they will start crying",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 192,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "NW",
+      "attributeText": "Ensure support to each other in out of need",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 193,
+      "utilityName": "FAMILY LOUNGE",
+      "directionCode": "NNW",
+      "attributeText": "Members will enjoy each other talk and feel pleased",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 194,
+      "utilityName": "TOILET",
+      "directionCode": "N",
+      "attributeText": "Cause career related issues, limited opportunity to make money and grow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 195,
+      "utilityName": "TOILET",
+      "directionCode": "NNE",
+      "attributeText": "Lead to poor immunity, person fall sick take longer time to recover.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 196,
+      "utilityName": "TOILET",
+      "directionCode": "NE",
+      "attributeText": "Cause major health problems like memory loss, paralysis and neurological problem.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 197,
+      "utilityName": "TOILET",
+      "directionCode": "ENE",
+      "attributeText": "Makes people feel lazy with sense of heaviness; most of the members suffer from constipation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 198,
+      "utilityName": "TOILET",
+      "directionCode": "E",
+      "attributeText": "Causes smaller social circle, society do not notice person, eventually unsocial.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 199,
+      "utilityName": "TOILET",
+      "directionCode": "ESE",
+      "attributeText": "Reduce anxiety and over analytical thoughts.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 200,
+      "utilityName": "TOILET",
+      "directionCode": "SE",
+      "attributeText": "Hamper inflow of money and restrict rise in life, hurdle in marriages.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 201,
+      "utilityName": "TOILET",
+      "directionCode": "SSE",
+      "attributeText": "Cause low confidence, low mood and strength at work.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 202,
+      "utilityName": "TOILET",
+      "directionCode": "S",
+      "attributeText": "Makes person desperate for name and fame, it also effect good will and brand value.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 203,
+      "utilityName": "TOILET",
+      "directionCode": "SSW",
+      "attributeText": "Best zone for toilet as it's a zone of disposal.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 204,
+      "utilityName": "TOILET",
+      "directionCode": "SW",
+      "attributeText": "Cause disturbed family relationships and instability in life.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 205,
+      "utilityName": "TOILET",
+      "directionCode": "WSW",
+      "attributeText": "Unable to save money, kids won't be able to secure good marks.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 206,
+      "utilityName": "TOILET",
+      "directionCode": "W",
+      "attributeText": "Disturb profits, limited results even after making sincere efforts.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 207,
+      "utilityName": "TOILET",
+      "directionCode": "WNW",
+      "attributeText": "Another good location will help in removing blocked emotions from mind.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 208,
+      "utilityName": "TOILET",
+      "directionCode": "NW",
+      "attributeText": "Reduces bank balance and make it different for person to receive support.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 209,
+      "utilityName": "TOILET",
+      "directionCode": "NNW",
+      "attributeText": "Lead to extra marital affairs and couple lose their attraction towards each other.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 210,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "N",
+      "attributeText": "North Digestion is poor in this zone as person will keep thinking about carrier even having meal .",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 211,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "NNE",
+      "attributeText": "Person becomes more careful about his health.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 212,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "NE",
+      "attributeText": "Intake of more liquid, ear considering religious prescription.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 213,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "ENE",
+      "attributeText": "Love to enjoy food presentation and ambiance of place they eating.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 214,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "E",
+      "attributeText": "Like to invite friends and try to be more socialize to eat with them.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 215,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "ESE",
+      "attributeText": "Often complain about food, its taste.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 216,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "SE",
+      "attributeText": "Improve digestion, will have meal on time but always in aggression.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 217,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "SSE",
+      "attributeText": "Zone of nutrition, food get digested easily and strengthen body and heal.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 218,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "S",
+      "attributeText": "South Advisable, as residents crave to have meal at home, enjoy food with peace of mind.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 219,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "SSW",
+      "attributeText": "Must not each food here as it will lead to over spending on outside food and health problem.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 220,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "SW",
+      "attributeText": "Must not have meals here, as it will lead to issues like table manners.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 221,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "WSW",
+      "attributeText": "Eating here will make you conscious about table manners.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 222,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "W",
+      "attributeText": "Lead to net gain, absorption of nutrient and good health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 223,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "WNW",
+      "attributeText": "People will complain about food and development of negative attitude.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 224,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "NW",
+      "attributeText": "People meet and have food here will get there support.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 225,
+      "utilityName": "DINING TABLE-HALL",
+      "directionCode": "NNW",
+      "attributeText": "People love their food and develop different taste buds.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 226,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "N",
+      "attributeText": "Ideal in this zone, create opportunities out of discussions .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 227,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "NNE",
+      "attributeText": "Will receive tips for better health from visitors in house .",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 228,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "NE",
+      "attributeText": "Lead to discussion and contacts related to religious matters.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 229,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "ENE",
+      "attributeText": "Very well entertained, Whistler will enjoy reception and company.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 230,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "E",
+      "attributeText": "Will develop understanding among people meeting here.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 231,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "ESE",
+      "attributeText": "Fruitless discussion, do not reach any conclusion.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 232,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "SE",
+      "attributeText": "Meetings will lead to positive results but far from peace.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 233,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "SSE",
+      "attributeText": "Meetings here will always be full of agreement and peaceful and graceful manner.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 234,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "S",
+      "attributeText": "Meetings here are more relaxed and calm.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 235,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "SSW",
+      "attributeText": "Must avoid as it leads to financial losses.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 236,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "SW",
+      "attributeText": "Discussion related to relationships, ancestors, stability and skill.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 237,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "WSW",
+      "attributeText": "More talking related to education of children in this zone.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 238,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "W",
+      "attributeText": "Discussions and meetings in the production and fruitful .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 239,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "WNW",
+      "attributeText": "Avoid as resident will only talk about their problems in life with visitors.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 240,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "NW",
+      "attributeText": "Meeting and negotiations here will result in committed support from visitors.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 241,
+      "utilityName": "DRAWING ROOM",
+      "directionCode": "NNW",
+      "attributeText": "Enjot to discuss tops of their choice and feel pleased out of discussion.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 242,
+      "utilityName": "BED ROOM",
+      "directionCode": "N",
+      "attributeText": "Good for carrier.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 243,
+      "utilityName": "BED ROOM",
+      "directionCode": "NNE",
+      "attributeText": "With caution that it may weak immunity and cause cough related issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 244,
+      "utilityName": "BED ROOM",
+      "directionCode": "NE",
+      "attributeText": "Strictly no, disturb mind and feeling of restless,",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 245,
+      "utilityName": "BED ROOM",
+      "directionCode": "ENE",
+      "attributeText": "Bring joy and inner happiness, best for old residents.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 246,
+      "utilityName": "BED ROOM",
+      "directionCode": "E",
+      "attributeText": "Best for celebrities,politicians and people who would like to be socialised.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 247,
+      "utilityName": "BED ROOM",
+      "directionCode": "ESE",
+      "attributeText": "Cause anxiety , cause disturbed relationship and hypertention.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 248,
+      "utilityName": "BED ROOM",
+      "directionCode": "SE",
+      "attributeText": "Become short tempered and crave for money all the time.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 249,
+      "utilityName": "BED ROOM",
+      "directionCode": "SSE",
+      "attributeText": "Sleeping here will strength mental and physical health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 250,
+      "utilityName": "BED ROOM",
+      "directionCode": "S",
+      "attributeText": "Ideal for someone looking forward for calm.relaxed and peaceful life.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 251,
+      "utilityName": "BED ROOM",
+      "directionCode": "SSW",
+      "attributeText": "Strictly no,will dispose immunity of body,face hurdles in overall growth.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 252,
+      "utilityName": "BED ROOM",
+      "directionCode": "SW",
+      "attributeText": "Advisable for new skill development and strong family bond .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 253,
+      "utilityName": "BED ROOM",
+      "directionCode": "WSW",
+      "attributeText": "Excellent for person willing to take risk in speculation business like shares.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 254,
+      "utilityName": "BED ROOM",
+      "directionCode": "W",
+      "attributeText": "Advisable as will provide overall gains in life .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 255,
+      "utilityName": "BED ROOM",
+      "directionCode": "WNW",
+      "attributeText": "Stricitly No, Lead to Depression.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 256,
+      "utilityName": "BED ROOM",
+      "directionCode": "NW",
+      "attributeText": "Good for negotiators and person looking forward for financial support in business",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 257,
+      "utilityName": "BED ROOM",
+      "directionCode": "NNW",
+      "attributeText": "Good for newly wedded couple, students up to 10-12 years should not sleep here regularly.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 258,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N1",
+      "attributeText": "Residents in house is affected by bed intention of other people.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 259,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N2",
+      "attributeText": "Residents feel like other people are jealous of them.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 260,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N3",
+      "attributeText": "Entrance bring lot of money.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 261,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N4",
+      "attributeText": "Gain from ancestors property and earn money.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 262,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N5",
+      "attributeText": "Religious, clam and non aggressive.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 263,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N6",
+      "attributeText": "Acceptable behavious in society and peopleusually avoid listening them.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 264,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N7",
+      "attributeText": "Girls in family go beyond family culture.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 265,
+      "utilityName": "ENTRANCE",
+      "directionCode": "N8",
+      "attributeText": "Gives high bank balance",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 266,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E1",
+      "attributeText": "Causes fire, accidents and unexpected loss",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 267,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E2",
+      "attributeText": "Wasteful expenditure and no of girls are more in family.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 268,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E3",
+      "attributeText": "Auspicious entrance bring money ,profit and success.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 269,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E4",
+      "attributeText": "Built connections and growth with powerful people in government depertment",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 270,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E5",
+      "attributeText": "Extreme short temperament.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 271,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E6",
+      "attributeText": "Non commitments and unreliability of residents.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 272,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E7",
+      "attributeText": "Insensitive towards problem and discomfort of other.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 273,
+      "utilityName": "ENTRANCE",
+      "directionCode": "E8",
+      "attributeText": "Results accidente ,burglary, financial losses.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 274,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S1",
+      "attributeText": "Effact negatively on boys in house, there action and thoughts go beyond parents expectation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 275,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S2",
+      "attributeText": "Increase tendency to work for others , good for people working in MNC and corporates.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 276,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S3",
+      "attributeText": "Brings immense prosperity, make you smart enough to get their work dance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 277,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S4",
+      "attributeText": "Industries are highly successful, family is blessed with more boys in house.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 278,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S5",
+      "attributeText": "People live with high debts and feel they are not making good use of there skills.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 279,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S6",
+      "attributeText": "Door brings poverty in house.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 280,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S7",
+      "attributeText": "Professional and relationship efforts going in waste, people feel disconnected from others.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 281,
+      "utilityName": "ENTRANCE",
+      "directionCode": "S8",
+      "attributeText": "Extreme rude and attitude behaviours which disconnect them from rest of the world leading to financial and relationship hardships.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 282,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W1",
+      "attributeText": "Negativity of entrance affects financial postion and life span.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 283,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W2",
+      "attributeText": "Instable carrier, feel insure in life , lack of clarity and vision.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 284,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W3",
+      "attributeText": "Amazing growth and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 285,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W4",
+      "attributeText": "Balanced and smooth life. Not to profits not too losses.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 286,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W5",
+      "attributeText": "Makes one perfectionst and overambitious which lead to problems in life.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 287,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W6",
+      "attributeText": "Mental depression.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 288,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W7",
+      "attributeText": "Drug, alcohol, loss of general happiness.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 289,
+      "utilityName": "ENTRANCE",
+      "directionCode": "W8",
+      "attributeText": "Unfair and unlawful means for their own benefits.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 290,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "N",
+      "attributeText": "Pure and pious direction; unsuitable for servant room to avoid energy imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 291,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "NNE",
+      "attributeText": "Close to NE purity; not recommended for servant accommodation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 292,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "NE",
+      "attributeText": "Sacred and spiritual zone; servant room here may cause theft, negative behavior, and imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 293,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "ENE",
+      "attributeText": "Near pure NE direction; generally avoided for servant rooms.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 294,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "E",
+      "attributeText": "Direction of purity and light; servant room may disrupt spiritual energy flow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 295,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "ESE",
+      "attributeText": "Avoid servant room for smooth owner-servant relations.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 296,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "SE",
+      "attributeText": "Fire element zone; servant may be respectful. Floor level lower than main house; avoid heavy dominance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 297,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "SSE",
+      "attributeText": "Near SE, maintains good servant-owner dynamics.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 298,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "S",
+      "attributeText": "Strong direction; may empower servant excessively.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 299,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "SSE",
+      "attributeText": "Close to SW; can cause servant dominance and conflict.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 300,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "SW",
+      "attributeText": "Earth element; ideal for master bedroom. Servant room here leads to servant dominance and trouble.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 301,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "WSW",
+      "attributeText": "Near SW but less power; cautiously used for servant room.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 302,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "W",
+      "attributeText": "Neutral balanced direction; considered stable and supports harmony.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 303,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "WNW",
+      "attributeText": "Supports positive energy, but servant turnover may increase.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 304,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "NW",
+      "attributeText": "Most favorable for servant room; maintains peace and proper hierarchy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 305,
+      "utilityName": "SERVANT ROOM",
+      "directionCode": "NNW",
+      "attributeText": "Near NW; positive but less ideal than exact NW",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 306,
+      "utilityName": "BAR",
+      "directionCode": "N",
+      "attributeText": "Causes financial instability and disturbed mindset; avoid placing bar here.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 307,
+      "utilityName": "BAR",
+      "directionCode": "NNE",
+      "attributeText": "Near spiritual zone; may cause health and clarity issues, leading to overindulgence.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 308,
+      "utilityName": "BAR",
+      "directionCode": "NE",
+      "attributeText": "Sacred direction; bar here risks health problems and spiritual conflicts.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 309,
+      "utilityName": "BAR",
+      "directionCode": "ENE",
+      "attributeText": "Close to NE purity; bar disturbs peace and creates negative energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 310,
+      "utilityName": "BAR",
+      "directionCode": "E",
+      "attributeText": "Sunshine and positive vibes; bar here may reduce family harmony if not managed carefully.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 311,
+      "utilityName": "BAR",
+      "directionCode": "ESE",
+      "attributeText": "Not preferred but acceptable if no better options; moderate use advised.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 312,
+      "utilityName": "BAR",
+      "directionCode": "SE",
+      "attributeText": "Fire element zone; best for bar setup, fosters enjoyment and socialization with moderation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 313,
+      "utilityName": "BAR",
+      "directionCode": "SSE",
+      "attributeText": "Near SE, supportive for bar placement, especially for occasional use.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 314,
+      "utilityName": "BAR",
+      "directionCode": "S",
+      "attributeText": "Permissible location; not as energizing as SE; avoid excesses.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 315,
+      "utilityName": "BAR",
+      "directionCode": "SSE",
+      "attributeText": "Promotes addiction risks and domestic arguments; avoid placement here.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 316,
+      "utilityName": "BAR",
+      "directionCode": "SW",
+      "attributeText": "Stability zone; bar weakens relationships and creates financial issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 317,
+      "utilityName": "BAR",
+      "directionCode": "WSW",
+      "attributeText": "Use cautiously when other areas are unavailable; moderate impact.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 318,
+      "utilityName": "BAR",
+      "directionCode": "W",
+      "attributeText": "Favorable for social and relaxing ambiance; good choice for bar.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 319,
+      "utilityName": "BAR",
+      "directionCode": "WNW",
+      "attributeText": "Supports leisure, social gatherings; positive energy when properly managed.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 320,
+      "utilityName": "BAR",
+      "directionCode": "NW",
+      "attributeText": "Suitable for bar, promotes moderation and good social energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 321,
+      "utilityName": "BAR",
+      "directionCode": "NNW",
+      "attributeText": "Acceptable near NW but less ideal than SE or W; moderation needed.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 322,
+      "utilityName": "BOREWELL",
+      "directionCode": "N",
+      "attributeText": "Ideal for borewell; supports water element, prosperity, and health by ensuring pure and ample water supply.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 323,
+      "utilityName": "BOREWELL",
+      "directionCode": "NNE",
+      "attributeText": "Favorable for borewell; close to sacred zone but supports positive water energy and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 324,
+      "utilityName": "BOREWELL",
+      "directionCode": "NE",
+      "attributeText": "Sacred and spiritual direction; placing borewell here can disturb energy balance and reduce spiritual harmony.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 325,
+      "utilityName": "BOREWELL",
+      "directionCode": "ENE",
+      "attributeText": "Acceptable with caution; ensure the borewell does not disturb the purity of this direction.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 326,
+      "utilityName": "BOREWELL",
+      "directionCode": "E",
+      "attributeText": "Good for borewell; water and sunlight promote positive health and energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 327,
+      "utilityName": "BOREWELL",
+      "directionCode": "ESE",
+      "attributeText": "Moderately suitable; avoid close proximity to fire element zones that can cause energy conflicts.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 328,
+      "utilityName": "BOREWELL",
+      "directionCode": "SE",
+      "attributeText": "Fire zone; borewell here causes energy imbalance and negatively affects health and finances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 329,
+      "utilityName": "BOREWELL",
+      "directionCode": "SSE",
+      "attributeText": "Similar to SE; unsuitable location for borewell due to conflicting energies.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 330,
+      "utilityName": "BOREWELL",
+      "directionCode": "S",
+      "attributeText": "Acceptable but less ideal; avoid close proximity to main entrances or fire areas.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 331,
+      "utilityName": "BOREWELL",
+      "directionCode": "SSE",
+      "attributeText": "Earth element zone; can block positive energy flow if borewell placed here, causing stagnation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 332,
+      "utilityName": "BOREWELL",
+      "directionCode": "SW",
+      "attributeText": "Strong earth zone; borewell placement here disrupts household stability and prosperity.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 333,
+      "utilityName": "BOREWELL",
+      "directionCode": "WSW",
+      "attributeText": "Avoid placing borewell here; may cause financial and social disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 334,
+      "utilityName": "BOREWELL",
+      "directionCode": "W",
+      "attributeText": "Good placement for borewell; supports stable water flow and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 335,
+      "utilityName": "BOREWELL",
+      "directionCode": "WNW",
+      "attributeText": "Acceptable; ensure borewell does not obstruct energy flow or entrances.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 336,
+      "utilityName": "BOREWELL",
+      "directionCode": "NW",
+      "attributeText": "Favorable location; supports water availability and positive social energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 337,
+      "utilityName": "BOREWELL",
+      "directionCode": "NNW",
+      "attributeText": "Ideal for borewell; maintains energy balance and supports household welfare.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 338,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "N",
+      "attributeText": "Ideal for rainwater harvesting pit; supports water retention, prosperity, and positive energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 339,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "NNE",
+      "attributeText": "Favorable location; enhances water conservation while maintaining spiritual harmony.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 340,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "NE",
+      "attributeText": "Acceptable with care; avoid heavy excavation that may disturb this sacred zone.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 341,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "ENE",
+      "attributeText": "Suitable for rainwater harvesting; aligns well with water and air elements for enhancing abundance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 342,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "E",
+      "attributeText": "Good for collecting rainwater; promotes freshness and positive energy in surroundings.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 343,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "ESE",
+      "attributeText": "Moderately suitable; monitor interactions with fire element zones nearby.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 344,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "SE",
+      "attributeText": "Fire element zone; rainwater pit here can create energetic imbalance and reduce effectiveness.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 345,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "SSE",
+      "attributeText": "Same as SE; avoid due to conflicting energies.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 346,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "S",
+      "attributeText": "Acceptable but less ideal; ensure proper soil and drainage management.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 347,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "SSW",
+      "attributeText": "Earth zone; large pit disrupts stability and may cause stagnant energies, leading to problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 348,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "SW",
+      "attributeText": "Avoid placing rainwater pit here; can cause disturbance to household stability and finances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 349,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "WSW",
+      "attributeText": "Unsuitable zone; negatively affects overall water management and energy flow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 350,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "W",
+      "attributeText": "Good location for rainwater harvesting; supports proper water flow and retention.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 351,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "WNW",
+      "attributeText": "Favorable; enhances water conservation and good energy circulation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 352,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "NW",
+      "attributeText": "Best for rainwater pit; supports positive energy, water retention, and environmental balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 353,
+      "utilityName": "RAINWATER HARVESTING PIT",
+      "directionCode": "NNW",
+      "attributeText": "Suitable for pit; sustains water abundance and energy harmony.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 354,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "N",
+      "attributeText": "Avoid placing septic tank in the pure North direction as it can lead to health issues, especially for children.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 355,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "NNE",
+      "attributeText": "Sacred zone; septic tank placement here disturbs mental peace and spiritual energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 356,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; leads to major Vastu Dosh, financial loss, and health problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 357,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "ENE",
+      "attributeText": "Acceptable but with caution; keep distance from sacred NE corner.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 358,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "E",
+      "attributeText": "Suitable location; supports proper waste management and positive energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 359,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "ESE",
+      "attributeText": "Fire zone; septic tank here can cause major energy imbalance and family health issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 360,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "SE",
+      "attributeText": "To be avoided; disrupts financial stability and health due to conflicting fire and waste energies.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 361,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "SSE",
+      "attributeText": "Same as SE; causes negative impacts on prosperity and wellbeing.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 362,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "S",
+      "attributeText": "Not recommended; leads to loss of mental peace and financial problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 363,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "SSW",
+      "attributeText": "Heavy earth zone; septic tank placement may cause serious health and relationship issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 364,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "SW",
+      "attributeText": "Strongly avoid; affects household stability and generates negative energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 365,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "WSW",
+      "attributeText": "Unsuitable; detrimental to financial health and harmony in the home.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 366,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "W",
+      "attributeText": "Suitable; recommended for septic tank placement, supports waste disposal and energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 367,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "WNW",
+      "attributeText": "Favorable; aligns with natural energy flows, keeping the environment healthy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 368,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "NW",
+      "attributeText": "Most recommended direction; ensures smooth energy flow and containment of negative energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 369,
+      "utilityName": "SEPTIC TANK",
+      "directionCode": "NNW",
+      "attributeText": "Suitable position, beneficial for household health and environment.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 370,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "N",
+      "attributeText": "Avoid placing overhead water tanks in North; considered heavy energy burden and leads to financial losses.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 371,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "NNE",
+      "attributeText": "Sacred and pure zone; overhead tanks here disturb energy and cause health issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 372,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid due to purity and positive energy concerns; causes negative impact on prosperity and health.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 373,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "ENE",
+      "attributeText": "Close to NE; overhead tank placement can disrupt spiritual energy and bring imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 374,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "E",
+      "attributeText": "Less ideal but permissible; water element here may cause mild energy disturbances if badly placed.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 375,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "ESE",
+      "attributeText": "Fire element zone; overhead water tanks cause conflict and should be avoided.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 376,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "SE",
+      "attributeText": "Generally avoided; opposing fire and water energies create negative effects.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 377,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "SSE",
+      "attributeText": "Moderately permissible; tank placement here needs balancing but not optimal.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 378,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "S",
+      "attributeText": "Second-best position; supports positive energy and stability, keeps water cool, enhances vitality.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 379,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "SSW",
+      "attributeText": "Acceptable but less ideal; must be carefully aligned to avoid negative energy.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 380,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "SW",
+      "attributeText": "Considered the best position for overhead water tanks; earth element supports stability and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 381,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "WSW",
+      "attributeText": "Moderately suitable; needs proper support and maintenance to avoid imbalance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 382,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "W",
+      "attributeText": "Good direction for water tanks; promotes communication, harmony, and balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 383,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "WNW",
+      "attributeText": "Acceptable; ensure structure supports tank weight and energy flow.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 384,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "NW",
+      "attributeText": "Generally avoided due to unbalanced energy load concerns.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 385,
+      "utilityName": "OVERHEAD WATER TANK",
+      "directionCode": "NNW",
+      "attributeText": "Close to North; carries same risks as North zone, causes instability.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 386,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "N",
+      "attributeText": "Avoid placing water motor in North; poor energy and may cause malfunction or financial issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 387,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "NNE",
+      "attributeText": "Disturbs spiritual energy; leads to instability in water flow and household energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 388,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; sacred zone where motor placement can cause energy imbalance and health problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 389,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "ENE",
+      "attributeText": "Acceptable with care; ensure vibration and noise are minimized to avoid disturbance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 390,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "E",
+      "attributeText": "Favorable location; supports smooth operation and positive energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 391,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "ESE",
+      "attributeText": "Close to fire zone; motor here may cause energy conflicts and mechanical issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 392,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "SE",
+      "attributeText": "Fire element zone; avoid motor placement due to conflict with electrical equipment and potential hazards.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 393,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "SSE",
+      "attributeText": "Moderately acceptable; proper insulation and maintenance needed.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 394,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "S",
+      "attributeText": "Good location; stable energy and efficient motor operation supported.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 395,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "SSW",
+      "attributeText": "Acceptable; must be well-supported structurally and electrically.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 396,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "SW",
+      "attributeText": "Avoid placing motor here; heavy earth energy conflicts with motor operation causing disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 397,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "WSW",
+      "attributeText": "Acceptable with good installation and vibration control.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 398,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "W",
+      "attributeText": "Suitable direction; promotes positive energy and smooth motor running.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 399,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "WNW",
+      "attributeText": "Favorable for motor placement; aligned with air element energy supporting efficient working.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 400,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "NW",
+      "attributeText": "Generally avoided due to energy imbalance and possible technical issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 401,
+      "utilityName": "WATER MOTOR FOR O/H TANK",
+      "directionCode": "NNW",
+      "attributeText": "Similar to NW; causes disturbances and malfunction risks.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 402,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "N",
+      "attributeText": "Avoid placing main electric panel in North; can cause health issues, mental disturbance, and financial loss.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 403,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "NNE",
+      "attributeText": "Sacred zone; placement here may disturb spiritual energies and household harmony.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 404,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; can cause health issues, financial troubles, and spiritual imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 405,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "ENE",
+      "attributeText": "Acceptable but not optimal; ensure proper grounding and safety measures.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 406,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "E",
+      "attributeText": "Suitable for main electric panel; supports positive energy and safety, promotes well-being.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 407,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "ESE",
+      "attributeText": "Fire zone; placing panel here may lead to electrical hazards and energy conflicts.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 408,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "SE",
+      "attributeText": "Near fire element; not recommended due to risk of electrical mishaps.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 409,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "SSE",
+      "attributeText": "Moderately acceptable; maintain proper safety and ventilation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 410,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "S",
+      "attributeText": "Suitable; supports household stability and safety.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 411,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "SSW",
+      "attributeText": "Acceptable if installed with proper insulation and safety precautions.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 412,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "SW",
+      "attributeText": "Heavy earth zone; not advisable; can lead to electrical hazards, interruptions, and instability.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 413,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "WSW",
+      "attributeText": "Generally avoided; risk of electrical faults and disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 414,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "W",
+      "attributeText": "Recommended location; supports household harmony and safety.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 415,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "WNW",
+      "attributeText": "Suitable; supports stability, safety, and organized energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 416,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "NW",
+      "attributeText": "Acceptable with proper safety measures; ensure proper grounding.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 417,
+      "utilityName": "MAIN ELECTRIC PANEL",
+      "directionCode": "NNW",
+      "attributeText": "Favorable; supports safety, structural stability, and positive household energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 418,
+      "utilityName": "GENERATOR",
+      "directionCode": "N",
+      "attributeText": "Avoid placing generator in North; may cause financial loss, health issues, and disturbance in mental peace.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 419,
+      "utilityName": "GENERATOR",
+      "directionCode": "NNE",
+      "attributeText": "Sacred zone; generator placement disrupts spiritual energy and household harmony.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 420,
+      "utilityName": "GENERATOR",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; disturbs the pure energy, causing health and financial problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 421,
+      "utilityName": "GENERATOR",
+      "directionCode": "ENE",
+      "attributeText": "Acceptable with precautions; keep noise and vibrations under control.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 422,
+      "utilityName": "GENERATOR",
+      "directionCode": "E",
+      "attributeText": "Suitable location; supports efficient functioning and energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 423,
+      "utilityName": "GENERATOR",
+      "directionCode": "ESE",
+      "attributeText": "Fire zone; generator may cause energetic conflict and safety hazards.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 424,
+      "utilityName": "GENERATOR",
+      "directionCode": "SE",
+      "attributeText": "To be avoided; noise and vibration increase negativity in fire zone.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 425,
+      "utilityName": "GENERATOR",
+      "directionCode": "SSE",
+      "attributeText": "Moderately acceptable; noise control and isolation recommended.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 426,
+      "utilityName": "GENERATOR",
+      "directionCode": "S",
+      "attributeText": "Good placement; stable energy supports functional efficiency and longevity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 427,
+      "utilityName": "GENERATOR",
+      "directionCode": "SSW",
+      "attributeText": "Acceptable with structural support and noise isolation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 428,
+      "utilityName": "GENERATOR",
+      "directionCode": "SW",
+      "attributeText": "Avoid; heavy earth energy clashes with generator vibrations causing disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 429,
+      "utilityName": "GENERATOR",
+      "directionCode": "WSW",
+      "attributeText": "Moderately suitable; noise damping and proper grounding required.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 430,
+      "utilityName": "GENERATOR",
+      "directionCode": "W",
+      "attributeText": "Favorable; smooth operation and balance between energy and functionality.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 431,
+      "utilityName": "GENERATOR",
+      "directionCode": "WNW",
+      "attributeText": "Suitable direction; supports circulation of positive energy and reduces vibration impact.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 432,
+      "utilityName": "GENERATOR",
+      "directionCode": "NW",
+      "attributeText": "Generally avoided due to potential energy imbalance and mechanical issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 433,
+      "utilityName": "GENERATOR",
+      "directionCode": "NNW",
+      "attributeText": "Similar to NW; can cause disturbances and reduce equipment efficiency.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 434,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "N",
+      "attributeText": "Favorable direction; aligns with energy flow and support for electrical efficiency and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 435,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "NNE",
+      "attributeText": "Acceptable; keep meter protected and ensure it does not hinder NE’s spiritual purity.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 436,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "NE",
+      "attributeText": "Avoid placing meter here to maintain this sacred zone’s positive energy and spiritual sanctity.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 437,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "ENE",
+      "attributeText": "Moderately suitable; proper installation needed to avoid energy flow disruption.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 438,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "E",
+      "attributeText": "Good location; supports energy generation and efficient power usage.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 439,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "ESE",
+      "attributeText": "Acceptable; ensure meter is well shielded and maintained away from fire sources.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 440,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "SE",
+      "attributeText": "Fire element zone; avoid as it can cause conflict between electrical and fire energies.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 441,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "SSE",
+      "attributeText": "Moderately permissible; maintain safety and shielding for the meter.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 442,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "S",
+      "attributeText": "Suitable; supports strong energy flow and meter efficiency.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 443,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "SSW",
+      "attributeText": "Acceptable with proper installation and shielding.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 444,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "SW",
+      "attributeText": "Avoid placement; interferes with stability energies and may cause disruptions.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 445,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "WSW",
+      "attributeText": "Moderately suitable; good maintenance required for optimal function.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 446,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "W",
+      "attributeText": "Favorable; supports stable power measurement and energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 447,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "WNW",
+      "attributeText": "Good direction; aligns with proper energy flow and equipment longevity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 448,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "NW",
+      "attributeText": "Acceptable; ensure meter is protected from weather and vibration.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 449,
+      "utilityName": "SOLAR PANEL METER",
+      "directionCode": "NNW",
+      "attributeText": "Suitable and supportive for energy monitoring and positive energy circulation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 450,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "N",
+      "attributeText": "Acceptable with care; ensure no obstruction to solar exposure and proper installation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 451,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "NNE",
+      "attributeText": "Moderately suitable; keep area clean and free of shade for optimal efficiency.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 452,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "NE",
+      "attributeText": "Avoid; sacred zone where installations can disrupt positive spiritual energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 453,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "ENE",
+      "attributeText": "Good location; receives ample sunlight and supports energy generation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 454,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "E",
+      "attributeText": "Excellent for solar water generators; maximizes morning sunlight exposure.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 455,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "ESE",
+      "attributeText": "Favourable zone with strong solar energy; supports efficient functioning.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 456,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "SE",
+      "attributeText": "Considered the best direction; associated with fire element, aligns with solar energy and produces maximum yield.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 457,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "SSE",
+      "attributeText": "Supportive of solar equipment; ensures good sunlight capture and energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 458,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "S",
+      "attributeText": "Suitable; excellent solar energy harnessing and positive energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 459,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "SSW",
+      "attributeText": "Acceptable with care to avoid shading and proper alignment.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 460,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "SW",
+      "attributeText": "Avoid; heavy earth energy stands in conflict with solar fire energy and can cause energy blockage.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 461,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "WSW",
+      "attributeText": "Moderately suitable; proper structural support and shading avoidance needed.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 462,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "W",
+      "attributeText": "Good for solar water system; captures evening sun and balances energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 463,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "WNW",
+      "attributeText": "Acceptable with good maintenance and positioning to avoid obstructions.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 464,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "NW",
+      "attributeText": "Avoid; energy conflicts and less effective solar exposure.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 465,
+      "utilityName": "SOLAR WATER GENERATOR",
+      "directionCode": "NNW",
+      "attributeText": "Generally discouraged due to poor solar effectiveness and energy imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 466,
+      "utilityName": "GYM",
+      "directionCode": "N",
+      "attributeText": "Energizing direction; supports physical vitality and positive energy flow for workouts.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 467,
+      "utilityName": "GYM",
+      "directionCode": "NNE",
+      "attributeText": "Moderately suitable; requires good ventilation and clutter-free environment for best results.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 468,
+      "utilityName": "GYM",
+      "directionCode": "NE",
+      "attributeText": "Avoid placing gym here; spiritual zone where high physical energy may disturb peace and sanctity.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 469,
+      "utilityName": "GYM",
+      "directionCode": "ENE",
+      "attributeText": "Supportive; aligns with fresh air flow and sunlight beneficial for workouts.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 470,
+      "utilityName": "GYM",
+      "directionCode": "E",
+      "attributeText": "Favorable for gym; encourages enthusiasm and physical health with morning sunlight.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 471,
+      "utilityName": "GYM",
+      "directionCode": "ESE",
+      "attributeText": "Positive direction for gym; balances energy and fire elements, supporting strength and stamina.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 472,
+      "utilityName": "GYM",
+      "directionCode": "SE",
+      "attributeText": "Best suited for gym as it is fire element zone, boosting energy and endurance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 473,
+      "utilityName": "GYM",
+      "directionCode": "SSE",
+      "attributeText": "Supports physical activities with stable energy, good for gym use.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 474,
+      "utilityName": "GYM",
+      "directionCode": "S",
+      "attributeText": "Acceptable placement; may require balancing with ventilation for positive airflow.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 475,
+      "utilityName": "GYM",
+      "directionCode": "SSW",
+      "attributeText": "Avoid gym here; heavy earth energy may cause lethargy and reduce motivation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 476,
+      "utilityName": "GYM",
+      "directionCode": "SW",
+      "attributeText": "Unsuitable for gym; may cause resistance, fatigue, and poor health outcomes.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 477,
+      "utilityName": "GYM",
+      "directionCode": "WSW",
+      "attributeText": "Avoid placement; energy here is heavy and stabilizing, not suitable for active use.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 478,
+      "utilityName": "GYM",
+      "directionCode": "W",
+      "attributeText": "Good location; supports physical activity and regulates energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 479,
+      "utilityName": "GYM",
+      "directionCode": "WNW",
+      "attributeText": "Fairly acceptable; ensure good light and ventilation to maintain workout energy.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 480,
+      "utilityName": "GYM",
+      "directionCode": "NW",
+      "attributeText": "Supportive direction; promotes movement and dynamism beneficial for gym activities.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 481,
+      "utilityName": "GYM",
+      "directionCode": "NNW",
+      "attributeText": "Acceptable with proper setup; noise and energy flow management recommended.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 482,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "N",
+      "attributeText": "Acceptable with noise control; avoid blocking energy flow or creating disturbance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 483,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "NNE",
+      "attributeText": "Avoid; sacred direction sensitive to disturbances and noise.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 484,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; disturbs positive and spiritual energy flow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 485,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "ENE",
+      "attributeText": "Moderately suitable; ensure unit is well-ventilated and isolated to reduce vibration.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 486,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "E",
+      "attributeText": "Favorable placement; supports good airflow and energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 487,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "ESE",
+      "attributeText": "Acceptable if noise and vibration are managed well.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 488,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "SE",
+      "attributeText": "Fire zone; avoid due to conflicting fire and cooling energy causing disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 489,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "SSE",
+      "attributeText": "Acceptable with proper insulation and ventilation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 490,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "S",
+      "attributeText": "Suitable for outdoor unit; supports stable airflow and energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 491,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "SSW",
+      "attributeText": "Avoid placement; heavy earth energy conflicts with air circulation and vibration.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 492,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "SW",
+      "attributeText": "Not recommended; causes energy stagnation and physical disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 493,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "WSW",
+      "attributeText": "Acceptable with soundproofing and proper airflow.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 494,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "W",
+      "attributeText": "Good location; supports airflow, cooling efficiency, and energy balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 495,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "WNW",
+      "attributeText": "Suitable for ease of access and proper ventilation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 496,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "NW",
+      "attributeText": "Avoid in NW due to noise disturbance and clashes with air energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 497,
+      "utilityName": "A/C OUTDOOR UNIT",
+      "directionCode": "NNW",
+      "attributeText": "Similar to NW; can lead to energy imbalance and noise issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 498,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "N",
+      "attributeText": "Highly auspicious direction; enhances wealth, positivity, and good energy flow with water element.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 499,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "NNE",
+      "attributeText": "Favorable; supports spiritual energy and financial growth.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 500,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "NE",
+      "attributeText": "Acceptable with caution; avoid heavy and large aquariums; small ones are okay for positive energy.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 501,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "ENE",
+      "attributeText": "Supports health and prosperity; good sunlight and air energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 502,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "E",
+      "attributeText": "Suitable; enhances vitality and positive vibrations in the house.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 503,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "ESE",
+      "attributeText": "Moderately acceptable; small aquarium recommended to balance water and fire elements.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 504,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "SE",
+      "attributeText": "Fire zone; large aquarium causes conflict with fire energy, leading to imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 505,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "SSE",
+      "attributeText": "Not recommended; can disturb household harmony and create tension.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 506,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "S",
+      "attributeText": "Acceptable if small; avoid large aquariums to prevent energy clashes.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 507,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "SSW",
+      "attributeText": "Avoid; heavy earth energy clashes with water energy of aquarium.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 508,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "SW",
+      "attributeText": "Unsuitable; disrupts stability and invites negative energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 509,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "WSW",
+      "attributeText": "Not recommended; leads to financial and health problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 510,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "W",
+      "attributeText": "Good direction; supports balance and calm energy with water feature.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 511,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "WNW",
+      "attributeText": "Suitable; beneficial for social harmony and energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 512,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "NW",
+      "attributeText": "Acceptable with care; small aquariums preferred to avoid energy disturbance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 513,
+      "utilityName": "FISH AQUARIUM",
+      "directionCode": "NNW",
+      "attributeText": "Favorable; promotes prosperity and healthy energy circulation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 514,
+      "utilityName": "DOG ROOM",
+      "directionCode": "N",
+      "attributeText": "Acceptable with good ventilation and cleanliness; maintain hygiene to ensure positive energy flow.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 515,
+      "utilityName": "DOG ROOM",
+      "directionCode": "NNE",
+      "attributeText": "Avoid; sacred and pure zone, not suitable for pets which may bring disturbance to spiritual energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 516,
+      "utilityName": "DOG ROOM",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid placement here; disrupts spiritual harmony and invites negative energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 517,
+      "utilityName": "DOG ROOM",
+      "directionCode": "ENE",
+      "attributeText": "Moderately suitable; ensure area is well-maintained and separated from living spaces.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 518,
+      "utilityName": "DOG ROOM",
+      "directionCode": "E",
+      "attributeText": "Suitable direction; promotes positive energy and smooth interaction in household.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 519,
+      "utilityName": "DOG ROOM",
+      "directionCode": "ESE",
+      "attributeText": "Acceptable with proper floor drainage and cleanliness practices.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 520,
+      "utilityName": "DOG ROOM",
+      "directionCode": "SE",
+      "attributeText": "Fire zone; not recommended for dog room to avoid energy conflicts and health dangers.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 521,
+      "utilityName": "DOG ROOM",
+      "directionCode": "SSE",
+      "attributeText": "Avoid placement; heavy fire energy zone, unsuitable for pets.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 522,
+      "utilityName": "DOG ROOM",
+      "directionCode": "S",
+      "attributeText": "Acceptable; requires careful maintenance to prevent energy stagnation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 523,
+      "utilityName": "DOG ROOM",
+      "directionCode": "SSW",
+      "attributeText": "Avoid; heavy earth energy conflicts with nature of pets and creates negative influences.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 524,
+      "utilityName": "DOG ROOM",
+      "directionCode": "SW",
+      "attributeText": "Unsuitable location, causes disturbance in household stability and health.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 525,
+      "utilityName": "DOG ROOM",
+      "directionCode": "WSW",
+      "attributeText": "Not recommended; may invite financial or health issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 526,
+      "utilityName": "DOG ROOM",
+      "directionCode": "W",
+      "attributeText": "Good direction; supports positive energy and healthy pet environment.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 527,
+      "utilityName": "DOG ROOM",
+      "directionCode": "WNW",
+      "attributeText": "Favorable for dog room; promotes proper energy flow and social harmony.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 528,
+      "utilityName": "DOG ROOM",
+      "directionCode": "NW",
+      "attributeText": "Acceptable; keep area clean and well-ventilated.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 529,
+      "utilityName": "DOG ROOM",
+      "directionCode": "NNW",
+      "attributeText": "Moderately suitable; requires noise control and hygiene management.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 530,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "N",
+      "attributeText": "Acceptable with proper ventilation; avoid blocking energy pathways or main entrances.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 531,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "NNE",
+      "attributeText": "Avoid; sacred and pure zone, not suitable for garage activity, which may disturb spiritual energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 532,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; garage here disrupts positive energies and can cause financial and health issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 533,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "ENE",
+      "attributeText": "Moderately suitable; ensure proper ventilation and separation from living spaces.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 534,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "E",
+      "attributeText": "Favorable; supports active energy, good ventilation, and movement.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 535,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "ESE",
+      "attributeText": "Acceptable with safety measures; ensure clear pathways and proper lighting.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 536,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "SE",
+      "attributeText": "Fire zone; avoid due to energy conflicts and fire hazard risks.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 537,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "SSE",
+      "attributeText": "Not recommended; causes energy imbalance, and can invite financial and health problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 538,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "S",
+      "attributeText": "Suitable; supports household stability and facilitates movement.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 539,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "SSW",
+      "attributeText": "Heavy earth energy; causes stagnation, financial loss, and household disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 540,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "SW",
+      "attributeText": "Not suitable; hampers stability, invites negative energies and financial issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 541,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "WSW",
+      "attributeText": "Moderately acceptable; ensure ventilation and avoid clutter.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 542,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "W",
+      "attributeText": "Good location; promotes organized movement, energy, and easy access.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 543,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "WNW",
+      "attributeText": "Suitable; supports flow of energy and household harmony.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 544,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "NW",
+      "attributeText": "Acceptable; ensure proper lighting and ventilation, avoid clutter.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 545,
+      "utilityName": "CAR GARAGE",
+      "directionCode": "NNW",
+      "attributeText": "Favorable; supports household stability and energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 546,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "N",
+      "attributeText": "Highly auspicious; enhances career growth, clarity, success, and supports consistent focus.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 547,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "NNE",
+      "attributeText": "Favorable for learning, research, and creative work; supports clarity and intuition.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 548,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "NE",
+      "attributeText": "Suitable for concentration, spiritual and mindful work; positive for writers and meditators.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 549,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "ENE",
+      "attributeText": "Good for new beginnings and creative energy; promotes enthusiasm and innovation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 550,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "E",
+      "attributeText": "Encourages productivity, energy, and mental clarity—excellent for home office setup.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 551,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "ESE",
+      "attributeText": "Supports focused work, efficient task completion, and positive communication.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 552,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "SE",
+      "attributeText": "Permissible; good for energy and activity but may lead to restlessness if used excessively for office work.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 553,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "SSE",
+      "attributeText": "Moderately suitable; can use for meetings and short work periods, but not for deep focus.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 554,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "S",
+      "attributeText": "Acceptable; good for authoritative roles and leadership work.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 555,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "SSW",
+      "attributeText": "Avoid; may stagnate career growth and cause confusion or inefficiency.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 556,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "SW",
+      "attributeText": "Not recommended; associated with heavy earth energy, brings inertia and lack of progress.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 557,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "WSW",
+      "attributeText": "Permissible with good organization.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 558,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "W",
+      "attributeText": "Suitable, especially for financial, legal, or management work; helps with discipline and stability.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 559,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "WNW",
+      "attributeText": "Acceptable; supports communication and dynamic tasks but avoid clutter.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 560,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "NW",
+      "attributeText": "Fosters creativity, networking, and sales-related work; aids active communication.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 561,
+      "utilityName": "HOME OFFICE",
+      "directionCode": "NNW",
+      "attributeText": "Favorable for activities requiring mental agility and teamwork; moderate for routine office work.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 562,
+      "utilityName": "PANTRY",
+      "directionCode": "N",
+      "attributeText": "Acceptable; pantry should be neat and organized to promote positive energy but not ideal for main pantry.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 563,
+      "utilityName": "PANTRY",
+      "directionCode": "NNE",
+      "attributeText": "Avoid; sacred zone, pantry activities may disturb spiritual and mental peace of the house.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 564,
+      "utilityName": "PANTRY",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; pantry here can block positive energy and cause financial instability.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 565,
+      "utilityName": "PANTRY",
+      "directionCode": "ENE",
+      "attributeText": "Moderately suitable; pantry here requires strict organization and cleanliness.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 566,
+      "utilityName": "PANTRY",
+      "directionCode": "E",
+      "attributeText": "Suitable location; promotes freshness, good energy flow, and health benefits for stored food items.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 567,
+      "utilityName": "PANTRY",
+      "directionCode": "ESE",
+      "attributeText": "Excellent placement; associated with fire element, ideal for food storage and pantry activities.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 568,
+      "utilityName": "PANTRY",
+      "directionCode": "SE",
+      "attributeText": "Good direction for pantry; enhances energy and maintains food vitality.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 569,
+      "utilityName": "PANTRY",
+      "directionCode": "SSE",
+      "attributeText": "Acceptable; proper hygiene and ventilation needed.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 570,
+      "utilityName": "PANTRY",
+      "directionCode": "S",
+      "attributeText": "Moderately acceptable provided good ventilation and cleanliness are maintained.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 571,
+      "utilityName": "PANTRY",
+      "directionCode": "SSW",
+      "attributeText": "Avoid pantry here; heavy earth energy may spoil stored food and invite energy stagnation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 572,
+      "utilityName": "PANTRY",
+      "directionCode": "SW",
+      "attributeText": "Not recommended; may cause spoilage, financial loss, and kitchen energy imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 573,
+      "utilityName": "PANTRY",
+      "directionCode": "WSW",
+      "attributeText": "Avoid placement; negative impact on stored food and household harmony.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 574,
+      "utilityName": "PANTRY",
+      "directionCode": "W",
+      "attributeText": "Suitable as pantry; supportive of food storage, enhances stability and positive energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 575,
+      "utilityName": "PANTRY",
+      "directionCode": "WNW",
+      "attributeText": "Good location; promotes organization, cleanliness, and easy access for pantry use.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 576,
+      "utilityName": "PANTRY",
+      "directionCode": "NW",
+      "attributeText": "Acceptable with care; ensure area is clean, dry, and well-organized.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 577,
+      "utilityName": "PANTRY",
+      "directionCode": "NNW",
+      "attributeText": "Moderately suitable with proper storage and cleanliness measures.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 578,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "N",
+      "attributeText": "Not advisable; gas cylinders here may cause energy imbalance and safety risks.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 579,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "NNE",
+      "attributeText": "Avoid placement; sacred zone requiring purity and safety.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 580,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "NE",
+      "attributeText": "Strongly avoid; sacred zone, risks of energy disturbance and accidents are high.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 581,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "ENE",
+      "attributeText": "Acceptable with safety precautions and proper ventilation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 582,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "E",
+      "attributeText": "Moderately suitable; ensure cylinder is kept away from direct heat sources and is well ventilated.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 583,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "ESE",
+      "attributeText": "Fire zone; placing gas cylinder here increases fire hazard risks.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 584,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "SE",
+      "attributeText": "Ideal location; aligns with fire element and safety protocols, preferred for kitchen gas cylinders.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 585,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "SSE",
+      "attributeText": "Acceptable with proper precautions, good ventilation, and away from flames.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 586,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "S",
+      "attributeText": "Moderately acceptable; ensure safety and distance from cooking area flames and heat.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 587,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "SSW",
+      "attributeText": "Avoid; heavy earth zone which may cause hazards and energy conflicts.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 588,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "SW",
+      "attributeText": "Not recommended; conflicts with earthen energies and increases risk of accidents.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 589,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "WSW",
+      "attributeText": "Avoid placement; may cause energy stagnation and safety hazards.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 590,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "W",
+      "attributeText": "Fairly suitable with adequate ventilation and safety compliance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 591,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "WNW",
+      "attributeText": "Acceptable; maintain good clearance and ventilation to reduce hazards.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 592,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "NW",
+      "attributeText": "Generally avoided; may cause safety risks and disturbance in airflow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 593,
+      "utilityName": "GAS CYLINDER",
+      "directionCode": "NNW",
+      "attributeText": "Avoid; similar risks as North and NW zones, may affect household safety.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 594,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "N",
+      "attributeText": "Highly favorable; promotes positive security energy, vigilance, and harmonious protection.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 595,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "NNE",
+      "attributeText": "Acceptable with good structure and cleanliness; supports alertness but avoid clutter.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 596,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "NE",
+      "attributeText": "Avoid; sacred zone, security cabin here disrupts spiritual energy and peace.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 597,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "ENE",
+      "attributeText": "Suitable for security cabin; supports quick alertness and positive energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 598,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "E",
+      "attributeText": "Favorable; aligns with energy flow promoting alertness and efficiency.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 599,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "ESE",
+      "attributeText": "Acceptable; requires good ventilation and organized setup.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 600,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "SE",
+      "attributeText": "Fire zone; not suitable due to potential conflicts and heat, leading to tension.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 601,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "SSE",
+      "attributeText": "Avoid; fire and heat energy clash with the purpose of security and can cause stress.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 602,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "S",
+      "attributeText": "Moderately suitable; keep the cabin clean and well-maintained for effective functioning.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 603,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "SSW",
+      "attributeText": "Avoid; heavy earth energy may cause lethargy or inefficiency.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 604,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "SW",
+      "attributeText": "Not appropriate; impacts stability and leads to energy imbalance.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 605,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "WSW",
+      "attributeText": "Acceptable with proper layout and ventilation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 606,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "W",
+      "attributeText": "Suitable; promotes effective energy management and work efficiency.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 607,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "WNW",
+      "attributeText": "Favorable for energy flow and security vigilance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 608,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "NW",
+      "attributeText": "Most ideal; encourages active presence, clear vision, and energetic protection.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 609,
+      "utilityName": "SECURITY GUARD CABIN",
+      "directionCode": "NNW",
+      "attributeText": "Supportive; combines alertness and stability, ensuring effective security.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 610,
+      "utilityName": "BACKYARD",
+      "directionCode": "N",
+      "attributeText": "Promotes positive energy entrance, good for garden and water features, enhances prosperity and health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 611,
+      "utilityName": "BACKYARD",
+      "directionCode": "NNE",
+      "attributeText": "Supports freshness and spiritual energy; good for landscaping and open spaces.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 612,
+      "utilityName": "BACKYARD",
+      "directionCode": "NE",
+      "attributeText": "Highly auspicious for backyard/garden; enhances spiritual balance and positive vibes.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 613,
+      "utilityName": "BACKYARD",
+      "directionCode": "ENE",
+      "attributeText": "Good for natural light and fresh air; supports healthy plant growth and ventilation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 614,
+      "utilityName": "BACKYARD",
+      "directionCode": "E",
+      "attributeText": "Encourages growth, sunlight access, and good air circulation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 615,
+      "utilityName": "BACKYARD",
+      "directionCode": "ESE",
+      "attributeText": "Moderately suitable; careful landscaping needed to balance fire element.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 616,
+      "utilityName": "BACKYARD",
+      "directionCode": "SE",
+      "attributeText": "Suitable for backyard, especially plants requiring more sunlight and warmth.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 617,
+      "utilityName": "BACKYARD",
+      "directionCode": "SSE",
+      "attributeText": "Acceptable with proper management to avoid excessive heat and dryness.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 618,
+      "utilityName": "BACKYARD",
+      "directionCode": "S",
+      "attributeText": "Moderately suitable; can be used for open spaces but avoid heavy constructions to prevent energy stagnation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 619,
+      "utilityName": "BACKYARD",
+      "directionCode": "SSW",
+      "attributeText": "Heavy earth zone; backyard here may block positive energy and restrict free air movement.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 620,
+      "utilityName": "BACKYARD",
+      "directionCode": "SW",
+      "attributeText": "Not advisable; earth element dominance can lead to blockages, affecting home stability and airflow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 621,
+      "utilityName": "BACKYARD",
+      "directionCode": "WSW",
+      "attributeText": "Acceptable with proper landscaping and open space management to ensure energy flow.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 622,
+      "utilityName": "BACKYARD",
+      "directionCode": "W",
+      "attributeText": "Good direction for backyard; supports ventilation, open space, and natural light balance.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 623,
+      "utilityName": "BACKYARD",
+      "directionCode": "WNW",
+      "attributeText": "Fosters energy flow, open space, and social activity areas.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 624,
+      "utilityName": "BACKYARD",
+      "directionCode": "NW",
+      "attributeText": "Suitable for outdoor spaces; promotes airflow and socializing areas.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 625,
+      "utilityName": "BACKYARD",
+      "directionCode": "NNW",
+      "attributeText": "Highly favorable; enhances movement of positive energy and supports outdoor activities.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 626,
+      "utilityName": "LAWN",
+      "directionCode": "N",
+      "attributeText": "Highly auspicious; promotes growth, prosperity, and fresh energy flow; ideal for lush green lawns.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 627,
+      "utilityName": "LAWN",
+      "directionCode": "NNE",
+      "attributeText": "Supports spiritual balance and positive vibrations; good for open lawn spaces.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 628,
+      "utilityName": "LAWN",
+      "directionCode": "NE",
+      "attributeText": "Extremely favorable; enhances peace, positivity, and natural energy flow with greenery.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 629,
+      "utilityName": "LAWN",
+      "directionCode": "ENE",
+      "attributeText": "Good for sunlight and fresh air; supports healthy plant growth and lawn vitality.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 630,
+      "utilityName": "LAWN",
+      "directionCode": "E",
+      "attributeText": "Encourages healthy greenery, sunlight, and positive energy in the lawn area.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 631,
+      "utilityName": "LAWN",
+      "directionCode": "ESE",
+      "attributeText": "Moderately suitable; balancing fire element with greenery to prevent negativity.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 632,
+      "utilityName": "LAWN",
+      "directionCode": "SE",
+      "attributeText": "Supports vigorous plant growth and energy when well-maintained; beneficial for lawns with sun-loving plants.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 633,
+      "utilityName": "LAWN",
+      "directionCode": "SSE",
+      "attributeText": "Acceptable with good care and management to avoid stagnation of energy.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 634,
+      "utilityName": "LAWN",
+      "directionCode": "S",
+      "attributeText": "Can support lawn area but avoid heavy constructions or excessive shade to maintain energy.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 635,
+      "utilityName": "LAWN",
+      "directionCode": "SSW",
+      "attributeText": "Heavy earth zone; lawns here may block energy and restrict ventilation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 636,
+      "utilityName": "LAWN",
+      "directionCode": "SW",
+      "attributeText": "Not ideal due to earth energy dominance; can cause energy stagnation impacting household stability.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 637,
+      "utilityName": "LAWN",
+      "directionCode": "WSW",
+      "attributeText": "Acceptable with proper sunlight and ventilation to keep lawn vibrant.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 638,
+      "utilityName": "LAWN",
+      "directionCode": "W",
+      "attributeText": "Good for lawn placement; balances light and shadow, promotes greenery and positive energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 639,
+      "utilityName": "LAWN",
+      "directionCode": "WNW",
+      "attributeText": "Favorable for social and play spaces with healthy lawn and airflow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 640,
+      "utilityName": "LAWN",
+      "directionCode": "NW",
+      "attributeText": "Supports open spaces, airflow, and good energy around lawns.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 641,
+      "utilityName": "LAWN",
+      "directionCode": "NNW",
+      "attributeText": "Highly auspicious; encourages free energy flow and vibrant greenery.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 642,
+      "utilityName": "TUB/SHOWER",
+      "directionCode": "BRAHMSTHAN",
+      "attributeText": "HIGHLY INAUSPICIOUS-ANY KIND OF PIT/DISPOSAL AT HE BRAHMSTHAN SHOULD BE AVOIDED AT ALL COSTS",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 643,
+      "utilityName": "LIFT",
+      "directionCode": "N",
+      "attributeText": "Zone of growth and wealth; enhances financial prosperity and clarity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 644,
+      "utilityName": "LIFT",
+      "directionCode": "NNE",
+      "attributeText": "Brings mental clarity, supports health and smooth energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 645,
+      "utilityName": "LIFT",
+      "directionCode": "NE",
+      "attributeText": "Spiritual and healing zone, but lift here blocks positive flow and blessings.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 646,
+      "utilityName": "LIFT",
+      "directionCode": "ENE",
+      "attributeText": "Encourages learning and wisdom; moderate results for lifts.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 647,
+      "utilityName": "LIFT",
+      "directionCode": "E",
+      "attributeText": "Openness and progress; supports new opportunities and direction.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 648,
+      "utilityName": "LIFT",
+      "directionCode": "ESE",
+      "attributeText": "Zone of creativity and intellect; may require remedies if used for lifts.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 649,
+      "utilityName": "LIFT",
+      "directionCode": "SE",
+      "attributeText": "Source of energy and finances; aligns with Fire, ideal for some homes.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 650,
+      "utilityName": "LIFT",
+      "directionCode": "SSE",
+      "attributeText": "Transformation and ambition, but may create restlessness.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 651,
+      "utilityName": "LIFT",
+      "directionCode": "S",
+      "attributeText": "Zone of fame; can invite health or social issues if not treated properly.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 652,
+      "utilityName": "LIFT",
+      "directionCode": "SSW",
+      "attributeText": "Heavy zone for waste and obstructions; OK IF PITLESS",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 653,
+      "utilityName": "LIFT",
+      "directionCode": "SW",
+      "attributeText": "Governs stability and relationships; lift here can destabilize the home.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 654,
+      "utilityName": "LIFT",
+      "directionCode": "WSW",
+      "attributeText": "Zone of delays and hard effort; often leads to stagnation.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 655,
+      "utilityName": "LIFT",
+      "directionCode": "W",
+      "attributeText": "Gains and fulfillment; may bring mixed results for lift placement.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 656,
+      "utilityName": "LIFT",
+      "directionCode": "WNW",
+      "attributeText": "Supports movement and connections; beneficial for corner plots.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 657,
+      "utilityName": "LIFT",
+      "directionCode": "NW",
+      "attributeText": "Dynamic zone; encourages movement and networking, good for lifts.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 658,
+      "utilityName": "LIFT",
+      "directionCode": "NNW",
+      "attributeText": "Healing and helpful people; placement here is neutral or average.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 659,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "N",
+      "attributeText": "Highly favorable; brings ample natural light and fresh air, promoting health and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 660,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "NNE",
+      "attributeText": "Suitable; ensures positive energy flow and light penetration into the home.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 661,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "NE",
+      "attributeText": "Most auspicious direction; OTS here energizes the home with light, air, and positivity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 662,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "ENE",
+      "attributeText": "Encourages fresh air and light flow; supports health and energy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 663,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "E",
+      "attributeText": "Ideal for OTS; maximizes sunlight and ventilation in the home.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 664,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "ESE",
+      "attributeText": "Supportive direction; balances fire and air elements through natural light.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 665,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "SE",
+      "attributeText": "Acceptable; avoid large OTS here to mitigate fire element dominance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 666,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "SSE",
+      "attributeText": "Moderately suitable; ensure proper design to maintain energy balance.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 667,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "S",
+      "attributeText": "Acceptable with careful design to prevent heat buildup and energy stagnation.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 668,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "SSW",
+      "attributeText": "Not recommended; may cause energy blockage and increase heat stress.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 669,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "SW",
+      "attributeText": "Unsuitable; disrupts stability and causes negative energy flow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 670,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "WSW",
+      "attributeText": "Avoid; may bring energy stagnation and poor airflow.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 671,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "W",
+      "attributeText": "Suitable; encourages light and air circulation but maintain size to avoid excessive cold or dampness.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 672,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "WNW",
+      "attributeText": "Supports air circulation and energy flow; beneficial for natural ventilation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 673,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "NW",
+      "attributeText": "Favorable for OTS; promotes positive energy, light, and ventilation.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 674,
+      "utilityName": "OTS/SHAFT",
+      "directionCode": "NNW",
+      "attributeText": "Suitable; helps in energy balance and ventilation flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 675,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "N",
+      "attributeText": "Favorable for refrigerators as water element is strong here; promotes health and prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 676,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "NNE",
+      "attributeText": "Acceptable; supports positive energy but not ideal for large or heavy refrigerators.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 677,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "NE",
+      "attributeText": "Sacred direction; refrigerator placement may block spiritual energy and cause financial issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 678,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "ENE",
+      "attributeText": "Moderately suitable; keep refrigerator well-maintained and clutter-free.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 679,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "E",
+      "attributeText": "Suitable; faces sun energy supporting freshness and health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 680,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "ESE",
+      "attributeText": "Acceptable but not the best placement, avoid near stove or fire area.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 681,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "SE",
+      "attributeText": "Fire element zone conflicts with refrigerator’s cool energy; avoid placement here.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 682,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "SSE",
+      "attributeText": "Avoid as it disrupts energy balance and can impact health and finances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 683,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "S",
+      "attributeText": "Permissible but less ideal; avoid near heat sources and keep well-ventilated.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 684,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "SSW",
+      "attributeText": "Heavy earth zone not suitable for refrigeration; may lead to stagnation and negative energy.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 685,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "SW",
+      "attributeText": "Avoid; may cause financial losses and disturbances.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 686,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "WSW",
+      "attributeText": "Not recommended; impacts household energy negatively.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 687,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "W",
+      "attributeText": "Good direction for refrigerator; supports balance and energy flow.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 688,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "WNW",
+      "attributeText": "Acceptable with care; ensure proper ventilation and cleanliness.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 689,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "NW",
+      "attributeText": "Good placement; supports positive energy and effective cooling.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 690,
+      "utilityName": "REFRIGERATOR",
+      "directionCode": "NNW",
+      "attributeText": "Favorable; promotes health and household prosperity.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 691,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "N",
+      "attributeText": "Promotes financial growth and wealth stability in family.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 692,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "NNE",
+      "attributeText": "Enhances wisdom but causes mild mental sensitivity issues.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 693,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "NE",
+      "attributeText": "Boosts spiritual clarity, prosperity, and overall family health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 694,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "ENE",
+      "attributeText": "Supports positive growth and maintains mental peace effectively.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 695,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "E",
+      "attributeText": "Brings fresh energy flow and strengthens physical health support.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 696,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "ESE",
+      "attributeText": "Creates mild fire-water tension leading to minor energy clashes.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 697,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "SE",
+      "attributeText": "Triggers arguments, family stress, and interpersonal conflicts.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 698,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "SSE",
+      "attributeText": "Leads to health instability and frequent repair-related issues.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 699,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "S",
+      "attributeText": "Increases daily struggles, efforts, and unnecessary tensions.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 700,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "SSW",
+      "attributeText": "Causes heavy obstacles, blockages, and prolonged delays.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 701,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "SW",
+      "attributeText": "Results in financial losses and strains family relationships.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 702,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "WSW",
+      "attributeText": "Raises unnecessary expenses and creates heavy energy drain.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 703,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "W",
+      "attributeText": "Provides stable storage but risks dampness and minor leaks.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 704,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "WNW",
+      "attributeText": "Maintains relationship harmony with supportive air movement.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 705,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "NW",
+      "attributeText": "Induces dynamic changes and fluctuating water flow patterns.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 706,
+      "utilityName": "KITCHEN SINK",
+      "directionCode": "NNW",
+      "attributeText": "Offers fluctuating support leading to inconsistent outcomeS.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 707,
+      "utilityName": "TV UNIT",
+      "directionCode": "N",
+      "attributeText": "Best to explore carrier rand new opportunities.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 708,
+      "utilityName": "TV UNIT",
+      "directionCode": "NNE",
+      "attributeText": "Placement lead to vital information related to health.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 709,
+      "utilityName": "TV UNIT",
+      "directionCode": "NE",
+      "attributeText": "Will use more to watch religious videos and articles.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 710,
+      "utilityName": "TV UNIT",
+      "directionCode": "ENE",
+      "attributeText": "Members will enjoy watching movies, songs or play games.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 711,
+      "utilityName": "TV UNIT",
+      "directionCode": "E",
+      "attributeText": "Can be kept to get global associations.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 712,
+      "utilityName": "TV UNIT",
+      "directionCode": "ESE",
+      "attributeText": "Ideal to do data entry, research and analysis.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 713,
+      "utilityName": "TV UNIT",
+      "directionCode": "SE",
+      "attributeText": "Good for CA's or accounting purpose.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 714,
+      "utilityName": "TV UNIT",
+      "directionCode": "SSE",
+      "attributeText": "Ideal for those who want to work for long hours without feeling tiered.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 715,
+      "utilityName": "TV UNIT",
+      "directionCode": "S",
+      "attributeText": "Good for management and admin work.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 716,
+      "utilityName": "TV UNIT",
+      "directionCode": "SSW",
+      "attributeText": "Frequent repair is required in computer and of no use outcome when browse.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 717,
+      "utilityName": "TV UNIT",
+      "directionCode": "SW",
+      "attributeText": "Ideal for designing and skill work, also good to find perfect partner in life for marriage.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 718,
+      "utilityName": "TV UNIT",
+      "directionCode": "WSW",
+      "attributeText": "Kids can watch educational lessons on computer, also good for new project reports. .",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 719,
+      "utilityName": "TV UNIT",
+      "directionCode": "W",
+      "attributeText": "Ideal for share market people and bosses",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 720,
+      "utilityName": "TV UNIT",
+      "directionCode": "WNW",
+      "attributeText": "Best to overcome from low mood, or write an emotional script.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 721,
+      "utilityName": "TV UNIT",
+      "directionCode": "NW",
+      "attributeText": "Help in providing support related sources when kept here.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 722,
+      "utilityName": "TV UNIT",
+      "directionCode": "NNW",
+      "attributeText": "Undesired surfing area must avoid.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 723,
+      "utilityName": "POOL",
+      "directionCode": "N",
+      "attributeText": "Supports stability, steady growth, finances; water here is generally favourable.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 724,
+      "utilityName": "POOL",
+      "directionCode": "NNE",
+      "attributeText": "Very strong water zone; enhances healing, recovery and mental clarity if not overloaded.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 725,
+      "utilityName": "POOL",
+      "directionCode": "NE",
+      "attributeText": "Prime Ishanya water zone; best for any pool or water body, highly auspicious for prosperity and peace",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 726,
+      "utilityName": "POOL",
+      "directionCode": "ENW",
+      "attributeText": "Close to NE, supports spiritual growth, morning sun, light and purity; good for a small plunge pool.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 727,
+      "utilityName": "POOL",
+      "directionCode": "E",
+      "attributeText": "Second preference after NE/N; brings vitality, health and social visibility if pool is light, not too deep/heavy.",
+      "outcome": "GOOD"
+    },
+    {
+      "rowNumber": 728,
+      "utilityName": "POOL",
+      "directionCode": "ESE",
+      "attributeText": "Transition from air/water to fire; may create element clash, suitable only with strong balancing, so neutral.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 729,
+      "utilityName": "POOL",
+      "directionCode": "SE",
+      "attributeText": "Agni zone; water here disturbs fire, may create conflicts, health and financial fluctuations.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 730,
+      "utilityName": "POOL",
+      "directionCode": "SSE",
+      "attributeText": "Leaning more to fiery south; water here can increase stress, irritability and instability.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 731,
+      "utilityName": "POOL",
+      "directionCode": "S",
+      "attributeText": "Strong fire/karma zone; large water body here is generally inauspicious, can slow progress and create hurdles.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 732,
+      "utilityName": "POOL",
+      "directionCode": "SSW",
+      "attributeText": "Moving into most “heavy” earth zone; water here weakens stability and can disturb relationships.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 733,
+      "utilityName": "POOL",
+      "directionCode": "SW",
+      "attributeText": "Worst for pools; weakens support, security and long‑term stability, often linked with chronic problems.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 734,
+      "utilityName": "POOL",
+      "directionCode": "WSW",
+      "attributeText": "Heavy west‑earth mix; a plunge pool here may cause emotional heaviness and delayed results.",
+      "outcome": "BAD"
+    },
+    {
+      "rowNumber": 735,
+      "utilityName": "POOL",
+      "directionCode": "W",
+      "attributeText": "Mixed results: can be used for leisure pools but not ideal for core Vastu; keep very balanced and well‑lit.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 736,
+      "utilityName": "POOL",
+      "directionCode": "WNW",
+      "attributeText": "Airy/social zone; a small plunge pool gives enjoyment but can create restlessness or frequent guests.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 737,
+      "utilityName": "POOL",
+      "directionCode": "NW",
+      "attributeText": "Vayu zone; water here can cause fluctuations, mood swings, travel or rental/temporary energy.",
+      "outcome": "OK-OK"
+    },
+    {
+      "rowNumber": 738,
+      "utilityName": "POOL",
+      "directionCode": "NNW",
+      "attributeText": "Transition from good north to unstable NW; prone to instability and frequent maintenance.",
+      "outcome": "BAD"
+    }
+  ]
+}

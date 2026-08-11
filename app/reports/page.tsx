@@ -22,7 +22,7 @@ export default async function ReportsPage() {
         <div className="eyebrow">Simple report steps</div>
         <h1>See what is done and what to do next.</h1>
         <p className="lede">
-          Create the preview, confirm payment, collect two approvals, then release the final report.
+          Create the preview, confirm payment, record Founder review and approval, then release the final report.
         </p>
         <div className="hero-actions" style={{ marginTop: 14 }}>
           <a href="/ops" className="button">
@@ -34,7 +34,7 @@ export default async function ReportsPage() {
         </div>
         <div className="pill-row" style={{ marginTop: 16 }}>
           <span className="pill">Preview watermark control</span>
-          <span className="pill">Two-person report approval</span>
+          <span className="pill">Founder review and approval</span>
           <span className="pill">Balance gate before verdict</span>
         </div>
       </section>

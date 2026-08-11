@@ -27,6 +27,7 @@ export function AssessmentActionPlan() {
   const { activeUser } = useSession();
   const [state, setState] = useState<Bootstrap | null>(null);
   const [selectedClientId, setSelectedClientId] = useState("");
+  const [selectedFloorId, setSelectedFloorId] = useState("");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("Loading the assessment workspace...");
   const [observationTitle, setObservationTitle] = useState("");
@@ -65,13 +66,19 @@ export function AssessmentActionPlan() {
   const clients = state?.clients ?? [];
   const client = clients.find((item) => item.id === selectedClientId) ?? clients[0];
   const activeCase = state && client ? getActiveCaseForClient(state, client.id) : undefined;
-  const observations = state?.assessmentObservations.filter((item) => item.caseId === activeCase?.id) ?? [];
-  const recommendations = state?.recommendations.filter((item) => item.caseId === activeCase?.id) ?? [];
-  const tasks = state?.implementationTasks.filter((item) => item.caseId === activeCase?.id) ?? [];
+  const floors = state?.floorWorkspaces.filter((item) => item.caseId === activeCase?.id) ?? [];
+  const selectedFloor = floors.find((item) => item.id === selectedFloorId) ?? floors[0];
+  const observations = state?.assessmentObservations.filter((item) => item.caseId === activeCase?.id && item.floorId === selectedFloor?.id) ?? [];
+  const recommendations = state?.recommendations.filter((item) => item.caseId === activeCase?.id && item.floorId === selectedFloor?.id) ?? [];
+  const tasks = state?.implementationTasks.filter((item) => item.caseId === activeCase?.id && item.floorId === selectedFloor?.id) ?? [];
   const latestObservation = observations[0];
   const latestRecommendation = recommendations[0];
   const currentTask = tasks[0];
-  const evidenceOptions = useMemo(() => Array.from(new Map((state?.floorWorkspaces ?? []).filter((floor) => floor.caseId === activeCase?.id && floor.locked).flatMap((floor) => floor.evidenceUploads.map((ref) => [ref, { ref, floor: floor.floorLabel }] as const))).values()), [state, activeCase?.id]);
+  const evidenceOptions = useMemo(() => {
+    if (!selectedFloor?.locked) return [];
+    const refs = [...selectedFloor.evidenceUploads, ...(state?.spatialEvidenceVersions ?? []).filter((item) => item.caseId === activeCase?.id && item.floorId === selectedFloor.id && item.status === "CURRENT").map((item) => item.protectedFileRef)];
+    return Array.from(new Map(refs.map((ref) => [ref, { ref, floor: selectedFloor.floorLabel }] as const)).values());
+  }, [state, activeCase?.id, selectedFloor]);
   const nextStep = !activeCase ? "Open a case first" : !observations.length ? "1. Record what you verified" : !recommendations.length ? "2. Explain what should change" : !tasks.length ? "3. Assign the action" : "4. Update progress";
 
   useEffect(() => {
@@ -80,13 +87,13 @@ export function AssessmentActionPlan() {
     setTaskTitle(""); setTaskNotes(""); setOwnerRole("CLIENT"); setOwnerName(""); setTaskStatus("NOT_STARTED");
     if (currentTask) { setTaskTitle(currentTask.title); setTaskNotes(currentTask.notes ?? ""); setOwnerRole(currentTask.ownerRole); setOwnerName(currentTask.ownerName); setTaskStatus(currentTask.status); }
     idempotencyKeys.current = { observation: crypto.randomUUID(), recommendation: crypto.randomUUID(), task: crypto.randomUUID() };
-  }, [activeCase?.id, currentTask?.id, currentTask?.version]);
+  }, [activeCase?.id, selectedFloor?.id, currentTask?.id, currentTask?.version]);
 
   async function save(payload: Record<string, unknown>, success: string) {
-    if (!activeCase || !state) return;
+    if (!activeCase || !selectedFloor || !state) return;
     setBusy(true);
     try {
-      await postAction({ ...payload, caseId: activeCase.id, expectedRecordVersion: activeCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null }, activeUser.role);
+      await postAction({ ...payload, caseId: activeCase.id, floorId: selectedFloor.id, expectedRecordVersion: activeCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null }, activeUser.role);
       await refresh(client?.id); setMessage(success);
       if (payload.action === "assessment-observation-upsert") idempotencyKeys.current.observation = crypto.randomUUID();
       if (payload.action === "assessment-recommendation-upsert") idempotencyKeys.current.recommendation = crypto.randomUUID();
@@ -98,12 +105,12 @@ export function AssessmentActionPlan() {
     } finally { setBusy(false); }
   }
 
-  const canSaveObservation = Boolean(activeCase && observationTitle.trim() && observationText.trim() && selectedEvidence.length);
-  const canSaveRecommendation = Boolean(activeCase && latestObservation && recommendationTitle.trim() && rationale.trim() && recommendedAction.trim());
-  const canSaveTask = Boolean(activeCase && latestRecommendation && taskTitle.trim() && ownerName.trim());
+  const canSaveObservation = Boolean(activeCase && selectedFloor?.locked && observationTitle.trim() && observationText.trim() && selectedEvidence.length);
+  const canSaveRecommendation = Boolean(activeCase && selectedFloor && latestObservation && recommendationTitle.trim() && rationale.trim() && recommendedAction.trim());
+  const canSaveTask = Boolean(activeCase && selectedFloor && latestRecommendation && taskTitle.trim() && ownerName.trim());
 
   return <section className="section-grid" aria-labelledby="assessment-title">
-    <div className="card span-12"><div className="eyebrow">Assessment and action plan</div><h1 id="assessment-title">{nextStep}</h1><p className="subtle">Work in order. Save one clear fact, explain the action, assign it, then keep its progress current.</p><div className="workflow"><label htmlFor="assessment-client"><strong>Client</strong></label><select id="assessment-client" value={client?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} disabled={busy}>{clients.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}</select><button type="button" className="button-secondary" onClick={() => void refresh(client?.id)} disabled={busy}>Reload</button></div><div className="pill-row" style={{ marginTop: 12 }}><span className="pill">Case {activeCase?.caseNumber ?? "not open"}</span><span className="pill">Revision {activeCase?.revisionNumber ?? 1}</span><span className="pill">{observations.length} observations</span><span className="pill">{recommendations.length} recommendations</span><span className="pill">{tasks.length} actions</span></div></div>
+    <div className="card span-12"><div className="eyebrow">Assessment and action plan</div><h1 id="assessment-title">{nextStep}</h1><p className="subtle">Work on one floor at a time. Save one clear fact, explain the action, assign it, then keep its progress current.</p><div className="workflow"><label htmlFor="assessment-client"><strong>Client</strong></label><select id="assessment-client" value={client?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} disabled={busy}>{clients.map((item) => <option value={item.id} key={item.id}>{item.displayName}</option>)}</select><label htmlFor="assessment-floor"><strong>Floor</strong></label><select id="assessment-floor" value={selectedFloor?.id ?? ""} onChange={(event) => setSelectedFloorId(event.target.value)} disabled={busy}>{floors.map((floor) => <option value={floor.id} key={floor.id}>{floor.floorLabel}</option>)}</select><button type="button" className="button-secondary" onClick={() => void refresh(client?.id)} disabled={busy}>Reload</button></div><div className="pill-row" style={{ marginTop: 12 }}><span className="pill">Case {activeCase?.caseNumber ?? "not open"}</span><span className="pill">Floor {selectedFloor?.floorLabel ?? "not selected"}</span><span className="pill">Revision {activeCase?.revisionNumber ?? 1}</span><span className="pill">{observations.length} observations</span><span className="pill">{recommendations.length} recommendations</span><span className="pill">{tasks.length} actions</span></div></div>
 
     <div className="card span-12"><div className="eyebrow">Step 1</div><h2>Record what you verified</h2>{!activeCase ? <p className="subtle">Open a case before recording assessment work.</p> : <><div className="field"><label htmlFor="observation-title">Short title</label><input id="observation-title" value={observationTitle} onChange={(event) => setObservationTitle(event.target.value)} maxLength={160} /></div><div className="field"><label htmlFor="observation-text">What did you observe?</label><textarea id="observation-text" value={observationText} onChange={(event) => setObservationText(event.target.value)} maxLength={2000} /></div><div className="three-col"><div className="field"><label htmlFor="alignment-status">Alignment</label><select id="alignment-status" value={alignmentStatus} onChange={(event) => setAlignmentStatus(event.target.value)}><option value="ALIGNED">Aligned</option><option value="REVIEW">Needs review</option><option value="CONCERN">Concern</option></select></div><div className="field"><label htmlFor="energy-status">Energy</label><select id="energy-status" value={energyStatus} onChange={(event) => setEnergyStatus(event.target.value)}><option value="BALANCED">Balanced</option><option value="WEAK">Weak</option><option value="EXCESS">Excess</option><option value="NA">Not applicable</option></select></div><div className="field"><label htmlFor="placement-status">Placement</label><select id="placement-status" value={placementStatus} onChange={(event) => setPlacementStatus(event.target.value)}><option value="SUITABLE">Suitable</option><option value="REVIEW">Needs review</option><option value="RELOCATE">Relocate</option><option value="NA">Not applicable</option></select></div></div><fieldset className="panel"><legend><strong>Verified evidence</strong></legend>{evidenceOptions.length ? evidenceOptions.map((item) => <label className="list-item" key={item.ref}><span><input type="checkbox" checked={selectedEvidence.includes(item.ref)} onChange={(event) => setSelectedEvidence((current) => event.target.checked ? [...current, item.ref] : current.filter((ref) => ref !== item.ref))} /> {item.floor}: {item.ref}</span></label>) : <p className="subtle">No evidence from a locked floor is available. Add and lock floor evidence first.</p>}</fieldset><button type="button" className="button" disabled={busy || !canSaveObservation} onClick={() => { if (window.confirm("Save this verified observation to the case record?")) void save({ action: "assessment-observation-upsert", idempotencyKey: idempotencyKeys.current.observation, title: observationTitle, observation: observationText, alignmentStatus, energyStatus, placementStatus, evidenceRefs: selectedEvidence }, "Observation saved. Now write the recommendation."); }}>Save observation</button></>}</div>
 

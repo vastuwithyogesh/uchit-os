@@ -1,4 +1,5 @@
 import type { InboundLeadRecord } from "@/lib/domain";
+import { deterministicContentHash } from "./evaluation-provenance.ts";
 
 function parseCsvLine(line: string) {
   const values: string[] = [];
@@ -91,13 +92,7 @@ export function buildInboundLeadIdentity(input: {
 }
 
 export function buildStableClientId(identityKey: string) {
-  let hash = 2166136261;
-  for (let index = 0; index < identityKey.length; index += 1) {
-    hash ^= identityKey.charCodeAt(index);
-    hash = Math.imul(hash, 16777619);
-  }
-  const normalized = (hash >>> 0).toString(36).padStart(8, "0").slice(0, 10);
-  return `UC-${normalized.toUpperCase()}`;
+  return `UC-${deterministicContentHash({ identityKey }).slice(0, 24).toUpperCase()}`;
 }
 
 export type ParsedInboundLeadRow = Omit<InboundLeadRecord, "id" | "status" | "importedAt" | "uniqueClientId" | "identityKey" | "firstSeenAt" | "lastSeenAt" | "submissionCount" | "duplicateCount" | "isReturningLead"> & {
