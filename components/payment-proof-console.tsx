@@ -5,6 +5,7 @@ import type { PaymentProofRecord, PaymentProofKey } from "@/lib/payment-proof-ty
 import { prepareImageUpload } from "@/lib/image-upload";
 import type { AppState } from "@/lib/store";
 import { getActiveCaseForClient } from "@/lib/service-framework";
+import { FounderStepCard } from "@/components/founder-step-card";
 
 type PaymentProofPayload = {
   assets: PaymentProofRecord[];
@@ -139,10 +140,16 @@ export function PaymentProofConsole() {
 
   return (
     <section className="section-grid">
-      <div className="card span-8">
-        <div className="eyebrow">Payment receipts</div>
-        <h2>Upload proof of payment</h2>
-        <p className="subtle">First upload the advance receipt. After the final payment, upload the balance receipt.</p>
+      <div className="card span-8 founder-work-surface">
+        <div className="founder-context-bar" aria-label="Current payment context"><span>Payments</span><span aria-hidden="true">→</span><strong>{activeClient?.displayName ?? "Choose a client"}</strong><span aria-hidden="true">→</span><span>{payload?.summary.complete ? "Complete" : "Receipts"}</span></div>
+        <FounderStepCard
+          step="Current payment task"
+          title={payload?.summary.complete ? "Receipts are complete" : activeProposal ? "Secure the next payment checkpoint" : "Start with the advance receipt"}
+          description="Upload immutable evidence for one payment checkpoint at a time. Verification remains a separate protected action."
+          tone={payload?.summary.complete ? "approved" : payload?.summary.uploaded ? "attention" : "neutral"}
+          status={payload?.summary.complete ? "Complete" : `${payload?.summary.pending ?? 0} pending`}
+          className="founder-step-card-primary"
+        >
         <div className="field" style={{ marginTop: 16 }}>
           <label htmlFor="payment-proof-client">Client</label>
           <select id="payment-proof-client" value={activeClient?.id ?? ""} onChange={(event) => {
@@ -171,7 +178,7 @@ export function PaymentProofConsole() {
           </div>
         </div>
         <div className="hero-actions" style={{ marginTop: 16 }}>
-          <a href="/crm" className="button">
+          <a href="/crm" className="button-secondary">
             Open CRM
           </a>
           <a href="/ops" className="button-secondary">
@@ -243,9 +250,10 @@ export function PaymentProofConsole() {
             );
           })}
         </div>
+        </FounderStepCard>
       </div>
 
-      <div className="card span-4">
+      <div className="card span-4 founder-support-surface">
         <div className="eyebrow">Your next step</div>
         <h2>{payload?.summary.complete ? "Receipts are complete" : "Upload the missing receipt"}</h2>
         <p className="meta">For safety, the person who uploads a receipt must be different from the administrator who verifies it.</p>

@@ -793,6 +793,238 @@ h3,
   }
 }
 
+/* Founder v3: calm, step-led work surfaces used by the actual workflow components. */
+.founder-work-surface {
+  display: grid;
+  gap: 18px;
+  align-content: start;
+}
+
+.founder-context-bar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 36px;
+  color: var(--muted);
+  font-size: 0.82rem;
+  letter-spacing: 0.01em;
+}
+
+.founder-context-bar strong {
+  color: var(--text);
+  font-weight: 650;
+}
+
+.founder-step-card {
+  display: grid;
+  gap: 18px;
+  padding: clamp(18px, 3vw, 28px);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--panel);
+}
+
+.founder-step-card-primary {
+  border-color: var(--line-strong);
+}
+
+.founder-step-card[data-tone="blocked"] {
+  border-color: color-mix(in srgb, var(--status-blocked) 42%, var(--line));
+}
+
+.founder-step-card[data-tone="ready"],
+.founder-step-card[data-tone="approved"],
+.founder-step-card[data-tone="released"] {
+  border-color: color-mix(in srgb, var(--status-ready) 42%, var(--line));
+}
+
+.founder-step-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+}
+
+.founder-step-card-heading h3 {
+  margin: 4px 0 0;
+  font-size: clamp(1.2rem, 2vw, 1.65rem);
+  line-height: 1.15;
+}
+
+.founder-step-card-heading .subtle {
+  max-width: 62ch;
+  margin: 9px 0 0;
+}
+
+.founder-step-card-body {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+}
+
+.founder-step-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.founder-intake-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.field-span-full {
+  grid-column: 1 / -1;
+}
+
+.founder-current-status {
+  display: grid;
+  gap: 5px;
+  min-height: 100%;
+  padding: 14px 16px;
+  border-left: 2px solid var(--brass);
+  background: var(--bg-soft);
+}
+
+.meta-label,
+.label-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.founder-inline-note {
+  margin: 0;
+  padding: 12px 14px;
+  border-left: 2px solid var(--brass);
+  color: var(--muted);
+  background: var(--bg-soft);
+}
+
+.founder-primary-actions {
+  align-items: center;
+  margin-top: 4px;
+}
+
+.founder-action-primary {
+  min-width: 180px;
+}
+
+.founder-technical-details {
+  margin-top: 2px;
+  padding: 0;
+  border-top: 0 !important;
+}
+
+.founder-technical-details > summary {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  padding: 8px 0;
+  color: var(--accent-2);
+  font-weight: 650;
+}
+
+.founder-technical-details .details-body {
+  display: grid;
+  gap: 12px;
+  margin-top: 8px;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--bg-soft);
+}
+
+.founder-consent-fieldset {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 14px 16px;
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+
+.founder-support-surface {
+  align-self: start;
+}
+
+.founder-support-surface .footer-note {
+  margin-top: 14px;
+}
+
+.status-pill {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+  padding: 5px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.status-pill::before {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: currentColor;
+  content: "";
+}
+
+.status-neutral { color: var(--status-neutral); }
+.status-attention { color: var(--status-attention); }
+.status-blocked { color: var(--status-blocked); }
+.status-ready { color: var(--status-ready); }
+.status-approved { color: var(--status-approved); }
+.status-released { color: var(--status-released); }
+.status-needs-regeneration { color: var(--status-blocked); }
+
+.founder-work-surface .button,
+.founder-work-surface .button-secondary,
+.founder-work-surface select,
+.founder-work-surface input,
+.founder-work-surface textarea,
+.founder-work-surface summary {
+  min-height: 44px;
+}
+
+.founder-work-surface .button,
+.founder-work-surface .button-secondary {
+  box-shadow: none;
+}
+
+@media (max-width: 820px) {
+  .founder-step-card-heading {
+    display: grid;
+    gap: 10px;
+  }
+
+  .founder-step-grid,
+  .founder-intake-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .field-span-full {
+    grid-column: auto;
+  }
+
+  .founder-primary-actions,
+  .founder-work-surface .hero-actions {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .founder-action-primary {
+    width: 100%;
+  }
+}
+
 /* Final shell precedence: keep navigation calm even after legacy component rules. */
 .topbar {
   border-radius: var(--radius-lg);

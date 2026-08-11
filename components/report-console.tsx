@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { AppState } from "@/lib/store";
 import { useSession } from "@/components/session-provider";
+import { FounderStepCard } from "@/components/founder-step-card";
 import { getActiveCaseForClient } from "@/lib/service-framework";
 import { canApproveReport, canEditFloorWorkspaces, canReleaseVerdict } from "@/lib/permissions";
 import { canReleaseOfficialVerdict, formatMoney, isPreviewWatermarked } from "@/lib/workflows";
@@ -184,10 +185,16 @@ export function ReportConsole() {
 
   return (
     <section className="section-grid">
-      <div className="card span-8">
-        <div className="eyebrow">Reports</div>
-        <h2>Finish and release a client report</h2>
-        <p className="subtle">Follow the steps in order. The final report cannot be released until payment and every approval checkpoint is complete.</p>
+      <div className="card span-8 founder-work-surface">
+        <div className="founder-context-bar" aria-label="Current report context"><span>Reports</span><span aria-hidden="true">→</span><strong>{selectedClient?.displayName ?? "Choose a client"}</strong><span aria-hidden="true">→</span><span>{selectedFloor?.floorLabel ?? "Floor"}</span></div>
+        <FounderStepCard
+          step="Current release task"
+          title={nextAction}
+          description="Work on one floor report at a time. Preview stays internal; export and print are available only after the protected release gate passes."
+          tone={canReleaseCurrentVerdict ? "ready" : blockerReasons.length ? "blocked" : "attention"}
+          status={canReleaseCurrentVerdict ? "Ready" : blockerReasons.length ? "Blocked" : "In progress"}
+          className="founder-step-card-primary"
+        >
         <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
             <span className="stat-value">{previewReport ? "Yes" : "No"}</span>
@@ -275,6 +282,7 @@ export function ReportConsole() {
           ) : null}
           {previewReport && selectedFloor?.stageAVerdictStatus !== "PRESENTED" ? <div style={{ marginTop: 14 }}><label htmlFor="presentation-note"><strong>What was presented?</strong></label><textarea id="presentation-note" value={presentationNote} onChange={(event) => setPresentationNote(event.target.value)} rows={3} style={{ width: "100%", marginTop: 6 }} /></div> : null}
         </div>
+        </FounderStepCard>
         <div className="two-col" style={{ marginTop: 16 }}>
           <div className="panel">
             <div className="panel-head">
