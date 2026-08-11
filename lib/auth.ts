@@ -146,7 +146,15 @@ async function ensureStaffRoleAssignmentsTable() {
   if (!env.DB) {
     return null;
   }
-  await migrateD1(env.DB);
+  try {
+    await migrateD1(env.DB);
+  } catch {
+    // Session verification must not become unavailable because a non-critical
+    // role-assignment migration is temporarily unavailable. Callers fall back
+    // to the authenticated user's safe default CLIENT role until the next
+    // request can complete the migration.
+    return null;
+  }
 
   return env.DB;
 }
