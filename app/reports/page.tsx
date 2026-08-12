@@ -23,7 +23,7 @@ export default async function ReportsPage() {
         eyebrow="Reports"
         title="Release one protected report at a time."
         description="Prepare the watermarked preview, clear payment and Founder approval gates, then release an immutable report version. Historical releases never change in place."
-        primaryAction={{ href: "/ops", label: "Open active case" }}
+        primaryAction={{ href: "/clients-cases", label: "Open active case" }}
         secondaryAction={{ href: "/timeline", label: "View history" }}
         context="Founder Edition · preview, approval and protected release"
         status={{ label: "Gated release", tone: "attention" }}

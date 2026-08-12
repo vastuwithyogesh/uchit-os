@@ -43,8 +43,14 @@ test("balance visual QA keeps payment confirmation primary and details progressi
 
 test("report visual QA keeps protected artifact actions progressive", () => {
   const ui = read("components/founder-report-step.tsx");
+  const legacyUi = read("components/report-console.tsx");
+  const route = read("app/reports/page.tsx");
   const manifest = read("scripts/prepare-founder-visual-qa.mjs");
   assert.match(ui, /<summary>Released artifact actions<\/summary>/);
+  assert.match(legacyUi, /<summary>Report status details<\/summary>/);
+  assert.match(legacyUi, /<summary>Preview and approval status<\/summary>/);
+  assert.match(legacyUi, /<summary>Report archive and history<\/summary>/);
+  assert.doesNotMatch(route, /href="\/ops"/);
   assert.match(ui, /mode=export/);
   assert.match(ui, /mode=print/);
   assert.match(ui, /report-approve/);

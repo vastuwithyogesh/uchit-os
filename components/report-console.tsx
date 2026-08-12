@@ -195,7 +195,7 @@ export function ReportConsole() {
           status={canReleaseCurrentVerdict ? "Ready" : blockerReasons.length ? "Blocked" : "In progress"}
           className="founder-step-card-primary"
         >
-        <div className="stat-grid" style={{ marginTop: 18 }}>
+        <details className="founder-technical-details"><summary>Report status details</summary><div className="stat-grid details-body" style={{ marginTop: 18 }}>
           <div className="stat-card">
             <span className="stat-value">{previewReport ? "Yes" : "No"}</span>
             <span className="stat-label">preview ready</span>
@@ -212,7 +212,7 @@ export function ReportConsole() {
             <span className="stat-value">{verdictReadyByState ? "Ready" : "Blocked"}</span>
             <span className="stat-label">ready to release</span>
           </div>
-        </div>
+        </div></details>
         <div className="panel" style={{ marginTop: 16 }}>
           <div className="workflow">
             <button className={state ? "button-secondary" : "button"} type="button" onClick={() => refresh()} disabled={busy} aria-busy={busy}>
@@ -283,7 +283,7 @@ export function ReportConsole() {
           {previewReport && selectedFloor?.stageAVerdictStatus !== "PRESENTED" ? <div style={{ marginTop: 14 }}><label htmlFor="presentation-note"><strong>What was presented?</strong></label><textarea id="presentation-note" value={presentationNote} onChange={(event) => setPresentationNote(event.target.value)} rows={3} style={{ width: "100%", marginTop: 6 }} /></div> : null}
         </div>
         </FounderStepCard>
-        <div className="two-col" style={{ marginTop: 16 }}>
+        <details className="founder-technical-details"><summary>Preview and approval status</summary><div className="two-col details-body" style={{ marginTop: 16 }}>
           <div className="panel">
             <div className="panel-head">
               <div>
@@ -342,9 +342,9 @@ export function ReportConsole() {
               </div>
             </div>
           </div>
-        </div>
+        </div></details>
 
-        <div className="panel" style={{ marginTop: 16 }}>
+        <details className="founder-technical-details" style={{ marginTop: 16 }}><summary>Report archive and history</summary><div className="panel details-body">
           <div className="panel-head">
             <div>
               <strong>Report archive</strong>
@@ -379,7 +379,7 @@ export function ReportConsole() {
               </div>
             )}
           </div>
-        </div>
+        </div></details>
       </div>
 
       <div className="card span-4">
