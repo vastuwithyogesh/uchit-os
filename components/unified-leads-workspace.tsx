@@ -8,14 +8,14 @@ import { getAllowedPipelineTransitions, normalizeClientPipeline } from "@/lib/cr
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { LeadImportSheet } from "@/components/lead-import-sheet";
-import { LeadCommunicationSheet } from "@/components/lead-communication-sheet";
+import { LeadCommunicationSheet, type CommunicationContext } from "@/components/lead-communication-sheet";
 import type { FounderTemplateKey } from "@/lib/founder-communication-templates";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
 type LeadPayload = { leads: InboundLeadRecord[] };
 export type UnifiedLeadsWorkspaceMode = "all" | "leads" | "pipeline";
 type Row = {
-  id: string; clientId?: string; name: string; email?: string; phone?: string; city?: string;
+  id: string; leadId?: string; leadRecordVersion?: number; clientId?: string; name: string; email?: string; phone?: string; city?: string;
   serviceInterest?: string; source: string; sourceRecordId?: string; sourceSystem: string;
   stage: CanonicalPipelineStage; nextAction?: { summary: string; dueAt: string };
   syncStatus?: string; receivedAt?: string; submissions?: number;
@@ -59,7 +59,7 @@ function normaliseRows(state: Bootstrap | null, leads: InboundLeadRecord[]): Row
     const client = byClientId.get(lead.convertedClientId ?? lead.uniqueClientId);
     const pipeline = client ? normalizeClientPipeline(client) : undefined;
     rows.set(lead.id, {
-      id: lead.id, clientId: client?.id, name: client?.displayName ?? lead.fullName,
+      id: lead.id, leadId: lead.id, leadRecordVersion: lead.recordVersion ?? 0, clientId: client?.id, name: client?.displayName ?? lead.fullName,
       email: client?.email ?? lead.email, phone: client?.phone ?? lead.phone, city: client?.city ?? lead.city,
       serviceInterest: client ? intakes.get(client.id)?.propertyContext?.serviceInterest ?? lead.serviceInterest : lead.serviceInterest,
       source: client?.source ?? lead.source, sourceRecordId: lead.sourceRecordId,
@@ -77,8 +77,9 @@ function normaliseRows(state: Bootstrap | null, leads: InboundLeadRecord[]): Row
   for (const client of clients) {
     if (Array.from(rows.values()).some((row) => row.clientId === client.id)) continue;
     const pipeline = normalizeClientPipeline(client);
+    const sourceLead = leads.find((lead) => (lead.convertedClientId ?? lead.uniqueClientId) === client.id);
     rows.set(`client:${client.id}`, {
-      id: `client:${client.id}`, clientId: client.id, name: client.displayName, email: client.email, phone: client.phone,
+      id: `client:${client.id}`, leadId: sourceLead?.id, leadRecordVersion: sourceLead?.recordVersion, clientId: client.id, name: client.displayName, email: client.email, phone: client.phone,
       city: client.city, serviceInterest: intakes.get(client.id)?.propertyContext?.serviceInterest,
       source: client.source, sourceSystem: client.source === "LOVABLE" ? "LOVABLE" : "UCHIT",
       stage: pipeline.stage, nextAction: pipeline.nextAction, syncStatus: "NATIVE",
@@ -224,14 +225,25 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   }
 
   async function latestRevision() { return (await fetchJson<Bootstrap>("/api/bootstrap")).persistenceRevision ?? null; }
-  async function prepareCommunication(channel: "WHATSAPP" | "EMAIL", values: Record<string, string>, idempotencyKey: string) {
+  async function prepareCommunicationContext(idempotencyKey: string, qualificationKind?: "RESIDENTIAL" | "COMMERCIAL" | "HYBRID") {
+    if (!selected?.leadId) throw new Error("This row has no linked inbound lead. Open the original lead record before preparing communication.");
+    const expectedRevision = await latestRevision();
+    const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
+      action: "founder-communication-context", leadId: selected.leadId, clientId: selected.clientId, templateKey: communication?.key,
+      serviceType: communication?.serviceType, qualificationKind, idempotencyKey, expectedRecordVersion: selected.leadRecordVersion ?? selected.recordVersion, expectedRevision,
+    }) });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "The approved communication context could not be prepared.");
+    return result.result as CommunicationContext;
+  }
+  async function prepareCommunication(channel: "WHATSAPP" | "EMAIL", values: Record<string, string>, idempotencyKey: string, context?: CommunicationContext) {
     if (!selected) throw new Error("Select a lead first.");
     const expectedRevision = await latestRevision();
     const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
-      action: "founder-communication-prepare", leadId: selected.id, clientId: selected.clientId,
+      action: "founder-communication-prepare", leadId: selected.leadId ?? selected.id, clientId: selected.clientId,
       templateKey: communication?.key, values,
       channel, recipient: channel === "WHATSAPP" ? selected.phone : selected.email,
-      idempotencyKey, expectedRecordVersion: selected.recordVersion, expectedRevision,
+      assetVersionIds: context?.assetVersionIds, formDefinitionId: context?.formDefinitionId, grantIds: context?.grantIds,
+      idempotencyKey, expectedRecordVersion: selected.leadRecordVersion ?? selected.recordVersion, expectedRevision,
     }) });
     const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "Communication could not be prepared.");
     return { id: result.result.record.id as string, recordVersion: result.result.record.recordVersion as number };
@@ -286,5 +298,5 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
 
     <div className="lead-workspace-footer" role={errorKind === "conflict" ? "alert" : "status"} aria-live="polite"><span>{message}{errorKind === "conflict" ? " Your draft remains here; reload before retrying." : ""}</span><button type="button" className="button-secondary" disabled={busy} onClick={() => void refresh(selected?.id)}>{busy ? "Refreshing…" : "Reload"}</button></div>
-  </section>{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;
+  </section>{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepareContext={prepareCommunicationContext} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;
 }

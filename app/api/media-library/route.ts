@@ -13,10 +13,11 @@ async function ownerContext(request: Request) {
   const access = await requireRouteActor(request, "SUPER_ADMIN");
   if (!access.ok) return { response: access.response } as const;
   const foundation = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
-  if (access.actor.id !== foundation.organisation.founderUserId || access.actor.organisationCapability !== "organisation_owner") {
+  if (access.actor.id !== foundation.organisation.founderUserId || foundation.membership.capability !== "organisation_owner") {
     return { response: NextResponse.json({ ok: false, error: "Only the configured Founder owner can manage Media Library assets." }, { status: 403, headers: noStore }) } as const;
   }
-  return { actor: access.actor, foundation } as const;
+  const actor = { ...access.actor, role: access.actor.role, organisationId: foundation.organisation.id, organisationCapability: foundation.membership.capability };
+  return { actor, foundation } as const;
 }
 
 export async function GET(request: Request) {

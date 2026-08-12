@@ -122,6 +122,60 @@ export async function prepareManualCommunication(input: { state: AppState; actor
   input.state.communicationPreparations.push(record); return { replayed: false, record, rendered };
 }
 
+/** Resolve the exact approved assets/forms and scoped secure links for a guided drawer action. */
+export async function createFounderCommunicationContext(input: {
+  state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId?: string;
+  templateKey: FounderTemplateKey; serviceType?: VastuServiceType; qualificationKind?: QualificationKind;
+  idempotencyKey: string; expectedRecordVersion?: number; now?: Date;
+}) {
+  assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId); safeIdempotency(input.idempotencyKey);
+  const lead = input.state.optInLeads.find((item) => item.id === input.leadId && item.organisationId === input.organisationId);
+  if (!lead) fail(404, "Lead not found.");
+  if (input.expectedRecordVersion === undefined) fail(428, "The latest lead version is required.");
+  if ((lead.recordVersion ?? 0) !== input.expectedRecordVersion) fail(409, "The lead changed. Reload before preparing communication.");
+  const valuesPatch: TemplateValues = {};
+  const assetVersionIds: string[] = [];
+  const grantIds: string[] = [];
+  let formDefinitionId: string | undefined;
+  const now = input.now ?? new Date();
+  if (input.templateKey === "VSL") return { valuesPatch, assetVersionIds, grantIds, formDefinitionId };
+  if (input.templateKey === "BROCHURE") {
+    if (!input.serviceType) fail(400, "Choose Existing Space or New Construction before preparing the brochure.");
+    const manifestKey = input.serviceType === "EXISTING_SPACE" ? "BROCHURE_EXISTING_SPACE_V2" : "BROCHURE_NEW_CONSTRUCTION_V2";
+    const manifest = APPROVED_FOUNDER_ASSETS.find((item) => item.key === manifestKey)!;
+    const asset = input.state.mediaAssets.find((item) => item.id === `media:${manifestKey.toLowerCase()}` && item.organisationId === input.organisationId);
+    const version = input.state.mediaAssetVersions.find((item) => item.id === asset?.activeVersionId && item.organisationId === input.organisationId && item.status === "ACTIVE" && item.clientSendable && item.checksumSha256 === manifest.checksumSha256);
+    if (!version) fail(409, "Activate the exact approved brochure before preparing this message.");
+    const activeGrant = input.state.secureAccessGrants.find((item) => item.organisationId === input.organisationId && item.leadId === input.leadId && item.purpose === "BROCHURE" && item.assetVersionId === version.id && !item.revokedAt && new Date(item.expiresAt) > now);
+    const grant = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "BROCHURE", leadId: input.leadId, clientId: input.clientId, assetVersionId: version.id, days: 30, rotateGrantId: activeGrant?.id, now });
+    if (!grant.token) fail(409, "The active brochure link could not be recovered. Retry to rotate a secure link.");
+    valuesPatch["Secure Brochure Link"] = `/api/public/media/${grant.token}`;
+    assetVersionIds.push(version.id); grantIds.push(grant.grant.id);
+    return { valuesPatch, assetVersionIds, grantIds, formDefinitionId };
+  }
+  if (input.templateKey === "QUALIFICATION") {
+    if (!input.qualificationKind) fail(400, "Choose Residential, Commercial or Hybrid; the qualification type cannot be guessed.");
+    if (!input.clientId) fail(409, "A permanent Client ID is required before sending a qualification form.");
+    const selectedServices = input.qualificationKind === "HYBRID" ? ["RESIDENTIAL", "COMMERCIAL"] as const : [input.qualificationKind] as const;
+    const invitation = await createQualificationInvitation({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, kind: input.qualificationKind, selectedServices: [...selectedServices], idempotencyKey: `invite-${input.idempotencyKey}`, expectedRecordVersion: input.expectedRecordVersion, now });
+    if (!invitation.token) fail(409, "The qualification link could not be recovered. Retry with a new review action.");
+    const definition = APPROVED_QUALIFICATION_DEFINITIONS[input.qualificationKind];
+    const manifest = APPROVED_FOUNDER_ASSETS.find((item) => item.key === definition.sourceAssetVersionId)!;
+    const asset = input.state.mediaAssets.find((item) => item.id === `media:${manifest.key.toLowerCase()}` && item.organisationId === input.organisationId);
+    const version = input.state.mediaAssetVersions.find((item) => item.id === asset?.activeVersionId && item.organisationId === input.organisationId && item.status === "ACTIVE" && item.clientSendable && item.checksumSha256 === manifest.checksumSha256);
+    if (!version) fail(409, "Activate the exact approved qualification PDF before preparing this message.");
+    const activeGrant = input.state.secureAccessGrants.find((item) => item.organisationId === input.organisationId && item.leadId === input.leadId && item.purpose === "QUALIFICATION_PDF" && item.assetVersionId === version.id && !item.revokedAt && new Date(item.expiresAt) > now);
+    const pdfGrant = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "QUALIFICATION_PDF", leadId: input.leadId, clientId: input.clientId, assetVersionId: version.id, days: 14, rotateGrantId: activeGrant?.id, now });
+    if (!pdfGrant.token) fail(409, "The qualification PDF link could not be recovered. Retry to rotate a secure link.");
+    valuesPatch["Qualification Form Title"] = definition.title;
+    valuesPatch["Secure Online Form Link"] = `/api/public/qualification/${invitation.token}`;
+    valuesPatch["Secure PDF Link"] = `/api/public/media/${pdfGrant.token}`;
+    assetVersionIds.push(version.id); grantIds.push(invitation.invitation.grantId, pdfGrant.grant.id); formDefinitionId = definition.id;
+    return { valuesPatch, assetVersionIds, grantIds, formDefinitionId };
+  }
+  fail(400, "This communication action is not supported.");
+}
+
 export function markCommunicationOpened(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; preparationId: string; expectedRecordVersion?: number }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId);
   const record = input.state.communicationPreparations.find((item) => item.id === input.preparationId && item.organisationId === input.organisationId);

@@ -5,7 +5,7 @@ import type { AppUser } from "../lib/domain.ts";
 import { APPROVED_FOUNDER_ASSETS } from "../lib/founder-media-manifest.ts";
 import { APPROVED_QUALIFICATION_DEFINITIONS } from "../lib/qualification-form-definitions.ts";
 import { FOUNDER_COMMUNICATION_TEMPLATES, renderFounderTemplate } from "../lib/founder-communication-templates.ts";
-import { assignReviewCall, createQualificationInvitation, createSecureGrant, FounderEngagementError, markCommunicationOpened, prepareManualCommunication, registerMediaAssetVersion, resolveSecureGrant, rescheduleReviewCall, respondToBooking, saveQualificationResponse, setupZoomMeeting, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "../lib/founder-engagement.ts";
+import { assignReviewCall, createFounderCommunicationContext, createQualificationInvitation, createSecureGrant, FounderEngagementError, markCommunicationOpened, prepareManualCommunication, registerMediaAssetVersion, resolveSecureGrant, rescheduleReviewCall, respondToBooking, saveQualificationResponse, setupZoomMeeting, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "../lib/founder-engagement.ts";
 
 const org = "org-founder";
 const founder: AppUser = { id: "yogesh-owner", fullName: "Yogesh Hora", email: "iyogesh2020@gmail.com", role: "SUPER_ADMIN", color: "#111111", organisationId: org, organisationCapability: "organisation_owner" };

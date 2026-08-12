@@ -10,7 +10,7 @@ export async function GET(request: Request) {
   const access = await requireRouteActor(request, "SUPER_ADMIN");
   if (!access.ok) return access.response;
   const foundation = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
-  if (access.actor.id !== foundation.organisation.founderUserId || access.actor.organisationCapability !== "organisation_owner") {
+  if (access.actor.id !== foundation.organisation.founderUserId || foundation.membership.capability !== "organisation_owner") {
     return NextResponse.json({ ok: false, error: "Only the configured Founder owner can verify migrations." }, { status: 403, headers });
   }
   const db = getRuntimeEnv().DB;
