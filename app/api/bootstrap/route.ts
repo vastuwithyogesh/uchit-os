@@ -13,7 +13,12 @@ export async function GET(request: Request) {
     const context = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
     const snapshot = await loadStateSnapshotFromPersistence();
     const scopedState = projectOrganisationState(snapshot.state, context.organisation.id);
-    return NextResponse.json({ ...scopedState, persistenceRevision: snapshot.revision, foundation: {
+    const optInLeads = access.actor.role === "SUPER_ADMIN" ? scopedState.optInLeads : scopedState.optInLeads.map((lead) => {
+      const { dob: _dob, landingPage: _landingPage, referrer: _referrer, assignedTo: _assignedTo, deletedAt: _deletedAt,
+        sourceRecordId: _sourceRecordId, externalClientCode: _externalClientCode, sourceProfile: _sourceProfile, ...safe } = lead;
+      return safe;
+    });
+    return NextResponse.json({ ...scopedState, persistenceRevision: snapshot.revision, optInLeads, foundation: {
       organisation: context.organisation,
       membership: context.membership,
       workflowPolicyVersion: context.workflowPolicy.version,

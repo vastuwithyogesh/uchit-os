@@ -3,6 +3,7 @@ import { isExplicitLocalDemo, isInitialOrganisationOwnerEmail, requireRouteActor
 import { deterministicContentHash } from "@/lib/evaluation-provenance";
 import {
   appendImmutableAuditEvent,
+  findImmutableAuditEventByEntity,
   findImmutableAuditEventByIdempotency,
   FoundationAccessError,
   resolveActiveOrganisationContext
@@ -10,6 +11,7 @@ import {
 import {
   buildLeadImportPreview,
   LEAD_IMPORT_MAX_BYTES,
+  LEAD_IMPORT_MINIMAL_TEMPLATE,
   LEAD_IMPORT_TEMPLATE,
   publicLeadImportPreview
 } from "@/lib/lead-import";
@@ -68,19 +70,26 @@ function expectedRevision(formData: FormData) {
 }
 
 export async function GET(request: Request) {
-  const wantsTemplate = new URL(request.url).searchParams.get("template") === "1";
+  const template = new URL(request.url).searchParams.get("template");
+  const wantsTemplate = template === "1" || template === "minimal";
   const access = await requireRouteActor(request, wantsTemplate ? "SUPER_ADMIN" : "SETTER");
   if (!access.ok) return access.response;
   try {
     if (wantsTemplate) {
-      return new Response(LEAD_IMPORT_TEMPLATE, { status: 200, headers: { ...privateHeaders(), "Content-Type": "text/csv; charset=utf-8",
-        "Content-Disposition": 'attachment; filename="uchit-lead-import-template.csv"' } });
+      const minimal = template === "minimal";
+      return new Response(minimal ? LEAD_IMPORT_MINIMAL_TEMPLATE : LEAD_IMPORT_TEMPLATE, { status: 200, headers: { ...privateHeaders(), "Content-Type": "text/csv; charset=utf-8",
+        "Content-Disposition": `attachment; filename="${minimal ? "uchit-minimal-lead-import-template.csv" : "vastu-with-yogesh-apply-leads-template.csv"}` } });
     }
     const localDemo = isExplicitLocalDemo(request.headers);
     const context = localDemo ? null : await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
     const snapshot = await loadStateSnapshotFromPersistence();
     const leads = context ? snapshot.state.optInLeads.filter((lead) => lead.organisationId === context.organisation.id) : snapshot.state.optInLeads;
-    return NextResponse.json({ leads, counts: { total: leads.length,
+    const projectedLeads = access.actor.role === "SUPER_ADMIN" ? leads : leads.map((lead) => {
+      const { dob: _dob, landingPage: _landingPage, referrer: _referrer, assignedTo: _assignedTo, deletedAt: _deletedAt,
+        sourceRecordId: _sourceRecordId, externalClientCode: _externalClientCode, sourceProfile: _sourceProfile, ...safe } = lead;
+      return safe;
+    });
+    return NextResponse.json({ leads: projectedLeads, counts: { total: leads.length,
       qualified: leads.filter((lead) => lead.status === "QUALIFIED").length,
       new: leads.filter((lead) => lead.submissionCount === 1).length,
       filtered: leads.filter((lead) => lead.status === "FILTERED").length } }, { headers: privateHeaders() });
@@ -136,6 +145,12 @@ export async function POST(request: Request) {
         result: { createdClients: 0, linkedExistingClients: 0, reviewRequired: preview.counts.reviewRequired, rejected: 0 } },
         { headers: privateHeaders() });
     }
+    const batchReplay = context ? await findImmutableAuditEventByEntity(organisationId, "LEAD_CSV_IMPORT_CONFIRMED", "LEAD_IMPORT_BATCH", preview.batchHash) : null;
+    if (batchReplay) {
+      return NextResponse.json({ ok: true, replayed: true, batchHash: preview.batchHash,
+        result: { createdClients: 0, linkedExistingClients: 0, reviewRequired: preview.counts.reviewRequired, rejected: 0, unchanged: preview.counts.accepted } },
+        { headers: privateHeaders() });
+    }
     const requestedRevision = expectedRevision(formData);
     if (requestedRevision !== snapshot.revision) throw new FoundationAccessError(409, "The CRM changed after preview. Reload and preview the file again.");
     if (!formData.has("expectedOrganisationVersion")) throw precondition("The latest organisation version is required.");
@@ -158,7 +173,7 @@ export async function POST(request: Request) {
     }
     return NextResponse.json({ ok: true, replayed: false, batchHash: preview.batchHash,
       result: { createdClients: result.createdClients.length, linkedExistingClients: result.linkedExisting,
-        reviewRequired: result.reviewRequired, rejected: 0, importedLeads: result.created.length + result.updated.length } },
+        reviewRequired: result.reviewRequired, rejected: 0, importedLeads: result.created.length + result.updated.length, unchanged: result.unchanged } },
       { status: 201, headers: privateHeaders() });
   } catch (error) {
     setAppState(rollback);

@@ -17,6 +17,7 @@ type Row = {
   serviceInterest?: string; source: string; sourceRecordId?: string; sourceSystem: string;
   stage: CanonicalPipelineStage; nextAction?: { summary: string; dueAt: string };
   syncStatus?: string; receivedAt?: string; submissions?: number;
+  privateSourceDetails?: { dob?: string; sourceAssignedTo?: string; propertyStage?: string; sourceRecordId?: string; externalClientCode?: string; sourceDeletedAt?: string };
 };
 
 const leadPipelineStages: CanonicalPipelineStage[] = [
@@ -62,6 +63,11 @@ function normaliseRows(state: Bootstrap | null, leads: InboundLeadRecord[]): Row
       sourceSystem: lead.sourceSystem ?? "UCHIT", stage: pipeline?.stage ?? (lead.status === "QUALIFIED" ? "QUALIFIED" : "NEW"),
       nextAction: pipeline?.nextAction, syncStatus: lead.syncStatus ?? "NATIVE", receivedAt: lead.firstSeenAt ?? lead.importedAt,
       submissions: lead.submissionCount,
+      privateSourceDetails: lead.sourceProfile || lead.sourceRecordId || lead.externalClientCode ? {
+        dob: lead.sourceProfile?.dob, sourceAssignedTo: lead.sourceProfile?.sourceAssignedTo,
+        propertyStage: lead.sourceProfile?.propertyStage, sourceRecordId: lead.sourceRecordId,
+        externalClientCode: lead.externalClientCode, sourceDeletedAt: lead.sourceProfile?.sourceDeletedAt
+      } : undefined,
     });
   }
   for (const client of clients) {
@@ -223,6 +229,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
         <details className="lead-drawer-section"><summary>Timeline</summary>{events.length ? <ol className="lead-timeline">{events.map((event) => <li key={event.id}><strong>{event.headline}</strong><span>{readableDate(event.happenedAt)} · {event.actorName ?? "Uchit"}</span></li>)}</ol> : <p>No Uchit activity yet.</p>}<p className="meta">Source history is labelled separately and never becomes authoritative audit.</p></details>
         <details className="lead-drawer-section"><summary>Follow-ups</summary><p>{selected.nextAction?.summary ?? "No follow-up scheduled."}</p><p className="meta">{readableDate(selected.nextAction?.dueAt)}</p></details>
         <details className="lead-drawer-section"><summary>Commercial</summary><p>Scope, proposal, advance and case creation remain Uchit-owned and server-gated.</p><a href="/founder/01" className="text-link">Open commercial readiness</a></details>
+        {activeUser.role === "SUPER_ADMIN" && selected.privateSourceDetails ? <details className="lead-drawer-section"><summary>Private source details</summary><dl><div><dt>Date of birth</dt><dd>{selected.privateSourceDetails.dob || "Not supplied"}</dd></div><div><dt>Source assignment</dt><dd>{selected.privateSourceDetails.sourceAssignedTo || "Not supplied"}</dd></div><div><dt>Property stage</dt><dd>{selected.privateSourceDetails.propertyStage || "Not supplied"}</dd></div><div><dt>Source record</dt><dd>{selected.privateSourceDetails.sourceRecordId || "Not supplied"}</dd></div><div><dt>External client reference</dt><dd>{selected.privateSourceDetails.externalClientCode || "Not supplied"}</dd></div><div><dt>Source tombstone</dt><dd>{selected.privateSourceDetails.sourceDeletedAt ? "Recorded in source history" : "None"}</dd></div></dl><p className="meta">Restricted source metadata only. It does not change ownership, client identity, qualification, reports or evaluation.</p></details> : null}
         <details className="lead-drawer-section"><summary>Technical details</summary><p className="meta">Sync status: {selected.syncStatus ?? "native"}. Source payloads, private IDs and audit internals are intentionally excluded.</p></details>
       </div>
       <footer className="lead-drawer-footer"><div className="lead-contact-actions">{selected.phone ? <><a href={`tel:${selected.phone}`}>Call</a><a href={`https://wa.me/${selected.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</a></> : null}{selected.email ? <a href={`mailto:${selected.email}`}>Email</a> : null}</div>{selectedClient ? <button type="button" className="button" disabled={busy || !allowedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : primaryLabel}</button> : <a className="button" href="/founder/01">{primaryLabel}</a>}</footer>

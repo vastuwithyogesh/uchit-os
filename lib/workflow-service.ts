@@ -19,7 +19,7 @@ import {
   WhatsAppTemplateRecord
 } from "@/lib/domain";
 import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonicalServiceStages, caseDocumentTypes, decisionMakerStatuses, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalPipelineStage, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionMakerStatus, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
-import { buildInboundLeadIdentity, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, toInboundLeadRecord, type LeadImportPreview, type ParsedInboundLeadRow } from "@/lib/lead-import";
+import { buildInboundLeadIdentity, normalizeCsvDate, normalizeLeadEmail, toInboundLeadRecord, type LeadImportPreview, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { canCreateCase, generateUtilityEvaluation, lockWorkspace, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
 import { formatMoney } from "@/lib/workflows";
@@ -640,7 +640,7 @@ export function bookQualificationCall(input: {
 function mergeLeadRecord(existing: InboundLeadRecord, incoming: ParsedInboundLeadRow, importedAt: string, actor?: AppUser, organisationId?: string) {
   existing.fullName = incoming.fullName || existing.fullName;
   existing.email = normalizeLeadEmail(incoming.email || existing.email);
-  existing.phone = normalizeLeadPhone(incoming.phone || existing.phone);
+  existing.phone = incoming.phone || existing.phone;
   existing.city = incoming.city || existing.city;
   existing.serviceInterest = incoming.serviceInterest ?? existing.serviceInterest;
   existing.source = incoming.source || existing.source;
@@ -650,15 +650,19 @@ function mergeLeadRecord(existing: InboundLeadRecord, incoming: ParsedInboundLea
   existing.utmCampaign = incoming.utmCampaign || existing.utmCampaign;
   existing.utmTerm = incoming.utmTerm || existing.utmTerm;
   existing.utmContent = incoming.utmContent || existing.utmContent;
-  existing.message = [existing.message, incoming.message].filter(Boolean).join(" | ");
-  existing.notes = [existing.notes, incoming.notes].filter(Boolean).join(" | ");
+  existing.message = incoming.message || existing.message;
+  existing.notes = incoming.notes || existing.notes;
   existing.firstSeenAt = existing.firstSeenAt || incoming.csvCreatedDate || importedAt.slice(0, 10);
   const lastSeenCandidates = [existing.lastSeenAt, incoming.csvCreatedDate].filter(Boolean).sort();
   existing.lastSeenAt = lastSeenCandidates[lastSeenCandidates.length - 1] ?? existing.lastSeenAt;
-  existing.submissionCount += 1;
+  existing.submissionCount = Math.max(existing.submissionCount, incoming.sourceProfile?.sourceSubmissionCount ?? existing.submissionCount + 1);
   existing.duplicateCount += 1;
   existing.isReturningLead = true;
-  existing.sourceSystem = existing.sourceSystem ?? "CSV_IMPORT";
+  existing.sourceSystem = incoming.sourceProfile ? "LOVABLE_CSV_IMPORT" : existing.sourceSystem ?? "CSV_IMPORT";
+  existing.sourceRecordType = incoming.sourceProfile ? "APPLICATION" : existing.sourceRecordType;
+  existing.sourceRecordId ??= incoming.sourceRecordId;
+  existing.externalClientCode ??= incoming.externalClientCode;
+  existing.sourceProfile = incoming.sourceProfile ?? existing.sourceProfile;
   existing.syncStatus = "APPLIED";
   existing.organisationId = organisationId || existing.organisationId;
   existing.createdByActorUserId ??= actor?.id;
@@ -715,6 +719,7 @@ export function importInboundLeads(preview: LeadImportPreview, actor: AppUser, o
   const updated: InboundLeadRecord[] = [];
   const createdClients: ClientRecord[] = [];
   let linkedExisting = 0;
+  let unchanged = 0;
 
   for (const [index, previewRow] of preview.rows.entries()) {
     if (!previewRow.parsed || previewRow.disposition === "INVALID" || previewRow.disposition === "REVIEW_REQUIRED") continue;
@@ -722,9 +727,17 @@ export function importInboundLeads(preview: LeadImportPreview, actor: AppUser, o
     const identityKey = buildInboundLeadIdentity(row);
     const uniqueClientId = previewRow.targetClientId!;
     const existing = state.optInLeads.find((item) => item.organisationId === organisationId
-      && (item.identityKey === identityKey || item.uniqueClientId === uniqueClientId || item.convertedClientId === uniqueClientId));
+      && ((row.sourceRecordId && item.sourceRecordId === row.sourceRecordId)
+        || (row.externalClientCode && item.externalClientCode === row.externalClientCode)
+        || (!row.sourceRecordId && !row.externalClientCode
+          && (item.identityKey === identityKey || item.uniqueClientId === uniqueClientId || item.convertedClientId === uniqueClientId))));
 
     if (existing) {
+      if (row.sourceProfile?.sourceRowHash && existing.sourceProfile?.sourceRowHash === row.sourceProfile.sourceRowHash) {
+        unchanged += 1;
+        linkedExisting += 1;
+        continue;
+      }
       const merged = mergeLeadRecord(existing, row, importedAt, actor, organisationId);
       updated.push(merged);
       linkedExisting += 1;
@@ -756,11 +769,12 @@ export function importInboundLeads(preview: LeadImportPreview, actor: AppUser, o
 
   const byIdentity = new Map<string, InboundLeadRecord>();
   for (const lead of state.optInLeads) {
-    byIdentity.set(`${lead.organisationId ?? "legacy"}:${lead.identityKey}`, lead);
+    const sourceKey = lead.sourceRecordId ? `source:${lead.sourceSystem ?? "CSV"}:${lead.sourceRecordId}` : `identity:${lead.identityKey}`;
+    byIdentity.set(`${lead.organisationId ?? "legacy"}:${sourceKey}`, lead);
   }
 
   state.optInLeads = [...byIdentity.values()].sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt));
-  return { created, updated, createdClients, linkedExisting, reviewRequired: preview.counts.reviewRequired, leads: state.optInLeads };
+  return { created, updated, createdClients, linkedExisting, unchanged, reviewRequired: preview.counts.reviewRequired, leads: state.optInLeads };
 }
 
 export function qualifyInboundLead(inboundLeadId: string, actor: AppUser) {

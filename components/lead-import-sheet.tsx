@@ -4,9 +4,9 @@ import { useEffect, useRef, useState } from "react";
 import { useSession } from "@/components/session-provider";
 
 type PreviewRow = { rowNumber: number; disposition: "CREATE" | "LINK_EXISTING" | "DUPLICATE_IN_FILE" | "REVIEW_REQUIRED" | "INVALID"; reason: string; name: string; emailMasked: string; phoneMasked: string };
-type Preview = { batchHash: string; rows: PreviewRow[]; counts: { total: number; accepted: number; create: number; existingMatch: number; duplicate: number; reviewRequired: number; invalid: number }; canImport: boolean; batchErrors: string[] };
+type Preview = { batchHash: string; formatLabel: string; columns: string[]; rows: PreviewRow[]; counts: { total: number; accepted: number; create: number; existingMatch: number; duplicate: number; reviewRequired: number; invalid: number; sourceTombstone: number }; canImport: boolean; batchErrors: string[] };
 type PreviewResponse = { ok: boolean; error?: string; preview?: Preview; expectedRevision?: number | null; expectedOrganisationVersion?: number };
-type ImportResult = { createdClients: number; linkedExistingClients: number; reviewRequired: number; rejected: number; importedLeads?: number };
+type ImportResult = { createdClients: number; linkedExistingClients: number; reviewRequired: number; rejected: number; importedLeads?: number; unchanged?: number };
 
 export function LeadImportSheet({ onImported }: { onImported: () => Promise<void> }) {
   const { activeUser } = useSession();
@@ -16,7 +16,7 @@ export function LeadImportSheet({ onImported }: { onImported: () => Promise<void
   const [revision, setRevision] = useState<number | null | undefined>(undefined);
   const [organisationVersion, setOrganisationVersion] = useState<number | undefined>(undefined);
   const [busy, setBusy] = useState(false);
-  const [message, setMessage] = useState("Select the Uchit CSV template to begin.");
+  const [message, setMessage] = useState("Select a Vastu With Yogesh Apply Leads CSV to begin.");
   const [errorKind, setErrorKind] = useState<"none" | "validation" | "conflict" | "network">("none");
   const [result, setResult] = useState<ImportResult | null>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
@@ -34,7 +34,7 @@ export function LeadImportSheet({ onImported }: { onImported: () => Promise<void
 
   function reset(nextOpen = false) {
     setOpen(nextOpen); setFile(null); setPreview(null); setRevision(undefined); setOrganisationVersion(undefined);
-    setResult(null); setErrorKind("none"); setMessage("Select the Uchit CSV template to begin.");
+    setResult(null); setErrorKind("none"); setMessage("Select a Vastu With Yogesh Apply Leads CSV to begin.");
     idempotencyKey.current = crypto.randomUUID();
   }
 
@@ -80,12 +80,13 @@ export function LeadImportSheet({ onImported }: { onImported: () => Promise<void
         <header className="lead-import-header"><div><span className="eyebrow">Founder-only import</span><h2 id="lead-import-title">Upload leads</h2><p>Validate the whole batch before Uchit creates or links any permanent client.</p></div><button type="button" className="drawer-close" onClick={() => reset(false)} disabled={busy} aria-label="Close lead upload">×</button></header>
         <div className="lead-import-body">{!result ? <>
           <section className="lead-import-select" aria-labelledby="lead-import-select-title"><div><h3 id="lead-import-select-title">1. Select file</h3><p>CSV only · 2 MB maximum · 1,000 rows. XLSX is deferred.</p></div><a className="button-secondary" href="/api/optin-leads?template=1">Download template</a>
-            <label className="lead-file-picker"><span>CSV file</span><input ref={fileInput} type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); setPreview(null); setResult(null); setMessage(next ? `${next.name} selected. Validate it before importing.` : "Select the Uchit CSV template to begin."); idempotencyKey.current = crypto.randomUUID(); }} /><small>{file?.name ?? "No file selected"}</small></label>
+            <label className="lead-file-picker"><span>CSV file</span><input ref={fileInput} type="file" accept=".csv,text/csv" disabled={busy} onChange={(event) => { const next = event.target.files?.[0] ?? null; setFile(next); setPreview(null); setResult(null); setMessage(next ? `${next.name} selected. Validate it before importing.` : "Select a Vastu With Yogesh Apply Leads CSV to begin."); idempotencyKey.current = crypto.randomUUID(); }} /><small>{file?.name ?? "No file selected"}</small></label>
           </section>
-          {preview ? <section className="lead-import-preview" aria-labelledby="lead-import-preview-title"><header><div><h3 id="lead-import-preview-title">2. Preview rows</h3><p>No data has been changed.</p></div><div className="lead-import-counts"><span className="status-pill status-ready">{preview.counts.accepted} accepted</span><span className="status-pill status-neutral">{preview.counts.existingMatch + preview.counts.duplicate} matches</span><span className="status-pill status-attention">{preview.counts.reviewRequired} review</span><span className="status-pill status-blocked">{preview.counts.invalid} invalid</span></div></header>
+          {preview ? <section className="lead-import-preview" aria-labelledby="lead-import-preview-title"><header><div><h3 id="lead-import-preview-title">2. Preview rows</h3><p>Detected format: <strong>{preview.formatLabel}</strong>. No data has been changed.</p></div><div className="lead-import-counts"><span className="status-pill status-ready">{preview.counts.accepted} accepted</span><span className="status-pill status-neutral">{preview.counts.existingMatch + preview.counts.duplicate} matches</span><span className="status-pill status-attention">{preview.counts.reviewRequired} review</span><span className="status-pill status-blocked">{preview.counts.invalid} invalid</span>{preview.counts.sourceTombstone ? <span className="status-pill status-neutral">{preview.counts.sourceTombstone} source tombstone</span> : null}</div></header>
             {preview.batchErrors.length ? <div role="alert" className="blocked-note">{preview.batchErrors.join(" ")}</div> : null}
             <div className="lead-import-table-wrap"><table><thead><tr><th>Row</th><th>Lead</th><th>Contact</th><th>Result</th><th>Reason</th></tr></thead><tbody>{preview.rows.map((row) => <tr key={row.rowNumber}><td>{row.rowNumber}</td><td>{row.name}</td><td>{row.emailMasked}<br />{row.phoneMasked}</td><td><span className={`status-pill status-${row.disposition === "INVALID" ? "blocked" : row.disposition === "REVIEW_REQUIRED" ? "attention" : row.disposition === "CREATE" ? "ready" : "neutral"}`}>{row.disposition.replaceAll("_", " ")}</span></td><td>{row.reason}</td></tr>)}</tbody></table></div>
-            <details><summary>Permitted column mapping</summary><p className="meta">Full name, email, phone, city, service interest, source, received date, message and UTM attribution only. Owner, DOB/numerology, payments, cases, evaluations and reports are rejected.</p></details>
+            <p className="meta">Source IDs remain immutable references. Uchit permanent Client IDs are created or linked separately and are never replaced.</p>
+            <details><summary>Detected columns ({preview.columns.length})</summary><p className="meta">{preview.columns.join(", ")}</p><p className="meta">DOB and source-only metadata stay restricted to the Founder profile. Assignment never changes the Uchit owner; tombstones never delete a client.</p><a href="/api/optin-leads?template=minimal" className="text-link">Download Uchit minimal template</a></details>
             {preview.counts.invalid || preview.counts.reviewRequired ? <button type="button" className="text-button" onClick={downloadIssues}>Download issue CSV</button> : null}
           </section> : null}</> : <section className="lead-import-result" aria-labelledby="lead-import-result-title"><span className="status-pill status-approved">Complete</span><h3 id="lead-import-result-title">Import summary</h3><dl><div><dt>Permanent clients created</dt><dd>{result.createdClients}</dd></div><div><dt>Existing clients linked</dt><dd>{result.linkedExistingClients}</dd></div><div><dt>Review Required</dt><dd>{result.reviewRequired}</dd></div><div><dt>Rejected</dt><dd>{result.rejected}</dd></div></dl><p>Review Required rows were not auto-merged. No payment, case, evaluation or report state was changed.</p></section>}</div>
         <footer className="lead-import-footer"><div role={errorKind === "none" ? "status" : "alert"} aria-live="polite"><span>{message}</span>{errorKind === "conflict" ? <small>Your file and preview remain here. Reload the lead workspace, then validate again.</small> : errorKind === "network" ? <small>Check the connection and retry; no import was committed.</small> : null}</div>{result ? <button type="button" className="button" onClick={() => reset(false)}>Done</button> : preview ? <button type="button" className="button" disabled={busy || !preview.canImport} onClick={() => void submit("confirm")}>{busy ? "Importing…" : "Confirm import"}</button> : <button type="button" className="button" disabled={busy || !file} onClick={() => void submit("preview")}>{busy ? "Validating…" : "Preview rows"}</button>}</footer>

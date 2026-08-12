@@ -210,6 +210,14 @@ export async function findImmutableAuditEventByIdempotency(organisationId: strin
   return row ? auditFromRow(row) : null;
 }
 
+export async function findImmutableAuditEventByEntity(organisationId: string, action: string, entityType: string, entityId: string) {
+  const db = database();
+  await migrateD1(db);
+  const row = await db.prepare("SELECT * FROM audit_events WHERE organisation_id=? AND action=? AND entity_type=? AND entity_id=? ORDER BY occurred_at LIMIT 1")
+    .bind(organisationId, action, entityType, entityId).first<AuditRow>();
+  return row ? auditFromRow(row) : null;
+}
+
 export async function resolveActiveOrganisationContext(actor: AppUser, allowFounderBootstrap = false): Promise<FounderFoundationContext> {
   const db = database();
   await migrateD1(db);

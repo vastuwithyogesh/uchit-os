@@ -38,15 +38,39 @@ test("server route is Founder-only, exact-field, bounded, audited and replay-saf
   assert.doesNotMatch(route, /organisationId\s*=\s*formData|get\("organisationId"\)/);
 });
 
-test("import contract rejects sensitive/authoritative columns and never maps owner or protected state", () => {
+test("import contract isolates approved source profile and never maps owner or protected state", () => {
   const parser = source("lib/lead-import.ts");
   const service = source("lib/workflow-service.ts");
-  assert.match(parser, /dob\|dateofbirth\|gender\|birthtime\|birthplace\|vehicle\|house\|rawpayload\|assignedto\|owner/);
+  assert.match(parser, /VASTU_WITH_YOGESH_APPLY_LEADS/);
+  assert.match(parser, /sourceAssignedTo/);
+  assert.match(parser, /sourceDeletedAt/);
+  assert.match(parser, /sourceProfile/);
   assert.match(parser, /Formula-like CSV cells are not allowed/);
   assert.match(parser, /REVIEW_REQUIRED/);
   assert.match(service, /preserveCanonical/);
+  assert.match(service, /sourceRowHash/);
+  assert.match(service, /unchanged \+= 1/);
+  assert.match(service, /assignedSetterId = setterId/);
   const block = service.slice(service.indexOf("export function importInboundLeads"), service.indexOf("export function qualifyInboundLead"));
   assert.doesNotMatch(block, /payment|proposal|caseId|evaluation|reportVersions|assignedSetterId\s*=/i);
+});
+
+test("default template and preview expose the exact named format without private row data", () => {
+  const route = source("app/api/optin-leads/route.ts");
+  const parser = source("lib/lead-import.ts");
+  const sheet = source("components/lead-import-sheet.tsx");
+  const drawer = source("components/unified-leads-workspace.tsx");
+  const bootstrap = source("app/api/bootstrap/route.ts");
+  for (const column of ["id", "dob", "landing_page", "assigned_to", "deleted_at", "property_stage", "client_code"]) assert.match(parser, new RegExp(`"${column}"`));
+  assert.match(route, /vastu-with-yogesh-apply-leads-template\.csv/);
+  assert.match(parser, /rows\.map\(\(\{ parsed: _parsed, targetClientId: _targetClientId/);
+  assert.match(sheet, /Detected format/);
+  assert.match(sheet, /Source IDs remain immutable references/);
+  assert.match(drawer, /Private source details/);
+  assert.match(drawer, /activeUser\.role === "SUPER_ADMIN"/);
+  assert.match(bootstrap, /access\.actor\.role === "SUPER_ADMIN"/);
+  assert.match(bootstrap, /sourceProfile: _sourceProfile/);
+  assert.doesNotMatch(drawer.slice(drawer.indexOf("<table"), drawer.indexOf("</table>")), /Date of birth|sourceRecordId|landingPage|referrer/);
 });
 
 test("mobile sheet and controls preserve full-screen, focus and 44px contracts", () => {

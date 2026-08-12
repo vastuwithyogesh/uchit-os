@@ -35,6 +35,7 @@ function hydrateLead(record: Partial<InboundLeadRecord>, index: number): Inbound
   const lastSeenAt = normalizeCsvDate(String(record.lastSeenAt ?? importedAt));
 
   return {
+    ...record,
     id: String(record.id ?? `inbound_${Date.now()}_${index}`),
     uniqueClientId,
     identityKey,

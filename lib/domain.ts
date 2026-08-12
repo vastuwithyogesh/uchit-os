@@ -253,6 +253,22 @@ export interface LeadQualificationRecord extends OrganisationOwnedRecord {
   conversationalForm: Array<{ label: string; answer: string }>;
 }
 
+export interface LeadSourceProfile {
+  format: "VASTU_WITH_YOGESH_APPLY_LEADS";
+  sourceRowHash: string;
+  rawPhone?: string;
+  dob?: string;
+  sourceAssignedTo?: string;
+  sourceDeletedAt?: string;
+  propertyStage?: "new" | "existing";
+  sourceCreatedAt: string;
+  sourceLastSubmittedAt: string;
+  sourceSubmissionCount: number;
+  landingPage?: string;
+  referrer?: string;
+  sourceNote?: string;
+}
+
 export interface InboundLeadRecord extends OrganisationOwnedRecord {
   id: string;
   uniqueClientId: string;
@@ -291,6 +307,7 @@ export interface InboundLeadRecord extends OrganisationOwnedRecord {
   sourceRecordType?: string;
   sourceRecordId?: string;
   externalClientCode?: string;
+  sourceProfile?: LeadSourceProfile;
   syncStatus?: "RECEIVED" | "APPLIED" | "REVIEW_REQUIRED" | "FAILED";
   lastSyncedAt?: string;
   sourceEventId?: string;
