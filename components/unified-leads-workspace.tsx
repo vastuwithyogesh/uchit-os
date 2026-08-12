@@ -7,6 +7,7 @@ import { canonicalPipelineStages } from "@/lib/domain";
 import { getAllowedPipelineTransitions, normalizeClientPipeline } from "@/lib/crm-pipeline";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
+import { LeadImportSheet } from "@/components/lead-import-sheet";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
 type LeadPayload = { leads: InboundLeadRecord[] };
@@ -56,7 +57,7 @@ function normaliseRows(state: Bootstrap | null, leads: InboundLeadRecord[]): Row
     rows.set(lead.id, {
       id: lead.id, clientId: client?.id, name: client?.displayName ?? lead.fullName,
       email: client?.email ?? lead.email, phone: client?.phone ?? lead.phone, city: client?.city ?? lead.city,
-      serviceInterest: client ? intakes.get(client.id)?.propertyContext?.serviceInterest : undefined,
+      serviceInterest: client ? intakes.get(client.id)?.propertyContext?.serviceInterest ?? lead.serviceInterest : lead.serviceInterest,
       source: client?.source ?? lead.source, sourceRecordId: lead.sourceRecordId,
       sourceSystem: lead.sourceSystem ?? "UCHIT", stage: pipeline?.stage ?? (lead.status === "QUALIFIED" ? "QUALIFIED" : "NEW"),
       nextAction: pipeline?.nextAction, syncStatus: lead.syncStatus ?? "NATIVE", receivedAt: lead.firstSeenAt ?? lead.importedAt,
@@ -191,7 +192,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const resetFilters = () => { setQuery(""); setSourceFilter("ALL"); setStageFilter("ALL"); setDateFrom(""); setDateTo(""); setShowArchived(false); };
 
   return <section className={`lead-workspace ${isPipelinePage ? "lead-workspace-pipeline" : "lead-workspace-table"}`} aria-labelledby="unified-leads-title">
-    <header className="lead-workspace-header"><div><h2 id="unified-leads-title">{isPipelinePage ? "Lead Pipeline" : "Leads / Opt-ins"}</h2><p>{isPipelinePage ? "Acquisition and qualification only. Every move is confirmed by the Uchit server." : `${activeCount} active leads · canonical Uchit records`}</p></div>{!isPipelinePage ? <label className="archive-toggle"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} /> Show archived</label> : <span className="status-pill status-neutral">Lovable sync dormant</span>}</header>
+    <header className="lead-workspace-header"><div><h2 id="unified-leads-title">{isPipelinePage ? "Lead Pipeline" : "Leads / Opt-ins"}</h2><p>{isPipelinePage ? "Acquisition and qualification only. Every move is confirmed by the Uchit server." : `${activeCount} active leads · canonical Uchit records`}</p></div>{!isPipelinePage ? <div className="lead-header-actions"><label className="archive-toggle"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} /> Show archived</label><LeadImportSheet onImported={() => refresh(selected?.id)} /></div> : <span className="status-pill status-neutral">Lovable sync dormant</span>}</header>
 
     <div className="lead-filterbar" aria-label="Lead filters">
       <label><span>Search</span><input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Client ID, name, contact or city" /></label>

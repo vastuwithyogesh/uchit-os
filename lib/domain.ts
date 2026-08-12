@@ -262,6 +262,7 @@ export interface InboundLeadRecord extends OrganisationOwnedRecord {
   phone: string;
   dob?: string;
   city: string;
+  serviceInterest?: VastuServiceType;
   source: string;
   statusLabel?: string;
   utmSource?: string;

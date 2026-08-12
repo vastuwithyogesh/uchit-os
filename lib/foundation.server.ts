@@ -202,6 +202,14 @@ export async function appendImmutableAuditEvent(input: Parameters<typeof buildAu
   return { event, replayed: false };
 }
 
+export async function findImmutableAuditEventByIdempotency(organisationId: string, idempotencyKey: string) {
+  const db = database();
+  await migrateD1(db);
+  const row = await db.prepare("SELECT * FROM audit_events WHERE organisation_id=? AND idempotency_key=?")
+    .bind(organisationId, idempotencyKey).first<AuditRow>();
+  return row ? auditFromRow(row) : null;
+}
+
 export async function resolveActiveOrganisationContext(actor: AppUser, allowFounderBootstrap = false): Promise<FounderFoundationContext> {
   const db = database();
   await migrateD1(db);

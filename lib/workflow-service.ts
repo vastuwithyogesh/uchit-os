@@ -19,7 +19,7 @@ import {
   WhatsAppTemplateRecord
 } from "@/lib/domain";
 import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonicalServiceStages, caseDocumentTypes, decisionMakerStatuses, decisionPriorities, deliveryMilestoneKinds, deliveryMilestoneStatuses, documentRevisionStatuses, energyStatuses, implementationHorizons, implementationStatuses, placementStatuses, recommendationLevels, responsibilityRoles, serviceTypes, type AlignmentStatus, type AttentionClass, type CanonicalPipelineStage, type CanonicalServiceStage, type CaseDocumentType, type CaseDrawingReference, type CaseInputReadiness, type DecisionMakerStatus, type DecisionPriority, type DeliveryMilestoneKind, type DeliveryMilestoneStatus, type DocumentRevisionStatus, type EnergyStatus, type ImplementationHorizon, type ImplementationStatus, type PlacementStatus, type RecommendationLevel, type ResponsibilityRole, type VastuServiceType } from "@/lib/domain";
-import { buildInboundLeadIdentity, buildStableClientId, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, type ParsedInboundLeadRow } from "@/lib/lead-import";
+import { buildInboundLeadIdentity, normalizeCsvDate, normalizeLeadEmail, normalizeLeadPhone, toInboundLeadRecord, type LeadImportPreview, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { canCreateCase, generateUtilityEvaluation, lockWorkspace, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
 import { formatMoney } from "@/lib/workflows";
@@ -637,12 +637,12 @@ export function bookQualificationCall(input: {
   return lead;
 }
 
-function mergeLeadRecord(existing: InboundLeadRecord, incoming: ParsedInboundLeadRow, importedAt: string) {
+function mergeLeadRecord(existing: InboundLeadRecord, incoming: ParsedInboundLeadRow, importedAt: string, actor?: AppUser, organisationId?: string) {
   existing.fullName = incoming.fullName || existing.fullName;
   existing.email = normalizeLeadEmail(incoming.email || existing.email);
   existing.phone = normalizeLeadPhone(incoming.phone || existing.phone);
-  existing.dob = incoming.dob || existing.dob;
   existing.city = incoming.city || existing.city;
+  existing.serviceInterest = incoming.serviceInterest ?? existing.serviceInterest;
   existing.source = incoming.source || existing.source;
   existing.statusLabel = incoming.statusLabel || existing.statusLabel;
   existing.utmSource = incoming.utmSource || existing.utmSource;
@@ -650,37 +650,41 @@ function mergeLeadRecord(existing: InboundLeadRecord, incoming: ParsedInboundLea
   existing.utmCampaign = incoming.utmCampaign || existing.utmCampaign;
   existing.utmTerm = incoming.utmTerm || existing.utmTerm;
   existing.utmContent = incoming.utmContent || existing.utmContent;
-  existing.landingPage = incoming.landingPage || existing.landingPage;
-  existing.referrer = incoming.referrer || existing.referrer;
-  existing.assignedTo = incoming.assignedTo || existing.assignedTo;
-  existing.deletedAt = incoming.deletedAt || existing.deletedAt;
-  existing.score = incoming.score ?? existing.score;
   existing.message = [existing.message, incoming.message].filter(Boolean).join(" | ");
   existing.notes = [existing.notes, incoming.notes].filter(Boolean).join(" | ");
-  existing.status = existing.status === "QUALIFIED" ? "QUALIFIED" : "DUPLICATE";
   existing.firstSeenAt = existing.firstSeenAt || incoming.csvCreatedDate || importedAt.slice(0, 10);
   const lastSeenCandidates = [existing.lastSeenAt, incoming.csvCreatedDate].filter(Boolean).sort();
   existing.lastSeenAt = lastSeenCandidates[lastSeenCandidates.length - 1] ?? existing.lastSeenAt;
   existing.submissionCount += 1;
   existing.duplicateCount += 1;
   existing.isReturningLead = true;
+  existing.sourceSystem = existing.sourceSystem ?? "CSV_IMPORT";
+  existing.syncStatus = "APPLIED";
+  existing.organisationId = organisationId || existing.organisationId;
+  existing.createdByActorUserId ??= actor?.id;
+  existing.updatedByActorUserId = actor?.id ?? existing.updatedByActorUserId;
+  existing.recordVersion = (existing.recordVersion ?? 0) + 1;
   return existing;
 }
 
-function upsertClientShellFromInboundLead(lead: InboundLeadRecord, actor?: AppUser) {
+function upsertClientShellFromInboundLead(lead: InboundLeadRecord, actor?: AppUser, organisationId?: string, preserveCanonical = false) {
   const state = getAppState();
   const existingClient = state.clients.find((client) => client.id === lead.uniqueClientId);
   const stage = lead.status === "QUALIFIED" ? "QUALIFIED" : lead.status === "DISQUALIFIED" ? "DISQUALIFIED" : lead.score >= 80 ? "QUALIFIED" : lead.score >= 60 ? "QUALIFYING" : "NEW";
   const setterId = actor?.role === "SETTER" ? actor.id : existingClient?.assignedSetterId ?? "";
 
   if (existingClient) {
-    existingClient.displayName = lead.fullName || existingClient.displayName;
-    existingClient.email = lead.email || existingClient.email;
-    existingClient.phone = lead.phone || existingClient.phone;
-    existingClient.city = lead.city || existingClient.city;
-    existingClient.source = lead.source || existingClient.source;
-    existingClient.assignedSetterId = setterId;
-    existingClient.stage = stage;
+    if (organisationId && existingClient.organisationId && existingClient.organisationId !== organisationId) throw new WorkflowConflictError("Client not found in this organisation.");
+    existingClient.displayName = preserveCanonical ? existingClient.displayName || lead.fullName : lead.fullName || existingClient.displayName;
+    existingClient.email = preserveCanonical ? existingClient.email || lead.email : lead.email || existingClient.email;
+    existingClient.phone = preserveCanonical ? existingClient.phone || lead.phone : lead.phone || existingClient.phone;
+    existingClient.city = preserveCanonical ? existingClient.city || lead.city : lead.city || existingClient.city;
+    existingClient.source = preserveCanonical ? existingClient.source || lead.source : lead.source || existingClient.source;
+    if (!preserveCanonical) { existingClient.assignedSetterId = setterId; existingClient.stage = stage; }
+    existingClient.organisationId = organisationId || existingClient.organisationId;
+    existingClient.createdByActorUserId ??= actor?.id;
+    existingClient.updatedByActorUserId = actor?.id ?? existingClient.updatedByActorUserId;
+    existingClient.recordVersion = (existingClient.recordVersion ?? 0) + 1;
     return existingClient;
   }
 
@@ -692,88 +696,71 @@ function upsertClientShellFromInboundLead(lead: InboundLeadRecord, actor?: AppUs
     city: lead.city,
     source: lead.source,
     assignedSetterId: setterId,
-    stage
+    stage: preserveCanonical ? "NEW" : stage,
+    pipelineStage: "NEW",
+    organisationId: organisationId || lead.organisationId,
+    createdByActorUserId: actor?.id,
+    updatedByActorUserId: actor?.id,
+    recordVersion: 1
   };
   state.clients.unshift(client);
   return client;
 }
 
-export function importInboundLeads(rows: ParsedInboundLeadRow[]) {
+export function importInboundLeads(preview: LeadImportPreview, actor: AppUser, organisationId: string) {
+  if (!preview.canImport || preview.batchErrors.length || preview.counts.invalid) throw new Error("The whole CSV batch must pass validation before import.");
   const state = getAppState();
   const importedAt = nowIso();
-  const seenThisBatch = new Map<string, InboundLeadRecord>();
   const created: InboundLeadRecord[] = [];
   const updated: InboundLeadRecord[] = [];
+  const createdClients: ClientRecord[] = [];
+  let linkedExisting = 0;
 
-  for (const [index, row] of rows.entries()) {
+  for (const [index, previewRow] of preview.rows.entries()) {
+    if (!previewRow.parsed || previewRow.disposition === "INVALID" || previewRow.disposition === "REVIEW_REQUIRED") continue;
+    const row = previewRow.parsed;
     const identityKey = buildInboundLeadIdentity(row);
-    const uniqueClientId = buildStableClientId(identityKey);
-    const existing = seenThisBatch.get(identityKey) ?? state.optInLeads.find((item) => item.identityKey === identityKey || item.uniqueClientId === uniqueClientId);
+    const uniqueClientId = previewRow.targetClientId!;
+    const existing = state.optInLeads.find((item) => item.organisationId === organisationId
+      && (item.identityKey === identityKey || item.uniqueClientId === uniqueClientId || item.convertedClientId === uniqueClientId));
 
     if (existing) {
-      const merged = mergeLeadRecord(existing, row, importedAt);
-      seenThisBatch.set(identityKey, merged);
+      const merged = mergeLeadRecord(existing, row, importedAt, actor, organisationId);
       updated.push(merged);
+      linkedExisting += 1;
       appendTimeline(
         merged.uniqueClientId,
-        "Lead refilled",
-        `Repeat opt-in received from ${merged.fullName}. Submission count is now ${merged.submissionCount}.`,
-        "Lead"
+        "CSV lead matched",
+        "A repeat CSV lead was linked to this permanent client after exact identity validation.",
+        "Lead",
+        actor
       );
       continue;
     }
 
-    const lead: InboundLeadRecord = {
-      id: `inbound_${Date.now()}_${index}`,
-      uniqueClientId,
-      identityKey,
-      fullName: row.fullName,
-      email: normalizeLeadEmail(row.email),
-      phone: normalizeLeadPhone(row.phone),
-      dob: row.dob,
-      city: row.city,
-      source: row.source,
-      statusLabel: row.statusLabel,
-      utmSource: row.utmSource,
-      utmMedium: row.utmMedium,
-      utmCampaign: row.utmCampaign,
-      utmTerm: row.utmTerm,
-      utmContent: row.utmContent,
-      landingPage: row.landingPage,
-      referrer: row.referrer,
-      assignedTo: row.assignedTo,
-      deletedAt: row.deletedAt,
-      score: row.score,
-      message: row.message,
-      notes: row.notes,
-      status: "NEW",
-      importedAt,
-      firstSeenAt: row.csvCreatedDate || importedAt.slice(0, 10),
-      lastSeenAt: row.csvCreatedDate || importedAt.slice(0, 10),
-      submissionCount: 1,
-      duplicateCount: 0,
-      isReturningLead: false
-    };
-
-    seenThisBatch.set(identityKey, lead);
+    const lead = { ...toInboundLeadRecord(row, index), uniqueClientId, identityKey, importedAt,
+      organisationId, createdByActorUserId: actor.id, updatedByActorUserId: actor.id, recordVersion: 1 };
     created.push(lead);
-    upsertClientShellFromInboundLead(lead);
+    state.optInLeads.push(lead);
+    const clientAlreadyExisted = state.clients.some((client) => client.id === uniqueClientId);
+    const client = upsertClientShellFromInboundLead(lead, actor, organisationId, true);
+    if (clientAlreadyExisted) linkedExisting += 1; else createdClients.push(client);
     appendTimeline(
       lead.uniqueClientId,
-      "Lead imported",
-      `New website opt-in captured from ${lead.source}. Submission count is now ${lead.submissionCount}.`,
-      "Lead"
+      clientAlreadyExisted ? "CSV lead linked" : "CSV lead imported",
+      clientAlreadyExisted ? "A validated CSV lead was linked to this permanent client." : "A validated CSV lead created this permanent client record.",
+      "Lead",
+      actor
     );
   }
 
   const byIdentity = new Map<string, InboundLeadRecord>();
-  for (const lead of [...state.optInLeads, ...updated, ...created]) {
-    byIdentity.set(lead.identityKey, lead);
+  for (const lead of state.optInLeads) {
+    byIdentity.set(`${lead.organisationId ?? "legacy"}:${lead.identityKey}`, lead);
   }
 
   state.optInLeads = [...byIdentity.values()].sort((left, right) => right.lastSeenAt.localeCompare(left.lastSeenAt));
-  void writeOptInLeadRecords(state.optInLeads);
-  return { created, updated, leads: state.optInLeads };
+  return { created, updated, createdClients, linkedExisting, reviewRequired: preview.counts.reviewRequired, leads: state.optInLeads };
 }
 
 export function qualifyInboundLead(inboundLeadId: string, actor: AppUser) {

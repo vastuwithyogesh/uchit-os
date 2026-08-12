@@ -43,6 +43,7 @@ function hydrateLead(record: Partial<InboundLeadRecord>, index: number): Inbound
     phone: normalizedPhone,
     dob: record.dob,
     city: String(record.city ?? ""),
+    serviceInterest: record.serviceInterest,
     source: String(record.source ?? "Website opt-in"),
     statusLabel: record.statusLabel,
     utmSource: record.utmSource,
