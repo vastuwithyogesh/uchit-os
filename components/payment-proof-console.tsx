@@ -198,7 +198,12 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
             {(appState?.clients ?? []).map((client) => <option key={client.id} value={client.id}>{client.displayName}</option>)}
           </select>
         </div>
-        <div className="stat-grid" style={{ marginTop: 18 }}>
+        {focus === "balance" ? <details className="founder-technical-details"><summary>Payment status details</summary><div className="stat-grid details-body">{[
+          [payload?.summary.required ?? 0, "receipts needed"],
+          [payload?.summary.uploaded ?? 0, "receipts uploaded"],
+          [payload?.summary.pending ?? 0, "still needed"],
+          [payload?.summary.complete ? "Yes" : "No", "all uploaded"]
+        ].map(([value, labelText]) => <div className="stat-card" key={labelText}><span className="stat-value">{value}</span><span className="stat-label">{labelText}</span></div>)}</div></details> : <div className="stat-grid" style={{ marginTop: 18 }}>
           <div className="stat-card">
             <span className="stat-value">{payload?.summary.required ?? 0}</span>
             <span className="stat-label">receipts needed</span>
@@ -215,7 +220,7 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
             <span className="stat-value">{payload?.summary.complete ? "Yes" : "No"}</span>
             <span className="stat-label">all uploaded</span>
           </div>
-        </div>
+        </div>}
         <div className="hero-actions" style={{ marginTop: 16 }} hidden={focus !== "all"}>
           <a href="/crm" className="button-secondary">
             Open CRM
@@ -297,7 +302,10 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
         <div className="eyebrow">Your next step</div>
         <h2>{payload?.summary.complete ? "Receipts are complete" : "Upload the missing receipt"}</h2>
         <p className="meta">Founder Edition permits the organisation owner to upload and confirm this checkpoint; the immutable approval remains auditable.</p>
-        <div className="list" style={{ marginTop: 14 }}>
+        {focus === "balance" ? <details className="founder-technical-details"><summary>Receipt history and gate context</summary><div className="details-body"><div className="list">{proofKeys.map((key) => {
+          const asset = assetsByKey[key];
+          return <div key={key} className="list-item"><strong>{uploadLabels[key]}</strong><span className={`tag ${asset ? "good" : "warn"}`}>{asset ? "Uploaded" : "Missing"}</span><span className="meta">{asset ? asset.fileName : "No proof uploaded yet"}</span></div>;
+        })}</div><div className="panel"><strong>Why this is needed</strong><div className="meta" style={{ marginTop: 6 }}>The advance receipt opens the case. The balance receipt lets the report move to final approval.</div></div></div></details> : <><div className="list" style={{ marginTop: 14 }}>
           {proofKeys.map((key) => {
             const asset = assetsByKey[key];
             return (
@@ -314,7 +322,7 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
           <div className="meta" style={{ marginTop: 6 }}>
             The advance receipt opens the case. The balance receipt lets the report move to final approval.
           </div>
-        </div>
+        </div></>}
         <div className="footer-note" role="status" aria-live="polite">{message}</div>
       </div>
     </section>

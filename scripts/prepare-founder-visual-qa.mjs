@@ -23,6 +23,7 @@ const manifest = {
     "/founder/08",
     "/founder/10",
     "/founder/11",
+    "/founder/12",
     "/reports",
     "/diagnostics"
   ],

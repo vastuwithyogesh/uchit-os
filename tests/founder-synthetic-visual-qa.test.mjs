@@ -29,3 +29,14 @@ test("manual-sheet visual QA keeps the selected evidence task primary", () => {
   assert.match(ui, /<summary>Version history and recovery<\/summary>/);
   assert.match(ui, /files-focus-\$\{focus\}/);
 });
+
+test("balance visual QA keeps payment confirmation primary and details progressive", () => {
+  const ui = read("components/payment-proof-console.tsx");
+  const manifest = read("scripts/prepare-founder-visual-qa.mjs");
+  assert.match(ui, /focus === "balance"/);
+  assert.match(ui, /<summary>Payment status details<\/summary>/);
+  assert.match(ui, /<summary>Receipt history and gate context<\/summary>/);
+  assert.match(ui, /balance-proof-verify/);
+  assert.match(ui, /Confirm full balance/);
+  assert.match(manifest, /"\/founder\/12"/);
+});
