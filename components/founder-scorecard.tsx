@@ -81,7 +81,7 @@ export function FounderScorecard({ scorecard }: { scorecard: FounderScorecardMod
             ))}
           </div>
         ) : (
-          <div className="founder-scorecard-empty"><p>No floor workspace exists yet. Complete case setup, then add the first floor.</p><a className="button-secondary" href="/ops">Open floor setup</a></div>
+          <div className="founder-scorecard-empty"><p>No floor workspace exists yet. Complete case setup, then add the first floor.</p><a className="button-secondary" href="/clients-cases">Open Clients &amp; Cases</a></div>
         )}
       </section>
 
