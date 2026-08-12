@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runFounderPreStagingRehearsal } from "../scripts/rehearse-founder-pre-staging.mjs";
 
-test("disposable SQLite rehearses clean and upgrade v11 paths with recovery evidence", async () => {
+test("disposable SQLite rehearses clean and upgrade v12 paths with recovery evidence", async () => {
   const result = await runFounderPreStagingRehearsal();
   assert.equal(result.scope, "DISPOSABLE_LOCAL_ONLY");
   assert.equal(result.persistentEnvironmentTouched, false);
   assert.equal(result.disposed, true);
-  assert.deepEqual(result.cleanPath, { from: 1, to: 11, markerCount: 11, idempotent: true });
+  assert.deepEqual(result.cleanPath, { from: 1, to: 12, markerCount: 12, idempotent: true });
   assert.equal(result.upgradePath.syntheticDataPreserved, true);
   assert.equal(result.upgradePath.integrity, "ok");
   assert.equal(result.backupRestore.backupCreated, true);

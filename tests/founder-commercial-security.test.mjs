@@ -23,7 +23,8 @@ test("commercial actions are server-owned, allowlisted, CAS/idempotent and tenan
 
 test("legal, acceptance, invoice and client privacy gates fail closed", () => {
   const commercial = source("lib/founder-commercial.ts");
-  for (const marker of ["P5_OWNER_LEGAL", "P13_OWNER_LEGAL", "P14_OWNER_LEGAL", "MISSING_STATUTORY_CONFIG", "BLOCKED — OWNER\/LEGAL INPUT REQUIRED"]) assert.match(commercial, new RegExp(marker));
+  for (const marker of ["P5_OWNER_LEGAL", "P13_OWNER_LEGAL", "P14_OWNER_LEGAL", "BLOCKED — OWNER\/LEGAL INPUT REQUIRED"]) assert.match(commercial, new RegExp(marker));
+  assert.match(source("lib/founder-statutory-documents.ts"), /REVIEW_REQUIRED_ACCOUNTANT/);
   assert.match(commercial, /projectFounderProposalForClient/);
   assert.doesNotMatch(source("lib/commercial-document-renderer.ts"), /feeDeviationReason|classificationReason|advanceExceptionReason|gstDeviationReason/);
   assert.match(commercial, /acceptanceDoesNotCreateCase: true/);

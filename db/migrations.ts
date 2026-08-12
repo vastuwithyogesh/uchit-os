@@ -462,6 +462,64 @@ export const d1Migrations: readonly D1Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_founder_deadlines_due ON founder_balance_deadlines(organisation_id,status,due_at)",
       "CREATE INDEX IF NOT EXISTS idx_founder_invoices_due ON founder_commercial_invoices(organisation_id,status,due_at)"
     ]
+  },
+  {
+    version: 12,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS founder_statutory_policy_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, version INTEGER NOT NULL, status TEXT NOT NULL,
+        legal_business_name TEXT NOT NULL, gstin TEXT NOT NULL, registered_address TEXT NOT NULL,
+        email TEXT NOT NULL, phone_e164 TEXT NOT NULL, phone_display TEXT NOT NULL,
+        authorised_signatory TEXT NOT NULL, designation TEXT NOT NULL, sac TEXT NOT NULL,
+        line_description TEXT NOT NULL, default_gst_basis_points INTEGER NOT NULL,
+        reverse_charge_text TEXT NOT NULL, place_of_supply_basis TEXT NOT NULL,
+        place_of_supply_approval TEXT NOT NULL, service_timing_approval TEXT NOT NULL,
+        correction_policy_approval TEXT NOT NULL, service_timing_policy_text TEXT,
+        accountant_approval_reference TEXT, created_by_actor_user_id TEXT NOT NULL, created_at TEXT NOT NULL,
+        approved_at TEXT, activated_at TEXT, reason TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_billing_profile_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL,
+        version INTEGER NOT NULL, billing_legal_name TEXT NOT NULL, billing_address TEXT NOT NULL,
+        billing_state TEXT NOT NULL, billing_pin TEXT NOT NULL, recipient_registered_for_gst INTEGER NOT NULL,
+        recipient_gstin TEXT, client_location_country TEXT NOT NULL, client_location_state TEXT,
+        property_location TEXT, time_zone TEXT NOT NULL, created_by_actor_user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL, reason TEXT NOT NULL, predecessor_id TEXT, idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,client_id,prospective_project_id,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_statutory_sequence_reservations (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, document_kind TEXT NOT NULL,
+        fiscal_year TEXT NOT NULL, fiscal_year_compact TEXT NOT NULL, sequence INTEGER NOT NULL,
+        document_number TEXT NOT NULL, status TEXT NOT NULL, reserved_at TEXT NOT NULL,
+        reserved_by_actor_user_id TEXT NOT NULL, document_id TEXT NOT NULL, failure_code TEXT,
+        idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,document_kind,fiscal_year,sequence), UNIQUE (organisation_id,document_number),
+        UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_statutory_documents (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+        proposal_version_id TEXT NOT NULL, proposal_content_hash TEXT NOT NULL, client_id TEXT NOT NULL,
+        prospective_project_id TEXT NOT NULL, case_id TEXT, advance_payment_confirmation_id TEXT,
+        balance_payment_confirmation_ids_json TEXT NOT NULL, triggering_payment_id TEXT, due_at TEXT,
+        service_supplied_at TEXT, statutory_deadline_at TEXT, issued_at TEXT, issued_by_actor_user_id TEXT,
+        policy_version_id TEXT, billing_profile_version_id TEXT, document_number TEXT, sequence_reservation_id TEXT,
+        professional_fee_paise INTEGER NOT NULL, gst_basis_points INTEGER NOT NULL, cgst_paise INTEGER NOT NULL,
+        sgst_paise INTEGER NOT NULL, igst_paise INTEGER NOT NULL, gst_total_paise INTEGER NOT NULL,
+        round_off_paise INTEGER NOT NULL, total_payable_paise INTEGER NOT NULL, amount_received_paise INTEGER NOT NULL,
+        remaining_balance_paise INTEGER NOT NULL, amount_in_words TEXT NOT NULL, tax_mode TEXT NOT NULL,
+        balance_due_at TEXT, balance_deadline_status TEXT, logo_asset_version_id TEXT, logo_checksum_sha256 TEXT,
+        signature_asset_version_id TEXT, signature_checksum_sha256 TEXT, artifact_hash_sha256 TEXT,
+        private_object_key TEXT, renderer_version TEXT, failure_code TEXT, failure_at TEXT,
+        idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,idempotency_key), UNIQUE (organisation_id,document_number),
+        UNIQUE (organisation_id,artifact_hash_sha256)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_founder_statutory_due ON founder_statutory_documents(organisation_id,status,due_at)",
+      "CREATE INDEX IF NOT EXISTS idx_founder_statutory_project ON founder_statutory_documents(organisation_id,client_id,prospective_project_id,kind)"
+    ]
   }
 ];
 

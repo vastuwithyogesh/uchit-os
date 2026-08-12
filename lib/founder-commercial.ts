@@ -2,7 +2,6 @@ import type {
   AppUser,
   FounderCommercialLegalPolicyRecord,
   FounderCommercialPolicyVersionRecord,
-  FounderCommercialInvoiceRecord,
   FounderEngagementClassification,
   FounderProposalContentSnapshot,
   FounderProposalStep,
@@ -12,7 +11,8 @@ import type {
 } from "./domain.ts";
 import type { AppState } from "./store.ts";
 import { deterministicContentHash } from "./evaluation-provenance.ts";
-import { COMMERCIAL_INVOICE_RENDERER_VERSION, COMMERCIAL_PROPOSAL_RENDERER_VERSION, renderCommercialInvoicePdf, renderCommercialProposalPdf, type FounderProposalClientProjection } from "./commercial-document-renderer.ts";
+import { COMMERCIAL_PROPOSAL_RENDERER_VERSION, renderCommercialProposalPdf, type FounderProposalClientProjection } from "./commercial-document-renderer.ts";
+import { registerFinalTaxInvoiceReviewTask, registerStatutoryPaymentTrigger } from "./founder-statutory-documents.ts";
 
 export class FounderCommercialError extends Error {
   statusCode: number;
@@ -350,7 +350,6 @@ export async function respondToFounderProposal(input: { state: AppState; token: 
   if (input.response === "CHANGES_REQUESTED" && !input.requestedChanges?.trim()) fail(400, "Requested changes are required.");
   const record = { id: uuid(), organisationId: proposal.organisationId, proposalVersionId: proposal.id, proposalContentHash: proposal.contentHash, artifactHashSha256: artifact.artifactHashSha256, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, response: input.response, fullName: input.fullName.trim(), acceptanceChecked: input.response === "ACCEPTED" ? true : undefined, typedConfirmationHash: input.response === "ACCEPTED" ? await hashText(input.typedConfirmation!) : undefined, organisationName: input.organisationName?.trim(), designation: input.designation?.trim(), requestedChanges: input.requestedChanges?.trim(), respondedAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
   input.state.founderProposalResponses.push(record); proposal.status = input.response; if (input.response === "ACCEPTED") proposal.acceptedAt = record.respondedAt; proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
-  if (input.response === "ACCEPTED") input.state.founderCommercialInvoices.push({ id: uuid(), organisationId: proposal.organisationId, proposalVersionId: proposal.id, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, status: "NOT_DUE", amountReceivedPaise: 0, gstBasisPoints: proposal.content.commercial.gstAppliedBasisPoints, gstAmountSnapshotPaise: proposal.content.commercial.gstAmountPaise, remainingBalancePaise: proposal.content.commercial.totalPayablePaise, idempotencyKey: `invoice:not-due:${proposal.id}`, requestHash: deterministicContentHash({ proposalVersionId: proposal.id, state: "NOT_DUE" }), recordVersion: 1 });
   return record;
 }
 
@@ -373,11 +372,11 @@ export function confirmFounderCommercialPayment(input: { state: AppState; actor:
     const policy = input.state.founderCommercialPolicies.find((item) => item.id === deadline.commercialPolicyId)!; const instant = new Date(confirmedAt);
     deadline.advancePaymentConfirmationId = confirmation.id; deadline.advanceConfirmedAt = confirmedAt; deadline.dueAt = addDays(instant, policy.balanceDeadlineDays).toISOString(); deadline.status = remaining === 0 ? "PAID" : "DUE"; deadline.remainingAmountPaise = remaining; deadline.recordVersion = (deadline.recordVersion ?? 1) + 1;
     appendAudit(input.state, { organisationId: input.organisationId, eventType: "BALANCE_DEADLINE_CREATED", entityType: "BALANCE_DEADLINE", entityId: deadline.id, actorUserId: input.actor.id, reason: "Seven-day deadline created from immutable confirmed-advance timestamp.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, afterHash: deterministicContentHash({ advanceConfirmedAt: deadline.advanceConfirmedAt, dueAt: deadline.dueAt, policyVersion: deadline.commercialPolicyVersion }), idempotencyKey: `audit:deadline:${input.idempotencyKey}` });
-    const invoice = input.state.founderCommercialInvoices.find((item) => item.proposalVersionId === proposal.id)!; invoice.advancePaymentConfirmationId = confirmation.id; invoice.status = "DUE"; invoice.dueAt = addMinutes(instant, policy.advanceInvoiceSlaMinutes).toISOString(); invoice.amountReceivedPaise = input.amountPaise; invoice.remainingBalancePaise = remaining; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1;
-    appendAudit(input.state, { organisationId: input.organisationId, eventType: "ADVANCE_INVOICE_DUE", entityType: "COMMERCIAL_INVOICE", entityId: invoice.id, actorUserId: input.actor.id, reason: "Advance confirmation started the immutable sixty-minute invoice SLA.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, afterHash: deterministicContentHash({ advanceConfirmedAt: confirmedAt, dueAt: invoice.dueAt, policyVersion: policy.version }), idempotencyKey: `audit:invoice-due:${input.idempotencyKey}` });
-    if (!activeLegal(input.state, input.organisationId, "INVOICE_STATUTORY_CONFIG")) { invoice.status = "GENERATION_FAILED"; invoice.failureCode = "MISSING_STATUTORY_CONFIG"; invoice.failureAt = confirmedAt; }
+    appendAudit(input.state, { organisationId: input.organisationId, eventType: "RECEIPT_VOUCHER_DUE", entityType: "STATUTORY_DOCUMENT", entityId: confirmation.id, actorUserId: input.actor.id, reason: "Confirmed advance started the immutable sixty-minute GST Receipt Voucher SLA.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, afterHash: deterministicContentHash({ advanceConfirmedAt: confirmedAt, dueAt: addMinutes(instant, policy.advanceInvoiceSlaMinutes).toISOString(), policyVersion: policy.version }), idempotencyKey: `audit:receipt-voucher-due:${input.idempotencyKey}` });
   }
   if (remaining === 0) { deadline.status = "PAID"; deadline.remainingAmountPaise = 0; appendAudit(input.state, { organisationId: input.organisationId, eventType: "BALANCE_CONFIRMED", entityType: "BALANCE_DEADLINE", entityId: deadline.id, actorUserId: input.actor.id, reason: "Full GST-inclusive balance confirmed against the accepted proposal.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, idempotencyKey: `audit:balance:${input.idempotencyKey}` }); }
+  registerStatutoryPaymentTrigger({ state: input.state, proposalVersionId: proposal.id, confirmation, now: input.now });
+  if (remaining === 0 && terms.engagementClassification !== "INTERNAL_COMPLIMENTARY") registerFinalTaxInvoiceReviewTask({ state: input.state, proposalVersionId: proposal.id, confirmation });
   proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
   return confirmation;
 }
@@ -412,18 +411,8 @@ export function applyFounderBalanceDeadlineException(input: { state: AppState; a
 }
 
 export async function issueFounderAdvanceInvoice(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; store: CommercialArtifactStore; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
-  owner(input); safeIdempotency(input.idempotencyKey); const invoice = input.state.founderCommercialInvoices.find((item) => item.proposalVersionId === input.proposalVersionId && item.organisationId === input.organisationId); const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
-  if (!invoice || !proposal || proposal.status !== "ACCEPTED" || !invoice.advancePaymentConfirmationId || !invoice.dueAt) fail(409, "An accepted proposal and confirmed advance are required before invoice issuance.");
-  if (invoice.status === "ISSUED") return invoice; assertExpected(invoice.recordVersion, input.expectedRecordVersion, "invoice");
-  const policy = activeLegal(input.state, input.organisationId, "INVOICE_STATUTORY_CONFIG"); if (!policy) { invoice.status = "GENERATION_FAILED"; invoice.failureCode = "MISSING_STATUTORY_CONFIG"; invoice.failureAt = nowIso(input.now); invoice.recordVersion = (invoice.recordVersion ?? 1) + 1; fail(409, "REVIEW_REQUIRED — approved statutory invoice numbering and content configuration is missing."); }
-  const config = policy.configuration!; const sequence = (config.startingSequence ?? 1) + input.state.founderCommercialInvoices.filter((item) => item.organisationId === input.organisationId && item.invoiceNumber).length; const invoiceNumber = `${config.invoicePrefix}${sequence}`;
-  const client = input.state.clients.find((item) => item.id === proposal.clientId && (!item.organisationId || item.organisationId === input.organisationId))!; const issuedAt = nowIso(input.now);
-  const bytes = renderCommercialInvoicePdf({ invoiceNumber, clientName: client.displayName, proposalVersion: proposal.version, paymentId: input.state.founderCommercialPaymentConfirmations.find((item) => item.id === invoice.advancePaymentConfirmationId)!.paymentId, amountReceivedPaise: invoice.amountReceivedPaise, gstBasisPoints: invoice.gstBasisPoints, gstAmountSnapshotPaise: invoice.gstAmountSnapshotPaise, remainingBalancePaise: invoice.remainingBalancePaise, statutoryText: policy.exactText, issuedAt });
-  const artifactHash = await hashBytes(bytes); const key = `commercial/invoices/${input.organisationId}/${invoice.id}/${artifactHash}.pdf`;
-  try { await input.store.putImmutable(key, bytes, "application/pdf", { immutable: "true", invoiceId: invoice.id, checksumSha256: artifactHash, rendererVersion: COMMERCIAL_INVOICE_RENDERER_VERSION }); }
-  catch (error) { invoice.status = new Date(invoice.dueAt) <= (input.now ?? new Date()) ? "OVERDUE" : "GENERATION_FAILED"; invoice.failureCode = "ARTIFACT_GENERATION_FAILED"; invoice.failureAt = issuedAt; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1; throw error; }
-  invoice.status = "ISSUED"; invoice.invoicePolicyId = policy.id; invoice.invoiceNumber = invoiceNumber; invoice.artifactHashSha256 = artifactHash; invoice.privateObjectKey = key; invoice.issuedAt = issuedAt; invoice.issuedByActorUserId = input.actor.id; invoice.failureCode = undefined; invoice.failureAt = undefined; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1;
-  return invoice;
+  owner(input); safeIdempotency(input.idempotencyKey); void input.state; void input.proposalVersionId; void input.store; void input.expectedRecordVersion; void input.now;
+  fail(409, "SUPERSEDED — advance confirmation requires a GST Receipt Voucher, not a Tax Invoice. Use the statutory-document issue action.");
 }
 
 export function createFounderProposalSuccessor(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
@@ -437,5 +426,6 @@ export function createFounderProposalSuccessor(input: { state: AppState; actor: 
 export function getFounderCommercialPublicSummary(state: AppState, proposalVersionId: string, now = new Date()) {
   const proposal = state.founderProposalVersions.find((item) => item.id === proposalVersionId); if (!proposal) fail(404, "Proposal not found.");
   const deadline = projectFounderBalanceDeadline(state, proposal.id, now); const invoice = projectFounderInvoiceStatus(state, proposal.id, now);
-  return { proposalStatus: proposal.status, proposalVersion: proposal.version, balance: { status: deadline.status, advanceConfirmedAt: deadline.advanceConfirmedAt, dueAt: deadline.dueAt, remainingAmountPaise: deadline.remainingAmountPaise }, invoice: invoice ? { status: invoice.status, dueAt: invoice.dueAt, issuedAt: invoice.issuedAt, invoiceNumber: invoice.invoiceNumber } : undefined, gates: { acceptanceDoesNotCreateCase: true, paymentProofDoesNotConfirmPayment: true, reportEvidenceMethodologyApprovalGatesRemainEnforced: true } };
+  const statutoryDocuments = state.founderStatutoryDocuments.filter((item) => item.proposalVersionId === proposal.id).map((item) => ({ kind: item.kind, status: item.status, dueAt: item.dueAt, issuedAt: item.issuedAt, documentNumber: item.documentNumber }));
+  return { proposalStatus: proposal.status, proposalVersion: proposal.version, balance: { status: deadline.status, advanceConfirmedAt: deadline.advanceConfirmedAt, dueAt: deadline.dueAt, remainingAmountPaise: deadline.remainingAmountPaise }, statutoryDocuments, invoice: invoice ? { status: invoice.status, dueAt: invoice.dueAt, issuedAt: invoice.issuedAt, invoiceNumber: invoice.invoiceNumber } : undefined, gates: { acceptanceDoesNotCreateCase: true, paymentProofDoesNotConfirmPayment: true, reportEvidenceMethodologyApprovalGatesRemainEnforced: true } };
 }

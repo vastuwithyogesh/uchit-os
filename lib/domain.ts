@@ -335,8 +335,8 @@ export interface MediaAssetRecord extends OrganisationOwnedRecord {
 }
 
 export interface MediaAssetVersionRecord extends OrganisationOwnedRecord {
-  id: string; assetId: string; version: number; filename: string; privateObjectKey: string; mimeType: "application/pdf";
-  sizeBytes: number; checksumSha256: string; pageCount: number; status: MediaAssetStatus; clientSendable: boolean;
+  id: string; assetId: string; version: number; filename: string; privateObjectKey: string; mimeType: "application/pdf" | "image/png" | "image/jpeg";
+  sizeBytes: number; checksumSha256: string; pageCount: number; status: MediaAssetStatus; clientSendable: boolean; statutoryPurpose?: "LOGO" | "SIGNATURE";
   uploadedByActorUserId: string; uploadedAt: string; approvedByActorUserId?: string; approvedAt?: string;
   supersedesVersionId?: string; supersededByVersionId?: string; reason: string; registrationHash: string;
 }
@@ -492,6 +492,56 @@ export interface FounderCommercialInvoiceRecord extends OrganisationOwnedRecord 
   status: FounderInvoiceStatus; dueAt?: string; amountReceivedPaise: number; gstBasisPoints: number; gstAmountSnapshotPaise: number; remainingBalancePaise: number;
   invoicePolicyId?: string; invoiceNumber?: string; artifactHashSha256?: string; privateObjectKey?: string; issuedAt?: string; issuedByActorUserId?: string;
   failureCode?: string; failureAt?: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export type FounderStatutoryDocumentKind = "RECEIPT_VOUCHER" | "PROFORMA" | "TAX_INVOICE" | "INTERNAL_NON_COMMERCIAL";
+export type FounderStatutoryDocumentStatus = "NOT_DUE" | "DUE" | "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "OVERDUE" | "ISSUED" | "GENERATION_FAILED" | "VOID";
+export type FounderTaxMode = "CGST_SGST" | "IGST" | "ZERO" | "REVIEW_REQUIRED";
+export type FounderAccountantApprovalState = "REVIEW_REQUIRED_ACCOUNTANT" | "ACCOUNTANT_APPROVED" | "SUPERSEDED";
+
+export interface FounderStatutoryPolicyVersionRecord extends OrganisationOwnedRecord {
+  id: string; version: number; status: "DRAFT" | "FOUNDER_APPROVED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+  legalBusinessName: "Uchit Vastu India"; gstin: "03AEVPH1562F1ZM"; registeredAddress: string;
+  email: "info@uchitvastu.com"; phoneE164: "+919115530756"; phoneDisplay: "+91 91155 30756";
+  authorisedSignatory: "Yogesh K Hora"; designation: "Proprietor"; sac: "9983";
+  lineDescription: "Professional Vastu Consultancy Services"; defaultGstBasisPoints: 1800;
+  reverseChargeText: "Tax payable under reverse charge: No";
+  placeOfSupplyBasis: "CLIENT_LOCATION"; placeOfSupplyApproval: FounderAccountantApprovalState;
+  serviceTimingApproval: FounderAccountantApprovalState; correctionPolicyApproval: FounderAccountantApprovalState;
+  serviceTimingPolicyText?: string; accountantApprovalReference?: string;
+  createdByActorUserId: string; createdAt: string; approvedAt?: string; activatedAt?: string;
+  reason: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface FounderBillingProfileVersionRecord extends OrganisationOwnedRecord {
+  id: string; clientId: string; prospectiveProjectId: string; version: number;
+  billingLegalName: string; billingAddress: string; billingState: string; billingPin: string;
+  recipientRegisteredForGst: boolean; recipientGstin?: string; clientLocationCountry: string;
+  clientLocationState?: string; propertyLocation?: string; timeZone: string;
+  createdByActorUserId: string; createdAt: string; reason: string; predecessorId?: string;
+  idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface FounderStatutorySequenceReservationRecord extends OrganisationOwnedRecord {
+  id: string; documentKind: Exclude<FounderStatutoryDocumentKind, "INTERNAL_NON_COMMERCIAL">;
+  fiscalYear: string; fiscalYearCompact: string; sequence: number; documentNumber: string;
+  status: "RESERVED" | "ISSUED" | "FAILED" | "VOID"; reservedAt: string; reservedByActorUserId: string;
+  documentId: string; failureCode?: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface FounderStatutoryDocumentRecord extends OrganisationOwnedRecord {
+  id: string; kind: FounderStatutoryDocumentKind; status: FounderStatutoryDocumentStatus;
+  proposalVersionId: string; proposalContentHash: string; clientId: string; prospectiveProjectId: string; caseId?: string;
+  advancePaymentConfirmationId?: string; balancePaymentConfirmationIds: string[]; triggeringPaymentId?: string;
+  dueAt?: string; serviceSuppliedAt?: string; statutoryDeadlineAt?: string; issuedAt?: string; issuedByActorUserId?: string;
+  policyVersionId?: string; billingProfileVersionId?: string; documentNumber?: string; sequenceReservationId?: string;
+  professionalFeePaise: number; gstBasisPoints: number; cgstPaise: number; sgstPaise: number; igstPaise: number;
+  gstTotalPaise: number; roundOffPaise: number; totalPayablePaise: number; amountReceivedPaise: number;
+  remainingBalancePaise: number; amountInWords: string; taxMode: FounderTaxMode;
+  balanceDueAt?: string; balanceDeadlineStatus?: FounderBalanceDeadlineStatus;
+  logoAssetVersionId?: string; logoChecksumSha256?: string; signatureAssetVersionId?: string; signatureChecksumSha256?: string;
+  artifactHashSha256?: string; privateObjectKey?: string; rendererVersion?: string; failureCode?: string; failureAt?: string;
+  idempotencyKey: string; requestHash: string; recordVersion: number;
 }
 
 export interface FounderCommercialAuditEventRecord extends OrganisationOwnedRecord {

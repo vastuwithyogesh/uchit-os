@@ -11,7 +11,8 @@ const ownedCollections = [
   "qualificationResponseVersions", "prospectiveProjects", "founderReviewBookings", "zoomMeetingBindings", "founderReminderTasks"
   ,"founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
   "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
-  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents"
+  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents",
+  "founderStatutoryPolicies", "founderBillingProfileVersions", "founderStatutorySequenceReservations", "founderStatutoryDocuments"
 ] as const satisfies readonly (keyof AppState)[];
 
 type Owned = { id?: string; organisationId?: string; createdByActorUserId?: string; updatedByActorUserId?: string; recordVersion?: number };

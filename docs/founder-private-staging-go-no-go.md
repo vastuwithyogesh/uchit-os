@@ -22,7 +22,7 @@ This is a preparation checklist only. Packaging does not publish or migrate anyt
 
 ## Automatic NO-GO
 
-Any failing test/build, dirty scoped source, ordinary string `DB`/`R2` values, missing secret, unverified migration/backup, unresolved no-op action, external visitor, live/client data, enabled Lovable/provider/client-delivery path, or attempt to weaken P5/P13/P14/statutory invoice/template/Stage B blockers is NO-GO.
+Any failing test/build, dirty scoped source, ordinary string `DB`/`R2` values, missing secret, unverified migration/backup, unresolved no-op action, external visitor, live/client data, enabled Lovable/provider/client-delivery path, or attempt to weaken P5/P13/P14/statutory-document/template/Stage B blockers is NO-GO.
 
 These content blockers do not prevent private UI review, but they do prevent proposal approval/sending/acceptance, invoice issuance, real asset communication, Zoom creation, and Stage B.
 

@@ -2,6 +2,7 @@ import type { FounderProposalVersionRecord } from "./domain.ts";
 
 export const COMMERCIAL_PROPOSAL_RENDERER_VERSION = "uchit-commercial-proposal/pdf-v1";
 export const COMMERCIAL_INVOICE_RENDERER_VERSION = "uchit-commercial-invoice/pdf-v1";
+export const STATUTORY_DOCUMENT_RENDERER_VERSION = "uchit-statutory-document/pdf-v1";
 
 const textEncoder = new TextEncoder();
 const pdfEscape = (value: string) => value.replaceAll("\\", "\\\\").replaceAll("(", "\\(").replaceAll(")", "\\)").replaceAll(/[\r\n]+/g, " ");
@@ -80,5 +81,53 @@ export function renderCommercialInvoicePdf(input: { invoiceNumber: string; clien
     `Commercial GST snapshot: ${(input.gstBasisPoints / 100).toFixed(2)}% / ${money(input.gstAmountSnapshotPaise)}`,
     `Remaining balance: ${money(input.remainingBalancePaise)}`,
     input.statutoryText
+  ]);
+}
+
+export type FounderStatutoryDocumentProjection = {
+  kind: "RECEIPT_VOUCHER" | "PROFORMA" | "TAX_INVOICE" | "INTERNAL_NON_COMMERCIAL";
+  documentNumber: string; issuedAt: string; legalBusinessName: string; gstin: string; registeredAddress: string;
+  email: string; phoneDisplay: string; authorisedSignatory: string; designation: string; sac: string; lineDescription: string;
+  clientId: string; projectId: string; caseId?: string; billingLegalName: string; billingAddress: string; billingState: string; billingPin: string;
+  recipientGstin?: string; reverseChargeText: string; taxMode: string; professionalFeePaise: number; gstBasisPoints: number;
+  cgstPaise: number; sgstPaise: number; igstPaise: number; gstTotalPaise: number; roundOffPaise: number; totalPayablePaise: number;
+  amountReceivedPaise: number; remainingBalancePaise: number; amountInWords: string; confirmedPaymentReferences: string[];
+  balanceDueAt?: string; balanceDeadlineStatus?: string; logoAssetVersionId: string; logoChecksumSha256: string;
+  signatureAssetVersionId: string; signatureChecksumSha256: string;
+};
+
+export function renderFounderStatutoryDocumentPdf(input: FounderStatutoryDocumentProjection): Uint8Array {
+  const money = (paise: number) => `INR ${(paise / 100).toFixed(2)}`;
+  const title = input.kind === "TAX_INVOICE" ? "TAX INVOICE" : input.kind === "RECEIPT_VOUCHER" ? "GST RECEIPT VOUCHER" : input.kind === "PROFORMA" ? "PROFORMA / PAYMENT SUMMARY" : "INTERNAL NON-COMMERCIAL RECORD";
+  return deterministicPdf([
+    `${input.legalBusinessName.toUpperCase()} — ${title}`,
+    `Document: ${input.documentNumber}`,
+    `Issued: ${input.issuedAt}`,
+    `GSTIN: ${input.gstin}`,
+    input.registeredAddress,
+    `${input.email} | ${input.phoneDisplay}`,
+    `Bill to: ${input.billingLegalName}`,
+    `${input.billingAddress}, ${input.billingState} ${input.billingPin}`,
+    ...(input.recipientGstin ? [`Recipient GSTIN: ${input.recipientGstin}`] : []),
+    `Permanent Client ID: ${input.clientId}`,
+    `Prospective Project ID: ${input.projectId}`,
+    ...(input.caseId ? [`Vastu Case ID: ${input.caseId}`] : []),
+    `SAC ${input.sac}: ${input.lineDescription}`,
+    input.reverseChargeText,
+    `Tax mode: ${input.taxMode}`,
+    `Professional fee: ${money(input.professionalFeePaise)}`,
+    `GST rate: ${(input.gstBasisPoints / 100).toFixed(2)}%`,
+    `CGST: ${money(input.cgstPaise)} | SGST: ${money(input.sgstPaise)} | IGST: ${money(input.igstPaise)}`,
+    `GST total: ${money(input.gstTotalPaise)}`,
+    `Round Off: ${money(input.roundOffPaise)}`,
+    `Total contract value: ${money(input.totalPayablePaise)}`,
+    `Amount received: ${money(input.amountReceivedPaise)}`,
+    `Remaining balance: ${money(input.remainingBalancePaise)}`,
+    ...(input.balanceDueAt ? [`Balance due: ${input.balanceDueAt} (${input.balanceDeadlineStatus})`] : []),
+    `Payment reference(s): ${input.confirmedPaymentReferences.join(", ")}`,
+    `Amount in words: ${input.amountInWords}`,
+    `Logo asset pin: ${input.logoAssetVersionId} / ${input.logoChecksumSha256}`,
+    `Signature asset pin: ${input.signatureAssetVersionId} / ${input.signatureChecksumSha256}`,
+    `Authorised signatory: ${input.authorisedSignatory}, ${input.designation}`
   ]);
 }

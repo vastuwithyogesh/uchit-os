@@ -27,6 +27,7 @@ import {
   reviewFounderProposal,
   sendFounderProposal
 } from "../lib/founder-commercial.ts";
+import { projectStatutoryReadiness } from "../lib/founder-statutory-documents.ts";
 
 const organisationId = "org-synthetic-commercial";
 const founder: AppUser = { id: "owner-yogesh", fullName: "Yogesh Hora", email: "owner@example.test", role: "SUPER_ADMIN", color: "#111111", organisationId, organisationCapability: "organisation_owner" };
@@ -114,13 +115,13 @@ test("review approval artifact send acceptance payment invoice and deadlines rem
   assert.equal(artifactReplay.artifactHashSha256, artifact.artifactHashSha256); assert.equal(store.objects.size, 1);
   const sent = await sendFounderProposal({ ...ownerArgs(state), proposalVersionId: proposal.id, idempotencyKey: "proposal-send-0001", expectedRecordVersion: 7, now: at("2026-08-13T00:10:00Z") });
   const response = await respondToFounderProposal({ state, token: sent.token, response: "ACCEPTED", fullName: "Synthetic Resident", acceptanceChecked: true, typedConfirmation: "TEST ACCEPT", idempotencyKey: "proposal-response-0001", now: at("2026-08-13T00:20:00Z") });
-  assert.equal(response.artifactHashSha256, artifact.artifactHashSha256); assert.equal(state.vastuCases.length, 0); assert.equal(state.payments.length, 0); assert.equal(state.founderCommercialInvoices[0].status, "NOT_DUE");
+  assert.equal(response.artifactHashSha256, artifact.artifactHashSha256); assert.equal(state.vastuCases.length, 0); assert.equal(state.payments.length, 0); assert.equal(state.founderCommercialInvoices.length, 0);
   const confirmedAt = at("2026-08-13T01:00:00Z");
   confirmFounderCommercialPayment({ ...ownerArgs(state), proposalVersionId: proposal.id, paymentId: "pay-synth-advance", type: "ADVANCE", amountPaise: 1_100_000, idempotencyKey: "payment-confirm-0001", expectedProposalRecordVersion: 9, now: confirmedAt });
-  const deadline = state.founderBalanceDeadlines[0]; const invoice = state.founderCommercialInvoices[0];
-  assert.equal(deadline.dueAt, "2026-08-20T01:00:00.000Z"); assert.equal(invoice.dueAt, "2026-08-13T02:00:00.000Z"); assert.equal(invoice.status, "DUE");
-  await issueFounderAdvanceInvoice({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "invoice-issue-0001", expectedRecordVersion: 2, now: at("2026-08-13T01:01:00Z") });
-  assert.equal(invoice.status, "ISSUED"); assert.equal(invoice.invoiceNumber, "TEST-INV-100"); assert.equal(store.objects.size, 2);
+  const deadline = state.founderBalanceDeadlines[0]; const receipt = state.founderStatutoryDocuments[0];
+  assert.equal(deadline.dueAt, "2026-08-20T01:00:00.000Z"); assert.equal(receipt.kind, "RECEIPT_VOUCHER"); assert.equal(receipt.dueAt, "2026-08-13T02:00:00.000Z"); assert.equal(receipt.status, "REVIEW_REQUIRED");
+  await expectStatus(409, () => issueFounderAdvanceInvoice({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "invoice-issue-0001", expectedRecordVersion: 1, now: at("2026-08-13T01:01:00Z") }));
+  assert.equal(store.objects.size, 1);
   assert.equal(projectFounderBalanceDeadline(state, proposal.id, at("2026-08-20T00:59:59.999Z")).status, "DUE");
   assert.equal(projectFounderBalanceDeadline(state, proposal.id, at("2026-08-20T01:00:00.000Z")).status, "OVERDUE");
   assert.equal(state.founderCommercialAuditEvents.filter((item) => item.eventType === "BALANCE_OVERDUE").length, 1);
@@ -132,11 +133,10 @@ test("invoice SLA and issuance fail closed without statutory configuration while
   const proposal = completeDraft(state, createDraft(state)); reviewFounderProposal({ ...ownerArgs(state), proposalVersionId: proposal.id, reason: "Synthetic review.", idempotencyKey: "proposal-review-0001", expectedRecordVersion: 5 }); approveFounderProposal({ ...ownerArgs(state), proposalVersionId: proposal.id, reason: "Synthetic approval.", idempotencyKey: "proposal-approve-0001", expectedRecordVersion: 6 });
   const store = new InMemoryCommercialArtifactStore(); await generateFounderProposalArtifact({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "proposal-artifact-0001", expectedRecordVersion: 7 }); const sent = await sendFounderProposal({ ...ownerArgs(state), proposalVersionId: proposal.id, idempotencyKey: "proposal-send-0001", expectedRecordVersion: 7, now: at("2026-08-13T00:00:00Z") }); await respondToFounderProposal({ state, token: sent.token, response: "ACCEPTED", fullName: "Synthetic Resident", acceptanceChecked: true, typedConfirmation: "TEST ACCEPT", idempotencyKey: "proposal-response-0001" });
   confirmFounderCommercialPayment({ ...ownerArgs(state), proposalVersionId: proposal.id, paymentId: "pay-synth", type: "ADVANCE", amountPaise: 1_100_000, idempotencyKey: "payment-confirm-0001", expectedProposalRecordVersion: 9, now: at("2026-08-13T01:00:00Z") });
-  assert.equal(state.founderCommercialInvoices[0].status, "GENERATION_FAILED"); assert.equal(state.founderCommercialPaymentConfirmations.length, 1);
-  assert.equal(projectFounderInvoiceStatus(state, proposal.id, at("2026-08-13T01:59:59.999Z"))?.status, "GENERATION_FAILED");
-  assert.equal(projectFounderInvoiceStatus(state, proposal.id, at("2026-08-13T02:00:00.000Z"))?.status, "OVERDUE");
-  assert.equal(state.founderCommercialAuditEvents.filter((item) => item.eventType === "ADVANCE_INVOICE_OVERDUE").length, 1);
-  await expectStatus(409, () => issueFounderAdvanceInvoice({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "invoice-retry-0001", expectedRecordVersion: 3, now: at("2026-08-13T02:00:00Z") }));
+  assert.equal(state.founderStatutoryDocuments[0].status, "REVIEW_REQUIRED"); assert.equal(state.founderCommercialPaymentConfirmations.length, 1);
+  assert.equal(projectStatutoryReadiness(state, proposal.id, at("2026-08-13T01:59:59.999Z")).documents[0].status, "REVIEW_REQUIRED");
+  assert.equal(projectStatutoryReadiness(state, proposal.id, at("2026-08-13T02:00:00.000Z")).documents[0].status, "OVERDUE");
+  await expectStatus(409, () => issueFounderAdvanceInvoice({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "invoice-retry-0001", expectedRecordVersion: 1, now: at("2026-08-13T02:00:00Z") }));
   assert.equal(state.founderCommercialPaymentConfirmations.length, 1); assert.equal(store.objects.size, 1);
 });
 

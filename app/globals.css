@@ -1407,6 +1407,14 @@ body { overflow-x: hidden; }
   .legacy-console-notice a { margin-left: 0; }
 }
 
+.statutory-readiness-card { max-width: 760px; margin: 2rem auto; padding: clamp(1.25rem, 3vw, 2rem); border: 1px solid var(--border, #d8d2c8); background: #fffdf9; }
+.statutory-readiness-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: 1rem; }
+.statutory-readiness-list { list-style: decimal-leading-zero; display: grid; gap: .75rem; padding-left: 2.25rem; margin: 1.5rem 0; }
+.statutory-readiness-list li { padding: .75rem 0; border-bottom: 1px solid #e8e2d9; }
+.statutory-readiness-list li strong, .statutory-readiness-list li span { display: block; }
+.statutory-readiness-list li span { color: #68625b; margin-top: .2rem; }
+@media (max-width: 600px) { .statutory-readiness-heading { flex-direction: column; } .statutory-readiness-card summary { min-height: 44px; display: flex; align-items: center; } }
+
 @media (prefers-reduced-motion: reduce) {
   .lead-profile-drawer, .lead-move-sheet { scroll-behavior: auto; }
 }

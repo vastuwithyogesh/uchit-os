@@ -1,6 +1,6 @@
 # Founder Commercial Proposals — local implementation contract
 
-Status: implemented locally, not deployed. D1 v11 is defined but has not been executed in any environment.
+Status: implemented locally, not deployed. D1 v12 is defined but has not been executed in any environment.
 
 ## Founder flow
 
@@ -14,9 +14,9 @@ The lifecycle is DRAFT → SUPER_ADMIN_REVIEWED → SUPER_ADMIN_APPROVED → SEN
 
 No P5 professional-boundary wording, P13 acceptance declaration, P14 cancellation/refund/delay policy or statutory invoice configuration is seeded. The separate review document is advisory and is not imported. Review, approval, send and acceptance remain blocked until P5, P13 and P14 have explicit active owner-approved versions. Invoice issuance remains `REVIEW_REQUIRED` until statutory configuration is active.
 
-## P17 invoice SLA
+## P17 superseded statutory-document SLA
 
-Acceptance alone and payment-proof upload alone do not create an invoice. Acceptance creates a `NOT_DUE` invoice task. Exact Founder-confirmed advance starts the server clock, persists `dueAt = confirmedAt + 60 minutes` and binds the payment, accepted proposal version and GST snapshot. Missing statutory configuration produces `GENERATION_FAILED`; the confirmed payment is preserved. At the exact deadline an unissued task becomes `OVERDUE`. Tests can activate synthetic test-only statutory configuration and an in-memory artifact store, but no real invoice is issued.
+Acceptance alone and payment-proof upload alone create no statutory document. Exact Founder-confirmed advance starts a GST Receipt Voucher clock and persists `dueAt = confirmedAt + 60 minutes`. The final Tax Invoice is preferred after confirmed full payment and remains blocked without an accountant-approved service-supply timing policy and `serviceSuppliedAt`. Tests use synthetic policies/assets and an in-memory artifact store; no real document is issued.
 
 ## P18 balance deadline
 

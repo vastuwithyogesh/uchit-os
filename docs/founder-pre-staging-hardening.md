@@ -8,11 +8,11 @@ Run `pnpm test:founder-pre-staging`. The suite creates only temporary local SQLi
 
 The SQLite rehearsal executes the actual statements declared in `db/migrations.ts` and verifies:
 
-- clean v1 through v11 migration and repeated execution with exactly 11 markers;
-- a populated synthetic v9 database upgraded through v10 and v11 without changing the snapshot, lead, or external-source records;
-- required v11 tables and indexes;
+- clean v1 through v12 migration and repeated execution with exactly 12 markers;
+- a populated synthetic v9 database upgraded through v10, v11 and v12 without changing the snapshot, lead, or external-source records;
+- required v12 tables and indexes;
 - unique organisation policy version, seven-calendar-day balance policy, and sixty-minute invoice SLA constraints;
-- a deliberately interrupted v11 transaction leaves neither its marker nor a partial table, then succeeds by forward-fix;
+- a deliberately interrupted v12 transaction leaves neither its marker nor a partial table, then succeeds by forward-fix;
 - a v9 backup can be restored and upgraded, with `PRAGMA integrity_check` returning `ok`.
 
 The private-object rehearsal uses synthetic bytes only. It verifies organisation/client-scoped keys, SHA-256 and byte identity, immutable new-version supersession, revocation, cross-scope denial, path-attack denial, orphan inventory/recovery, and final memory disposal. It has no D1, R2, network, or filesystem adapter.
@@ -21,7 +21,7 @@ The private-object rehearsal uses synthetic bytes only. It verifies organisation
 
 1. Confirm the target is a newly created disposable database and record its resource identifier. Never infer a target from an environment variable.
 2. Take a provider backup/export before applying migrations. Record its checksum and timestamp without including row payloads in logs.
-3. Apply migrations through the normal authenticated migration path. Confirm markers 1–11 and the required tables/indexes.
+3. Apply migrations through the normal authenticated migration path. Confirm markers 1–12 and the required tables/indexes.
 4. Repeat the migration once; it must make no schema or data changes.
 5. Compare synthetic row counts and snapshot hashes before and after.
 6. On interruption, do not remove markers manually. Restore the disposable backup or apply a reviewed additive forward-fix, then repeat integrity and preservation checks.
@@ -58,7 +58,9 @@ At that stop point there must be no proposal version, payment confirmation, invo
 | P5 professional boundaries | Owner/legal input required | Review/approval/send blocked | Return approved exact text and activate its version |
 | P13 acceptance declaration | Owner/legal input required | Review/approval/send/acceptance blocked | Return approved exact text/confirmation configuration and activate it |
 | P14 cancellation/refund/delay policy | Owner/legal input required | Review/approval/send blocked | Return approved exact policy and activate it |
-| Statutory invoice configuration | Review required | Invoice issuance remains `GENERATION_FAILED`/`OVERDUE`; payment is preserved | Approve legal identity, numbering and statutory tax content |
+| Place-of-supply and service-timing policy | `REVIEW_REQUIRED_ACCOUNTANT` | Receipt Voucher/Tax Invoice issuance is unavailable; confirmed payment is preserved | Supply and activate an accountant-approved successor policy |
+| Statutory logo and signature images | Not uploaded/active | Document readiness remains blocked | Upload privately, Founder-approve and activate exact Media Library versions |
+| Statutory corrections/credit-debit policy | `BLOCKED_ACCOUNTANT_APPROVAL` | Issued bytes cannot be corrected in place | Supply accountant-approved correction policy |
 | Five approved PDF bytes | Not ingested | New client-sendable asset grants unavailable | Owner-observed checksum validation and private ingestion approval |
 | Zoom organisation connection | Not configured | Fake connector only; real meeting setup fails closed | Configure server-side OAuth/account and verify rotation without exposing secrets |
 | Stage B remedial methodology | `BLOCKED_METHOD_INPUT` | No remedy logic or language | Supply and approve a separate remedial PRD/methodology |
@@ -81,9 +83,9 @@ WhatsApp and email remain manual compose. The only automated states are `PREPARE
 5. Confirm only `ACTIVE` plus `CLIENT_SENDABLE` versions can create a new grant.
 6. Exercise expiry, rotation, revocation, supersession, and cross-client denial with synthetic links before real use.
 
-## Statutory invoice activation
+## Statutory document activation
 
-Do not issue an invoice until an active approved configuration contains, at minimum, the legal issuer identity, registration/tax identifiers as applicable, numbering series and sequence ownership, statutory fields/wording, tax jurisdiction, financial-year rollover rules, correction/credit-note rules, artifact retention, and approval authority. Verify concurrent generation yields one number/artifact per confirmed qualifying advance. Never backdate.
+Do not issue a Receipt Voucher or Tax Invoice until the accountant approves place-of-supply and service-supply timing, and the owner activates private logo/signature assets. Confirm recipient billing fields, payment reconciliation, independent fiscal-year numbering, artifact retention, and one reservation/artifact per qualifying trigger. Never backdate. Tax Invoice correction/credit-debit behavior remains blocked pending accountant approval.
 
 ## UI/action audit
 

@@ -66,7 +66,8 @@ import type {
   ,FounderCommercialPolicyVersionRecord, FounderCommercialLegalPolicyRecord, FounderProposalTemplateVersionRecord,
   FounderProposalVersionRecord, FounderProposalApprovalRecord, FounderProposalArtifactRecord, FounderProposalGrantRecord,
   FounderProposalResponseRecord, FounderCommercialPaymentConfirmationRecord, FounderBalanceDeadlineRecord,
-  FounderCommercialInvoiceRecord, FounderCommercialAuditEventRecord
+  FounderCommercialInvoiceRecord, FounderCommercialAuditEventRecord, FounderStatutoryPolicyVersionRecord,
+  FounderBillingProfileVersionRecord, FounderStatutorySequenceReservationRecord, FounderStatutoryDocumentRecord
 } from "./domain.ts";
 import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
 
@@ -147,6 +148,10 @@ export interface AppState {
   founderBalanceDeadlines: FounderBalanceDeadlineRecord[];
   founderCommercialInvoices: FounderCommercialInvoiceRecord[];
   founderCommercialAuditEvents: FounderCommercialAuditEventRecord[];
+  founderStatutoryPolicies: FounderStatutoryPolicyVersionRecord[];
+  founderBillingProfileVersions: FounderBillingProfileVersionRecord[];
+  founderStatutorySequenceReservations: FounderStatutorySequenceReservationRecord[];
+  founderStatutoryDocuments: FounderStatutoryDocumentRecord[];
 }
 
 export const createEmptyAppState = (): AppState => ({
@@ -204,7 +209,8 @@ export const createEmptyAppState = (): AppState => ({
   founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
   founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
   founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
-  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: []
+  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: [],
+  founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
 });
 
 const createDemoAppState = (): AppState => ({
@@ -262,7 +268,8 @@ const createDemoAppState = (): AppState => ({
   founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
   founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
   founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
-  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: []
+  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: [],
+  founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
 });
 
 const createInitialState = () => process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();

@@ -21,7 +21,7 @@ function openDatabase(path) {
   return db;
 }
 
-function applyMigrations(db, fromVersion = 1, throughVersion = 11) {
+function applyMigrations(db, fromVersion = 1, throughVersion = 12) {
   db.exec(migrationsTableSql);
   const applied = new Set(db.prepare("SELECT version FROM schema_migrations").all().map((row) => Number(row.version)));
   for (const migration of d1Migrations) {
@@ -82,19 +82,19 @@ function verifyV11Constraints(db) {
 
 export async function runFounderPreStagingRehearsal() {
   const workspace = await mkdtemp(join(tmpdir(), "uchit-founder-rehearsal-"));
-  const cleanPath = join(workspace, "clean-v11.sqlite");
-  const upgradePath = join(workspace, "upgrade-v9-v11.sqlite");
+  const cleanPath = join(workspace, "clean-v12.sqlite");
+  const upgradePath = join(workspace, "upgrade-v9-v12.sqlite");
   const backupPath = join(workspace, "upgrade-v9.backup.sqlite");
-  const restorePath = join(workspace, "restore-v11.sqlite");
-  const interruptedPath = join(workspace, "interrupted-v10.sqlite");
+  const restorePath = join(workspace, "restore-v12.sqlite");
+  const interruptedPath = join(workspace, "interrupted-v11.sqlite");
   let report;
   try {
     const clean = openDatabase(cleanPath);
-    applyMigrations(clean, 1, 11);
+    applyMigrations(clean, 1, 12);
     const cleanTables = tableNames(clean);
     const cleanIndexes = indexNames(clean);
     const constraints = verifyV11Constraints(clean);
-    applyMigrations(clean, 1, 11);
+    applyMigrations(clean, 1, 12);
     const repeatedMarkerCount = Number(clean.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count);
     clean.close();
 
@@ -104,53 +104,53 @@ export async function runFounderPreStagingRehearsal() {
     upgrade.exec(`VACUUM INTO ${quoteSqlitePath(backupPath)}`);
     upgrade.close();
     upgrade = openDatabase(upgradePath);
-    applyMigrations(upgrade, 10, 11);
+    applyMigrations(upgrade, 10, 12);
     const snapshot = upgrade.prepare("SELECT payload,revision FROM app_state_snapshot WHERE id='primary'").get();
     const preserved = sha(String(snapshot.payload)) === payloadHashBefore && Number(snapshot.revision) === 9
       && Number(upgrade.prepare("SELECT COUNT(*) AS count FROM optin_leads WHERE id='lead-safe-1'").get().count) === 1
       && Number(upgrade.prepare("SELECT COUNT(*) AS count FROM external_sources WHERE id='source-safe'").get().count) === 1;
-    applyMigrations(upgrade, 10, 11);
+    applyMigrations(upgrade, 10, 12);
     const upgradedMarkers = Number(upgrade.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count);
     const integrity = String(upgrade.prepare("PRAGMA integrity_check").get().integrity_check);
     upgrade.close();
 
     await copyFile(backupPath, restorePath);
     const restored = openDatabase(restorePath);
-    applyMigrations(restored, 10, 11);
+    applyMigrations(restored, 10, 12);
     const restoredSnapshot = restored.prepare("SELECT payload,revision FROM app_state_snapshot WHERE id='primary'").get();
     const restoredPreserved = sha(String(restoredSnapshot.payload)) === payloadHashBefore && Number(restoredSnapshot.revision) === 9;
     const restoreIntegrity = String(restored.prepare("PRAGMA integrity_check").get().integrity_check);
     restored.close();
 
     const interrupted = openDatabase(interruptedPath);
-    applyMigrations(interrupted, 1, 10);
+    applyMigrations(interrupted, 1, 11);
     interrupted.exec("BEGIN IMMEDIATE");
     let injectedFailure = false;
     try {
-      interrupted.exec(d1Migrations.find((item) => item.version === 11).statements[0]);
+      interrupted.exec(d1Migrations.find((item) => item.version === 12).statements[0]);
       interrupted.exec("THIS IS AN INTENTIONAL REHEARSAL FAILURE");
       interrupted.exec("COMMIT");
     } catch {
       interrupted.exec("ROLLBACK");
       injectedFailure = true;
     }
-    const noPartialMarker = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=11").get().count) === 0;
-    const noPartialTable = !tableNames(interrupted).includes("founder_commercial_policy_versions");
-    applyMigrations(interrupted, 11, 11);
-    const forwardFixed = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=11").get().count) === 1;
+    const noPartialMarker = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=12").get().count) === 0;
+    const noPartialTable = !tableNames(interrupted).includes("founder_statutory_policy_versions");
+    applyMigrations(interrupted, 12, 12);
+    const forwardFixed = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=12").get().count) === 1;
     interrupted.close();
 
     report = {
       scope: "DISPOSABLE_LOCAL_ONLY",
-      migrationsDeclared: 11,
-      cleanPath: { from: 1, to: 11, markerCount: repeatedMarkerCount, idempotent: repeatedMarkerCount === 11 },
-      upgradePath: { from: 9, through: 11, markerCount: upgradedMarkers, syntheticDataPreserved: preserved, integrity },
+      migrationsDeclared: 12,
+      cleanPath: { from: 1, to: 12, markerCount: repeatedMarkerCount, idempotent: repeatedMarkerCount === 12 },
+      upgradePath: { from: 9, through: 12, markerCount: upgradedMarkers, syntheticDataPreserved: preserved, integrity },
       backupRestore: { backupCreated: (await stat(backupPath)).size > 0, syntheticDataPreserved: restoredPreserved, integrity: restoreIntegrity },
       interruptionRecovery: { injectedFailure, noPartialMarker, noPartialTable, forwardFixed },
       schema: {
         tableCount: cleanTables.length,
-        founderV11TableCount: cleanTables.filter((name) => name.startsWith("founder_")).length,
-        requiredIndexesPresent: ["idx_founder_proposals_scope", "idx_founder_deadlines_due", "idx_founder_invoices_due"].every((name) => cleanIndexes.includes(name)),
+        founderV12TableCount: cleanTables.filter((name) => name.startsWith("founder_")).length,
+        requiredIndexesPresent: ["idx_founder_proposals_scope", "idx_founder_deadlines_due", "idx_founder_invoices_due", "idx_founder_statutory_due", "idx_founder_statutory_project"].every((name) => cleanIndexes.includes(name)),
         constraintFailuresObserved: constraints
       },
       persistentEnvironmentTouched: false,

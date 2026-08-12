@@ -64,7 +64,8 @@ const collectionKeys = [
   "founderReminderTasks"
   ,"founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
   "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
-  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents"
+  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents",
+  "founderStatutoryPolicies", "founderBillingProfileVersions", "founderStatutorySequenceReservations", "founderStatutoryDocuments"
 ] as const satisfies readonly (keyof AppState)[];
 
 /** Missing legacy fields inherit seeds; explicitly persisted empty arrays stay empty. */
