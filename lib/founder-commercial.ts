@@ -2,6 +2,7 @@ import type {
   AppUser,
   FounderCommercialLegalPolicyRecord,
   FounderCommercialPolicyVersionRecord,
+  FounderCommercialPolicyEventType,
   FounderEngagementClassification,
   FounderProposalContentSnapshot,
   FounderProposalStep,
@@ -33,6 +34,34 @@ const hashBytes = async (bytes: Uint8Array) => {
 const hashText = async (text: string) => hashBytes(new TextEncoder().encode(text));
 const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86_400_000);
 const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * 60_000);
+
+export const FOUNDER_NO_REFUND_POLICY_TITLE = "Founder Cancellation, Refund and Delay Policy";
+export const FOUNDER_NO_REFUND_POLICY_COPY = "Payments made to Uchit Vastu India are non-refundable. If a client cancels, pauses, or does not proceed, no refund, credit, voucher, or fee adjustment will be issued. Delays caused by pending client information, documents, access, confirmations, or site availability may move the estimated schedule. If Uchit needs to reschedule, a replacement date or slot will be offered. Any correction required by applicable law is handled only through a separately approved accountant process.";
+export const FOUNDER_NO_REFUND_POLICY_CONFIGURATION = {
+  refundPolicy: "NO_REFUNDS",
+  creditPolicy: "NO_CREDITS_VOUCHERS_OR_FEE_OFFSETS",
+  correctionPolicyApproval: "REVIEW_REQUIRED_ACCOUNTANT"
+} as const;
+export const FOUNDER_PROFESSIONAL_BOUNDARIES_TITLE = "P5 — Core Professional Boundaries";
+export const FOUNDER_PROFESSIONAL_BOUNDARIES_COPY = [
+  "P5.1. Nature of the service. Uchit Vastu India provides Vastu consultancy and advisory services within the scope expressly stated in the Proposal. The consultancy is based on the information, plans, photographs, recordings, site observations and other evidence made available for the engagement, together with the approved Uchit methodology applicable to the relevant version of the work.",
+  "P5.2. Services not included. Unless expressly included in the Proposal, the consultancy is not architectural design, structural engineering, civil engineering, electrical, plumbing or fire-safety design, quantity surveying, legal, tax, accounting, medical, psychological, financial or investment advice. The Client must obtain advice, drawings, approvals and certifications from appropriately qualified or licensed professionals wherever required.",
+  "P5.3. Law, safety and professional standards prevail. No recommendation requires or authorises the Client, contractor or any other person to depart from applicable law, statutory approval, building regulation, safety requirement, professional code or manufacturer instruction. Where a recommendation appears inconsistent with any such requirement, implementation must pause until the relevant qualified professional confirms an appropriate compliant solution.",
+  "P5.4. No guaranteed outcome. Uchit does not guarantee any particular financial, commercial, health, relationship, personal, regulatory, construction, sale, occupancy or other outcome. The consultancy is an advisory professional service; results may depend on factors outside Uchit’s control, including the accuracy of inputs, site conditions, third-party work, implementation choices and subsequent changes to the property.",
+  "P5.5. Reliance on client information. The Client is responsible for providing complete, accurate and current information and for identifying any change that may affect the engagement. If material information is missing, inaccurate, contradictory or changed, Uchit may pause the work, request clarification, mark the affected output for review, or require a revised assessment or successor version before relying on it.",
+  "P5.6. Changes after review or approval. A change to the property, floor plan, orientation, evidence, intended use, construction, utilities or other relevant input after an assessment or approval may invalidate dependent work. Uchit may require new evidence, re-evaluation, a revised scope, additional time and a separately agreed commercial variation. A previously approved or released artifact will not be altered in place.",
+  "P5.7. Implementation responsibility. The Client remains responsible for deciding whether and how to implement a recommendation and for engaging the required qualified professionals and contractors. Uchit remains responsible for performing the consultancy services included in the agreed scope with reasonable care and skill, subject to applicable law and the approved Proposal terms."
+].join("\n\n");
+export const FOUNDER_ACCEPTANCE_DECLARATION_TITLE = "P13 — Client Acceptance Declaration";
+export const FOUNDER_ACCEPTANCE_CHECKBOX_COPY = "I confirm that I have reviewed this exact Uchit Vastu Proposal, including its scope, deliverables, exclusions, client responsibilities, estimated timeline, professional fee, GST, total payable, agreed advance, payment plan, professional boundaries, cancellation/refund/delay policy and next steps. I accept the Proposal on behalf of myself or the organisation identified below, and I understand that my statutory rights are not excluded or waived by this acceptance.";
+export const FOUNDER_ACCEPTANCE_DECLARATION_COPY = [
+  "P13.1. Authority and capacity. I confirm that the name, organisation and designation entered by me are accurate and that I have the legal capacity and authority required to accept this Proposal for the stated Client and prospective project.",
+  "P13.2. Information supplied. I confirm that, to the best of my knowledge, the information supplied for the Proposal is complete and accurate. I will promptly tell Uchit about any material error or change.",
+  "P13.3. Exact version. My acceptance applies only to the proposal number, version, date and secure artifact presented with this declaration. A later change requires a successor proposal version and a new acceptance; a previously accepted version is not edited in place.",
+  "P13.4. Electronic acceptance. By selecting the acceptance checkbox and submitting my full name, I intend to accept the Proposal electronically and to create an auditable record of that decision.",
+  "P13.5. Payment and case status. I understand that proposal acceptance is not payment confirmation. A Vastu Case ID and operational workspace are created only after the applicable advance is confirmed or an authorised internal exception is approved. Official report generation, release and delivery remain subject to the payment, evidence, evaluation and approval gates stated in the Proposal and Uchit workflow.",
+  "P13.6. No waiver of legal rights. Nothing in this declaration removes any right or remedy that cannot lawfully be excluded, restricted or waived."
+].join("\n\n");
 
 export interface CommercialArtifactStore {
   putImmutable(key: string, bytes: Uint8Array, contentType: "application/pdf", metadata: Record<string, string>): Promise<void>;
@@ -100,7 +129,7 @@ export function publishFounderCommercialPolicy(input: { state: AppState; actor: 
 export function createFounderLegalPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; kind: FounderCommercialLegalPolicyRecord["kind"]; title: string; exactText: string; configuration?: FounderCommercialLegalPolicyRecord["configuration"]; reason: string; idempotencyKey: string; now?: Date }) {
   owner(input); safeIdempotency(input.idempotencyKey);
   const exactText = trimmed(input.exactText, "Owner/legal-approved exact text");
-  if (input.kind === "ACCEPTANCE_DECLARATION" && (!input.configuration?.acceptanceCheckboxLabel?.trim() || !input.configuration?.typedConfirmationPhrase?.trim())) fail(400, "Acceptance checkbox and typed confirmation wording require owner/legal input.");
+  if (input.kind === "ACCEPTANCE_DECLARATION" && (!input.configuration?.acceptanceCheckboxLabel?.trim() || (!input.configuration?.typedConfirmationPhrase?.trim() && input.configuration?.typedConfirmationMode !== "FULL_NAME"))) fail(400, "Acceptance checkbox and typed confirmation mode require owner/legal input.");
   if (input.kind === "CANCELLATION_REFUND_DELAY" && input.configuration?.refundPolicy !== "NO_REFUNDS") fail(400, "The owner-approved NO_REFUNDS policy must be explicitly bound to P14 wording.");
   if (input.kind === "INVOICE_STATUTORY_CONFIG" && (!input.configuration?.invoicePrefix?.trim() || !Number.isSafeInteger(input.configuration?.startingSequence) || (input.configuration?.startingSequence ?? 0) < 1 || !input.configuration?.jurisdictionLabel?.trim() || !input.configuration?.requiredFields?.length)) fail(400, "Statutory invoice numbering, jurisdiction and required fields require approved configuration.");
   const requestHash = deterministicContentHash({ kind: input.kind, title: trimmed(input.title, "Policy title"), exactText, configuration: input.configuration, reason: trimmed(input.reason, "Reason") });
@@ -126,6 +155,57 @@ export function activateFounderLegalPolicy(input: { state: AppState; actor: AppU
   policy.status = "ACTIVE"; policy.approvedByActorUserId = input.actor.id; policy.approvedAt ??= nowIso(input.now); policy.activatedAt = nowIso(input.now); policy.recordVersion = (policy.recordVersion ?? 1) + 1;
   appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_ACTIVATED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Activation reason"), afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
   return policy;
+}
+
+export function activateFounderNoRefundPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; reason: string; idempotencyKey: string; expectedActiveRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const reason = trimmed(input.reason, "Activation reason");
+  const requestHash = deterministicContentHash({ title: FOUNDER_NO_REFUND_POLICY_TITLE, exactText: FOUNDER_NO_REFUND_POLICY_COPY, configuration: FOUNDER_NO_REFUND_POLICY_CONFIGURATION, reason });
+  const replay = input.state.founderCommercialLegalPolicies.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different no-refund policy content."); return replay; }
+  const active = activeLegal(input.state, input.organisationId, "CANCELLATION_REFUND_DELAY");
+  assertExpected(active?.recordVersion ?? 0, input.expectedActiveRecordVersion, "active no-refund policy");
+  const now = nowIso(input.now);
+  const version = Math.max(0, ...input.state.founderCommercialLegalPolicies.filter((item) => item.organisationId === input.organisationId && item.kind === "CANCELLATION_REFUND_DELAY").map((item) => item.version)) + 1;
+  const policy: FounderCommercialLegalPolicyRecord = { id: uuid(), organisationId: input.organisationId, kind: "CANCELLATION_REFUND_DELAY", version, status: "ACTIVE", title: FOUNDER_NO_REFUND_POLICY_TITLE, exactText: FOUNDER_NO_REFUND_POLICY_COPY, contentHash: deterministicContentHash({ exactText: FOUNDER_NO_REFUND_POLICY_COPY, configuration: FOUNDER_NO_REFUND_POLICY_CONFIGURATION }), configuration: structuredClone(FOUNDER_NO_REFUND_POLICY_CONFIGURATION), reason, createdByActorUserId: input.actor.id, createdAt: now, approvedByActorUserId: input.actor.id, approvedAt: now, activatedAt: now, idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  if (active) { active.status = "SUPERSEDED"; active.supersedesPolicyId = policy.id; active.recordVersion = (active.recordVersion ?? 1) + 1; }
+  input.state.founderCommercialLegalPolicies.push(policy);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "FOUNDER_NO_REFUND_POLICY_ACTIVATED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: "Founder activated the approved no-refund policy version.", beforeHash: active?.contentHash, afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return policy;
+}
+
+export function recordFounderCommercialPolicyEvent(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; prospectiveProjectId: string; proposalVersionId?: string; eventType: FounderCommercialPolicyEventType; reason: string; revisedEstimate?: string; replacementDateOrSlot?: string; idempotencyKey: string; expectedProjectRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const project = input.state.prospectiveProjects.find((item) => item.id === input.prospectiveProjectId && item.organisationId === input.organisationId && item.clientId === input.clientId);
+  if (!project) fail(404, "Prospective project not found.");
+  assertExpected(project.recordVersion, input.expectedProjectRecordVersion, "prospective project");
+  if (input.proposalVersionId && !input.state.founderProposalVersions.some((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId && item.clientId === input.clientId && item.prospectiveProjectId === project.id)) fail(404, "Proposal version not found.");
+  const reason = trimmed(input.reason, "Event reason");
+  const revisedEstimate = input.revisedEstimate?.trim(); const replacementDateOrSlot = input.replacementDateOrSlot?.trim();
+  if (input.eventType === "CLIENT_DEPENDENCY_DELAY_RECORDED" && !revisedEstimate) fail(400, "A revised estimated schedule is required for a client-dependency delay.");
+  if (input.eventType === "UCHIT_RESCHEDULE_RECORDED" && !replacementDateOrSlot) fail(400, "A replacement date or slot is required for an Uchit reschedule.");
+  const requestHash = deterministicContentHash({ clientId: input.clientId, prospectiveProjectId: input.prospectiveProjectId, proposalVersionId: input.proposalVersionId, eventType: input.eventType, reason, revisedEstimate, replacementDateOrSlot });
+  const replay = input.state.founderCommercialPolicyEvents.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for a different commercial policy event."); return replay; }
+  const event = { id: uuid(), organisationId: input.organisationId, clientId: input.clientId, prospectiveProjectId: input.prospectiveProjectId, proposalVersionId: input.proposalVersionId, eventType: input.eventType, reason, revisedEstimate, replacementDateOrSlot, noRefundOrCreditEntitlement: true as const, paymentHistoryPreserved: true as const, createdByActorUserId: input.actor.id, createdAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 as const };
+  input.state.founderCommercialPolicyEvents.push(event);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: input.eventType, entityType: "PROSPECTIVE_PROJECT", entityId: project.id, actorUserId: input.actor.id, reason: "Commercial cancellation or schedule event recorded; no payment or workflow state changed.", proposalVersionId: input.proposalVersionId, prospectiveProjectId: project.id, afterHash: requestHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return event;
+}
+
+export function activateFounderApprovedLegalSections(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; reason: string; idempotencyKey: string; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey); const reason = trimmed(input.reason, "Approval reason");
+  const ensure = (kind: "PROFESSIONAL_BOUNDARIES" | "ACCEPTANCE_DECLARATION", title: string, exactText: string, configuration?: FounderCommercialLegalPolicyRecord["configuration"]) => {
+    const current = activeLegal(input.state, input.organisationId, kind); const expectedHash = deterministicContentHash({ exactText, configuration });
+    if (current) { if (current.contentHash !== expectedHash) fail(409, `An active ${kind} policy already exists with different content. Create an explicit successor version.`); return current; }
+    const draft = createFounderLegalPolicy({ ...input, kind, title, exactText, configuration, reason, idempotencyKey: `${input.idempotencyKey}:${kind}:draft` });
+    return activateFounderLegalPolicy({ ...input, policyId: draft.id, reason, idempotencyKey: `${input.idempotencyKey}:${kind}:active`, expectedRecordVersion: draft.recordVersion });
+  };
+  const professionalBoundaries = ensure("PROFESSIONAL_BOUNDARIES", FOUNDER_PROFESSIONAL_BOUNDARIES_TITLE, FOUNDER_PROFESSIONAL_BOUNDARIES_COPY);
+  const acceptanceDeclaration = ensure("ACCEPTANCE_DECLARATION", FOUNDER_ACCEPTANCE_DECLARATION_TITLE, FOUNDER_ACCEPTANCE_DECLARATION_COPY, { acceptanceCheckboxLabel: FOUNDER_ACCEPTANCE_CHECKBOX_COPY, typedConfirmationMode: "FULL_NAME" });
+  const currentP14 = activeLegal(input.state, input.organisationId, "CANCELLATION_REFUND_DELAY");
+  const cancellationRefundDelay = currentP14?.contentHash === deterministicContentHash({ exactText: FOUNDER_NO_REFUND_POLICY_COPY, configuration: FOUNDER_NO_REFUND_POLICY_CONFIGURATION }) ? currentP14 : activateFounderNoRefundPolicy({ ...input, idempotencyKey: `${input.idempotencyKey}:P14:active`, expectedActiveRecordVersion: currentP14?.recordVersion ?? 0 });
+  return { professionalBoundaries, acceptanceDeclaration, cancellationRefundDelay };
 }
 
 export function createFounderProposalTemplate(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; serviceType: VastuServiceType; name: string; kind: "DEFAULT" | "REUSABLE_VARIANT"; scopeItems: FounderProposalTemplateVersionRecord["scopeItems"]; deliverables: FounderProposalTemplateVersionRecord["deliverables"]; reason: string; idempotencyKey: string; now?: Date }) {
@@ -259,7 +339,7 @@ function bindActivePolicies(state: AppState, proposal: FounderProposalVersionRec
   const p13 = activeLegal(state, proposal.organisationId!, "ACCEPTANCE_DECLARATION");
   const p14 = activeLegal(state, proposal.organisationId!, "CANCELLATION_REFUND_DELAY");
   if (!p5 || !p13 || !p14) fail(409, "BLOCKED — OWNER/LEGAL INPUT REQUIRED. P5, P13 and P14 must be approved and active.");
-  proposal.content.policyBindings.professionalBoundariesPolicyId = p5.id; proposal.content.policyBindings.acceptanceDeclarationPolicyId = p13.id; proposal.content.policyBindings.cancellationPolicyId = p14.id;
+  proposal.content.policyBindings.professionalBoundariesPolicyId = p5.id; proposal.content.policyBindings.acceptanceDeclarationPolicyId = p13.id; proposal.content.policyBindings.cancellationPolicyId = p14.id; proposal.content.policyBindings.cancellationPolicyVersion = p14.version; proposal.content.policyBindings.cancellationPolicyContentHash = p14.contentHash;
 }
 
 export function reviewFounderProposal(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
@@ -295,6 +375,7 @@ export function projectFounderProposalForClient(state: AppState, proposal: Found
   const p5 = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.professionalBoundariesPolicyId && item.organisationId === proposal.organisationId);
   const p14 = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.cancellationPolicyId && item.organisationId === proposal.organisationId);
   if (!p5 || !p14) fail(409, "The proposal legal-policy snapshot is unavailable.");
+  if ((proposal.content.policyBindings.cancellationPolicyVersion !== undefined && proposal.content.policyBindings.cancellationPolicyVersion !== p14.version) || (proposal.content.policyBindings.cancellationPolicyContentHash && proposal.content.policyBindings.cancellationPolicyContentHash !== p14.contentHash)) fail(409, "The proposal no-refund policy snapshot does not match its immutable version binding.");
   const commercial = proposal.content.commercial;
   return { proposalVersion: proposal.version, proposalHash: proposal.contentHash, client: { name: proposal.content.clientProject.clientName, permanentClientId: proposal.clientId }, project: { kind: proposal.content.clientProject.projectKind, serviceType: proposal.serviceType, propertyType: proposal.content.clientProject.propertyType, propertyLocation: proposal.content.clientProject.propertyLocation, knownFloorCount: proposal.content.clientProject.knownFloorCount, primaryRequirement: proposal.content.clientProject.primaryRequirement }, requirements: { exactQualificationVersion: proposal.content.requirements.qualificationResponseVersionId, refinedSummary: proposal.content.requirements.refinedSummary }, scopeItems: proposal.content.scopeItems.map(({ order, title, status, floorIds, note }) => ({ order, title, status, floorIds, note })), deliverables: proposal.content.deliverables.map(({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency }) => ({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency })), interactions: structuredClone(proposal.content.interactions), timeline: structuredClone(proposal.content.timeline), commercial: { professionalFeePaise: commercial.professionalFeePaise, gstAppliedBasisPoints: commercial.gstAppliedBasisPoints, gstAmountPaise: commercial.gstAmountPaise, totalPayablePaise: commercial.totalPayablePaise, agreedAdvancePaise: commercial.agreedAdvancePaise, remainingBalancePaise: commercial.remainingBalancePaise, paymentMilestones: structuredClone(commercial.paymentMilestones) }, professionalBoundaries: p5.exactText, projectExclusions: [...proposal.content.projectExclusions], cancellationRefundDelayPolicy: p14.exactText, validityEndsAt: proposal.validityEndsAt!, postAcceptanceSequence: ["Uchit acknowledges acceptance.", "Payment instructions are issued where applicable.", "The agreed advance or approved exception is confirmed.", "A Case ID and workspace are created only after commercial clearance.", "Project intake and evidence collection begin."] };
 }
@@ -334,7 +415,7 @@ export async function resolveFounderProposalGrant(state: AppState, token: string
   if (!grant.openedAt) { grant.openedAt = now.toISOString(); grant.recordVersion = (grant.recordVersion ?? 1) + 1; }
   const acceptance = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.acceptanceDeclarationPolicyId && item.organisationId === proposal.organisationId);
   if (!acceptance) fail(409, "The accepted legal declaration snapshot is unavailable.");
-  return { grant, proposal, projection: projectFounderProposalForClient(state, proposal), acceptanceDeclaration: { exactText: acceptance.exactText, checkboxLabel: acceptance.configuration?.acceptanceCheckboxLabel, typedConfirmationPhrase: acceptance.configuration?.typedConfirmationPhrase } };
+  return { grant, proposal, projection: projectFounderProposalForClient(state, proposal), acceptanceDeclaration: { exactText: acceptance.exactText, checkboxLabel: acceptance.configuration?.acceptanceCheckboxLabel, typedConfirmationPhrase: acceptance.configuration?.typedConfirmationPhrase, typedConfirmationMode: acceptance.configuration?.typedConfirmationMode } };
 }
 
 export async function respondToFounderProposal(input: { state: AppState; token: string; response: "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED"; fullName: string; acceptanceChecked?: boolean; typedConfirmation?: string; organisationName?: string; designation?: string; requestedChanges?: string; idempotencyKey: string; now?: Date }) {
@@ -346,7 +427,8 @@ export async function respondToFounderProposal(input: { state: AppState; token: 
   const artifact = input.state.founderProposalArtifacts.find((item) => item.proposalVersionId === proposal.id)!;
   if (input.response === "ACCEPTED") {
     if (!input.acceptanceChecked || !input.fullName.trim()) fail(400, "Full name and explicit acceptance checkbox are required.");
-    if (input.typedConfirmation !== resolved.acceptanceDeclaration.typedConfirmationPhrase) fail(400, "Typed confirmation must exactly match the approved acceptance declaration.");
+    const typedMatches = resolved.acceptanceDeclaration.typedConfirmationMode === "FULL_NAME" ? input.typedConfirmation === input.fullName : input.typedConfirmation === resolved.acceptanceDeclaration.typedConfirmationPhrase;
+    if (!typedMatches) fail(400, "Typed confirmation must exactly match the approved acceptance declaration.");
     if (proposal.content.clientProject.projectKind === "COMMERCIAL" && (!input.organisationName?.trim() || !input.designation?.trim())) fail(400, "Organisation and designation are required for commercial-project acceptance.");
   }
   if (input.response === "CHANGES_REQUESTED" && !input.requestedChanges?.trim()) fail(400, "Requested changes are required.");

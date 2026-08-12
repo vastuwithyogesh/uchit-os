@@ -8,9 +8,9 @@ Run `pnpm test:founder-pre-staging`. The suite creates only temporary local SQLi
 
 The SQLite rehearsal executes the actual statements declared in `db/migrations.ts` and verifies:
 
-- clean v1 through v14 migration and repeated execution with exactly 14 markers;
-- a populated synthetic v9 database upgraded through v10, v11, v12, v13 and v14 without changing the snapshot, lead, or external-source records;
-- required v12 tables, v13 owner-policy columns, v14 Zoom host/OAuth lineage columns and indexes;
+- clean v1 through v16 migration and repeated execution with exactly 16 markers;
+- a populated synthetic v9 database upgraded through v10, v11, v12, v13, v14, v15 and v16 without changing the snapshot, lead, or external-source records;
+- required v12 tables, v13 owner-policy columns, v14 Zoom host/OAuth lineage, v15 append-only no-refund event ledger/index and v16 fixed-Ludhiana tax-policy columns;
 - unique organisation policy version, seven-calendar-day balance policy, and sixty-minute invoice SLA constraints;
 - a deliberately interrupted v13 transaction leaves neither its marker nor partial policy columns, then succeeds by forward-fix;
 - a v9 backup can be restored and upgraded, with `PRAGMA integrity_check` returning `ok`.
@@ -57,7 +57,7 @@ At that stop point there must be no proposal version, payment confirmation, invo
 | New Construction master scope/deliverables | Deferred | Real proposal draft cannot start | Supply, name, approve, and activate an immutable template version |
 | P5 professional boundaries | Owner/legal input required | Review/approval/send blocked | Return approved exact text and activate its version |
 | P13 acceptance declaration | Owner/legal input required | Review/approval/send/acceptance blocked | Return approved exact text/confirmation configuration and activate it |
-| P14 cancellation/refund/delay policy | Owner/legal input required | Review/approval/send blocked | Return approved exact policy and activate it |
+| P14 cancellation/refund/delay policy | Active Founder v1.2 NO_REFUNDS | Version/hash pinned; no refund or credit path | Preserve exact copy and immutable prior versions |
 | Place-of-supply and service-timing policy | `REVIEW_REQUIRED_ACCOUNTANT` | Receipt Voucher/Tax Invoice issuance is unavailable; confirmed payment is preserved | Supply and activate an accountant-approved successor policy |
 | Statutory logo and signature images | Not uploaded/active | Document readiness remains blocked | Upload privately, Founder-approve and activate exact Media Library versions |
 | Statutory corrections/credit-debit policy | `BLOCKED_ACCOUNTANT_APPROVAL` | Issued bytes cannot be corrected in place | Supply accountant-approved correction policy |

@@ -28,6 +28,7 @@
     "test:reference-parity": "node --test tests/reference-parity-founder-workflow.test.mjs",
     "test:lead-import": "node --experimental-strip-types --test tests/safe-lead-import.test.ts tests/safe-lead-import-ui.test.mjs",
     "test:founder-statutory": "node --experimental-strip-types --test tests/founder-statutory-documents-runtime.test.ts tests/founder-statutory-documents-contract.test.mjs tests/founder-statutory-v12-rehearsal.test.mjs tests/founder-statutory-v13-policy.test.mjs",
+    "test:founder-no-refund": "node --experimental-strip-types --test tests/founder-no-refund-policy.test.ts tests/founder-no-refund-contract.test.mjs",
     "rehearse:founder-statutory-v12": "node --experimental-strip-types scripts/rehearse-founder-statutory-v12.mjs",
     "prepare:founder-statutory-v12": "node --experimental-strip-types scripts/prepare-founder-statutory-v12-readiness.mjs",
     "rehearse:founder-statutory-v13": "node --experimental-strip-types scripts/rehearse-founder-statutory-v13.mjs",

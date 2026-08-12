@@ -62,10 +62,10 @@ class FakeD1 {
   }
 }
 
-test("v1 through v14 migrate an empty database and repeat without drift", async () => {
+test("v1 through v16 migrate an empty database and repeat without drift", async () => {
   const db = new FakeD1();
   await migrateD1(db);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   assert.ok(db.tables.has("app_state_snapshot"));
   assert.ok(db.tables.has("case_file_assets"));
   assert.ok(db.tables.has("staff_role_assignments"));
@@ -80,6 +80,7 @@ test("v1 through v14 migrate an empty database and repeat without drift", async 
   for (const column of ["organisation_id", "external_source_id", "source_record_type", "source_record_id", "external_client_code", "sync_status", "last_synced_at", "record_version"]) assert.ok(db.columns.get("inbound_optin_events").has(column));
   for (const column of ["source_system", "source_record_type", "source_record_id", "integration_event_id"]) assert.ok(db.columns.get("audit_events").has(column));
   for (const column of ["operational_place_of_supply_selection", "receipt_voucher_trigger", "receipt_voucher_sla_minutes", "proforma_policy", "tax_invoice_trigger", "refund_policy", "correction_posture", "purchase_side_debit_notes_in_scope", "opex_tracking_scope", "accountant_approved_service_types_json"]) assert.ok(db.columns.get("founder_statutory_policy_versions").has(column));
+  for (const column of ["active_place_of_supply_policy", "place_of_supply_display", "outside_india_billing_label", "tax_treatment"]) assert.ok(db.columns.get("founder_statutory_policy_versions").has(column));
   assert.ok(db.columns.get("founder_commercial_policy_versions").has("refund_policy"));
   assert.ok(db.columns.get("founder_billing_profile_versions").has("service_location"));
   for (const column of ["host_user_email", "oauth_connection_type", "scope_snapshot_json"]) assert.ok(db.columns.get("zoom_meeting_bindings").has(column));
@@ -93,12 +94,12 @@ test("production-like v2 schema adopts migration markers without changing revisi
   const db = new FakeD1({ revisionColumn: true, revision: 37, applied: [1] });
   await migrateD1(db);
   assert.equal(db.revision, 37);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   assert.ok(db.tables.has("case_file_assets"));
 });
 
 test("migration list is deterministic and Sites packages the db directory", async () => {
-  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
+  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
   const prepare = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../scripts/prepare-sites.mjs", import.meta.url), "utf8"));
   assert.match(prepare, /"db"/);
 });

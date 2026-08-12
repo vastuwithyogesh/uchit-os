@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FounderProposalClientProjection } from "@/lib/commercial-document-renderer";
 
-type Loaded = { proposal: FounderProposalClientProjection; acceptanceDeclaration: { exactText: string; checkboxLabel?: string; typedConfirmationPhrase?: string } };
+type Loaded = { proposal: FounderProposalClientProjection; acceptanceDeclaration: { exactText: string; checkboxLabel?: string; typedConfirmationPhrase?: string; typedConfirmationMode?: "FULL_NAME" } };
 const money = (paise: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: paise % 100 === 0 ? 0 : 2 }).format(paise / 100);
 
 export function CommercialProposalClient({ token }: { token: string }) {
@@ -27,7 +27,7 @@ export function CommercialProposalClient({ token }: { token: string }) {
       <h2>Your response</h2>
       <div className="proposal-response-choice"><label><input type="radio" name="response" checked={response === "ACCEPTED"} onChange={() => setResponse("ACCEPTED")} /> Accept proposal</label><label><input type="radio" name="response" checked={response === "CHANGES_REQUESTED"} onChange={() => setResponse("CHANGES_REQUESTED")} /> Request changes</label><label><input type="radio" name="response" checked={response === "DECLINED"} onChange={() => setResponse("DECLINED")} /> Decline</label></div>
       <label>Full name<input name="fullName" required /></label>
-      {response === "ACCEPTED" ? <><p>{acceptanceDeclaration.exactText}</p><label className="checkbox-row"><input type="checkbox" name="acceptanceChecked" required /> {acceptanceDeclaration.checkboxLabel}</label><label>Type the approved confirmation phrase<input name="typedConfirmation" required autoComplete="off" /></label>{proposal.project.kind === "COMMERCIAL" ? <><label>Organisation<input name="organisationName" required /></label><label>Designation<input name="designation" required /></label></> : null}</> : null}
+      {response === "ACCEPTED" ? <><p>{acceptanceDeclaration.exactText}</p><label className="checkbox-row"><input type="checkbox" name="acceptanceChecked" required /> {acceptanceDeclaration.checkboxLabel}</label><label>{acceptanceDeclaration.typedConfirmationMode === "FULL_NAME" ? "Type your full name to confirm" : "Type the approved confirmation phrase"}<input name="typedConfirmation" required autoComplete="off" /></label>{proposal.project.kind === "COMMERCIAL" ? <><label>Organisation<input name="organisationName" required /></label><label>Designation<input name="designation" required /></label></> : null}</> : null}
       {response === "CHANGES_REQUESTED" ? <label>Requested changes<textarea name="requestedChanges" required /></label> : null}
       {error ? <p role="alert" className="error-text">{error}</p> : null}{result ? <p role="status" className="success-text">{result}</p> : null}
       <button type="submit" disabled={busy}>{busy ? "Recording…" : "Record response"}</button>

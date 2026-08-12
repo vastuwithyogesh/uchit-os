@@ -66,7 +66,7 @@ import type {
   ,FounderCommercialPolicyVersionRecord, FounderCommercialLegalPolicyRecord, FounderProposalTemplateVersionRecord,
   FounderProposalVersionRecord, FounderProposalApprovalRecord, FounderProposalArtifactRecord, FounderProposalGrantRecord,
   FounderProposalResponseRecord, FounderCommercialPaymentConfirmationRecord, FounderBalanceDeadlineRecord,
-  FounderCommercialInvoiceRecord, FounderCommercialAuditEventRecord, FounderStatutoryPolicyVersionRecord,
+  FounderCommercialInvoiceRecord, FounderCommercialPolicyEventRecord, FounderCommercialAuditEventRecord, FounderStatutoryPolicyVersionRecord,
   FounderBillingProfileVersionRecord, FounderStatutorySequenceReservationRecord, FounderStatutoryDocumentRecord
 } from "./domain.ts";
 import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
@@ -147,6 +147,7 @@ export interface AppState {
   founderCommercialPaymentConfirmations: FounderCommercialPaymentConfirmationRecord[];
   founderBalanceDeadlines: FounderBalanceDeadlineRecord[];
   founderCommercialInvoices: FounderCommercialInvoiceRecord[];
+  founderCommercialPolicyEvents: FounderCommercialPolicyEventRecord[];
   founderCommercialAuditEvents: FounderCommercialAuditEventRecord[];
   founderStatutoryPolicies: FounderStatutoryPolicyVersionRecord[];
   founderBillingProfileVersions: FounderBillingProfileVersionRecord[];
@@ -209,7 +210,7 @@ export const createEmptyAppState = (): AppState => ({
   founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
   founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
   founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
-  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: [],
+  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialPolicyEvents: [], founderCommercialAuditEvents: [],
   founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
 });
 
@@ -268,7 +269,7 @@ const createDemoAppState = (): AppState => ({
   founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
   founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
   founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
-  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: [],
+  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialPolicyEvents: [], founderCommercialAuditEvents: [],
   founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
 });
 

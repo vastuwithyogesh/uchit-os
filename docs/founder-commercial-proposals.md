@@ -1,6 +1,6 @@
 # Founder Commercial Proposals — local implementation contract
 
-Status: implemented locally, not deployed. D1 v13 is defined but has not been executed in any environment.
+Status: implemented locally, not deployed. D1 v16 is defined but has not been executed in any environment.
 
 ## Founder flow
 
@@ -12,9 +12,9 @@ Money is stored as integer paise. The default reference fee is ₹51,000, the re
 
 The lifecycle is DRAFT → SUPER_ADMIN_REVIEWED → SUPER_ADMIN_APPROVED → SENT, followed by ACCEPTED, CHANGES_REQUESTED, DECLINED or EXPIRED. Review and approval are distinct records even when Yogesh performs both. Approved or sent content is never edited; a change creates a successor draft.
 
-No P5 professional-boundary wording, P13 acceptance declaration, P14 cancellation/refund/delay policy or statutory invoice configuration is seeded. The separate review document is advisory and is not imported. Review, approval, send and acceptance remain blocked until P5, P13 and P14 have explicit active owner-approved versions. Invoice issuance remains `REVIEW_REQUIRED` until statutory configuration is active.
+No P5 professional-boundary wording, P13 acceptance declaration or statutory invoice configuration is seeded. The separate review document is advisory and is not imported. P14 v1.2 is now the exact active Founder policy contract; proposal versions pin its policy ID, version and content hash. Review, approval, send and acceptance remain blocked until P5 and P13 also have explicit active owner-approved versions. Invoice issuance remains `REVIEW_REQUIRED` until statutory configuration is active.
 
-The owner’s operational commercial policy is `NO_REFUNDS`; no refund workflow or refund promise is exposed. This does not fabricate or activate the still-missing P14 client-facing legal wording.
+The owner’s operational commercial policy is `NO_REFUNDS`; no refund, credit, voucher, fee-offset, payment-reversal or deletion workflow is exposed. Client cancellation, client-dependency delay and Uchit reschedule requests are append-only events that preserve payment and workflow state. Statutory correction remains a separately accountant-gated exception.
 
 ## P17 superseded statutory-document SLA
 

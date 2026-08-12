@@ -11,9 +11,9 @@ import { approveAouDisplayCopy, initializeCanonicalAouSource, saveAouDisplayDraf
 import { transitionFloorRegeneration } from "@/lib/founder-regeneration";
 import { assignReviewCall, cancelReviewCall, createFounderCommunicationContext, createQualificationInvitation, markCommunicationOpened, prepareManualCommunication, rescheduleReviewCall,
   registerMediaAssetVersion, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "@/lib/founder-engagement";
-import { activateFounderLegalPolicy, activateFounderProposalTemplate, applyFounderBalanceDeadlineException, approveFounderProposal, autosaveFounderProposalStep,
+import { activateFounderLegalPolicy, activateFounderNoRefundPolicy, activateFounderProposalTemplate, applyFounderBalanceDeadlineException, approveFounderProposal, autosaveFounderProposalStep,
   confirmFounderCommercialPayment, createFounderLegalPolicy, createFounderProposalDraft, createFounderProposalSuccessor, createFounderProposalTemplate,
-  generateFounderProposalArtifact, issueFounderAdvanceInvoice, publishFounderCommercialPolicy, reviewFounderProposal, sendFounderProposal } from "@/lib/founder-commercial";
+  generateFounderProposalArtifact, issueFounderAdvanceInvoice, publishFounderCommercialPolicy, recordFounderCommercialPolicyEvent, reviewFounderProposal, sendFounderProposal } from "@/lib/founder-commercial";
 import { founderCommercialArtifactStore } from "@/lib/founder-commercial.server";
 import { activateFounderStatutoryPolicy, createFounderStatutoryPolicyDraft, issueFounderStatutoryDocument, saveFounderBillingProfile } from "@/lib/founder-statutory-documents";
 import { approveManualUtilitySheet, checkpointPostSiteFindings, checkpointSiteAnalysis, upsertPostSiteFindings, upsertSiteAnalysis } from "@/lib/site-workflow";
@@ -152,6 +152,8 @@ export async function POST(request: Request) {
       "founder-commercial-policy-publish": ["action", "actorRole", "referenceFeePaise", "referenceAdvancePaise", "defaultGstBasisPoints", "reason", "idempotencyKey", "expectedActiveVersion", "expectedRecordVersion", "expectedRevision"],
       "founder-commercial-legal-create": ["action", "actorRole", "kind", "title", "exactText", "configuration", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-commercial-legal-activate": ["action", "actorRole", "policyId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-no-refund-policy-activate": ["action", "actorRole", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-commercial-policy-event-record": ["action", "actorRole", "clientId", "prospectiveProjectId", "proposalVersionId", "eventType", "reason", "revisedEstimate", "replacementDateOrSlot", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-proposal-template-create": ["action", "actorRole", "serviceType", "name", "kind", "scopeItems", "deliverables", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-proposal-template-activate": ["action", "actorRole", "templateId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-proposal-draft-create": ["action", "actorRole", "clientId", "prospectiveProjectId", "classification", "professionalFeePaise", "appliedGstBasisPoints", "agreedAdvancePaise", "feeDeviationReason", "classificationReason", "gstDeviationReason", "advanceExceptionReason", "idempotencyKey", "expectedProjectVersion", "expectedRecordVersion", "expectedRevision"],
@@ -267,6 +269,12 @@ export async function POST(request: Request) {
       }
       case "founder-commercial-legal-activate": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, policy: activateFounderLegalPolicy({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, policyId: body.policyId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-no-refund-policy-activate": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, policy: activateFounderNoRefundPolicy({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedActiveRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-commercial-policy-event-record": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, event: recordFounderCommercialPolicyEvent({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, clientId: body.clientId, prospectiveProjectId: body.prospectiveProjectId, proposalVersionId: body.proposalVersionId, eventType: body.eventType, reason: body.reason, revisedEstimate: body.revisedEstimate, replacementDateOrSlot: body.replacementDateOrSlot, idempotencyKey: body.idempotencyKey, expectedProjectRecordVersion: body.expectedRecordVersion }) }; break;
       }
       case "founder-proposal-template-create": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, template: createFounderProposalTemplate({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, serviceType: body.serviceType, name: body.name, kind: body.kind, scopeItems: body.scopeItems ?? [], deliverables: body.deliverables ?? [], reason: body.reason, idempotencyKey: body.idempotencyKey }) }; break;
