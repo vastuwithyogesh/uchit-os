@@ -26,6 +26,7 @@ The generated manifest is `output/visual-qa/founder-synthetic-visual-qa.manifest
 ## Source findings
 
 - Evaluation readiness recovery now routes to `/clients-cases`; the primary journey no longer requires `/ops`.
+- Spatial evidence recovery now continues through `/founder/continue` instead of linking directly to the legacy `/evaluation` console. The server derives the exact case, floor and first actionable step.
 - Evaluation, manual evidence, balance, Founder approval and protected-PDF surfaces keep secondary context behind Details disclosures.
 - Stage B remains `BLOCKED_METHOD_INPUT`; client delivery remains deferred; provider integrations remain dormant.
 - Protected report export/print remains gated by the exact artifact release state.
