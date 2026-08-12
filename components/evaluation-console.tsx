@@ -130,7 +130,9 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
         <p className="subtle">
           Choose a client, complete the required case inputs, then save the two evaluation snapshots.
         </p>
-        <div className="stat-grid" style={{ marginTop: 18 }}>
+        <details className="founder-technical-details">
+          <summary>Evaluation status details</summary>
+          <div className="stat-grid details-body">
           <div className="stat-card">
             <span className="stat-value">{rules.length}</span>
             <span className="stat-label">rules loaded</span>
@@ -147,7 +149,8 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
             <span className="stat-value">{currentCase?.caseNumber ?? "—"}</span>
             <span className="stat-label">active case context</span>
           </div>
-        </div>
+          </div>
+        </details>
         <div className="workflow" style={{ marginTop: 14 }}>
           <button type="button" className="button-secondary" onClick={() => refresh()} disabled={busy}>
             Reload master table
@@ -165,12 +168,15 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
             {floors.map((item) => <option key={item.id} value={item.id}>{item.floorLabel}</option>)}
           </select>
         </div>
-        <div className="pill-row" style={{ marginTop: 14 }}>
-          <span className="pill">GOOD {grouped.GOOD.length}</span>
-          <span className="pill">BAD {grouped.BAD.length}</span>
-          <span className="pill">OK-OK {grouped["OK-OK"].length}</span>
-          <span className="pill">Snapshots {evaluationSnapshots.length}</span>
-        </div>
+        <details className="founder-technical-details">
+          <summary>Rule summary</summary>
+          <div className="pill-row details-body">
+            <span className="pill">GOOD {grouped.GOOD.length}</span>
+            <span className="pill">BAD {grouped.BAD.length}</span>
+            <span className="pill">OK-OK {grouped["OK-OK"].length}</span>
+            <span className="pill">Snapshots {evaluationSnapshots.length}</span>
+          </div>
+        </details>
         <div className="panel" style={{ marginTop: 14 }} aria-live="polite"><strong>{evaluationReady ? "Ready to run evaluation" : "Complete the case setup first"}</strong><div className="meta" style={{ marginTop: 6 }}>{service ? `${serviceTypeLabel(service.serviceType)} · ${readiness?.completed ?? 0} of ${readiness?.total ?? 0} required inputs ready.` : "Open a case and save its service setup."}</div>{!evaluationReady ? <><p className="subtle">Evaluation controls stay unavailable until these requirements are complete:</p><ul>{evaluationBlockers.slice(0, 3).map((blocker) => <li key={blocker}>{blocker}</li>)}</ul>{evaluationBlockers.length > 3 ? <p className="meta">Case setup shows {evaluationBlockers.length - 3} more requirement{evaluationBlockers.length - 3 === 1 ? "" : "s"}.</p> : null}<a className="button" href="/ops">Complete case setup</a></> : null}</div>
         {evaluationReady ? <><div className="field" style={{ marginTop: 14 }}>
           <label htmlFor="snapshot-name">Snapshot name</label>
@@ -178,12 +184,12 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
         </div>
         <button
           type="button"
-          className="button-secondary"
+          className="button founder-action-primary"
           style={{ marginTop: 10 }}
           disabled={busy || !evaluationReady || !snapshotName.trim() || snapshotName.trim().length > 120}
           onClick={() => run({ action: "utility-evaluate", caseId: currentCase?.id, snapshotName }, "Utility evaluation snapshot saved for this floor.")}
         >
-          Save utility snapshot
+          Save Utility snapshot
         </button>
         </> : null}
         <details style={{ marginTop: 14 }}>
@@ -224,7 +230,10 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
         >
           Save Shakti snapshot
         </button>
-        <div className="list" style={{ marginTop: 14 }}>
+        <details className="founder-technical-details">
+          <summary>Release and payment context</summary>
+          <div className="details-body">
+          <div className="list">
           <div className="list-item">
             <strong>Current case</strong>
             <span className="meta">{currentCase?.caseNumber ?? "No case selected"}</span>
@@ -237,8 +246,8 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
             <strong>Expected input</strong>
             <span className="meta">Exactly 16 values with ±2 tie-break support</span>
           </div>
-        </div>
-        <div className="panel" style={{ marginTop: 14 }}>
+          </div>
+        <div className="panel">
           <div className="panel-head">
             <div>
               <strong>{report?.versionLabel ?? "Stage-A Preview"}</strong>
@@ -252,7 +261,7 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
             {report?.watermarkText ?? "Preview only. Balance pending."}
           </p>
         </div>
-        <div className="list" style={{ marginTop: 14 }}>
+        <div className="list">
           <div className="list-item">
             <strong>Balance gate</strong>
             <span className="meta">Locked until the balance payment is approved</span>
@@ -266,6 +275,8 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
             <span className="meta">{caseAmountInr ? formatMoney(caseAmountInr) : "Not set"}</span>
           </div>
         </div>
+        </div>
+        </details>
         <div className="footer-note" role={message.toLowerCase().includes("failed") || message.toLowerCase().includes("could not") ? "alert" : "status"} aria-live="polite">{message}</div>
       </div> : null}
     </section>

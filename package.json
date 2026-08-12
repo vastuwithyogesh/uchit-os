@@ -39,6 +39,7 @@
     "test:founder-communication-context": "node --experimental-strip-types --test tests/founder-communication-context.test.ts tests/founder-manual-compose.test.ts && node --test tests/founder-email-compose-ui.test.mjs",
     "test:deployment-readiness": "node --test tests/deployment-readiness-contract.test.mjs",
     "pilot:founder": "node --experimental-strip-types scripts/render-founder-pilot.mjs",
+    "prepare:founder-visual-qa": "node --experimental-strip-types scripts/prepare-founder-visual-qa.mjs",
     "lint": "tsc --noEmit",
     "test:persistence": "node --experimental-strip-types --test lib/persistence-merge.test.ts",
     "test:payment-migration": "node --experimental-strip-types --test lib/payment-proof-migration.test.ts",
