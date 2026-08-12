@@ -1,6 +1,6 @@
 # Founder Commercial Proposals — local implementation contract
 
-Status: implemented locally, not deployed. D1 v12 is defined but has not been executed in any environment.
+Status: implemented locally, not deployed. D1 v13 is defined but has not been executed in any environment.
 
 ## Founder flow
 
@@ -13,6 +13,8 @@ Money is stored as integer paise. The default reference fee is ₹51,000, the re
 The lifecycle is DRAFT → SUPER_ADMIN_REVIEWED → SUPER_ADMIN_APPROVED → SENT, followed by ACCEPTED, CHANGES_REQUESTED, DECLINED or EXPIRED. Review and approval are distinct records even when Yogesh performs both. Approved or sent content is never edited; a change creates a successor draft.
 
 No P5 professional-boundary wording, P13 acceptance declaration, P14 cancellation/refund/delay policy or statutory invoice configuration is seeded. The separate review document is advisory and is not imported. Review, approval, send and acceptance remain blocked until P5, P13 and P14 have explicit active owner-approved versions. Invoice issuance remains `REVIEW_REQUIRED` until statutory configuration is active.
+
+The owner’s operational commercial policy is `NO_REFUNDS`; no refund workflow or refund promise is exposed. This does not fabricate or activate the still-missing P14 client-facing legal wording.
 
 ## P17 superseded statutory-document SLA
 

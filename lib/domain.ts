@@ -410,13 +410,14 @@ export interface FounderCommercialPolicyVersionRecord extends OrganisationOwnedR
   id: string; version: number; status: "ACTIVE" | "SUPERSEDED";
   referenceFeePaise: number; referenceAdvancePaise: number; defaultGstBasisPoints: number;
   balanceDeadlineDays: 7; advanceInvoiceSlaMinutes: 60;
+  refundPolicy: "NO_REFUNDS";
   reason: string; actorUserId: string; createdAt: string; idempotencyKey: string; requestHash: string;
 }
 
 export interface FounderCommercialLegalPolicyRecord extends OrganisationOwnedRecord {
   id: string; kind: FounderLegalPolicyKind; version: number; status: FounderLegalPolicyStatus;
   title: string; exactText: string; contentHash: string;
-  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[] };
+  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[]; refundPolicy?: "NO_REFUNDS" };
   reason: string; createdByActorUserId: string; createdAt: string; approvedByActorUserId?: string; approvedAt?: string; activatedAt?: string; supersedesPolicyId?: string; idempotencyKey: string; requestHash: string;
 }
 
@@ -506,9 +507,13 @@ export interface FounderStatutoryPolicyVersionRecord extends OrganisationOwnedRe
   authorisedSignatory: "Yogesh K Hora"; designation: "Proprietor"; sac: "9983";
   lineDescription: "Professional Vastu Consultancy Services"; defaultGstBasisPoints: 1800;
   reverseChargeText: "Tax payable under reverse charge: No";
-  placeOfSupplyBasis: "CLIENT_LOCATION"; placeOfSupplyApproval: FounderAccountantApprovalState;
+  placeOfSupplyBasis: "CLIENT_LOCATION"; operationalPlaceOfSupplySelection: "CLIENT_LOCATION_ONLY"; placeOfSupplyApproval: FounderAccountantApprovalState;
   serviceTimingApproval: FounderAccountantApprovalState; correctionPolicyApproval: FounderAccountantApprovalState;
-  serviceTimingPolicyText?: string; accountantApprovalReference?: string;
+  receiptVoucherTrigger: "CONFIRMED_ADVANCE"; receiptVoucherSlaMinutes: 60;
+  proformaPolicy: "AFTER_CONFIRMED_ADVANCE_ONLY"; taxInvoiceTrigger: "CONFIRMED_FULL_PAYMENT";
+  refundPolicy: "NO_REFUNDS"; correctionPosture: "EXCEPTION_ONLY_ACCOUNTANT_APPROVAL";
+  purchaseSideDebitNotesInScope: false; opexTrackingScope: "OUTSIDE_CLIENT_INVOICE_MODULE";
+  serviceTimingPolicyText?: string; accountantApprovalReference?: string; accountantApprovedServiceTypes?: VastuServiceType[];
   createdByActorUserId: string; createdAt: string; approvedAt?: string; activatedAt?: string;
   reason: string; idempotencyKey: string; requestHash: string; recordVersion: number;
 }
@@ -517,7 +522,7 @@ export interface FounderBillingProfileVersionRecord extends OrganisationOwnedRec
   id: string; clientId: string; prospectiveProjectId: string; version: number;
   billingLegalName: string; billingAddress: string; billingState: string; billingPin: string;
   recipientRegisteredForGst: boolean; recipientGstin?: string; clientLocationCountry: string;
-  clientLocationState?: string; propertyLocation?: string; timeZone: string;
+  clientLocationState?: string; propertyLocation?: string; serviceLocation?: string; timeZone: string;
   createdByActorUserId: string; createdAt: string; reason: string; predecessorId?: string;
   idempotencyKey: string; requestHash: string; recordVersion: number;
 }

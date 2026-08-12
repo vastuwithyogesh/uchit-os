@@ -141,12 +141,14 @@ function assertSafe(report) {
   if (report.readiness.status !== "REVIEW_REQUIRED" || report.readiness.missingRequiredBlockers.length !== 3) throw new Error("Statutory readiness did not fail closed on the expected owner/accountant inputs.");
 }
 
-export async function runFounderStatutoryV12Rehearsal() {
-  const migration = await runFounderPreStagingRehearsal();
+export async function runFounderStatutoryV12Rehearsal(options = {}) {
+  const migrationLevel = options.migrationLevel ?? 12;
+  const contract = options.contract ?? "FE-INVOICE-STATUTORY-CONFIG/v1.1-readiness";
+  const migration = await runFounderPreStagingRehearsal(migrationLevel);
   const { state, proposal } = syntheticFixture();
 
   const documentCountAfterAcceptance = state.founderStatutoryDocuments.length;
-  createFounderStatutoryPolicyDraft({
+  const policyDraft = createFounderStatutoryPolicyDraft({
     state,
     actor: founder,
     founderUserId: founder.id,
@@ -155,7 +157,7 @@ export async function runFounderStatutoryV12Rehearsal() {
     idempotencyKey: "statutory-policy-draft-disposable-v12",
     now: new Date("2026-08-12T01:30:00.000Z")
   });
-  saveFounderBillingProfile({
+  const billingProfile = saveFounderBillingProfile({
     state,
     actor: founder,
     founderUserId: founder.id,
@@ -170,6 +172,7 @@ export async function runFounderStatutoryV12Rehearsal() {
     clientLocationCountry: "India",
     clientLocationState: "Punjab",
     propertyLocation: "Synthetic property location",
+    serviceLocation: "Synthetic service location",
     timeZone: "Asia/Kolkata",
     reason: "Synthetic disposable billing profile.",
     idempotencyKey: "billing-profile-disposable-v12",
@@ -198,7 +201,7 @@ export async function runFounderStatutoryV12Rehearsal() {
   const readiness = projectStatutoryReadiness(state, proposal.id, new Date("2026-08-12T02:30:00.000Z"));
 
   const report = {
-    contract: "FE-INVOICE-STATUTORY-CONFIG/v1.1-readiness",
+    contract,
     scope: "DISPOSABLE_SYNTHETIC_LOCAL_ONLY",
     migration,
     rules: {
@@ -220,6 +223,19 @@ export async function runFounderStatutoryV12Rehearsal() {
       billingProfilePrepared: Boolean(readiness.billing),
       privateLogoActive: Boolean(readiness.assets.logo),
       privateSignatureActive: Boolean(readiness.assets.signature)
+    },
+    ownerPolicy: {
+      operationalPlaceOfSupplySelection: policyDraft.operationalPlaceOfSupplySelection,
+      receiptVoucherTrigger: policyDraft.receiptVoucherTrigger,
+      receiptVoucherSlaMinutes: policyDraft.receiptVoucherSlaMinutes,
+      proformaPolicy: policyDraft.proformaPolicy,
+      taxInvoiceTrigger: policyDraft.taxInvoiceTrigger,
+      refundPolicy: policyDraft.refundPolicy,
+      correctionPosture: policyDraft.correctionPosture,
+      correctionPolicyApproval: policyDraft.correctionPolicyApproval,
+      purchaseSideDebitNotesInScope: policyDraft.purchaseSideDebitNotesInScope,
+      opexTrackingScope: policyDraft.opexTrackingScope,
+      locationsStoredSeparately: Boolean(billingProfile.billingAddress && billingProfile.clientLocationCountry && billingProfile.propertyLocation && billingProfile.serviceLocation)
     },
     safety: {
       persistentEnvironmentTouched: false,

@@ -18,7 +18,7 @@ test("disposable v12 statutory rehearsal preserves timing rules and all activati
   assert.equal(report.rules.finalInvoiceStatus, "REVIEW_REQUIRED");
   assert.equal(report.readiness.status, "REVIEW_REQUIRED");
   assert.deepEqual(report.readiness.missingRequiredBlockers, [
-    "Activate an accountant-approved place-of-supply and service-timing policy.",
+    "Activate an accountant-approved client-location and service-timing policy for this service type.",
     "Activate a Founder-approved Media Library logo image.",
     "Activate a private Founder-approved signature image."
   ]);

@@ -74,9 +74,9 @@ export function ensureFounderCommercialPolicy(input: { state: AppState; actor: A
   const policy: FounderCommercialPolicyVersionRecord = {
     id: uuid(), organisationId: input.organisationId, version: 1, status: "ACTIVE",
     referenceFeePaise: 5_100_000, referenceAdvancePaise: 1_100_000, defaultGstBasisPoints: 1_800,
-    balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60,
+    balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60, refundPolicy: "NO_REFUNDS",
     reason: "Founder commercial policy D1–D9, P17 and P18 initial version.", actorUserId: input.actor.id,
-    createdAt: nowIso(input.now), idempotencyKey: "founder-commercial-policy-v1", requestHash: deterministicContentHash({ fee: 5_100_000, advance: 1_100_000, gst: 1_800, deadlineDays: 7, invoiceMinutes: 60 }), recordVersion: 1
+    createdAt: nowIso(input.now), idempotencyKey: "founder-commercial-policy-v1", requestHash: deterministicContentHash({ fee: 5_100_000, advance: 1_100_000, gst: 1_800, deadlineDays: 7, invoiceMinutes: 60, refundPolicy: "NO_REFUNDS" }), recordVersion: 1
   };
   input.state.founderCommercialPolicies.push(policy);
   appendAudit(input.state, { organisationId: input.organisationId, eventType: "COMMERCIAL_POLICY_ACTIVATED", entityType: "COMMERCIAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: policy.reason, afterHash: policy.requestHash, idempotencyKey: "audit:founder-commercial-policy-v1" });
@@ -85,13 +85,13 @@ export function ensureFounderCommercialPolicy(input: { state: AppState; actor: A
 
 export function publishFounderCommercialPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; referenceFeePaise: number; referenceAdvancePaise: number; defaultGstBasisPoints: number; reason: string; idempotencyKey: string; expectedActiveVersion?: number; now?: Date }) {
   owner(input); safeIdempotency(input.idempotencyKey); safePaise(input.referenceFeePaise, "Reference fee"); safePaise(input.referenceAdvancePaise, "Reference advance"); safeBasisPoints(input.defaultGstBasisPoints);
-  const requestHash = deterministicContentHash({ referenceFeePaise: input.referenceFeePaise, referenceAdvancePaise: input.referenceAdvancePaise, defaultGstBasisPoints: input.defaultGstBasisPoints, reason: trimmed(input.reason, "Private reason"), balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60 });
+  const requestHash = deterministicContentHash({ referenceFeePaise: input.referenceFeePaise, referenceAdvancePaise: input.referenceAdvancePaise, defaultGstBasisPoints: input.defaultGstBasisPoints, reason: trimmed(input.reason, "Private reason"), balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60, refundPolicy: "NO_REFUNDS" });
   const replay = input.state.founderCommercialPolicies.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
   if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different policy content."); return replay; }
   const active = ensureFounderCommercialPolicy(input);
   assertExpected(active.version, input.expectedActiveVersion, "active commercial policy");
   active.status = "SUPERSEDED"; active.recordVersion = (active.recordVersion ?? 1) + 1;
-  const next: FounderCommercialPolicyVersionRecord = { id: uuid(), organisationId: input.organisationId, version: active.version + 1, status: "ACTIVE", referenceFeePaise: input.referenceFeePaise, referenceAdvancePaise: input.referenceAdvancePaise, defaultGstBasisPoints: input.defaultGstBasisPoints, balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60, reason: input.reason.trim(), actorUserId: input.actor.id, createdAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  const next: FounderCommercialPolicyVersionRecord = { id: uuid(), organisationId: input.organisationId, version: active.version + 1, status: "ACTIVE", referenceFeePaise: input.referenceFeePaise, referenceAdvancePaise: input.referenceAdvancePaise, defaultGstBasisPoints: input.defaultGstBasisPoints, balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60, refundPolicy: "NO_REFUNDS", reason: input.reason.trim(), actorUserId: input.actor.id, createdAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
   input.state.founderCommercialPolicies.push(next);
   appendAudit(input.state, { organisationId: input.organisationId, eventType: "COMMERCIAL_POLICY_ACTIVATED", entityType: "COMMERCIAL_POLICY", entityId: next.id, actorUserId: input.actor.id, reason: next.reason, beforeHash: active.requestHash, afterHash: requestHash, idempotencyKey: `audit:${input.idempotencyKey}` });
   return next;
@@ -101,6 +101,7 @@ export function createFounderLegalPolicy(input: { state: AppState; actor: AppUse
   owner(input); safeIdempotency(input.idempotencyKey);
   const exactText = trimmed(input.exactText, "Owner/legal-approved exact text");
   if (input.kind === "ACCEPTANCE_DECLARATION" && (!input.configuration?.acceptanceCheckboxLabel?.trim() || !input.configuration?.typedConfirmationPhrase?.trim())) fail(400, "Acceptance checkbox and typed confirmation wording require owner/legal input.");
+  if (input.kind === "CANCELLATION_REFUND_DELAY" && input.configuration?.refundPolicy !== "NO_REFUNDS") fail(400, "The owner-approved NO_REFUNDS policy must be explicitly bound to P14 wording.");
   if (input.kind === "INVOICE_STATUTORY_CONFIG" && (!input.configuration?.invoicePrefix?.trim() || !Number.isSafeInteger(input.configuration?.startingSequence) || (input.configuration?.startingSequence ?? 0) < 1 || !input.configuration?.jurisdictionLabel?.trim() || !input.configuration?.requiredFields?.length)) fail(400, "Statutory invoice numbering, jurisdiction and required fields require approved configuration.");
   const requestHash = deterministicContentHash({ kind: input.kind, title: trimmed(input.title, "Policy title"), exactText, configuration: input.configuration, reason: trimmed(input.reason, "Reason") });
   const replay = input.state.founderCommercialLegalPolicies.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
@@ -120,6 +121,7 @@ export function activateFounderLegalPolicy(input: { state: AppState; actor: AppU
   if (replay) return policy;
   assertExpected(policy.recordVersion, input.expectedRecordVersion, "legal policy");
   if (policy.status !== "DRAFT" && policy.status !== "FOUNDER_APPROVED") fail(409, "Only a draft or Founder-approved policy can be activated.");
+  if (policy.kind === "CANCELLATION_REFUND_DELAY" && policy.configuration?.refundPolicy !== "NO_REFUNDS") fail(409, "P14 cannot activate without the owner-approved NO_REFUNDS policy binding.");
   for (const prior of input.state.founderCommercialLegalPolicies.filter((item) => item.organisationId === input.organisationId && item.kind === policy.kind && item.status === "ACTIVE")) { prior.status = "SUPERSEDED"; prior.supersedesPolicyId = policy.id; prior.recordVersion = (prior.recordVersion ?? 1) + 1; }
   policy.status = "ACTIVE"; policy.approvedByActorUserId = input.actor.id; policy.approvedAt ??= nowIso(input.now); policy.activatedAt = nowIso(input.now); policy.recordVersion = (policy.recordVersion ?? 1) + 1;
   appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_ACTIVATED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Activation reason"), afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });

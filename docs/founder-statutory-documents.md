@@ -1,6 +1,6 @@
-# Founder statutory documents v1.1
+# Founder statutory documents v1.2
 
-Status: implemented locally and fail-closed. D1 v12 is defined and rehearsed only; it has not been executed on a deployed database. No statutory document has been issued.
+Status: implemented locally and fail-closed. D1 v13 is defined and rehearsed only; it has not been executed on a deployed database. No statutory document has been issued.
 
 Proposal acceptance alone creates no statutory document. Exact acceptance plus a Founder-confirmed advance creates a GST Receipt Voucher task due within 60 minutes. It binds the accepted proposal/content hash, confirmed payment, immutable seven-day balance deadline, recipient billing version and commercial GST snapshot. A Proforma/payment summary is optional and uses its own independent number sequence.
 
@@ -10,15 +10,19 @@ The owner-approved identity records Uchit Vastu India, GSTIN `03AEVPH1562F1ZM`, 
 
 Place of supply is configured as client location but remains `REVIEW_REQUIRED_ACCOUNTANT` until a versioned accountant approval is supplied. Only an active approved version permits Punjab CGST 9% + SGST 9% or other-India IGST 18%. Overseas treatment remains Review Required. Reverse charge is displayed exactly as “Tax payable under reverse charge: No”.
 
+The operational selection is exactly `CLIENT_LOCATION_ONLY`. Recipient billing location, client location, property location and service location are separate versioned values. Tax selection reads only the client-location country/state; it never infers from Uchit’s organisation address, billing address, property location or service location. Accountant activation must explicitly name each applicable Existing Space and/or New Construction service type; a policy approved for a different service remains unavailable.
+
+The commercial refund policy is exactly `NO_REFUNDS`. There is no refund action or client promise in this module. P14 client-facing legal wording remains separately blocked until exact owner/legal copy is active. Normal Founder operations expose no credit-note or debit-note workflow; a legally required correction remains a fail-closed exception requiring a successor Yogesh/accountant-approved policy. Purchase-side debit notes and ordinary OPEX—including salary, tools/subscriptions and Meta advertising—remain outside the client invoice module.
+
 Indian fiscal-year sequences are independent and reserved permanently: `UVI/{FY}/0001`, `UVI/RV/{FYCOMPACT}/001`, and `UVI/PI/{FYCOMPACT}/001`. Failed reservations are retained and never reused.
 
 Issuance requires exact recipient billing data, confirmed payments, an active accountant-approved policy, and active Founder-approved private Media Library logo and signature-image versions. Each artifact pins both asset IDs/checksums. The deterministic PDF is written to private immutable storage; issued bytes and numbering cannot be edited. Corrections remain `BLOCKED_ACCOUNTANT_APPROVAL`.
 
 The one-task readiness card exposes the next recovery action and no issue control while any accountant, billing, payment, asset, service-timing or overseas-treatment blocker remains.
 
-## Disposable v12 readiness rehearsal
+## Disposable migration readiness rehearsal
 
-`scripts/rehearse-founder-statutory-v12.mjs` is the only currently authorised statutory rehearsal. It runs the existing temporary SQLite v1→v12 and v9→v12 paths, then creates an in-memory synthetic accepted proposal, versioned billing profile, confirmed advance and confirmed balance. It verifies:
+`scripts/rehearse-founder-statutory-v12.mjs` preserves the historical v1.1 rehearsal. It runs temporary SQLite v1→v12 and v9→v12 paths, then creates an in-memory synthetic accepted proposal, versioned billing profile, confirmed advance and confirmed balance. It verifies:
 
 - proposal acceptance alone creates no statutory document;
 - confirmed advance creates exactly one idempotent Receipt Voucher task with `dueAt = confirmedAt + 60 minutes`;
@@ -28,5 +32,7 @@ The one-task readiness card exposes the next recovery action and no issue contro
 - the temporary SQLite workspace is removed and no deployed D1/R2 resource is touched.
 
 `scripts/prepare-founder-statutory-v12-readiness.mjs` runs only from committed source. It archives exact tracked `HEAD` bytes and emits a checksum-pinned readiness manifest under `build/`. It does not deploy, migrate a hosted database, create an R2 object, connect a provider, activate issuance or enable delivery.
+
+The historical v12 package remains checksum-pinned. `scripts/rehearse-founder-statutory-v13.mjs` applies the additive v13 policy fields only in a disposable SQLite workspace and verifies the exact v1.2 decisions without activating policy, assets or issuance.
 
 Run the isolated issuance rehearsal only after Yogesh supplies the private active logo/signature versions and versioned accountant approvals for place of supply, service timing/statutory deadline, correction/credit-debit notes and overseas treatment. Until then the package decision is `NO_GO_PENDING_OWNER_AND_ACCOUNTANT_INPUTS`.

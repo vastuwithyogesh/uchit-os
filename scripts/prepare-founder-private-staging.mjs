@@ -28,7 +28,7 @@ const manifest = {
   sourceCommit: commit,
   archive: { name: archiveName, sha256: archiveSha256, bytes: archiveBytes.byteLength },
   hosting: { projectId: hosting.project_id, d1LogicalBinding: hosting.d1, r2LogicalBinding: hosting.r2, deploymentExecuted: false },
-  declaredD1MigrationLevel: 12,
+  declaredD1MigrationLevel: 13,
   requiredRuntime: {
     resourceBindings: ["DB (disposable D1 resource binding)", "R2 (disposable private R2 resource binding)"],
     secrets: ["PDF_OWNER_SECRET (server-only, minimum 32 characters; verify presence/length only)"],
@@ -38,7 +38,8 @@ const manifest = {
     "P5 active approved professional-boundary copy",
     "P13 active approved acceptance declaration",
     "P14 active approved cancellation/refund/delay policy",
-    "active approved statutory invoice identity/numbering/tax configuration",
+    "accountant-approved client-location place-of-supply and service-timing policy",
+    "private active Founder-approved statutory logo and signature asset versions",
     "active approved Existing Space and New Construction scope/deliverable templates",
     "five approved PDF bytes not ingested or activated",
     "real Zoom organisation connection not configured"

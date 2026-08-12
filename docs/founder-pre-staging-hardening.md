@@ -8,11 +8,11 @@ Run `pnpm test:founder-pre-staging`. The suite creates only temporary local SQLi
 
 The SQLite rehearsal executes the actual statements declared in `db/migrations.ts` and verifies:
 
-- clean v1 through v12 migration and repeated execution with exactly 12 markers;
-- a populated synthetic v9 database upgraded through v10, v11 and v12 without changing the snapshot, lead, or external-source records;
-- required v12 tables and indexes;
+- clean v1 through v13 migration and repeated execution with exactly 13 markers;
+- a populated synthetic v9 database upgraded through v10, v11, v12 and v13 without changing the snapshot, lead, or external-source records;
+- required v12 tables, v13 owner-policy columns and indexes;
 - unique organisation policy version, seven-calendar-day balance policy, and sixty-minute invoice SLA constraints;
-- a deliberately interrupted v12 transaction leaves neither its marker nor a partial table, then succeeds by forward-fix;
+- a deliberately interrupted v13 transaction leaves neither its marker nor partial policy columns, then succeeds by forward-fix;
 - a v9 backup can be restored and upgraded, with `PRAGMA integrity_check` returning `ok`.
 
 The private-object rehearsal uses synthetic bytes only. It verifies organisation/client-scoped keys, SHA-256 and byte identity, immutable new-version supersession, revocation, cross-scope denial, path-attack denial, orphan inventory/recovery, and final memory disposal. It has no D1, R2, network, or filesystem adapter.

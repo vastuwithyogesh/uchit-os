@@ -55,7 +55,8 @@ function activateTemplate(state: ReturnType<typeof base>) {
 function activateLegal(state: ReturnType<typeof base>, kind: FounderLegalPolicyKind, index: number) {
   const configuration = kind === "ACCEPTANCE_DECLARATION" ? { acceptanceCheckboxLabel: "TEST ONLY: I accept this exact synthetic proposal.", typedConfirmationPhrase: "TEST ACCEPT" }
     : kind === "INVOICE_STATUTORY_CONFIG" ? { invoicePrefix: "TEST-INV-", startingSequence: 100, jurisdictionLabel: "TEST JURISDICTION", requiredFields: ["invoiceNumber", "amountReceived"] }
-      : undefined;
+      : kind === "CANCELLATION_REFUND_DELAY" ? { refundPolicy: "NO_REFUNDS" as const }
+        : undefined;
   const policy = createFounderLegalPolicy({ ...ownerArgs(state), kind, title: `TEST ONLY ${kind}`, exactText: `TEST ONLY — owner-supplied ${kind} fixture; never client production copy.`, configuration, reason: "Synthetic test-only policy configuration.", idempotencyKey: `legal-create-${index}0001` });
   return activateFounderLegalPolicy({ ...ownerArgs(state), policyId: policy.id, reason: "Synthetic test-only activation.", idempotencyKey: `legal-active-${index}0001`, expectedRecordVersion: 1 });
 }

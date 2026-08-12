@@ -21,7 +21,7 @@ function openDatabase(path) {
   return db;
 }
 
-function applyMigrations(db, fromVersion = 1, throughVersion = 12) {
+function applyMigrations(db, fromVersion = 1, throughVersion = 13) {
   db.exec(migrationsTableSql);
   const applied = new Set(db.prepare("SELECT version FROM schema_migrations").all().map((row) => Number(row.version)));
   for (const migration of d1Migrations) {
@@ -44,6 +44,10 @@ function tableNames(db) {
 
 function indexNames(db) {
   return db.prepare("SELECT name FROM sqlite_master WHERE type='index' AND sql IS NOT NULL ORDER BY name").all().map((row) => String(row.name));
+}
+
+function columnNames(db, table) {
+  return db.prepare(`PRAGMA table_info(${table})`).all().map((row) => String(row.name));
 }
 
 function sha(value) {
@@ -80,21 +84,22 @@ function verifyV11Constraints(db) {
   return failures;
 }
 
-export async function runFounderPreStagingRehearsal() {
+export async function runFounderPreStagingRehearsal(throughVersion = 13) {
   const workspace = await mkdtemp(join(tmpdir(), "uchit-founder-rehearsal-"));
-  const cleanPath = join(workspace, "clean-v12.sqlite");
-  const upgradePath = join(workspace, "upgrade-v9-v12.sqlite");
+  const cleanPath = join(workspace, `clean-v${throughVersion}.sqlite`);
+  const upgradePath = join(workspace, `upgrade-v9-v${throughVersion}.sqlite`);
   const backupPath = join(workspace, "upgrade-v9.backup.sqlite");
-  const restorePath = join(workspace, "restore-v12.sqlite");
-  const interruptedPath = join(workspace, "interrupted-v11.sqlite");
+  const restorePath = join(workspace, `restore-v${throughVersion}.sqlite`);
+  const interruptedPath = join(workspace, `interrupted-v${throughVersion - 1}.sqlite`);
   let report;
   try {
     const clean = openDatabase(cleanPath);
-    applyMigrations(clean, 1, 12);
+    applyMigrations(clean, 1, throughVersion);
     const cleanTables = tableNames(clean);
     const cleanIndexes = indexNames(clean);
+    const cleanStatPolicyColumns = columnNames(clean, "founder_statutory_policy_versions");
     const constraints = verifyV11Constraints(clean);
-    applyMigrations(clean, 1, 12);
+    applyMigrations(clean, 1, throughVersion);
     const repeatedMarkerCount = Number(clean.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count);
     clean.close();
 
@@ -104,53 +109,56 @@ export async function runFounderPreStagingRehearsal() {
     upgrade.exec(`VACUUM INTO ${quoteSqlitePath(backupPath)}`);
     upgrade.close();
     upgrade = openDatabase(upgradePath);
-    applyMigrations(upgrade, 10, 12);
+    applyMigrations(upgrade, 10, throughVersion);
     const snapshot = upgrade.prepare("SELECT payload,revision FROM app_state_snapshot WHERE id='primary'").get();
     const preserved = sha(String(snapshot.payload)) === payloadHashBefore && Number(snapshot.revision) === 9
       && Number(upgrade.prepare("SELECT COUNT(*) AS count FROM optin_leads WHERE id='lead-safe-1'").get().count) === 1
       && Number(upgrade.prepare("SELECT COUNT(*) AS count FROM external_sources WHERE id='source-safe'").get().count) === 1;
-    applyMigrations(upgrade, 10, 12);
+    applyMigrations(upgrade, 10, throughVersion);
     const upgradedMarkers = Number(upgrade.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count);
     const integrity = String(upgrade.prepare("PRAGMA integrity_check").get().integrity_check);
     upgrade.close();
 
     await copyFile(backupPath, restorePath);
     const restored = openDatabase(restorePath);
-    applyMigrations(restored, 10, 12);
+    applyMigrations(restored, 10, throughVersion);
     const restoredSnapshot = restored.prepare("SELECT payload,revision FROM app_state_snapshot WHERE id='primary'").get();
     const restoredPreserved = sha(String(restoredSnapshot.payload)) === payloadHashBefore && Number(restoredSnapshot.revision) === 9;
     const restoreIntegrity = String(restored.prepare("PRAGMA integrity_check").get().integrity_check);
     restored.close();
 
     const interrupted = openDatabase(interruptedPath);
-    applyMigrations(interrupted, 1, 11);
+    applyMigrations(interrupted, 1, throughVersion - 1);
     interrupted.exec("BEGIN IMMEDIATE");
     let injectedFailure = false;
     try {
-      interrupted.exec(d1Migrations.find((item) => item.version === 12).statements[0]);
+      interrupted.exec(d1Migrations.find((item) => item.version === throughVersion).statements[0]);
       interrupted.exec("THIS IS AN INTENTIONAL REHEARSAL FAILURE");
       interrupted.exec("COMMIT");
     } catch {
       interrupted.exec("ROLLBACK");
       injectedFailure = true;
     }
-    const noPartialMarker = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=12").get().count) === 0;
-    const noPartialTable = !tableNames(interrupted).includes("founder_statutory_policy_versions");
-    applyMigrations(interrupted, 12, 12);
-    const forwardFixed = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=12").get().count) === 1;
+    const noPartialMarker = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=?").get(throughVersion).count) === 0;
+    const noPartialTable = throughVersion === 12
+      ? !tableNames(interrupted).includes("founder_statutory_policy_versions")
+      : !columnNames(interrupted, "founder_commercial_policy_versions").includes("refund_policy");
+    applyMigrations(interrupted, throughVersion, throughVersion);
+    const forwardFixed = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=?").get(throughVersion).count) === 1;
     interrupted.close();
 
     report = {
       scope: "DISPOSABLE_LOCAL_ONLY",
-      migrationsDeclared: 12,
-      cleanPath: { from: 1, to: 12, markerCount: repeatedMarkerCount, idempotent: repeatedMarkerCount === 12 },
-      upgradePath: { from: 9, through: 12, markerCount: upgradedMarkers, syntheticDataPreserved: preserved, integrity },
+      migrationsDeclared: throughVersion,
+      cleanPath: { from: 1, to: throughVersion, markerCount: repeatedMarkerCount, idempotent: repeatedMarkerCount === throughVersion },
+      upgradePath: { from: 9, through: throughVersion, markerCount: upgradedMarkers, syntheticDataPreserved: preserved, integrity },
       backupRestore: { backupCreated: (await stat(backupPath)).size > 0, syntheticDataPreserved: restoredPreserved, integrity: restoreIntegrity },
       interruptionRecovery: { injectedFailure, noPartialMarker, noPartialTable, forwardFixed },
       schema: {
         tableCount: cleanTables.length,
         founderV12TableCount: cleanTables.filter((name) => name.startsWith("founder_")).length,
         requiredIndexesPresent: ["idx_founder_proposals_scope", "idx_founder_deadlines_due", "idx_founder_invoices_due", "idx_founder_statutory_due", "idx_founder_statutory_project"].every((name) => cleanIndexes.includes(name)),
+        v13PolicyColumnsPresent: throughVersion < 13 || ["operational_place_of_supply_selection", "refund_policy", "correction_posture", "purchase_side_debit_notes_in_scope", "opex_tracking_scope", "accountant_approved_service_types_json"].every((name) => cleanStatPolicyColumns.includes(name)),
         constraintFailuresObserved: constraints
       },
       persistentEnvironmentTouched: false,

@@ -520,6 +520,23 @@ export const d1Migrations: readonly D1Migration[] = [
       "CREATE INDEX IF NOT EXISTS idx_founder_statutory_due ON founder_statutory_documents(organisation_id,status,due_at)",
       "CREATE INDEX IF NOT EXISTS idx_founder_statutory_project ON founder_statutory_documents(organisation_id,client_id,prospective_project_id,kind)"
     ]
+  },
+  {
+    version: 13,
+    statements: [
+      "ALTER TABLE founder_commercial_policy_versions ADD COLUMN refund_policy TEXT NOT NULL DEFAULT 'NO_REFUNDS' CHECK (refund_policy = 'NO_REFUNDS')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN operational_place_of_supply_selection TEXT NOT NULL DEFAULT 'CLIENT_LOCATION_ONLY' CHECK (operational_place_of_supply_selection = 'CLIENT_LOCATION_ONLY')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN receipt_voucher_trigger TEXT NOT NULL DEFAULT 'CONFIRMED_ADVANCE' CHECK (receipt_voucher_trigger = 'CONFIRMED_ADVANCE')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN receipt_voucher_sla_minutes INTEGER NOT NULL DEFAULT 60 CHECK (receipt_voucher_sla_minutes = 60)",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN proforma_policy TEXT NOT NULL DEFAULT 'AFTER_CONFIRMED_ADVANCE_ONLY' CHECK (proforma_policy = 'AFTER_CONFIRMED_ADVANCE_ONLY')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN tax_invoice_trigger TEXT NOT NULL DEFAULT 'CONFIRMED_FULL_PAYMENT' CHECK (tax_invoice_trigger = 'CONFIRMED_FULL_PAYMENT')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN refund_policy TEXT NOT NULL DEFAULT 'NO_REFUNDS' CHECK (refund_policy = 'NO_REFUNDS')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN correction_posture TEXT NOT NULL DEFAULT 'EXCEPTION_ONLY_ACCOUNTANT_APPROVAL' CHECK (correction_posture = 'EXCEPTION_ONLY_ACCOUNTANT_APPROVAL')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN purchase_side_debit_notes_in_scope INTEGER NOT NULL DEFAULT 0 CHECK (purchase_side_debit_notes_in_scope = 0)",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN opex_tracking_scope TEXT NOT NULL DEFAULT 'OUTSIDE_CLIENT_INVOICE_MODULE' CHECK (opex_tracking_scope = 'OUTSIDE_CLIENT_INVOICE_MODULE')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN accountant_approved_service_types_json TEXT",
+      "ALTER TABLE founder_billing_profile_versions ADD COLUMN service_location TEXT"
+    ]
   }
 ];
 
