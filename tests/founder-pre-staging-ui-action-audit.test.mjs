@@ -52,5 +52,5 @@ test("no automatic provider delivery or blocker weakening is introduced", async 
   ])).join("\n");
   assert.doesNotMatch(sources, /AUTO_SEND|providerDelivered|automaticDelivery/);
   for (const blocker of ["P5_OWNER_LEGAL", "P13_OWNER_LEGAL", "P14_OWNER_LEGAL", "INVOICE_STATUTORY_CONFIG"]) assert.match(sources, new RegExp(blocker));
-  assert.match(sources, /active approved service scope template/i);
+  assert.match(sources, /Activate the exact approved brochure|approved brochure/i);
 });

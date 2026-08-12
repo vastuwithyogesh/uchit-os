@@ -4,7 +4,7 @@ Status: implemented locally, not deployed. D1 v16 is defined but has not been ex
 
 ## Founder flow
 
-The commercial proposal workspace uses six exclusive pages: Client & Project; Requirements & Scope; Deliverables & Interactions; Timeline & Commercials; Policies & Next Steps; Preview, Review & Approve. Canonical CRM, qualification and prospective-project values are snapshotted instead of re-entered. Scope and deliverables come only from an explicitly activated service template; brochure wording is never parsed into commercial truth.
+The commercial proposal workspace uses six exclusive pages: Client & Project; Requirements & Scope; Deliverables & Interactions; Timeline & Commercials; Policies & Next Steps; Preview, Review & Approve. Canonical CRM, qualification and prospective-project values are snapshotted instead of re-entered. For Existing Space and New Construction, the exact active approved brochure is the sole scope and deliverables reference; its asset key and checksum are pinned into the immutable proposal version. No brochure text is parsed or transformed into invented commercial fields. Legacy explicitly activated scope templates remain supported for backward compatibility and reusable variants.
 
 Money is stored as integer paise. The default reference fee is ₹51,000, the reference advance is ₹11,000 and the default GST rate is 18%, but the fee is not a hard minimum. Every deviation and non-standard classification uses private Founder-only reasons. Internal complimentary work requires zero fee, zero GST and zero total.
 

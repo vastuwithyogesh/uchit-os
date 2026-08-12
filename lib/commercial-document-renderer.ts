@@ -34,6 +34,7 @@ export type FounderProposalClientProjection = {
   requirements: { exactQualificationVersion: string; refinedSummary?: string };
   scopeItems: Array<{ order: number; title: string; status: string; floorIds: string[]; note?: string }>;
   deliverables: Array<{ order: number; name: string; status: string; floorIds: string[]; deliveryFormat: string; expectedStage: string; description: string; clientDependency: string }>;
+  brochureReference?: { title: string; assetKey: string; checksumSha256: string };
   interactions: FounderProposalVersionRecord["content"]["interactions"];
   timeline: FounderProposalVersionRecord["content"]["timeline"];
   commercial: { professionalFeePaise: number; gstAppliedBasisPoints: number; gstAmountPaise: number; totalPayablePaise: number; agreedAdvancePaise: number; remainingBalancePaise: number; paymentMilestones: FounderProposalVersionRecord["content"]["commercial"]["paymentMilestones"] };
@@ -57,6 +58,7 @@ export function renderCommercialProposalPdf(projection: FounderProposalClientPro
     `Agreed advance: ${money(projection.commercial.agreedAdvancePaise)}`,
     `Remaining balance: ${money(projection.commercial.remainingBalancePaise)}`,
     "Scope of Consultancy",
+    ...(projection.brochureReference ? [`Scope and deliverables reference: ${projection.brochureReference.title}`, `Approved brochure checksum: ${projection.brochureReference.checksumSha256}`] : []),
     ...projection.scopeItems.map((item) => `${item.order}. [${item.status}] ${item.title}`),
     "Deliverables",
     ...projection.deliverables.map((item) => `${item.order}. [${item.status}] ${item.name} — ${item.deliveryFormat}`),

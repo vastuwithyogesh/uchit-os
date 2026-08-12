@@ -50,7 +50,7 @@ test("longest safe CRM-to-booking path stops before unapproved commercial templa
   assert.equal(connectorCalls, 1);
 
   state.prospectiveProjects[0].serviceType = "EXISTING_SPACE";
-  assert.throws(() => createFounderProposalDraft({ state, actor: founder, founderUserId: founder.id, organisationId, clientId: "UC-DISPOSABLE-1", prospectiveProjectId: state.prospectiveProjects[0].id, classification: "STANDARD_PAID", professionalFeePaise: 5_100_000, appliedGstBasisPoints: 1_800, agreedAdvancePaise: 1_100_000, idempotencyKey: "boundary-proposal-0001", expectedProjectVersion: 1 }), /active approved service scope template/i);
+  assert.throws(() => createFounderProposalDraft({ state, actor: founder, founderUserId: founder.id, organisationId, clientId: "UC-DISPOSABLE-1", prospectiveProjectId: state.prospectiveProjects[0].id, classification: "STANDARD_PAID", professionalFeePaise: 5_100_000, appliedGstBasisPoints: 1_800, agreedAdvancePaise: 1_100_000, idempotencyKey: "boundary-proposal-0001", expectedProjectVersion: 1 }), /Activate the exact approved brochure/i);
   assert.equal(state.founderProposalVersions.length, 0);
   assert.equal(state.founderProposalTemplates.length, 0);
   assert.equal(state.founderCommercialLegalPolicies.length, 0);

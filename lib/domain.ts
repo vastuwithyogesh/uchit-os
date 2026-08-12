@@ -450,7 +450,7 @@ export interface FounderProposalContentSnapshot {
   timeline: { expectedCommencement: string; estimatedDateRange: string; milestones: string[]; prerequisites: string[]; clientDependencies: string[]; pauseOrExtensionConditions: string[]; isEstimate: true };
   commercial: FounderCommercialTermsSnapshot;
   projectExclusions: string[];
-  policyBindings: { professionalBoundariesPolicyId?: string; acceptanceDeclarationPolicyId?: string; cancellationPolicyId?: string; cancellationPolicyVersion?: number; cancellationPolicyContentHash?: string; commercialPolicyId: string; templateVersionId: string };
+  policyBindings: { professionalBoundariesPolicyId?: string; acceptanceDeclarationPolicyId?: string; cancellationPolicyId?: string; cancellationPolicyVersion?: number; cancellationPolicyContentHash?: string; commercialPolicyId: string; templateVersionId?: string; brochureAssetVersionId?: string; brochureAssetKey?: string; brochureChecksumSha256?: string };
   nextSteps: { advanceRequired: boolean; balanceAfterAdvanceDeadline: true; paymentProofRequiresConfirmation: true; reportGatesRemainServerEnforced: true };
 }
 
