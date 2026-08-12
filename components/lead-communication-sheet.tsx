@@ -50,13 +50,29 @@ export function LeadCommunicationSheet(props: Props) {
       const resolvedContext = context ?? await props.onPrepareContext(`context-${crypto.randomUUID()}`, qualificationKind);
       setContext(resolvedContext);
       const resolvedValues = { ...values, ...resolvedContext.valuesPatch };
-      const [whatsapp, email] = await Promise.allSettled([
-        props.onPrepare("WHATSAPP", resolvedValues, idempotencyKeys.WHATSAPP, resolvedContext),
-        props.onPrepare("EMAIL", resolvedValues, idempotencyKeys.EMAIL, resolvedContext),
-      ]);
-      setPrepared((current) => ({ ...current, ...(whatsapp.status === "fulfilled" ? { WHATSAPP: whatsapp.value } : {}), ...(email.status === "fulfilled" ? { EMAIL: email.value } : {}) }));
-      if (whatsapp.status === "fulfilled" && email.status === "fulfilled") setMessage("Both channel drafts are PREPARED. Uchit has not sent either message.");
-      else setMessage("One or more drafts could not be prepared. The successful channel is preserved; retry safely.");
+      // Each preparation is a protected, revisioned server mutation. Preparing in
+      // parallel makes the second request stale as soon as the first persists.
+      // Keep the channel records independent, but serialize this small pair so
+      // onPrepare can obtain the latest revision before each mutation.
+      let whatsapp: Prepared | undefined;
+      let email: Prepared | undefined;
+      let emailFailure: string | undefined;
+      try {
+        whatsapp = await props.onPrepare("WHATSAPP", resolvedValues, idempotencyKeys.WHATSAPP, resolvedContext);
+        setPrepared((current) => ({ ...current, WHATSAPP: whatsapp }));
+      } catch (error) {
+        const detail = error instanceof Error ? error.message : "WhatsApp could not be prepared.";
+        setMessage(`WhatsApp draft could not be prepared: ${detail} Reload and retry.`);
+        return;
+      }
+      try {
+        email = await props.onPrepare("EMAIL", resolvedValues, idempotencyKeys.EMAIL, resolvedContext);
+        setPrepared((current) => ({ ...current, EMAIL: email }));
+      } catch (error) {
+        emailFailure = error instanceof Error ? error.message : "Email could not be prepared.";
+      }
+      if (email) setMessage("Both channel drafts are PREPARED. Uchit has not sent either message.");
+      else setMessage(`WhatsApp is PREPARED. Email is not ready: ${emailFailure} Reload and retry email preparation.`);
     } catch (error) { setMessage(error instanceof Error ? error.message : "The message drafts could not be prepared."); }
     finally { setBusy(false); }
   }
