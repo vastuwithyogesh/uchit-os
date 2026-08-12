@@ -39,3 +39,5 @@ These content blockers do not prevent private UI review, but they do prevent pro
 ## Package command
 
 After all scoped changes are committed, run `node scripts/prepare-founder-private-staging.mjs`. It refuses a dirty scoped source tree, archives tracked bytes from the exact `HEAD`, computes the archive SHA-256, and writes a no-deploy manifest. It does not install dependencies, access a network, publish, migrate, or connect a provider.
+
+For statutory v12 readiness specifically, run `pnpm rehearse:founder-statutory-v12`, then—only from committed source—`pnpm prepare:founder-statutory-v12`. The resulting manifest must report zero issued documents, zero sequence reservations, zero asset versions, zero artifact bytes, no deployed resource use and `NO_GO_PENDING_OWNER_AND_ACCOUNTANT_INPUTS`. This readiness package is not a staging approval or issuance activation.

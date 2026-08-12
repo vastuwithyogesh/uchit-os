@@ -1,4 +1,4 @@
-# Founder statutory documents v1.0
+# Founder statutory documents v1.1
 
 Status: implemented locally and fail-closed. D1 v12 is defined and rehearsed only; it has not been executed on a deployed database. No statutory document has been issued.
 
@@ -15,3 +15,18 @@ Indian fiscal-year sequences are independent and reserved permanently: `UVI/{FY}
 Issuance requires exact recipient billing data, confirmed payments, an active accountant-approved policy, and active Founder-approved private Media Library logo and signature-image versions. Each artifact pins both asset IDs/checksums. The deterministic PDF is written to private immutable storage; issued bytes and numbering cannot be edited. Corrections remain `BLOCKED_ACCOUNTANT_APPROVAL`.
 
 The one-task readiness card exposes the next recovery action and no issue control while any accountant, billing, payment, asset, service-timing or overseas-treatment blocker remains.
+
+## Disposable v12 readiness rehearsal
+
+`scripts/rehearse-founder-statutory-v12.mjs` is the only currently authorised statutory rehearsal. It runs the existing temporary SQLite v1→v12 and v9→v12 paths, then creates an in-memory synthetic accepted proposal, versioned billing profile, confirmed advance and confirmed balance. It verifies:
+
+- proposal acceptance alone creates no statutory document;
+- confirmed advance creates exactly one idempotent Receipt Voucher task with `dueAt = confirmedAt + 60 minutes`;
+- the Receipt Voucher remains linked to the immutable seven-calendar-day balance deadline;
+- confirmed full payment creates a separate Tax Invoice task in `REVIEW_REQUIRED`;
+- no statutory policy is activated, no asset version is ingested, no sequence is reserved, no artifact bytes are generated, and no document is issued;
+- the temporary SQLite workspace is removed and no deployed D1/R2 resource is touched.
+
+`scripts/prepare-founder-statutory-v12-readiness.mjs` runs only from committed source. It archives exact tracked `HEAD` bytes and emits a checksum-pinned readiness manifest under `build/`. It does not deploy, migrate a hosted database, create an R2 object, connect a provider, activate issuance or enable delivery.
+
+Run the isolated issuance rehearsal only after Yogesh supplies the private active logo/signature versions and versioned accountant approvals for place of supply, service timing/statutory deadline, correction/credit-debit notes and overseas treatment. Until then the package decision is `NO_GO_PENDING_OWNER_AND_ACCOUNTANT_INPUTS`.
