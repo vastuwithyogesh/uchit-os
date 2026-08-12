@@ -66,12 +66,15 @@ export function FounderFlowPage({ scorecard, stepNumber }: { scorecard: FounderS
     <section className="founder-flow-page" aria-labelledby="founder-flow-title">
       <ProgressControl scorecard={scorecard} currentNumber={stepNumber} />
       <section className="founder-flow-surface" data-tone={tone}>
-        <div className="founder-flow-context">{contextLine(scorecard)}</div>
+        <div className="founder-flow-context" aria-label="Selected client, project and floor">{contextLine(scorecard)}</div>
         <div className="founder-flow-step-number">Step {step.number.toString().padStart(2, "0")} · {statusLabel(step.status)}</div>
         <h1 id="founder-flow-title">{step.title}</h1>
         <p className="founder-flow-description">{step.purpose}</p>
-        <div className={`founder-flow-status status-${tone}`}><span className="status-pill">{isFuture ? "BLOCKED" : statusLabel(step.status)}</span><p>{isFuture ? `Complete step ${current.number.toString().padStart(2, "0")} before opening this work.` : step.explanation}</p></div>
-        <details className="founder-flow-inputs"><summary>Required information</summary><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></details>
+        <div className={`founder-flow-status status-${tone}`} role={isBlocked ? "alert" : "status"}>
+          <div className="founder-flow-status-label"><span>Current status</span><strong>{isFuture ? "BLOCKED" : statusLabel(step.status)}</strong></div>
+          <p>{isFuture ? `Complete step ${current.number.toString().padStart(2, "0")} before opening this work.` : step.explanation}</p>
+        </div>
+        <details className="founder-flow-inputs" open={!isBlocked && !isComplete}><summary>Required now</summary><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></details>
         {step.status === "COMPLETE" && !isFuture ? <div className="founder-flow-success" role="status">This step is complete. Continue when you are ready for the next server-derived step.</div> : null}
         {!isBlocked && !isComplete ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
         <div className="founder-flow-action-bar">
