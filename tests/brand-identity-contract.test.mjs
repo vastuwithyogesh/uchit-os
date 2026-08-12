@@ -16,7 +16,8 @@ test("header uses a safe text lockup and preserves accessible navigation", () =>
   assert.match(header, /aria-label="Uchit Vastu India home"/);
   assert.match(header, /className="brand-name">UCHIT/);
   assert.match(header, /className="brand-descriptor">VASTU INDIA/);
-  assert.match(header, /aria-label="Main navigation"/);
+  assert.match(header, /aria-label="Primary navigation"/);
+  assert.match(header, /aria-label="Application sidebar"/);
   assert.doesNotMatch(header, /Gold UCHIT|brand story\.png|<img/);
 });
 

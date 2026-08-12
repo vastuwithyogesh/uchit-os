@@ -5,55 +5,50 @@ import { resolve } from "node:path";
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 
-test("Founder home opens a focused sequential flow, not a dense dashboard", () => {
+test("Founder home opens the sequential flow rather than a module dashboard", () => {
   const page = read("app/page.tsx");
   assert.match(page, /FounderFlowHome/);
   assert.match(page, /buildFounderScorecard/);
-  assert.doesNotMatch(page, /<FounderScorecard/);
-  assert.doesNotMatch(page, /Other work areas|Common tasks/);
+  assert.doesNotMatch(page, /<FounderScorecard|founder-scorecard-modules/);
 });
 
-test("scorecard exposes the canonical twelve modules and one next action", () => {
+test("scorecard projection exposes the canonical seventeen-step workflow", () => {
   const helper = read("lib/founder-scorecard.ts");
-  const component = read("components/founder-scorecard.tsx");
   for (const title of [
-    "Client and commercial readiness", "Case and project setup", "Floor setup", "Plans, evidence and orientation",
-    "Gridding, 32D/16D and manual sheet", "Utility and Shakti evaluation", "Site analysis and post-site findings",
-    "Stage A verdict and Founder review", "Balance and payment clearance", "Founder approval and protected report",
-    "Delivery history and follow-up", "Stage B remedial handoff"
-  ]) assert.match(helper, new RegExp(title.replace(/[.*+?^${}()|[\\]\\]/g, "\\$&")), title);
-  assert.match(component, /recommendedModuleId/);
-  assert.match(component, /founder-scorecard-module-active/);
-  assert.match(component, /founder-action-primary/);
-  assert.match(component, /Technical details/);
+    "Case and project creation", "Floor setup", "Intake complete", "Direction verification", "Layout preparation",
+    "Gridding and 32D/16D evidence", "Manual utility mapping", "Utility and Shakti evaluation",
+    "Stage A verdict and presentation", "Site Analysis", "Post-Site Findings and Layout Review", "Full balance clearance",
+    "Stage B remedial reservation", "Report assembly", "Founder review and approval", "Protected PDF", "Delivery history"
+  ]) assert.match(helper, new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), title);
+  assert.match(helper, /selectedFloorId/);
+  assert.match(helper, /caseId/);
 });
 
-test("scorecard states preserve gates, floor isolation and deferred delivery", () => {
+test("scorecard preserves regeneration, methodology, floor and delivery gates", () => {
   const helper = read("lib/founder-scorecard.ts");
-  const component = read("components/founder-scorecard.tsx");
   assert.match(helper, /NEEDS_REGENERATION/);
-  assert.match(helper, /floorHasOpenRegeneration/);
-  assert.match(component, /One floor per report|one floor per report/);
+  assert.match(helper, /hasOpenRegeneration/);
   assert.match(helper, /BLOCKED — METHOD INPUT REQUIRED/);
-  assert.match(helper, /clientDelivery=DEFERRED/);
-  assert.match(helper, /status: \"BLOCKED\"/);
+  assert.match(helper, /Client delivery is intentionally disabled/);
+  assert.match(helper, /one immutable report for this floor/i);
+  assert.match(helper, /contextPath/);
 });
 
-test("scorecard is mobile-first and keeps status semantics accessible", () => {
+test("case cards resolve Continue from the exact case and floor projection", () => {
+  const component = read("components/client-case-pipeline.tsx");
+  assert.match(component, /state\.vastuCases\.map/);
+  assert.match(component, /buildFounderScorecard\(state, \{ role: actorRole \}, card\.client\?\.id, card\.caseRecord\.id, floor\.id\)/);
+  assert.match(component, /getCurrentFounderFlowStep/);
+  assert.match(component, /Continue case/);
+  assert.match(component, /Partial floor completion never closes this project/);
+});
+
+test("reference-parity shell and workflow stay mobile and accessible", () => {
   const css = read("app/globals.css");
-  assert.match(css, /\.founder-scorecard\s*\{/);
-  assert.match(css, /\.founder-scorecard-header\s*\{/);
-  assert.match(css, /\.founder-floor-chips\s*\{/);
-  assert.match(css, /\.founder-scorecard-module-active/);
-  assert.match(css, /@media \(max-width: 820px\)[\s\S]*\.founder-scorecard-header/);
+  assert.match(css, /\.app-sidebar/);
+  assert.match(css, /\.mobile-appbar/);
+  assert.match(css, /\.lead-profile-drawer/);
+  assert.match(css, /@media \(max-width: 820px\)/);
   assert.match(css, /min-height:\s*44px/);
   assert.match(css, /prefers-reduced-motion/);
-});
-
-test("scorecard navigation remains native and every module has recovery or a direct workspace", () => {
-  const component = read("components/founder-scorecard.tsx");
-  assert.doesNotMatch(component, /next\/link|<Link\\b|prefetch=/);
-  assert.match(component, /href=\{module\.primaryAction\.href\}/);
-  assert.match(component, /module\.recoveryAction/);
-  assert.match(component, /href=\{`\/spatial\?floorId=/);
 });

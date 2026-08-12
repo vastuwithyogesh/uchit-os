@@ -20,5 +20,5 @@
     }
   },
   "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/routes.d.ts", "**/*.mts"],
-  "exclude": ["node_modules", ".next/types/app", "dist", "work", "build", "lib/db.ts", "lib/supabase.ts"]
+  "exclude": ["node_modules", ".next/types/app", "dist", "work", "build", "tmp", "output", "lib/db.ts", "lib/supabase.ts"]
 }

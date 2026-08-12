@@ -29,4 +29,4 @@ Client delivery remains disabled. Stage B remains `BLOCKED_METHOD_INPUT` until t
 
 ## Verification
 
-`tests/founder-scorecard.test.mjs` covers the twelve-module order, one recommended module, explicit statuses, direct recovery links, floor isolation, mobile contracts and deferred delivery. The scorecard is included in `pnpm test:release`.
+`tests/founder-scorecard.test.mjs` covers the canonical 17-module projection, one server-derived next module, explicit statuses, direct recovery links, exact floor isolation, FE-SITE-01 ordering, mobile contracts and deferred delivery. The scorecard is included in `pnpm test:release`.

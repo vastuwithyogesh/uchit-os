@@ -16,10 +16,10 @@ class ActionError extends Error {
   }
 }
 
-export function ClientIntakeForm() {
+export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: string } = {}) {
   const { activeUser } = useSession();
   const [state, setState] = useState<Bootstrap | null>(null);
-  const [clientId, setClientId] = useState("");
+  const [clientId, setClientId] = useState(initialClientId ?? "");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("Loading intake...");
   const [whatsapp, setWhatsapp] = useState("");

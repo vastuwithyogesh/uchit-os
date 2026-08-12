@@ -16,7 +16,7 @@ test("Founder route intro provides one dominant action with progressive context"
 
 test("priority Founder routes use the shared one-task intro", () => {
   for (const file of [
-    "app/page.tsx", "app/crm/page.tsx", "app/workspace/page.tsx", "app/ops/page.tsx",
+    "app/page.tsx", "app/workspace/page.tsx",
     "app/files/page.tsx", "app/spatial/page.tsx", "app/evaluation/page.tsx", "app/assessment/page.tsx",
     "app/site/page.tsx", "app/payment-proofs/page.tsx", "app/reports/page.tsx", "app/delivery/page.tsx",
     "app/diagnostics/page.tsx", "app/methodology/page.tsx", "app/insights/page.tsx"
@@ -31,6 +31,18 @@ test("priority Founder routes use the shared one-task intro", () => {
     assert.match(text, /description=/, `${file} explains the current job`);
     assert.match(text, /status=/, `${file} exposes a semantic status`);
   }
+});
+
+test("reference-parity CRM routes intentionally start at their working surface", () => {
+  const crm = read("app/crm/page.tsx");
+  const pipeline = read("app/lead-pipeline/page.tsx");
+  const cases = read("app/clients-cases/page.tsx");
+  const ops = read("app/ops/page.tsx");
+  assert.match(crm, /UnifiedLeadsWorkspace mode="leads"/);
+  assert.match(pipeline, /UnifiedLeadsWorkspace mode="pipeline"/);
+  assert.match(cases, /ClientCasePipeline/);
+  assert.match(ops, /Legacy technical console/);
+  for (const text of [crm, pipeline, cases]) assert.doesNotMatch(text, /FounderRouteIntro|route-intro/);
 });
 
 test("evaluation keeps secondary tools behind disclosure", () => {

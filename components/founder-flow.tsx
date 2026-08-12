@@ -1,5 +1,6 @@
 import type { FounderScorecard } from "@/lib/founder-scorecard";
 import { canOpenFounderFlowStep, getCurrentFounderFlowStep, getFounderFlowSteps, getNextFounderFlowStep, getPreviousFounderFlowStep, type FounderFlowStep } from "@/lib/founder-flow";
+import { FounderStepWorkspace } from "@/components/founder-step-workspace";
 
 function statusTone(status: FounderFlowStep["status"]) {
   if (status === "BLOCKED" || status === "NEEDS_REGENERATION") return status === "NEEDS_REGENERATION" ? "needs-regeneration" : "blocked";
@@ -14,7 +15,7 @@ function statusLabel(status: FounderFlowStep["status"]) {
 }
 
 function contextLine(scorecard: FounderScorecard) {
-  const floor = scorecard.floors[0];
+  const floor = scorecard.floors.find((item) => item.id === scorecard.selectedFloorId) ?? scorecard.floors[0];
   return `${scorecard.client?.displayName ?? "No client selected"} · ${scorecard.project?.propertyName ?? scorecard.caseRecord?.caseNumber ?? "Case setup pending"} · ${floor?.label ?? "Floor setup pending"}`;
 }
 
@@ -70,10 +71,11 @@ export function FounderFlowPage({ scorecard, stepNumber }: { scorecard: FounderS
         <h1 id="founder-flow-title">{step.title}</h1>
         <p className="founder-flow-description">{step.purpose}</p>
         <div className={`founder-flow-status status-${tone}`}><span className="status-pill">{isFuture ? "BLOCKED" : statusLabel(step.status)}</span><p>{isFuture ? `Complete step ${current.number.toString().padStart(2, "0")} before opening this work.` : step.explanation}</p></div>
-        <div className="founder-flow-inputs"><div className="eyebrow">Required before this step</div><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></div>
+        <details className="founder-flow-inputs"><summary>Required information</summary><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></details>
         {step.status === "COMPLETE" && !isFuture ? <div className="founder-flow-success" role="status">This step is complete. Continue when you are ready for the next server-derived step.</div> : null}
+        {!isBlocked && !isComplete ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
         <div className="founder-flow-action-bar">
-          {action ? <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}
+          {(isBlocked || isComplete) && action ? <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}
           {previous ? <a className="button-secondary" href={previous.flowPath}>Back</a> : <a className="button-secondary" href="/">Back to scorecard</a>}
         </div>
         <details className="founder-technical-details founder-flow-details"><summary>Details</summary><p>Technical status, IDs, hashes, audit history and advanced controls remain in the focused module workspace and history surfaces.</p></details>

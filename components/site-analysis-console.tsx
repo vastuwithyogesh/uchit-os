@@ -12,11 +12,11 @@ type Asset = { evidenceRef: string; fileName: string; floorLabel?: string; mimeT
 const observationFields = ["site", "entrance", "surroundings", "light", "ventilation", "airflow", "neighbouringEffects", "relevantObservations"] as const;
 const labels: Record<(typeof observationFields)[number], string> = { site: "Site", entrance: "Entrance", surroundings: "Surroundings", light: "Light", ventilation: "Ventilation", airflow: "Airflow", neighbouringEffects: "Neighbouring effects", relevantObservations: "Relevant observations" };
 
-export function SiteAnalysisConsole() {
+export function SiteAnalysisConsole({ focus = "all", clientId: initialClientId, caseId: requestedCaseId, floorId: initialFloorId }: { focus?: "all" | "site" | "post-site"; clientId?: string; caseId?: string; floorId?: string }) {
   const { activeUser } = useSession();
   const [state, setState] = useState<Bootstrap | null>(null);
-  const [clientId, setClientId] = useState("");
-  const [floorId, setFloorId] = useState("");
+  const [clientId, setClientId] = useState(initialClientId ?? "");
+  const [floorId, setFloorId] = useState(initialFloorId ?? "");
   const [assets, setAssets] = useState<Asset[]>([]);
   const [evidenceRef, setEvidenceRef] = useState("");
   const [evidenceType, setEvidenceType] = useState("VIDEO_ANALYSIS");
@@ -49,7 +49,8 @@ export function SiteAnalysisConsole() {
   useEffect(() => { void refresh(); }, []);
 
   const client = state?.clients.find((item) => item.id === clientId) ?? state?.clients[0];
-  const caseRecord = state && client ? getActiveCaseForClient(state, client.id) : undefined;
+  const caseRecord = state?.vastuCases.find((item) => item.id === requestedCaseId && item.clientId === client?.id)
+    ?? (state && client ? getActiveCaseForClient(state, client.id) : undefined);
   const project = state?.projects.find((item) => item.id === caseRecord?.projectId);
   const floors = state?.floorWorkspaces.filter((item) => item.caseId === caseRecord?.id && item.projectId === project?.id) ?? [];
   const floor = floors.find((item) => item.id === floorId) ?? floors[0];
@@ -85,7 +86,7 @@ export function SiteAnalysisConsole() {
   const messageIsError = message.includes("could not") || message.includes("failed") || message.includes("missing");
 
   return (
-    <section className="stack founder-work-surface" aria-label="Site Analysis and Post-Site Findings">
+    <section className={`stack founder-work-surface site-analysis-workspace site-focus-${focus}`} aria-label="Site Analysis and Post-Site Findings">
       <div className="founder-context-bar" aria-label="Current site context"><span>Evaluation</span><span aria-hidden="true">→</span><strong>{client?.displayName ?? "Choose a client"}</strong><span aria-hidden="true">→</span><span>{floor?.floorLabel ?? "Floor"}</span><span aria-hidden="true">→</span><span>Site review</span></div>
       <FounderStepCard step="Step 1 · site analysis" title="Record what was observed on this floor" description="Begin only after the exact Stage A verdict is presented. Observations are human-entered evidence; this step never reruns evaluation or invents a score." tone={analysis?.status === "FOUNDER_APPROVED" ? "approved" : stageAVerdictReportId && evidenceRef ? "ready" : "attention"} status={analysis?.status?.replaceAll("_", " ") ?? "Awaiting input"} className="founder-step-card-primary">
         <div className="founder-step-grid">

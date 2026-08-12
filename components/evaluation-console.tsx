@@ -38,20 +38,21 @@ async function postAction(payload: Record<string, unknown>, role?: string) {
   return result;
 }
 
-export function EvaluationConsole() {
+export function EvaluationConsole({ clientId: initialClientId, caseId: requestedCaseId, floorId: initialFloorId }: { clientId?: string; caseId?: string; floorId?: string } = {}) {
   const { activeUser } = useSession();
   const [rules, setRules] = useState<UtilityRule[]>([]);
   const [state, setState] = useState<AppState | null>(null);
   const [message, setMessage] = useState("Load the master table to inspect the residential rules.");
   const [busy, setBusy] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState("");
-  const [selectedFloorId, setSelectedFloorId] = useState("");
+  const [selectedClientId, setSelectedClientId] = useState(initialClientId ?? "");
+  const [selectedFloorId, setSelectedFloorId] = useState(initialFloorId ?? "");
   const [snapshotName, setSnapshotName] = useState("Residential tab evaluation");
   const [shaktiValuesText, setShaktiValuesText] = useState("9,8,8,7,6,9,8,7,6,7,8,9,8,7,6,8");
 
   const clients = state?.clients ?? [];
   const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
-  const currentCase = state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined;
+  const currentCase = state?.vastuCases.find((item) => item.id === requestedCaseId && item.clientId === selectedClient?.id)
+    ?? (state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined);
   const floors = state?.floorWorkspaces.filter((item) => item.caseId === currentCase?.id && (!currentCase?.projectId || item.projectId === currentCase.projectId)) ?? [];
   const selectedFloor = floors.find((item) => item.id === selectedFloorId) ?? floors[0];
   const readiness = currentCase ? getServiceReadiness(currentCase) : null;

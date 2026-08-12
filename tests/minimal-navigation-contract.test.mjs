@@ -6,9 +6,9 @@ test("the main navigation has one clear destination and an accessible More menu"
   const header = source("components/site-header.tsx");
   assert.match(header, /primaryHrefs/);
   assert.match(header, /activeUser\.role === "CLIENT"/);
-  assert.match(header, /<details className="nav-more">/);
-  assert.match(header, /<summary aria-label="Open navigation menu">/);
-  assert.match(header, /nav-more-label">Menu/);
+  assert.match(header, /<details className="sidebar-more">/);
+  assert.match(header, /<summary>More<\/summary>/);
+  assert.match(header, /<summary aria-label="Open navigation">Menu<\/summary>/);
   assert.match(header, /aria-current=/);
 });
 
@@ -32,18 +32,16 @@ test("workspace primary actions use direct href navigation", () => {
 
 test("the mobile menu stays above browser controls and remains scrollable", () => {
   const css = source("app/globals.css");
-  assert.match(css, /inset:\s*12px 12px max\(12px, env\(safe-area-inset-bottom\)\)/);
-  assert.match(css, /z-index:\s*1000/);
+  assert.match(css, /\.mobile-appbar[\s\S]*z-index:\s*90/);
+  assert.match(css, /\.mobile-nav-menu nav[\s\S]*inset:\s*62px 0 0 0/);
   assert.match(css, /overflow-y:\s*auto/);
-  assert.match(css, /overscroll-behavior:\s*contain/);
-  assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.topbar\s*\{[\s\S]*?backdrop-filter:\s*none/);
-  assert.match(css, /\.nav-more\[open\] > summary\s*\{[\s\S]*?position:\s*fixed[\s\S]*?z-index:\s*1001/);
-  assert.match(css, /@media \(max-width: 560px\)[\s\S]*?\.nav-more-menu\s*\{[\s\S]*?grid-template-columns:\s*1fr/);
+  assert.match(css, /@media \(max-width: 820px\)[\s\S]*?\.app-sidebar\s*\{\s*display:\s*none/);
+  assert.match(css, /\.mobile-nav-menu nav a[\s\S]*min-height:\s*48px/);
 });
 
 test("navigation labels use plain language", () => {
   const policy = source("lib/access-policy.ts");
-  for (const label of ["My Case", "Workspace", "Leads", "Lead Pipeline", "Clients & Cases", "History", "Case Setup", "Files & Drawings", "Report Charts", "Payments", "System Check"]) {
+  for (const label of ["My Case", "Workspace", "Overview", "Leads", "Lead Pipeline", "Clients & Cases", "Evaluation", "History", "Legacy technical console", "Files & Drawings", "Report Charts", "Payments", "System Check"]) {
     assert.match(policy, new RegExp(`label: "${label}"`));
   }
   assert.doesNotMatch(policy, /label: "(?:CRM workbench|Ops|Proofs|Diagnostics|Integrity|State|Bootstrap)"/);

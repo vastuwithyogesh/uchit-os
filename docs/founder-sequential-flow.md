@@ -23,4 +23,4 @@ The page layer is navigation only. Existing action routes remain responsible for
 
 ## Verification
 
-`tests/founder-flow.test.mjs` covers the dedicated route contract, twelve-step order, future-step gating, previous-step access, single primary action, progressive Details disclosure, Stage B/client-delivery deferral and mobile/focus/reduced-motion requirements. The v4 scorecard helper remains covered for status derivation and floor isolation.
+`tests/founder-flow.test.mjs` now covers the dedicated 17-step route contract, exact case/floor context, FE-SITE-01 ordering, future-step gating, previous-step access, real in-page editing surfaces, progressive Details disclosure, Stage B/client-delivery deferral and mobile/focus/reduced-motion requirements.

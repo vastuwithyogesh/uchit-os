@@ -5,66 +5,70 @@ import { resolve } from "node:path";
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 
-test("Founder home is compact and Continue opens a dedicated module route", () => {
+test("Founder home remains compact and Continue opens the exact current module", () => {
   const page = read("app/page.tsx");
   const home = read("components/founder-flow.tsx");
   assert.match(page, /FounderFlowHome/);
-  assert.doesNotMatch(page, /<FounderScorecard/);
   assert.match(home, /founder-flow-home/);
-  assert.match(home, /founder-flow-continue/);
   assert.match(home, /current\.flowPath/);
-  assert.doesNotMatch(home, /founder-scorecard-modules/);
+  assert.match(home, /Continue/);
+  assert.doesNotMatch(page, /<FounderScorecard|operations spine|CaseMasterConsole/);
 });
 
-test("all twelve Founder modules have dedicated sequential paths and required inputs", () => {
-  const helper = read("lib/founder-flow.ts");
+test("all seventeen Founder modules have dedicated server-derived paths", () => {
+  const scorecard = read("lib/founder-scorecard.ts");
+  const flow = read("lib/founder-flow.ts");
   const route = read("app/founder/[step]/page.tsx");
-  for (const id of ["client-commercial", "case-project", "floor-setup", "plans-evidence", "gridding", "evaluation", "site", "verdict", "balance", "report", "delivery", "remedial"]) {
-    assert.match(helper, new RegExp(`(?:"${id}"|${id}\\s*:)`), id);
-  }
-  assert.match(helper, /\/founder\/\$\{module\.number/);
-  assert.match(helper, /canOpenFounderFlowStep/);
-  assert.match(helper, /getPreviousFounderFlowStep/);
-  assert.match(helper, /getNextFounderFlowStep/);
-  assert.match(route, /FounderFlowPage/);
-  assert.match(route, /params/);
+  for (const number of Array.from({ length: 17 }, (_, index) => index + 1)) assert.match(scorecard, new RegExp(`number: ${number},`), `step ${number}`);
+  for (const id of ["case-project", "floor-setup", "intake", "direction", "layout", "gridding", "manual-sheet", "evaluation", "stage-a", "site", "post-site", "balance", "remedial", "report-assembly", "founder-approval", "protected-pdf", "delivery"]) assert.match(flow, new RegExp(`(?:(?:\"${id}\")|(?:${id}\\s*:))`), id);
+  assert.match(flow, /contextQuery/);
+  assert.match(route, /searchParams/);
+  assert.match(route, /caseId/);
+  assert.match(route, /floorId/);
 });
 
-test("future gates stay closed while previous steps remain accessible", () => {
+test("FE-SITE order is Stage A presentation then Site and Post-Site then balance", () => {
+  const scorecard = read("lib/founder-scorecard.ts");
+  const stageA = scorecard.indexOf('id: "stage-a"');
+  const site = scorecard.indexOf('id: "site"');
+  const postSite = scorecard.indexOf('id: "post-site"');
+  const balance = scorecard.indexOf('id: "balance"');
+  assert.ok(stageA > -1 && stageA < site && site < postSite && postSite < balance);
+  assert.match(scorecard, /Stage A must be generated, verified and presented first/);
+  assert.match(scorecard, /blocked: !stageAReady/);
+  assert.match(scorecard, /Post-Site Findings must be approved first/);
+});
+
+test("future gates stay closed while previous steps and exact recovery remain accessible", () => {
   const helper = read("lib/founder-flow.ts");
   const component = read("components/founder-flow.tsx");
   assert.match(helper, /number <= current\.number/);
   assert.match(component, /Previous steps/);
-  assert.match(component, /getPreviousFounderFlowStep/);
   assert.match(component, /Go to required step/);
-  assert.match(component, /Complete step/);
+  assert.match(component, /FounderStepWorkspace/);
   assert.doesNotMatch(component, /next\/link|<Link\b|prefetch=/);
 });
 
-test("focused module pages expose one primary action and progressive technical details", () => {
-  const component = read("components/founder-flow.tsx");
-  assert.match(component, /founder-flow-primary/);
-  assert.match(component, /founder-flow-details/);
-  assert.match(component, /<details/);
-  assert.match(component, /founder-flow-action-bar/);
-  assert.match(component, /founder-flow-success/);
-  assert.match(component, /founder-flow-status/);
+test("active module renders its real editing surface without the legacy ops console", () => {
+  const workspace = read("components/founder-step-workspace.tsx");
+  const flow = read("components/founder-flow.tsx");
+  for (const component of ["FounderCaseSetupStep", "ClientIntakeForm", "SpatialWorkspace", "FilesDrawingsConsole", "EvaluationConsole", "FounderReportStep", "SiteAnalysisConsole", "PaymentProofConsole"]) assert.match(workspace, new RegExp(component));
+  assert.match(workspace, /\.\.\.common/);
+  assert.doesNotMatch(`${workspace}\n${flow}`, /href="\/ops"|CaseMasterConsole|WorkflowConsole/);
+  assert.match(flow, /founder-flow-details/);
 });
 
-test("Stage B and client delivery remain explicitly deferred", () => {
+test("Stage B and delivery remain explicitly blocked", () => {
   const helper = read("lib/founder-scorecard.ts");
-  const component = read("components/founder-flow.tsx");
-  assert.match(helper, /BLOCKED[^\n]*METHOD INPUT REQUIRED/);
-  assert.match(helper, /clientDelivery=DEFERRED/);
-  assert.match(component, /Stage B remains reserved/);
-  assert.match(component, /Future gated steps stay closed/);
+  assert.match(helper, /BLOCKED — METHOD INPUT REQUIRED/);
+  assert.match(helper, /Client delivery is intentionally disabled/);
+  assert.match(helper, /status: "BLOCKED"/);
 });
 
 test("sequential flow preserves mobile, focus and reduced-motion contracts", () => {
   const css = read("app/globals.css");
-  assert.match(css, /\.founder-flow-home(?:,|\s*\{)/);
-  assert.match(css, /\.founder-flow-page(?:\s*\{)/);
-  assert.match(css, /\.founder-flow-progress/);
+  assert.match(css, /\.founder-flow-home/);
+  assert.match(css, /\.founder-flow-page/);
   assert.match(css, /min-height:\s*44px/);
   assert.match(css, /:where\(a, button, input, textarea, select, summary\):focus-visible/);
   assert.match(css, /prefers-reduced-motion/);
