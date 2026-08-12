@@ -1,25 +1,21 @@
 "use client";
 
-import { useState } from "react";
-import { buildActionHeaders } from "@/lib/request-helpers";
-import { useSession } from "@/components/session-provider";
+import { useEffect, useState } from "react";
 
-type ManifestAsset = { key: string; filename: string; title: string; category: string; pageCount: number; sizeBytes: number; checksumSha256: string };
+type ManifestAsset = { key: string; filename: string; title: string; category: string; pageCount: number; sizeBytes: number; checksumSha256: string; mimeType: string; widthPixels?: number; heightPixels?: number; hasAlphaChannel?: boolean; brandRole?: string };
+type AssetState = { key: string; status: string; version?: number; checksumSha256?: string; brandRole?: string };
 
 export function MediaLibraryConsole({ assets }: { assets: ManifestAsset[] }) {
-  const { activeUser } = useSession();
-  const [busyKey, setBusyKey] = useState(""); const [results, setResults] = useState<Record<string,string>>({});
-  async function validate(asset: ManifestAsset) {
-    setBusyKey(asset.key);
-    try {
-      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action: "founder-media-dry-run", ...asset }) });
-      const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "Validation failed.");
-      setResults((current) => ({ ...current, [asset.key]: "Hash, size and page count match. No bytes were stored." }));
-    } catch (error) { setResults((current) => ({ ...current, [asset.key]: error instanceof Error ? error.message : "Validation failed." })); }
-    finally { setBusyKey(""); }
+  const [busyKey, setBusyKey] = useState(""); const [results, setResults] = useState<Record<string,string>>({}); const [states,setStates]=useState<Record<string,AssetState>>({});
+  async function refresh() { const response=await fetch("/api/media-library",{cache:"no-store"}); const body=await response.json(); if(response.ok)setStates(Object.fromEntries(body.assets.map((item:AssetState)=>[item.key,item]))); }
+  useEffect(()=>{void refresh();},[]);
+  async function ingest(asset: ManifestAsset, file?: File) {
+    if(!file)return; setBusyKey(asset.key); setResults((current)=>({...current,[asset.key]:"Verifying exact bytes…"}));
+    try { const form=new FormData();form.set("assetKey",asset.key);form.set("file",file,file.name);const response=await fetch("/api/media-library",{method:"POST",body:form});const body=await response.json();if(!response.ok)throw new Error(body.error??"Ingestion failed.");setResults((current)=>({...current,[asset.key]:body.replayed?"Exact active version already exists; no duplicate was created.":"Exact bytes stored privately, Founder-approved and activated."}));await refresh(); }
+    catch(error){setResults((current)=>({...current,[asset.key]:error instanceof Error?error.message:"Ingestion failed without saving changes."}));}finally{setBusyKey("");}
   }
-  return <section className="founder-step-surface" aria-labelledby="media-library-title"><header><span className="eyebrow">Founder-only · protected assets</span><h1 id="media-library-title">Media Library</h1><p>Register immutable brochures and qualification forms separately from case evidence and report artifacts.</p></header>
-    <div className="workspace-state"><strong>Local dry-run mode</strong><p>These approved metadata records can be checked now. No PDF bytes are uploaded, bundled or exposed in this build.</p></div>
-    <div className="media-library-list">{assets.map((asset) => <article key={asset.key}><div><span className="status-pill status-attention">Not ingested</span><h2>{asset.title}</h2><p>{asset.category} · {asset.pageCount} pages · {(asset.sizeBytes / 1024).toFixed(0)} KB</p></div><details><summary>Technical details</summary><p>Filename: {asset.filename}</p><p>Approved SHA-256: {asset.checksumSha256}</p></details><button type="button" className="button-secondary" disabled={busyKey === asset.key} onClick={() => void validate(asset)}>{busyKey === asset.key ? "Validating…" : "Validate manifest (no upload)"}</button>{results[asset.key] ? <p role="status">{results[asset.key]}</p> : null}</article>)}</div>
+  return <section className="founder-step-surface" aria-labelledby="media-library-title"><header><span className="eyebrow">Founder-only · protected assets</span><h1 id="media-library-title">Media Library</h1><p>Store exact approved brand, brochure and qualification assets privately. Nothing here creates a public object URL or sends content to a client.</p></header>
+    <div className="workspace-state"><strong>Private immutable ingestion</strong><p>Yogesh selects the exact source file. The server verifies filename, MIME signature, byte size and SHA-256 before private R2 storage and activation.</p></div>
+    <div className="media-library-list">{assets.map((asset)=>{const state=states[asset.key];return <article key={asset.key}><div><span className={`status-pill ${state?.status==="ACTIVE"?"status-ready":"status-attention"}`}>{state?.status??"NOT INGESTED"}</span><h2>{asset.title}</h2><p>{asset.category} · {asset.mimeType==="application/pdf"?`${asset.pageCount} pages`:`${asset.widthPixels} × ${asset.heightPixels}px`} · {(asset.sizeBytes/1024).toFixed(0)} KB</p>{asset.brandRole?<p className="meta">Approved role: {asset.brandRole.replaceAll("_"," ").toLowerCase()}</p>:null}</div><details><summary>Technical details</summary><p>Filename: {asset.filename}</p><p>Approved SHA-256: {asset.checksumSha256}</p>{asset.mimeType==="image/png"?<p>Transparency: {asset.hasAlphaChannel?"alpha channel present":"opaque original"}. Exact bytes are retained.</p>:null}{state?.version?<p>Active immutable version: {state.version}</p>:null}</details><label className="button-secondary media-upload-label">{busyKey===asset.key?"Uploading and verifying…":state?.status==="ACTIVE"?"Verify or replay exact file":"Select exact file and activate"}<input type="file" accept={asset.mimeType} disabled={Boolean(busyKey)} onChange={(event)=>{const file=event.currentTarget.files?.[0];void ingest(asset,file);event.currentTarget.value="";}} /></label>{results[asset.key]?<p role="status">{results[asset.key]}</p>:null}</article>})}</div>
   </section>;
 }

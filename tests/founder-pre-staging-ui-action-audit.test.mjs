@@ -18,7 +18,8 @@ test("new Founder workflow controls have native actions, busy guards and actiona
   assert.match(leads, /Your draft remains here; reload before retrying/);
   assert.match(communication, /Prepare WhatsApp & email/); assert.match(communication, /disabled=\{busy \|\| blocked\}/);
   assert.match(communication, /Allow pop-ups and retry/); assert.doesNotMatch(communication, /SENT|DELIVERED|FAILED|RETRY/);
-  assert.match(media, /Validate manifest \(no upload\)/); assert.match(media, /disabled=\{busyKey === asset\.key\}/);
+  assert.match(media, /Select exact file and activate/); assert.match(media, /disabled=\{Boolean\(busyKey\)\}/);
+  assert.match(media, /\/api\/media-library/); assert.match(media, /Ingestion failed without saving changes/);
   assert.match(qualification, /disabled=\{busy\}/); assert.match(qualification, /Retry securely/); assert.match(qualification, /Your answers remain on this page/);
   assert.match(booking, /disabled=\{busy\}/); assert.match(booking, /Retry securely/); assert.match(booking, /Your selection remains unchanged; reload and try again/);
   assert.match(commercial, /disabled=\{busy\}/); assert.match(commercial, /Reload current version/); assert.match(commercial, /Nothing changed/);

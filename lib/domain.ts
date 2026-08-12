@@ -337,7 +337,10 @@ export interface MediaAssetRecord extends OrganisationOwnedRecord {
 export interface MediaAssetVersionRecord extends OrganisationOwnedRecord {
   id: string; assetId: string; version: number; filename: string; privateObjectKey: string; mimeType: "application/pdf" | "image/png" | "image/jpeg";
   sizeBytes: number; checksumSha256: string; pageCount: number; status: MediaAssetStatus; clientSendable: boolean; statutoryPurpose?: "LOGO" | "SIGNATURE";
+  widthPixels?: number; heightPixels?: number; hasAlphaChannel?: boolean;
+  brandRole?: "PRIMARY_DARK_PREMIUM" | "LIGHT_MONOCHROME_PRINT" | "FOUNDER_SIGNATURE";
   uploadedByActorUserId: string; uploadedAt: string; approvedByActorUserId?: string; approvedAt?: string;
+  activatedByActorUserId?: string; activatedAt?: string;
   supersedesVersionId?: string; supersededByVersionId?: string; reason: string; registrationHash: string;
 }
 
