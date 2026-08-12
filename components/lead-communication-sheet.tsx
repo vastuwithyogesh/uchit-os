@@ -87,7 +87,17 @@ export function LeadCommunicationSheet(props: Props) {
           : buildMailtoComposeUrl({ email: emailRecipient, subject: rendered.emailSubject, body: rendered.email });
       if (!url) throw new Error("A valid email address is required before a draft can be opened. Correct the lead profile and retry.");
       const opened = window.open(url, "_blank", "noopener,noreferrer");
-      if (!opened) throw new Error("The compose window was blocked. Allow pop-ups and retry; no OPENED state was recorded.");
+      if (!opened) {
+        if (channel !== "EMAIL") throw new Error("The compose window was blocked. Allow pop-ups and retry; no OPENED state was recorded.");
+        // The authenticated in-app browser blocks secondary windows. This is still
+        // a user-initiated compose action, so record OPENED and hand the draft to
+        // the configured compose target in the current tab instead of leaving an
+        // apparently dead button. Returning with Back restores this review sheet.
+        await props.onOpened(record);
+        setMessage("The compose pop-up was blocked, so the email draft is opening in this tab. Review it and press Send manually, or return here to retry.");
+        window.location.assign(url);
+        return;
+      }
       await props.onOpened(record);
       setMessage(`${channel === "WHATSAPP" ? "WhatsApp" : emailMode === "GMAIL" ? "Gmail draft" : "Email draft"} was OPENED. Yogesh must review and press Send manually.`);
     } catch (error) {

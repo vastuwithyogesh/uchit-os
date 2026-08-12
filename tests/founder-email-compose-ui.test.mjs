@@ -10,7 +10,10 @@ test("email compose uses Gmail first, preserves default-mail fallback and record
   assert.match(sheet, /buildMailtoComposeUrl/);
   assert.match(sheet, /Open Gmail draft/);
   assert.match(sheet, /Use default email app/);
-  assert.match(sheet, /if \(!opened\) throw new Error\("The compose window was blocked/);
+  assert.match(sheet, /if \(!opened\) \{/);
+  assert.match(sheet, /channel !== "EMAIL"\) throw new Error\("The compose window was blocked/);
+  assert.match(sheet, /window\.location\.assign\(url\)/);
+  assert.match(sheet, /compose pop-up was blocked, so the email draft is opening in this tab/);
   assert.match(sheet, /await props\.onOpened\(record\)/);
   assert.doesNotMatch(sheet, /fetch\(|axios|sendEmail|provider.*send/i);
   assert.match(sheet, /OPENED only means the compose window was opened/);
