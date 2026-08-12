@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { APPROVED_BROCHURE_TITLES, renderFounderTemplate, type FounderTemplateKey, type TemplateValues } from "@/lib/founder-communication-templates";
+import { buildGmailComposeUrl, buildMailtoComposeUrl, normaliseManualEmail } from "@/lib/founder-manual-compose";
 
 type Prepared = { id: string; recordVersion: number };
 export type CommunicationContext = { valuesPatch?: TemplateValues; assetVersionIds?: string[]; formDefinitionId?: string; grantIds?: string[] };
@@ -40,6 +41,7 @@ export function LeadCommunicationSheet(props: Props) {
     if (/^0\d{10}$/.test(digits)) return `91${digits.slice(1)}`;
     return digits.length >= 8 ? digits : "";
   }
+  const emailRecipient = normaliseManualEmail(props.email);
   const blocked = props.templateKey === "BROCHURE" ? !context && !props.secureBrochureLink : props.templateKey === "QUALIFICATION" ? !qualificationKind || (!context && (!props.secureOnlineFormLink || !props.securePdfLink || !props.qualificationTitle)) : false;
 
   async function prepareBoth() {
@@ -58,17 +60,20 @@ export function LeadCommunicationSheet(props: Props) {
     } catch (error) { setMessage(error instanceof Error ? error.message : "The message drafts could not be prepared."); }
     finally { setBusy(false); }
   }
-  async function openChannel(channel: "WHATSAPP" | "EMAIL") {
+  async function openChannel(channel: "WHATSAPP" | "EMAIL", emailMode: "GMAIL" | "MAILTO" = "GMAIL") {
     const record = prepared[channel]; if (!record || busy) return;
     setBusy(true);
     try {
       const url = channel === "WHATSAPP"
         ? `https://wa.me/${normaliseWhatsAppPhone(props.phone)}?text=${encodeURIComponent(rendered.whatsapp)}`
-        : `mailto:${props.email ?? ""}?subject=${encodeURIComponent(rendered.emailSubject)}&body=${encodeURIComponent(rendered.email)}`;
+        : emailMode === "GMAIL"
+          ? buildGmailComposeUrl({ email: emailRecipient, subject: rendered.emailSubject, body: rendered.email })
+          : buildMailtoComposeUrl({ email: emailRecipient, subject: rendered.emailSubject, body: rendered.email });
+      if (!url) throw new Error("A valid email address is required before a draft can be opened. Correct the lead profile and retry.");
       const opened = window.open(url, "_blank", "noopener,noreferrer");
       if (!opened) throw new Error("The compose window was blocked. Allow pop-ups and retry; no OPENED state was recorded.");
       await props.onOpened(record);
-      setMessage(`${channel === "WHATSAPP" ? "WhatsApp" : "Email"} was OPENED. Yogesh must review and press Send manually.`);
+      setMessage(`${channel === "WHATSAPP" ? "WhatsApp" : emailMode === "GMAIL" ? "Gmail draft" : "Email draft"} was OPENED. Yogesh must review and press Send manually.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "The compose action was not recorded. Retry safely.");
     } finally {
@@ -85,7 +90,8 @@ export function LeadCommunicationSheet(props: Props) {
       <p className="meta" role="status" aria-live="polite">{message}</p>
       <footer><button type="button" className="button" disabled={busy || blocked} onClick={() => void prepareBoth()}>{busy ? "Preparing…" : "Prepare WhatsApp & email"}</button>
         <button type="button" className="button-secondary" disabled={busy || !prepared.WHATSAPP || !normaliseWhatsAppPhone(props.phone)} onClick={() => void openChannel("WHATSAPP")}>Open WhatsApp</button>
-        <button type="button" className="button-secondary" disabled={busy || !prepared.EMAIL || !props.email} onClick={() => void openChannel("EMAIL")}>Open Email</button>
+        <button type="button" className="button-secondary" disabled={busy || !prepared.EMAIL || !emailRecipient} onClick={() => void openChannel("EMAIL", "GMAIL")}>Open Gmail draft</button>
+        <button type="button" className="button-secondary" disabled={busy || !prepared.EMAIL || !emailRecipient} onClick={() => void openChannel("EMAIL", "MAILTO")}>Use default email app</button>
         <button type="button" className="button-secondary" disabled={busy} onClick={props.onClose}>Close</button></footer>
     </section></div>;
 }

@@ -35,7 +35,7 @@
     "test:founder-zoom": "node --experimental-strip-types --test tests/founder-zoom-s2s.test.ts tests/founder-zoom-s2s-contract.test.mjs",
     "smoke:founder-zoom": "node --experimental-strip-types scripts/run-founder-zoom-synthetic-smoke.mjs",
     "test:founder-pre-staging": "node --experimental-strip-types --test tests/founder-pre-staging-migration.test.mjs tests/founder-private-storage-rehearsal-wrapper.test.mjs tests/founder-pre-staging-boundary-wrapper.test.mjs tests/founder-pre-staging-ui-action-audit.test.mjs tests/founder-pre-staging-runbook.test.mjs",
-    "test:founder-communication-context": "node --experimental-strip-types --test tests/founder-communication-context.test.ts",
+    "test:founder-communication-context": "node --experimental-strip-types --test tests/founder-communication-context.test.ts tests/founder-manual-compose.test.ts && node --test tests/founder-email-compose-ui.test.mjs",
     "test:deployment-readiness": "node --test tests/deployment-readiness-contract.test.mjs",
     "pilot:founder": "node --experimental-strip-types scripts/render-founder-pilot.mjs",
     "lint": "tsc --noEmit",
