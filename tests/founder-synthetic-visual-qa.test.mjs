@@ -40,3 +40,14 @@ test("balance visual QA keeps payment confirmation primary and details progressi
   assert.match(ui, /Confirm full balance/);
   assert.match(manifest, /"\/founder\/12"/);
 });
+
+test("report visual QA keeps protected artifact actions progressive", () => {
+  const ui = read("components/founder-report-step.tsx");
+  const manifest = read("scripts/prepare-founder-visual-qa.mjs");
+  assert.match(ui, /<summary>Released artifact actions<\/summary>/);
+  assert.match(ui, /mode=export/);
+  assert.match(ui, /mode=print/);
+  assert.match(ui, /report-approve/);
+  assert.match(manifest, /"\/founder\/15"/);
+  assert.match(manifest, /"\/founder\/16"/);
+});
