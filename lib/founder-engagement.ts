@@ -16,11 +16,12 @@ export function assertConfiguredFounder(actor: AppUser, founderUserId: string, o
   if (actor.id !== founderUserId || actor.organisationId !== organisationId || actor.organisationCapability !== "organisation_owner") fail(403, "Only the configured Founder owner can perform this action.");
 }
 
-export function validateApprovedAssetDryRun(input: { actor: AppUser; founderUserId: string; organisationId: string; assetKey: string; filename: string; sizeBytes: number; pageCount: number; checksumSha256: string }) {
+export function validateApprovedAssetDryRun(input: { actor: AppUser; founderUserId: string; organisationId: string; assetKey: string; filename: string; sizeBytes: number; pageCount: number; checksumSha256: string; mimeType?: string }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId);
   const manifest = APPROVED_FOUNDER_ASSETS.find((item) => item.key === input.assetKey);
   if (!manifest) fail(404, "Approved asset manifest entry not found.");
-  validateApprovedAssetMetadata({ key: manifest.key, checksumSha256: input.checksumSha256, sizeBytes: input.sizeBytes, pageCount: input.pageCount, mimeType: "application/pdf" });
+  if (input.filename !== manifest.filename) fail(400, "The selected filename does not match the approved immutable asset version.");
+  validateApprovedAssetMetadata({ key: manifest.key, checksumSha256: input.checksumSha256, sizeBytes: input.sizeBytes, pageCount: input.pageCount, mimeType: input.mimeType ?? manifest.mimeType });
   return { ok: true as const, dryRun: true as const, assetKey: manifest.key, filename: manifest.filename, sizeBytes: manifest.sizeBytes, pageCount: manifest.pageCount, checksumSha256: manifest.checksumSha256, bytesStored: false as const };
 }
 
@@ -35,10 +36,10 @@ export function registerMediaAssetVersion(input: { state: AppState; actor: AppUs
   const existing = input.state.mediaAssets.find((item) => item.organisationId === input.organisationId && item.id === `media:${manifest.key.toLowerCase()}`);
   if (input.expectedRecordVersion === undefined) fail(428, "The latest media record version is required.");
   if ((existing?.recordVersion ?? 0) !== input.expectedRecordVersion) fail(409, "The media library changed. Reload before registering this version.");
-  const asset = existing ?? { id: `media:${manifest.key.toLowerCase()}`, organisationId: input.organisationId, category: manifest.category, audience: "CLIENT_SENDABLE" as const, serviceApplicability: manifest.serviceApplicability, title: manifest.title, description: "Approved immutable Founder communication asset.", tags: ["approved-source", manifest.key.toLowerCase()], createdAt: nowIso(), createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
+  const asset = existing ?? { id: `media:${manifest.key.toLowerCase()}`, organisationId: input.organisationId, category: manifest.category, audience: manifest.audience ?? "CLIENT_SENDABLE" as const, serviceApplicability: manifest.serviceApplicability, title: manifest.title, description: "Approved immutable Founder Media Library asset.", tags: ["approved-source", manifest.key.toLowerCase()], createdAt: nowIso(), createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
   if (!existing) input.state.mediaAssets.push(asset);
   const prior = input.state.mediaAssetVersions.filter((item) => item.assetId === asset.id).sort((a,b) => b.version-a.version)[0];
-  const version = { id: uuid(), organisationId: input.organisationId, assetId: asset.id, version: (prior?.version ?? 0) + 1, filename: manifest.filename, privateObjectKey: input.privateObjectKey, mimeType: "application/pdf" as const, sizeBytes: manifest.sizeBytes, checksumSha256: manifest.checksumSha256, pageCount: manifest.pageCount, status: "DRAFT" as const, clientSendable: true, uploadedByActorUserId: input.actor.id, uploadedAt: nowIso(), supersedesVersionId: prior?.id, reason: `registration:${input.idempotencyKey}`, registrationHash, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
+  const version = { id: uuid(), organisationId: input.organisationId, assetId: asset.id, version: (prior?.version ?? 0) + 1, filename: manifest.filename, privateObjectKey: input.privateObjectKey, mimeType: manifest.mimeType, sizeBytes: manifest.sizeBytes, checksumSha256: manifest.checksumSha256, pageCount: manifest.pageCount, status: "DRAFT" as const, clientSendable: manifest.clientSendable, statutoryPurpose: manifest.statutoryPurpose, widthPixels: manifest.widthPixels, heightPixels: manifest.heightPixels, hasAlphaChannel: manifest.hasAlphaChannel, brandRole: manifest.brandRole, uploadedByActorUserId: input.actor.id, uploadedAt: nowIso(), supersedesVersionId: prior?.id, reason: `registration:${input.idempotencyKey}`, registrationHash, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
   input.state.mediaAssetVersions.push(version); return { asset, version, replayed: false };
 }
 
@@ -53,7 +54,7 @@ export function transitionMediaAssetVersion(input: { state: AppState; actor: App
   if (!allowed[version.status]?.includes(input.target)) fail(409, "That immutable media lifecycle transition is not allowed.");
   version.status = input.target; version.recordVersion += 1; version.updatedByActorUserId = input.actor.id;
   if (input.target === "FOUNDER_APPROVED") { version.approvedAt = nowIso(); version.approvedByActorUserId = input.actor.id; }
-  if (input.target === "ACTIVE") { const asset = input.state.mediaAssets.find((item) => item.id === version.assetId)!; const old = input.state.mediaAssetVersions.find((item) => item.id === asset.activeVersionId); if (old && old.id !== version.id) { old.status = "SUPERSEDED"; old.supersededByVersionId = version.id; old.recordVersion = (old.recordVersion ?? 0) + 1; } asset.activeVersionId = version.id; asset.recordVersion = (asset.recordVersion ?? 0) + 1; }
+  if (input.target === "ACTIVE") { version.activatedAt = nowIso(); version.activatedByActorUserId = input.actor.id; const asset = input.state.mediaAssets.find((item) => item.id === version.assetId)!; const old = input.state.mediaAssetVersions.find((item) => item.id === asset.activeVersionId); if (old && old.id !== version.id) { old.status = "SUPERSEDED"; old.supersededByVersionId = version.id; old.recordVersion = (old.recordVersion ?? 0) + 1; } asset.activeVersionId = version.id; asset.recordVersion = (asset.recordVersion ?? 0) + 1; }
   return version;
 }
 
