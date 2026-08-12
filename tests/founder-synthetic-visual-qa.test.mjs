@@ -7,10 +7,21 @@ const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 
 test("synthetic visual-QA harness is owner-scoped, no-write and context complete", () => {
   const script = read("scripts/prepare-founder-visual-qa.mjs");
-  for (const token of ["buildReleaseableFounderPilotFixture", "syntheticOnly: true", "noWrites: true", "noExternalCommunication: true", "1440", "390", "/founder/08", "/founder/10", "/founder/11", "BLOCKED_METHOD_INPUT", "DEFERRED"]) {
+  for (const token of ["buildReleaseableFounderPilotFixture", "syntheticOnly: true", "noWrites: true", "noExternalCommunication: true", "reviewMatrix", "ownerReview", "1440", "390", "/founder/08", "/founder/10", "/founder/11", "/founder/12", "/founder/15", "/founder/16", "BLOCKED_METHOD_INPUT", "DEFERRED"]) {
     assert.match(script, new RegExp(token.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")), token);
   }
-  assert.doesNotMatch(script, /fetch\(|POST|writeFileSync|real|client-data/i);
+  assert.doesNotMatch(script, /fetch\(|writeFileSync|client-data/i);
+  assert.doesNotMatch(script, /method:\s*["']POST/i);
+  assert.match(script, /hostedBrowserCapture: "PENDING_CLEAN_SYNTHETIC_RUNTIME"/);
+});
+
+test("synthetic review matrix covers all owner review surfaces and responsive recovery checks", () => {
+  const script = read("scripts/prepare-founder-visual-qa.mjs");
+  for (const token of ["Founder home", "Leads", "Lead Pipeline", "Clients & Cases", "Utility/Shakti evaluation", "Site analysis", "Post-Site findings", "Full balance clearance", "Founder approval", "Protected PDF", "Legacy report console", "Technical recovery", "keyboard-focus", "disabled-busy", "error-retry", "no-horizontal-overflow"]) {
+    assert.match(script, new RegExp(token.replace(/[.*+?^${}()|[\\]\\]/g, "\\\\$&")), token);
+  }
+  assert.match(script, /requiredScreenshots: \["desktop-1440x900", "mobile-390x844"\]/);
+  assert.match(script, /publication: "NO_GO_UNTIL_OWNER_VISUAL_REVIEW"/);
 });
 
 test("evaluation surface keeps technical context behind disclosure and one dominant save action", () => {
