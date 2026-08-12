@@ -2,12 +2,12 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { runFounderPreStagingRehearsal } from "../scripts/rehearse-founder-pre-staging.mjs";
 
-test("disposable SQLite rehearses clean and upgrade v14 paths with recovery evidence", async () => {
+test("disposable SQLite rehearses clean and upgrade v16 paths with recovery evidence", async () => {
   const result = await runFounderPreStagingRehearsal();
   assert.equal(result.scope, "DISPOSABLE_LOCAL_ONLY");
   assert.equal(result.persistentEnvironmentTouched, false);
   assert.equal(result.disposed, true);
-  assert.deepEqual(result.cleanPath, { from: 1, to: 14, markerCount: 14, idempotent: true });
+  assert.deepEqual(result.cleanPath, { from: 1, to: 16, markerCount: 16, idempotent: true });
   assert.equal(result.upgradePath.syntheticDataPreserved, true);
   assert.equal(result.upgradePath.integrity, "ok");
   assert.equal(result.backupRestore.backupCreated, true);
@@ -18,5 +18,8 @@ test("disposable SQLite rehearses clean and upgrade v14 paths with recovery evid
   assert.equal(result.schema.v13PolicyColumnsPresent, true);
   assert.equal(result.schema.v14ZoomHostBindingColumnsPresent, true);
   assert.equal(result.schema.v14ZoomHostIndexPresent, true);
+  assert.equal(result.schema.v15NoRefundEventLedgerPresent, true);
+  assert.equal(result.schema.v15NoRefundEventIndexPresent, true);
+  assert.equal(result.schema.v16FixedLudhianaPolicyPresent, true);
   assert.equal(result.schema.constraintFailuresObserved.length, 3);
 });

@@ -418,7 +418,7 @@ export interface FounderCommercialPolicyVersionRecord extends OrganisationOwnedR
 export interface FounderCommercialLegalPolicyRecord extends OrganisationOwnedRecord {
   id: string; kind: FounderLegalPolicyKind; version: number; status: FounderLegalPolicyStatus;
   title: string; exactText: string; contentHash: string;
-  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[]; refundPolicy?: "NO_REFUNDS" };
+  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; typedConfirmationMode?: "FULL_NAME"; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[]; refundPolicy?: "NO_REFUNDS"; creditPolicy?: "NO_CREDITS_VOUCHERS_OR_FEE_OFFSETS"; correctionPolicyApproval?: "REVIEW_REQUIRED_ACCOUNTANT" };
   reason: string; createdByActorUserId: string; createdAt: string; approvedByActorUserId?: string; approvedAt?: string; activatedAt?: string; supersedesPolicyId?: string; idempotencyKey: string; requestHash: string;
 }
 
@@ -447,7 +447,7 @@ export interface FounderProposalContentSnapshot {
   timeline: { expectedCommencement: string; estimatedDateRange: string; milestones: string[]; prerequisites: string[]; clientDependencies: string[]; pauseOrExtensionConditions: string[]; isEstimate: true };
   commercial: FounderCommercialTermsSnapshot;
   projectExclusions: string[];
-  policyBindings: { professionalBoundariesPolicyId?: string; acceptanceDeclarationPolicyId?: string; cancellationPolicyId?: string; commercialPolicyId: string; templateVersionId: string };
+  policyBindings: { professionalBoundariesPolicyId?: string; acceptanceDeclarationPolicyId?: string; cancellationPolicyId?: string; cancellationPolicyVersion?: number; cancellationPolicyContentHash?: string; commercialPolicyId: string; templateVersionId: string };
   nextSteps: { advanceRequired: boolean; balanceAfterAdvanceDeadline: true; paymentProofRequiresConfirmation: true; reportGatesRemainServerEnforced: true };
 }
 
@@ -496,6 +496,14 @@ export interface FounderCommercialInvoiceRecord extends OrganisationOwnedRecord 
   failureCode?: string; failureAt?: string; idempotencyKey: string; requestHash: string; recordVersion: number;
 }
 
+export type FounderCommercialPolicyEventType = "CLIENT_CANCELLATION_REQUESTED" | "CLIENT_DEPENDENCY_DELAY_RECORDED" | "UCHIT_RESCHEDULE_RECORDED";
+export interface FounderCommercialPolicyEventRecord extends OrganisationOwnedRecord {
+  id: string; clientId: string; prospectiveProjectId: string; proposalVersionId?: string;
+  eventType: FounderCommercialPolicyEventType; reason: string; revisedEstimate?: string; replacementDateOrSlot?: string;
+  noRefundOrCreditEntitlement: true; paymentHistoryPreserved: true; createdByActorUserId: string; createdAt: string;
+  idempotencyKey: string; requestHash: string; recordVersion: 1;
+}
+
 export type FounderStatutoryDocumentKind = "RECEIPT_VOUCHER" | "PROFORMA" | "TAX_INVOICE" | "INTERNAL_NON_COMMERCIAL";
 export type FounderStatutoryDocumentStatus = "NOT_DUE" | "DUE" | "READY" | "REVIEW_REQUIRED" | "BLOCKED" | "OVERDUE" | "ISSUED" | "GENERATION_FAILED" | "VOID";
 export type FounderTaxMode = "CGST_SGST" | "IGST" | "ZERO" | "REVIEW_REQUIRED";
@@ -509,6 +517,8 @@ export interface FounderStatutoryPolicyVersionRecord extends OrganisationOwnedRe
   lineDescription: "Professional Vastu Consultancy Services"; defaultGstBasisPoints: 1800;
   reverseChargeText: "Tax payable under reverse charge: No";
   placeOfSupplyBasis: "CLIENT_LOCATION"; operationalPlaceOfSupplySelection: "CLIENT_LOCATION_ONLY"; placeOfSupplyApproval: FounderAccountantApprovalState;
+  activePlaceOfSupplyPolicy: "FIXED_LUDHIANA_PUNJAB";
+  placeOfSupplyDisplay: "Ludhiana, Punjab, India"; outsideIndiaBillingLabel: "Cash Sale"; taxTreatment: "CGST_SGST_9_9_ALL_CLIENT_LOCATIONS";
   serviceTimingApproval: FounderAccountantApprovalState; correctionPolicyApproval: FounderAccountantApprovalState;
   receiptVoucherTrigger: "CONFIRMED_ADVANCE"; receiptVoucherSlaMinutes: 60;
   proformaPolicy: "AFTER_CONFIRMED_ADVANCE_ONLY"; taxInvoiceTrigger: "CONFIRMED_FULL_PAYMENT";

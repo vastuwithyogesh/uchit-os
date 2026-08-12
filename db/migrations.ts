@@ -546,6 +546,31 @@ export const d1Migrations: readonly D1Migration[] = [
       `ALTER TABLE zoom_meeting_bindings ADD COLUMN scope_snapshot_json TEXT NOT NULL DEFAULT '["meeting:write:admin","meeting:read:admin","user:read:admin"]'`,
       "CREATE INDEX IF NOT EXISTS idx_zoom_binding_host ON zoom_meeting_bindings(organisation_id,host_user_email,status,created_at)"
     ]
+  },
+  {
+    version: 15,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS founder_commercial_policy_events (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL,
+        proposal_version_id TEXT, event_type TEXT NOT NULL CHECK (event_type IN ('CLIENT_CANCELLATION_REQUESTED','CLIENT_DEPENDENCY_DELAY_RECORDED','UCHIT_RESCHEDULE_RECORDED')),
+        reason TEXT NOT NULL, revised_estimate TEXT, replacement_date_or_slot TEXT,
+        no_refund_or_credit_entitlement INTEGER NOT NULL DEFAULT 1 CHECK (no_refund_or_credit_entitlement = 1),
+        payment_history_preserved INTEGER NOT NULL DEFAULT 1 CHECK (payment_history_preserved = 1),
+        created_by_actor_user_id TEXT NOT NULL, created_at TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1 CHECK (record_version = 1),
+        UNIQUE (organisation_id,idempotency_key)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_founder_commercial_policy_events_scope ON founder_commercial_policy_events(organisation_id,client_id,prospective_project_id,event_type,created_at)"
+    ]
+  },
+  {
+    version: 16,
+    statements: [
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN active_place_of_supply_policy TEXT NOT NULL DEFAULT 'FIXED_LUDHIANA_PUNJAB' CHECK (active_place_of_supply_policy = 'FIXED_LUDHIANA_PUNJAB')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN place_of_supply_display TEXT NOT NULL DEFAULT 'Ludhiana, Punjab, India'",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN outside_india_billing_label TEXT NOT NULL DEFAULT 'Cash Sale' CHECK (outside_india_billing_label = 'Cash Sale')",
+      "ALTER TABLE founder_statutory_policy_versions ADD COLUMN tax_treatment TEXT NOT NULL DEFAULT 'CGST_SGST_9_9_ALL_CLIENT_LOCATIONS' CHECK (tax_treatment = 'CGST_SGST_9_9_ALL_CLIENT_LOCATIONS')"
+    ]
   }
 ];
 

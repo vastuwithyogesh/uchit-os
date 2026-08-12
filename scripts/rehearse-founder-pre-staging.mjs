@@ -21,7 +21,7 @@ function openDatabase(path) {
   return db;
 }
 
-function applyMigrations(db, fromVersion = 1, throughVersion = 14) {
+function applyMigrations(db, fromVersion = 1, throughVersion = 16) {
   db.exec(migrationsTableSql);
   const applied = new Set(db.prepare("SELECT version FROM schema_migrations").all().map((row) => Number(row.version)));
   for (const migration of d1Migrations) {
@@ -84,7 +84,7 @@ function verifyV11Constraints(db) {
   return failures;
 }
 
-export async function runFounderPreStagingRehearsal(throughVersion = 14) {
+export async function runFounderPreStagingRehearsal(throughVersion = 16) {
   const workspace = await mkdtemp(join(tmpdir(), "uchit-founder-rehearsal-"));
   const cleanPath = join(workspace, `clean-v${throughVersion}.sqlite`);
   const upgradePath = join(workspace, `upgrade-v9-v${throughVersion}.sqlite`);
@@ -141,7 +141,11 @@ export async function runFounderPreStagingRehearsal(throughVersion = 14) {
       injectedFailure = true;
     }
     const noPartialMarker = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=?").get(throughVersion).count) === 0;
-    const noPartialTable = throughVersion === 12
+    const noPartialTable = throughVersion === 16
+      ? !columnNames(interrupted, "founder_statutory_policy_versions").includes("active_place_of_supply_policy")
+      : throughVersion === 15
+      ? !tableNames(interrupted).includes("founder_commercial_policy_events")
+      : throughVersion === 12
       ? !tableNames(interrupted).includes("founder_statutory_policy_versions")
       : throughVersion === 13
         ? !columnNames(interrupted, "founder_commercial_policy_versions").includes("refund_policy")
@@ -164,6 +168,9 @@ export async function runFounderPreStagingRehearsal(throughVersion = 14) {
         v13PolicyColumnsPresent: throughVersion < 13 || ["operational_place_of_supply_selection", "refund_policy", "correction_posture", "purchase_side_debit_notes_in_scope", "opex_tracking_scope", "accountant_approved_service_types_json"].every((name) => cleanStatPolicyColumns.includes(name)),
         v14ZoomHostBindingColumnsPresent: throughVersion < 14 || ["host_user_email", "oauth_connection_type", "scope_snapshot_json"].every((name) => cleanZoomBindingColumns.includes(name)),
         v14ZoomHostIndexPresent: throughVersion < 14 || cleanIndexes.includes("idx_zoom_binding_host"),
+        v15NoRefundEventLedgerPresent: throughVersion < 15 || cleanTables.includes("founder_commercial_policy_events"),
+        v15NoRefundEventIndexPresent: throughVersion < 15 || cleanIndexes.includes("idx_founder_commercial_policy_events_scope"),
+        v16FixedLudhianaPolicyPresent: throughVersion < 16 || ["active_place_of_supply_policy", "place_of_supply_display", "outside_india_billing_label", "tax_treatment"].every((name) => cleanStatPolicyColumns.includes(name)),
         constraintFailuresObserved: constraints
       },
       persistentEnvironmentTouched: false,
