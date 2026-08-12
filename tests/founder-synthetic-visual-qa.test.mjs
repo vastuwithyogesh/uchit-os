@@ -24,6 +24,15 @@ test("synthetic review matrix covers all owner review surfaces and responsive re
   assert.match(script, /publication: "NO_GO_UNTIL_OWNER_VISUAL_REVIEW"/);
 });
 
+test("owner review package records safe hosted DOM evidence without claiming screenshots", () => {
+  const review = read("docs/founder-visual-qa-review-2026-08-13.md");
+  assert.match(review, /Desktop: requested 1440×900/);
+  assert.match(review, /Mobile: requested 390×844/);
+  assert.match(review, /no horizontal overflow/);
+  assert.match(review, /screenshots remain pending/);
+  assert.match(review, /NO-GO/);
+});
+
 test("evaluation surface keeps technical context behind disclosure and one dominant save action", () => {
   const ui = read("components/evaluation-console.tsx");
   assert.match(ui, /<summary>Evaluation status details<\/summary>/);

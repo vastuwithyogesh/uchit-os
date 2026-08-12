@@ -35,12 +35,19 @@ The generated manifest is `output/visual-qa/founder-synthetic-visual-qa.manifest
 
 Read-only authenticated staging DOM inspection reached the expected no-case/blocked report state, with mutation controls disabled. The available staging data is not a clean synthetic dataset and was not reproduced in this package.
 
+The safe browser DOM pass produced these additional signals on `/reports`:
+
+- Desktop: requested 1440×900, actual inner width 1440, document width 1425, no horizontal overflow, all seven report mutation buttons disabled, blocked/no-case state visible.
+- Mobile: requested 390×844, actual inner width 390, document width 375, no horizontal overflow, all seven report mutation buttons disabled, blocked/no-case state visible.
+
+These are DOM/metric checks only; they are not a visual screenshot substitute.
+
 Browser screenshot calls timed out in the available runtime. Therefore no screenshot artifact is claimed. Publication remains **NO-GO** until Yogesh reviews desktop/mobile screenshots from a clean synthetic authenticated environment.
 
 ## Owner review checklist
 
 1. Open the generated manifest and confirm all 17 steps and 12 routes are present.
-2. Capture each required surface at 1440×900 and 390×844 using clean synthetic data only.
-3. Verify keyboard focus, disabled/busy states, conflict/retry recovery and zero horizontal overflow.
+2. Capture each required surface at 1440×900 and 390×844 using clean synthetic data only; screenshots remain pending because the available capture calls timed out.
+3. Verify keyboard focus, disabled/busy states, conflict/retry recovery and zero horizontal overflow; the current report route has passed the DOM/metric portion.
 4. Confirm no mutation, message, upload, payment, invoice, provider or delivery action is exercised during review.
 5. Approve or reject publication as a separate decision; this package does not authorize deployment.
