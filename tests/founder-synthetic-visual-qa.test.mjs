@@ -51,6 +51,7 @@ test("report visual QA keeps protected artifact actions progressive", () => {
   assert.match(legacyUi, /<summary>Preview and approval status<\/summary>/);
   assert.match(legacyUi, /<summary>Report archive and history<\/summary>/);
   assert.doesNotMatch(route, /href="\/ops"/);
+  assert.doesNotMatch(read("components/evaluation-console.tsx"), /href="\/ops">Complete case setup/);
   assert.match(ui, /mode=export/);
   assert.match(ui, /mode=print/);
   assert.match(ui, /report-approve/);

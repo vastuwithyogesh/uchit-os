@@ -29,7 +29,7 @@ test("both evaluation actions remain disabled until service inputs are ready", (
   assert.match(evaluation, /!snapshotName\.trim\(\)/);
   assert.equal((evaluation.match(/disabled=\{busy \|\| !evaluationReady/g) ?? []).length, 2);
   assert.match(evaluation, /Complete the case setup first/);
-  assert.match(evaluation, /href="\/ops">Complete case setup/);
+  assert.match(evaluation, /href="\/clients-cases">Complete case setup/);
   assert.match(evaluation, /evaluationReady \? <div className="card span-4 founder-support-surface"/);
   assert.match(evaluation, /View rule master and technical details/);
   assert.match(evaluation, /Review the readiness steps and try again/);
