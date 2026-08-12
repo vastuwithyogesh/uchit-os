@@ -14,6 +14,12 @@ This local-only slice adds the protected contracts for Founder lead-profile edit
 6. Founder reschedule/cancel preserves the previous booking, retires its Zoom binding, cancels pending reminders and creates a separately idempotent successor assignment.
 7. The Zoom adapter fails closed until an organisation connection is configured. The fake connector verifies success, failure and idempotent retry locally. Reminder tasks at 24 hours and 2 hours prepare manual channel drafts and never auto-send.
 
+## Manual email recovery (Founder Edition)
+
+Email is deliberately manual. After **Prepare WhatsApp & email** succeeds, the drawer exposes **Open Gmail draft** and **Use default email app**. Both actions use the same approved template version, recipient, secure-link grant and rendered content; opening a compose surface records `OPENED` only. It never claims `SENT`, `DELIVERED`, `FAILED` or `RETRY`.
+
+If the Gmail draft does not open, allow pop-ups for the staging origin and use **Retry opening Gmail draft**. If the in-app browser cannot open Gmail, use the default email-app fallback (`mailto:`) and review the prefilled recipient, subject and body before sending manually. A missing recipient, inactive asset/form, expired grant or missing template keeps the action blocked with an actionable recovery message. No token or raw contact is written to logs.
+
 ## Safety boundary
 
 - Proposed D1 migration: v10, additive definition only. It was not executed.
@@ -28,3 +34,7 @@ This local-only slice adds the protected contracts for Founder lead-profile edit
 - Ingest and activate the five exact approved PDF byte versions in a separately authorised private R2 environment.
 - Configure a server-side Zoom organisation OAuth connection and encrypted credential storage; no manual-link fallback is approved.
 - Execute D1 v10 only after a separate migration rehearsal and owner approval.
+
+## QA boundary
+
+Read-only QA may prepare a draft and verify the two compose controls, keyboard focus, disabled/missing-recipient state and popup-blocked retry. Do not send a real message during QA. Communication-driven pipeline, payment, case, report and methodology state never changes.

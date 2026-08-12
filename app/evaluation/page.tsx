@@ -10,7 +10,7 @@ export default async function EvaluationPage() {
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="Evaluation Engine" subtitle="Utility matrix and report template" />
+        <SiteHeader title="Legacy Evaluation Tools" subtitle="Technical fallback; primary work stays in the Founder scorecard" />
         <AccessDeniedPanel area="Evaluation engine" requiredRole="CONSULTANT" actorRole={access.actor.role} />
       </main>
     );
@@ -18,14 +18,14 @@ export default async function EvaluationPage() {
 
   return (
     <main className="page-shell">
-      <SiteHeader title="Evaluation Engine" subtitle="Utility matrix and report template" />
+      <SiteHeader title="Legacy Evaluation Tools" subtitle="Technical fallback; primary work stays in the Founder scorecard" />
 
       <FounderRouteIntro
         eyebrow="Evaluation"
         title="Complete the next verified evaluation input."
         description="Open the exact floor context, confirm evidence and prerequisites, then review the deterministic evaluation output. Blocked methodology stays blocked until its approved input exists."
-        primaryAction={{ href: "/files", label: "Open files and drawings" }}
-        secondaryAction={{ href: "/assessment", label: "Open assessment workspace" }}
+        primaryAction={{ href: "/founder/continue", label: "Continue Founder scorecard" }}
+        secondaryAction={{ href: "/files", label: "Open files and drawings" }}
         context="Founder Edition · direction and element layers only"
         status={{ label: "Review prerequisites", tone: "attention" }}
       >
@@ -38,8 +38,14 @@ export default async function EvaluationPage() {
         </details>
       </FounderRouteIntro>
 
-      <EvaluationConsole />
-      <ChartAssetBoard />
+      <details className="route-secondary-links legacy-console-disclosure">
+        <summary>Open legacy evaluation console</summary>
+        <EvaluationConsole />
+      </details>
+      <details className="route-secondary-links legacy-console-disclosure">
+        <summary>Open chart readiness tools</summary>
+        <ChartAssetBoard />
+      </details>
     </main>
   );
 }

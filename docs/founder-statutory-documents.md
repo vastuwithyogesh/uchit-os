@@ -20,6 +20,14 @@ Issuance requires exact recipient billing data, confirmed payments, an active ac
 
 The one-task readiness card exposes the next recovery action and no issue control while any accountant, billing, payment, asset or service-timing blocker remains.
 
+## Operator readiness order
+
+Use the readiness card in this order: **identity** → **recipient/billing** → **fixed Ludhiana place-of-supply policy** → **confirmed payment reconciliation** → **active Founder logo/signature assets** → **approved service-supply timing** → **issue or retry**. Each card is one task and shows one of `READY`, `REVIEW_REQUIRED`, `BLOCKED`, `OVERDUE` or `ISSUED` with the exact recovery action. `REVIEW_REQUIRED` and `BLOCKED` states have no issue button.
+
+The receipt-voucher task is due within 60 minutes of the immutable confirmed-advance timestamp. The final Tax Invoice task is created only after confirmed full payment and remains fail-closed until the accountant-approved service-timing policy is active. Missing billing data, unresolved policy, unconfirmed payment, inactive assets or missing service timing must not be bypassed by retry. Retries are CAS/idempotent and cannot create a second number or artifact; issued bytes are immutable.
+
+No real statutory document, payment mutation or client delivery is part of local/staging QA. Use synthetic fixtures only and keep private exception reasons, tokens, asset storage keys and signature bytes out of logs and client projections.
+
 ## Disposable migration readiness rehearsal
 
 `scripts/rehearse-founder-statutory-v12.mjs` preserves the historical v1.1 rehearsal. It runs temporary SQLite v1→v12 and v9→v12 paths, then creates an in-memory synthetic accepted proposal, versioned billing profile, confirmed advance and confirmed balance. It verifies:
