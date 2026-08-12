@@ -21,3 +21,11 @@ test("evaluation surface keeps technical context behind disclosure and one domin
   assert.match(ui, /className="button-secondary"/);
   assert.match(ui, /<summary>Release and payment context<\/summary>/);
 });
+
+test("manual-sheet visual QA keeps the selected evidence task primary", () => {
+  const ui = read("components/files-drawings-console.tsx");
+  assert.match(ui, /focus === "manual-sheet"/);
+  assert.match(ui, /<summary>View other required files<\/summary>/);
+  assert.match(ui, /<summary>Version history and recovery<\/summary>/);
+  assert.match(ui, /files-focus-\$\{focus\}/);
+});
