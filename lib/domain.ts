@@ -311,6 +311,192 @@ export interface InboundLeadRecord extends OrganisationOwnedRecord {
   syncStatus?: "RECEIVED" | "APPLIED" | "REVIEW_REQUIRED" | "FAILED";
   lastSyncedAt?: string;
   sourceEventId?: string;
+  country?: string;
+  timeZone?: string;
+}
+
+export const mediaAssetCategories = ["BRAND", "COMPANY_DOCUMENT", "QUALIFICATION_FORM", "BROCHURE", "PROPOSAL_TEMPLATE", "MESSAGE_TEMPLATE", "LEGAL_POLICY", "TRAINING_REFERENCE", "OTHER"] as const;
+export type MediaAssetCategory = (typeof mediaAssetCategories)[number];
+export const mediaAssetStatuses = ["DRAFT", "FOUNDER_APPROVED", "ACTIVE", "SUPERSEDED", "ARCHIVED"] as const;
+export type MediaAssetStatus = (typeof mediaAssetStatuses)[number];
+export type QualificationKind = "RESIDENTIAL" | "COMMERCIAL" | "HYBRID";
+export type CommunicationChannel = "WHATSAPP" | "EMAIL";
+export type CommunicationChannelState = "NOT_PREPARED" | "PREPARED" | "OPENED";
+
+export interface LeadProfileVersionRecord extends OrganisationOwnedRecord {
+  id: string; leadId: string; clientId?: string; version: number;
+  canonicalSnapshot: { fullName: string; email: string; phone: string; city: string; country?: string; timeZone?: string; primaryServiceInterest?: VastuServiceType };
+  priorSnapshotHash?: string; snapshotHash: string; requestHash: string; reason: string; actorUserId: string; createdAt: string; idempotencyKey: string;
+}
+
+export interface MediaAssetRecord extends OrganisationOwnedRecord {
+  id: string; category: MediaAssetCategory; audience: "FOUNDER_PRIVATE" | "CLIENT_SENDABLE"; serviceApplicability: Array<VastuServiceType | "RESIDENTIAL" | "COMMERCIAL" | "HYBRID">;
+  title: string; description: string; tags: string[]; activeVersionId?: string; createdAt: string;
+}
+
+export interface MediaAssetVersionRecord extends OrganisationOwnedRecord {
+  id: string; assetId: string; version: number; filename: string; privateObjectKey: string; mimeType: "application/pdf";
+  sizeBytes: number; checksumSha256: string; pageCount: number; status: MediaAssetStatus; clientSendable: boolean;
+  uploadedByActorUserId: string; uploadedAt: string; approvedByActorUserId?: string; approvedAt?: string;
+  supersedesVersionId?: string; supersededByVersionId?: string; reason: string; registrationHash: string;
+}
+
+export interface SecureAccessGrantRecord extends OrganisationOwnedRecord {
+  id: string; purpose: "BROCHURE" | "QUALIFICATION_PDF" | "QUALIFICATION_FORM" | "BOOKING_RESPONSE";
+  leadId: string; clientId?: string; assetVersionId?: string; formDefinitionId?: string; bookingId?: string;
+  tokenHash: string; expiresAt: string; revokedAt?: string; replacedByGrantId?: string; openedAt?: string; createdAt: string; createdByActorUserId: string;
+}
+
+export interface CommunicationPreparationRecord extends OrganisationOwnedRecord {
+  id: string; leadId: string; clientId?: string; prospectiveProjectIds: string[]; templateKey: string; templateVersion: number;
+  channel: CommunicationChannel; state: CommunicationChannelState; recipientHash: string; renderedContentHash: string;
+  assetVersionIds: string[]; formDefinitionId?: string; bookingId?: string; grantIds: string[];
+  renderedTimeZoneSnapshot?: string; manualNote?: string; preparedAt: string; openedAt?: string; actorUserId: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface QualificationQuestionRecord {
+  id: string; sourcePage: number; section: string; prompt: string; helpText?: string;
+  kind: "TEXT" | "DATE" | "SINGLE" | "MULTI" | "CONSENT"; choices?: string[]; required: boolean; shared?: boolean;
+}
+
+export interface QualificationFormDefinitionRecord extends OrganisationOwnedRecord {
+  id: string; kind: QualificationKind; version: number; title: string; sourceAssetVersionId: string; sourceChecksumSha256: string;
+  questions: QualificationQuestionRecord[]; definitionHash: string; status: "DRAFT" | "FOUNDER_APPROVED" | "ACTIVE" | "RETIRED"; createdAt: string; approvedAt?: string; approvedByActorUserId?: string;
+}
+
+export interface QualificationInvitationRecord extends OrganisationOwnedRecord {
+  id: string; leadId: string; clientId: string; formDefinitionId: string; grantId: string; status: "OPEN" | "SUBMITTED" | "EXPIRED" | "REPLACED";
+  selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; createdAt: string; expiresAt: string; submittedAt?: string; requestHash: string; recordVersion: number;
+}
+
+export interface QualificationResponseVersionRecord extends OrganisationOwnedRecord {
+  id: string; invitationId: string; clientId: string; formDefinitionId: string; version: number; status: "DRAFT" | "SUBMITTED" | "SUPERSEDED";
+  answers: Record<string, unknown>; answersHash: string; selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; secondaryInterestSelected: boolean;
+  sourceQuestionIds: string[]; predecessorResponseId?: string; savedAt: string; submittedAt?: string; recordVersion: number;
+}
+
+export interface ProspectiveProjectRecord extends OrganisationOwnedRecord {
+  id: string; clientId: string; leadId: string; responseVersionId: string; kind: "RESIDENTIAL" | "COMMERCIAL"; status: "QUALIFICATION_SUBMITTED" | "REVIEW_PENDING" | "COMMERCIAL_PENDING" | "CONVERTED";
+  serviceType?: VastuServiceType; caseId?: string; createdAt: string; recordVersion: number;
+}
+
+export interface FounderReviewBookingRecord extends OrganisationOwnedRecord {
+  id: string; clientId: string; prospectiveProjectIds: string[]; responseVersionId: string; formDefinitionId: string;
+  startsAt: string; timeZone: string; durationMinutes: 30; bufferMinutes: 15; renderedClientTime: string; renderedIstTime?: string;
+  status: "ASSIGNED" | "CLIENT_CONFIRMED" | "RESCHEDULE_REQUESTED" | "MEETING_SETUP_FAILED" | "CONFIRMED" | "CANCELLED";
+  confirmationGrantId: string; assignedByActorUserId: string; assignedAt: string; confirmedAt?: string; priorBookingId?: string; reason?: string;
+  idempotencyKey: string; assignmentHash: string; recordVersion: number;
+}
+
+export interface ZoomMeetingBindingRecord extends OrganisationOwnedRecord {
+  id: string; bookingId: string; provider: "ZOOM"; providerMeetingId: string; privateJoinMetadataCiphertext: string;
+  status: "ACTIVE" | "RETIRED" | "FAILED"; createdAt: string; retiredAt?: string; idempotencyKey: string; recordVersion: number;
+}
+
+export interface FounderReminderTaskRecord extends OrganisationOwnedRecord {
+  id: string; bookingId: string; threshold: "24H" | "2H"; dueAt: string; status: "PENDING" | "PREPARED" | "OPENED" | "SKIPPED" | "CANCELLED";
+  whatsappState: CommunicationChannelState; emailState: CommunicationChannelState; templateKey: string; templateVersion: number; createdAt: string; recordVersion: number;
+}
+
+export type FounderEngagementClassification = "STANDARD_PAID" | "SPECIAL_DISCOUNTED" | "INTERNAL_COMPLIMENTARY";
+export type FounderProposalStatus = "DRAFT" | "SUPER_ADMIN_REVIEWED" | "SUPER_ADMIN_APPROVED" | "SENT" | "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED" | "EXPIRED" | "SUPERSEDED";
+export type FounderLegalPolicyKind = "PROFESSIONAL_BOUNDARIES" | "ACCEPTANCE_DECLARATION" | "CANCELLATION_REFUND_DELAY" | "INVOICE_STATUTORY_CONFIG";
+export type FounderLegalPolicyStatus = "DRAFT" | "FOUNDER_APPROVED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
+export type FounderBalanceDeadlineStatus = "NOT_DUE" | "DUE" | "PAID" | "OVERDUE" | "EXTENDED" | "WAIVED";
+export type FounderInvoiceStatus = "NOT_DUE" | "DUE" | "ISSUED" | "OVERDUE" | "GENERATION_FAILED";
+export type FounderProposalStep = 1 | 2 | 3 | 4 | 5 | 6;
+
+export interface FounderCommercialPolicyVersionRecord extends OrganisationOwnedRecord {
+  id: string; version: number; status: "ACTIVE" | "SUPERSEDED";
+  referenceFeePaise: number; referenceAdvancePaise: number; defaultGstBasisPoints: number;
+  balanceDeadlineDays: 7; advanceInvoiceSlaMinutes: 60;
+  reason: string; actorUserId: string; createdAt: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface FounderCommercialLegalPolicyRecord extends OrganisationOwnedRecord {
+  id: string; kind: FounderLegalPolicyKind; version: number; status: FounderLegalPolicyStatus;
+  title: string; exactText: string; contentHash: string;
+  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[] };
+  reason: string; createdByActorUserId: string; createdAt: string; approvedByActorUserId?: string; approvedAt?: string; activatedAt?: string; supersedesPolicyId?: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface FounderProposalScopeItem { id: string; order: number; title: string; status: "INCLUDED" | "OPTIONAL_ADD_ON" | "EXCLUDED"; prospectiveProjectId: string; floorIds: string[]; note?: string; }
+export interface FounderProposalDeliverable { id: string; order: number; name: string; status: "INCLUDED" | "OPTIONAL_ADD_ON"; prospectiveProjectId: string; floorIds: string[]; deliveryFormat: string; expectedStage: string; description: string; clientDependency: string; }
+
+export interface FounderProposalTemplateVersionRecord extends OrganisationOwnedRecord {
+  id: string; serviceType: VastuServiceType; version: number; name: string; kind: "DEFAULT" | "REUSABLE_VARIANT";
+  status: "DRAFT" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED"; scopeItems: FounderProposalScopeItem[]; deliverables: FounderProposalDeliverable[];
+  sourceProposalVersionId?: string; supersedesTemplateId?: string; contentHash: string; reason: string; actorUserId: string; createdAt: string; activatedAt?: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface FounderCommercialTermsSnapshot {
+  engagementClassification: FounderEngagementClassification;
+  professionalFeePaise: number; referenceFeePaise: number; gstReferenceBasisPoints: number; gstAppliedBasisPoints: number;
+  gstAmountPaise: number; totalPayablePaise: number; agreedAdvancePaise: number; remainingBalancePaise: number;
+  feeDeviationReason?: string; classificationReason?: string; gstDeviationReason?: string; advanceExceptionReason?: string; advanceExceptionApproved: boolean;
+  paymentMilestones: Array<{ id: string; label: string; amountPaise: number; trigger: string }>;
+}
+
+export interface FounderProposalContentSnapshot {
+  clientProject: { clientName: string; clientId: string; prospectiveProjectId: string; projectKind: "RESIDENTIAL" | "COMMERCIAL"; serviceType: VastuServiceType; propertyType?: string; propertyLocation?: string; knownFloorCount?: number; primaryRequirement?: string; proposalDate: string };
+  requirements: { qualificationResponseVersionId: string; qualificationResponseHash: string; exactAnswerSnapshotHash: string; refinedSummary?: string; refinedByActorUserId?: string; refinedAt?: string };
+  scopeItems: FounderProposalScopeItem[]; deliverables: FounderProposalDeliverable[];
+  interactions: { includedReviewRounds: number; includedPresentationCalls: number; clarificationPeriodDays: number; expectedResponseTime: string; additionalInteractionTreatment: string };
+  timeline: { expectedCommencement: string; estimatedDateRange: string; milestones: string[]; prerequisites: string[]; clientDependencies: string[]; pauseOrExtensionConditions: string[]; isEstimate: true };
+  commercial: FounderCommercialTermsSnapshot;
+  projectExclusions: string[];
+  policyBindings: { professionalBoundariesPolicyId?: string; acceptanceDeclarationPolicyId?: string; cancellationPolicyId?: string; commercialPolicyId: string; templateVersionId: string };
+  nextSteps: { advanceRequired: boolean; balanceAfterAdvanceDeadline: true; paymentProofRequiresConfirmation: true; reportGatesRemainServerEnforced: true };
+}
+
+export interface FounderProposalVersionRecord extends OrganisationOwnedRecord {
+  id: string; proposalId: string; version: number; clientId: string; prospectiveProjectId: string; serviceType: VastuServiceType;
+  status: FounderProposalStatus; currentStep: FounderProposalStep; content: FounderProposalContentSnapshot; contentHash: string;
+  validityEndsAt?: string; predecessorVersionId?: string; successorVersionId?: string; createdAt: string; createdByActorUserId: string;
+  reviewedAt?: string; approvedAt?: string; sentAt?: string; acceptedAt?: string; recordVersion: number; idempotencyKey: string; requestHash: string;
+}
+
+export interface FounderProposalApprovalRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; checkpoint: "SUPER_ADMIN_REVIEWED" | "SUPER_ADMIN_APPROVED"; actorUserId: string; actorName: string; actorRole: "SUPER_ADMIN"; reason: string; contentHash: string; createdAt: string; idempotencyKey: string;
+}
+
+export interface FounderProposalArtifactRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; proposalContentHash: string; clientProjectionHash: string; artifactHashSha256: string; privateObjectKey: string;
+  mimeType: "application/pdf"; sizeBytes: number; pageCount: number; rendererVersion: string; generatedAt: string; idempotencyKey: string; recordVersion: number;
+}
+
+export interface FounderProposalGrantRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; clientId: string; prospectiveProjectId: string; tokenHash: string; expiresAt: string; revokedAt?: string; replacedByGrantId?: string; openedAt?: string; createdAt: string; createdByActorUserId: string; recordVersion: number;
+}
+
+export interface FounderProposalResponseRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; proposalContentHash: string; artifactHashSha256: string; clientId: string; prospectiveProjectId: string;
+  response: "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED"; fullName: string; acceptanceChecked?: boolean; typedConfirmationHash?: string;
+  organisationName?: string; designation?: string; requestedChanges?: string; respondedAt: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface FounderCommercialPaymentConfirmationRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; clientId: string; prospectiveProjectId: string; paymentId: string; type: "ADVANCE" | "BALANCE";
+  amountPaise: number; confirmedAt: string; confirmedByActorUserId: string; proposalContentHash: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface FounderBalanceDeadlineRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; clientId: string; prospectiveProjectId: string; advancePaymentConfirmationId?: string;
+  advanceConfirmedAt?: string; dueAt?: string; status: FounderBalanceDeadlineStatus; remainingAmountPaise: number;
+  commercialPolicyId: string; commercialPolicyVersion: number; engagementClassification: FounderEngagementClassification;
+  priorDueAt?: string; exceptionReason?: string; exceptionActorUserId?: string; exceptionAt?: string; recordVersion: number;
+}
+
+export interface FounderCommercialInvoiceRecord extends OrganisationOwnedRecord {
+  id: string; proposalVersionId: string; clientId: string; prospectiveProjectId: string; advancePaymentConfirmationId?: string;
+  status: FounderInvoiceStatus; dueAt?: string; amountReceivedPaise: number; gstBasisPoints: number; gstAmountSnapshotPaise: number; remainingBalancePaise: number;
+  invoicePolicyId?: string; invoiceNumber?: string; artifactHashSha256?: string; privateObjectKey?: string; issuedAt?: string; issuedByActorUserId?: string;
+  failureCode?: string; failureAt?: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface FounderCommercialAuditEventRecord extends OrganisationOwnedRecord {
+  id: string; eventType: string; entityType: string; entityId: string; actorUserId: string; happenedAt: string; reason: string;
+  proposalVersionId?: string; prospectiveProjectId?: string; beforeHash?: string; afterHash?: string; idempotencyKey: string;
 }
 
 export interface CommercialProposalRecord extends OrganisationOwnedRecord {

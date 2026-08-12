@@ -49,7 +49,22 @@ const collectionKeys = [
   "timelineEvents",
   "optInLeads",
   "whatsappTemplates",
-  "whatsappLogs"
+  "whatsappLogs",
+  "leadProfileVersions",
+  "mediaAssets",
+  "mediaAssetVersions",
+  "secureAccessGrants",
+  "communicationPreparations",
+  "qualificationFormDefinitions",
+  "qualificationInvitations",
+  "qualificationResponseVersions",
+  "prospectiveProjects",
+  "founderReviewBookings",
+  "zoomMeetingBindings",
+  "founderReminderTasks"
+  ,"founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
+  "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
+  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents"
 ] as const satisfies readonly (keyof AppState)[];
 
 /** Missing legacy fields inherit seeds; explicitly persisted empty arrays stay empty. */

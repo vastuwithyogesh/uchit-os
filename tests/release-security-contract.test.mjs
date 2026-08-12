@@ -46,6 +46,10 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/optin-leads/events/route.ts": /OPTIN_WEBHOOK_SECRET.*verifyInboundSignature/s,
     "app/api/payment-proofs/route.ts": /requireRouteActor/,
     "app/api/payment-proofs/files/[fileName]/route.ts": /requireRouteActor/,
+    "app/api/public/qualification/[token]/route.ts": /resolveQualificationInvitation.*private, no-store/s,
+    "app/api/public/booking/[token]/route.ts": /resolveSecureGrant.*private, no-store/s,
+    "app/api/public/proposals/[token]/route.ts": /resolveFounderProposalGrant.*private, no-store/s,
+    "app/api/public/proposals/[token]/pdf/route.ts": /resolveFounderProposalGrant.*private, no-store/s,
     "app/api/reports/[reportId]/pdf/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/reports/[reportId]/print/route.ts": /resolveRequestActor.*canReadClientSnapshots/s,
     "app/api/seed/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
@@ -58,7 +62,7 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/utility/master/route.ts": /requireRouteActor/
   };
   const routes = tracked.filter((file) => /^app\/api\/.+\/route\.ts$/.test(file));
-  if (existsSync(resolve(process.cwd(), "app/api/optin-leads/events/route.ts")) && !routes.includes("app/api/optin-leads/events/route.ts")) routes.push("app/api/optin-leads/events/route.ts");
+  for (const file of Object.keys(policies)) if (existsSync(resolve(process.cwd(), file)) && !routes.includes(file)) routes.push(file);
   routes.sort();
   assert.deepEqual(routes, Object.keys(policies).sort());
   for (const [file, pattern] of Object.entries(policies)) assert.match(source(file), pattern, `${file} lacks its declared access gate`);

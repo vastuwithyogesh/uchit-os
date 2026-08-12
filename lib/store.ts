@@ -60,6 +60,13 @@ import type {
   AouReferenceRowRecord,
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
+  ,LeadProfileVersionRecord, MediaAssetRecord, MediaAssetVersionRecord, SecureAccessGrantRecord, CommunicationPreparationRecord,
+  QualificationFormDefinitionRecord, QualificationInvitationRecord, QualificationResponseVersionRecord, ProspectiveProjectRecord,
+  FounderReviewBookingRecord, ZoomMeetingBindingRecord, FounderReminderTaskRecord
+  ,FounderCommercialPolicyVersionRecord, FounderCommercialLegalPolicyRecord, FounderProposalTemplateVersionRecord,
+  FounderProposalVersionRecord, FounderProposalApprovalRecord, FounderProposalArtifactRecord, FounderProposalGrantRecord,
+  FounderProposalResponseRecord, FounderCommercialPaymentConfirmationRecord, FounderBalanceDeadlineRecord,
+  FounderCommercialInvoiceRecord, FounderCommercialAuditEventRecord
 } from "./domain.ts";
 import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
 
@@ -116,6 +123,30 @@ export interface AppState {
   optInLeads: InboundLeadRecord[];
   whatsappTemplates: WhatsAppTemplateRecord[];
   whatsappLogs: WhatsAppTemplateLogRecord[];
+  leadProfileVersions: LeadProfileVersionRecord[];
+  mediaAssets: MediaAssetRecord[];
+  mediaAssetVersions: MediaAssetVersionRecord[];
+  secureAccessGrants: SecureAccessGrantRecord[];
+  communicationPreparations: CommunicationPreparationRecord[];
+  qualificationFormDefinitions: QualificationFormDefinitionRecord[];
+  qualificationInvitations: QualificationInvitationRecord[];
+  qualificationResponseVersions: QualificationResponseVersionRecord[];
+  prospectiveProjects: ProspectiveProjectRecord[];
+  founderReviewBookings: FounderReviewBookingRecord[];
+  zoomMeetingBindings: ZoomMeetingBindingRecord[];
+  founderReminderTasks: FounderReminderTaskRecord[];
+  founderCommercialPolicies: FounderCommercialPolicyVersionRecord[];
+  founderCommercialLegalPolicies: FounderCommercialLegalPolicyRecord[];
+  founderProposalTemplates: FounderProposalTemplateVersionRecord[];
+  founderProposalVersions: FounderProposalVersionRecord[];
+  founderProposalApprovals: FounderProposalApprovalRecord[];
+  founderProposalArtifacts: FounderProposalArtifactRecord[];
+  founderProposalGrants: FounderProposalGrantRecord[];
+  founderProposalResponses: FounderProposalResponseRecord[];
+  founderCommercialPaymentConfirmations: FounderCommercialPaymentConfirmationRecord[];
+  founderBalanceDeadlines: FounderBalanceDeadlineRecord[];
+  founderCommercialInvoices: FounderCommercialInvoiceRecord[];
+  founderCommercialAuditEvents: FounderCommercialAuditEventRecord[];
 }
 
 export const createEmptyAppState = (): AppState => ({
@@ -168,7 +199,12 @@ export const createEmptyAppState = (): AppState => ({
   timelineEvents: [],
   optInLeads: [],
   whatsappTemplates: [],
-  whatsappLogs: []
+  whatsappLogs: [], leadProfileVersions: [], mediaAssets: [], mediaAssetVersions: [], secureAccessGrants: [], communicationPreparations: [],
+  qualificationFormDefinitions: [], qualificationInvitations: [], qualificationResponseVersions: [], prospectiveProjects: [],
+  founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
+  founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
+  founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
+  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: []
 });
 
 const createDemoAppState = (): AppState => ({
@@ -221,7 +257,12 @@ const createDemoAppState = (): AppState => ({
   timelineEvents: structuredClone(seedTimelineEvents),
   optInLeads: [],
   whatsappTemplates: structuredClone(seedWhatsappTemplates),
-  whatsappLogs: structuredClone(seedWhatsappLogs)
+  whatsappLogs: structuredClone(seedWhatsappLogs), leadProfileVersions: [], mediaAssets: [], mediaAssetVersions: [], secureAccessGrants: [], communicationPreparations: [],
+  qualificationFormDefinitions: [], qualificationInvitations: [], qualificationResponseVersions: [], prospectiveProjects: [],
+  founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
+  founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
+  founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
+  founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialAuditEvents: []
 });
 
 const createInitialState = () => process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();

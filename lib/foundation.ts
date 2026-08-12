@@ -153,7 +153,13 @@ const organisationCollections = [
   "vastuCases", "floorWorkspaces", "reportVersions", "rectificationRequests",
   "assessmentObservations", "recommendations", "implementationTasks", "caseDocuments",
   "deliveryMilestones", "evaluationSnapshots", "utilityVerdicts", "shaktiSnapshots", "timelineEvents", "optInLeads"
-  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures", "aouMethodologyVersions", "aouReferenceRows"
+  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures", "aouMethodologyVersions", "aouReferenceRows",
+  "leadProfileVersions", "mediaAssets", "mediaAssetVersions", "secureAccessGrants", "communicationPreparations",
+  "qualificationFormDefinitions", "qualificationInvitations", "qualificationResponseVersions", "prospectiveProjects",
+  "founderReviewBookings", "zoomMeetingBindings", "founderReminderTasks",
+  "founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
+  "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
+  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents"
 ] as const satisfies readonly (keyof AppState)[];
 
 /**

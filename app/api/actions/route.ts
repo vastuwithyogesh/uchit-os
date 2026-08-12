@@ -9,6 +9,12 @@ import { createOpeningMapping, createPlanVersion, createSpatialEvidenceVersion, 
 import { createMethodologyVersion, publishMethodologyVersion, upsertMethodologyFixture, upsertMethodologyRule } from "@/lib/methodology-registry";
 import { approveAouDisplayCopy, initializeCanonicalAouSource, saveAouDisplayDraft } from "@/lib/aou-methodology";
 import { transitionFloorRegeneration } from "@/lib/founder-regeneration";
+import { assignReviewCall, cancelReviewCall, createQualificationInvitation, markCommunicationOpened, prepareManualCommunication, rescheduleReviewCall,
+  registerMediaAssetVersion, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "@/lib/founder-engagement";
+import { activateFounderLegalPolicy, activateFounderProposalTemplate, applyFounderBalanceDeadlineException, approveFounderProposal, autosaveFounderProposalStep,
+  confirmFounderCommercialPayment, createFounderLegalPolicy, createFounderProposalDraft, createFounderProposalSuccessor, createFounderProposalTemplate,
+  generateFounderProposalArtifact, issueFounderAdvanceInvoice, publishFounderCommercialPolicy, reviewFounderProposal, sendFounderProposal } from "@/lib/founder-commercial";
+import { founderCommercialArtifactStore } from "@/lib/founder-commercial.server";
 import { approveManualUtilitySheet, checkpointPostSiteFindings, checkpointSiteAnalysis, upsertPostSiteFindings, upsertSiteAnalysis } from "@/lib/site-workflow";
 import {
   canApproveCommercialProposal,
@@ -72,7 +78,8 @@ export async function POST(request: Request) {
   let foundation: Awaited<ReturnType<typeof resolveActiveOrganisationContext>> | null = null;
   let organisationStateBefore: AppState | undefined;
   const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
-  const concurrencyActions = new Set(["case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert", "proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve"]);
+  const concurrencyActions = new Set(["founder-lead-profile-update", "founder-media-register", "founder-media-transition", "founder-qualification-invite", "founder-communication-prepare", "founder-communication-opened", "founder-booking-assign", "founder-booking-reschedule", "founder-booking-cancel", "case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert", "proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve"]);
+  for (const founderCommercialAction of ["founder-commercial-policy-publish", "founder-commercial-legal-create", "founder-commercial-legal-activate", "founder-proposal-template-create", "founder-proposal-template-activate", "founder-proposal-draft-create", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send", "founder-proposal-successor", "founder-commercial-payment-confirm", "founder-balance-deadline-exception", "founder-invoice-issue"]) concurrencyActions.add(founderCommercialAction);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -119,6 +126,47 @@ export async function POST(request: Request) {
       const allowed = new Set(crmAllowedFields[action]);
       const unknown = Object.keys(body).find((key) => !allowed.has(key));
       if (unknown) return NextResponse.json({ ok: false, error: `Unknown CRM field: ${unknown}.` }, { status: 400 });
+    }
+
+    const founderEngagementAllowedFields: Record<string, string[]> = {
+      "founder-lead-profile-update": ["action", "actorRole", "leadId", "changes", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-media-dry-run": ["action", "actorRole", "assetKey", "filename", "sizeBytes", "pageCount", "checksumSha256"],
+      "founder-media-register": ["action", "actorRole", "assetKey", "privateObjectKey", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-media-transition": ["action", "actorRole", "versionId", "target", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-qualification-invite": ["action", "actorRole", "leadId", "clientId", "kind", "selectedServices", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-communication-prepare": ["action", "actorRole", "leadId", "clientId", "prospectiveProjectIds", "templateKey", "values", "channel", "recipient", "assetVersionIds", "formDefinitionId", "bookingId", "grantIds", "renderedTimeZoneSnapshot", "manualNote", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-communication-opened": ["action", "actorRole", "preparationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-booking-assign": ["action", "actorRole", "responseVersionId", "startsAt", "timeZone", "confirmationGrantId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-booking-reschedule": ["action", "actorRole", "bookingId", "startsAt", "timeZone", "confirmationGrantId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-booking-cancel": ["action", "actorRole", "bookingId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
+    };
+    if (founderEngagementAllowedFields[action]) {
+      const allowed = new Set(founderEngagementAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown Founder engagement field: ${unknown}.` }, { status: 400 });
+    }
+
+    const founderCommercialAllowedFields: Record<string, string[]> = {
+      "founder-commercial-policy-publish": ["action", "actorRole", "referenceFeePaise", "referenceAdvancePaise", "defaultGstBasisPoints", "reason", "idempotencyKey", "expectedActiveVersion", "expectedRecordVersion", "expectedRevision"],
+      "founder-commercial-legal-create": ["action", "actorRole", "kind", "title", "exactText", "configuration", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-commercial-legal-activate": ["action", "actorRole", "policyId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-template-create": ["action", "actorRole", "serviceType", "name", "kind", "scopeItems", "deliverables", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-template-activate": ["action", "actorRole", "templateId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-draft-create": ["action", "actorRole", "clientId", "prospectiveProjectId", "classification", "professionalFeePaise", "appliedGstBasisPoints", "agreedAdvancePaise", "feeDeviationReason", "classificationReason", "gstDeviationReason", "advanceExceptionReason", "idempotencyKey", "expectedProjectVersion", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-step-save": ["action", "actorRole", "proposalVersionId", "step", "patch", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-review": ["action", "actorRole", "proposalVersionId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-approve": ["action", "actorRole", "proposalVersionId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-artifact-generate": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-send": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-proposal-successor": ["action", "actorRole", "proposalVersionId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-commercial-payment-confirm": ["action", "actorRole", "proposalVersionId", "paymentId", "type", "amountPaise", "idempotencyKey", "expectedProposalRecordVersion", "expectedRecordVersion", "expectedRevision"],
+      "founder-balance-deadline-exception": ["action", "actorRole", "proposalVersionId", "exceptionAction", "newDueAt", "reason", "engagementClassification", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-invoice-issue": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
+    };
+    if (founderCommercialAllowedFields[action]) {
+      const allowed = new Set(founderCommercialAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown Founder commercial field: ${unknown}.` }, { status: 400 });
     }
 
     const assessmentAllowedFields: Record<string, string[]> = {
@@ -198,12 +246,107 @@ export async function POST(request: Request) {
       "shakti-rank": ["action", "actorRole", "caseId", "floorId", "values", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
     };
     if (evaluationAllowedFields[action] && Object.keys(body).some((field) => !evaluationAllowedFields[action].includes(field))) return NextResponse.json({ ok: false, error: "Unsupported evaluation field." }, { status: 400 });
-    if (["proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve"].includes(action)
+    if (founderCommercialAllowedFields[action] && (typeof body.idempotencyKey !== "string" || body.idempotencyKey.trim().length < 8 || body.idempotencyKey.length > 160)) return NextResponse.json({ ok: false, error: "A stable idempotency key is required for this protected Founder commercial action." }, { status: 400 });
+    if (["founder-lead-profile-update", "founder-media-register", "founder-media-transition", "founder-qualification-invite", "founder-communication-prepare", "founder-communication-opened", "founder-booking-assign", "founder-booking-reschedule", "founder-booking-cancel", "proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve"].includes(action)
       && (typeof body.idempotencyKey !== "string" || body.idempotencyKey.trim().length < 8 || body.idempotencyKey.length > 160)) {
       return NextResponse.json({ ok: false, error: "A stable idempotency key is required for this protected action." }, { status: 400 });
     }
 
     switch (action) {
+      case "founder-commercial-policy-publish": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, policy: publishFounderCommercialPolicy({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, referenceFeePaise: Number(body.referenceFeePaise), referenceAdvancePaise: Number(body.referenceAdvancePaise), defaultGstBasisPoints: Number(body.defaultGstBasisPoints), reason: body.reason, idempotencyKey: body.idempotencyKey, expectedActiveVersion: body.expectedActiveVersion }) }; break;
+      }
+      case "founder-commercial-legal-create": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, policy: createFounderLegalPolicy({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, kind: body.kind, title: body.title, exactText: body.exactText, configuration: body.configuration, reason: body.reason, idempotencyKey: body.idempotencyKey }) }; break;
+      }
+      case "founder-commercial-legal-activate": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, policy: activateFounderLegalPolicy({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, policyId: body.policyId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-template-create": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, template: createFounderProposalTemplate({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, serviceType: body.serviceType, name: body.name, kind: body.kind, scopeItems: body.scopeItems ?? [], deliverables: body.deliverables ?? [], reason: body.reason, idempotencyKey: body.idempotencyKey }) }; break;
+      }
+      case "founder-proposal-template-activate": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, template: activateFounderProposalTemplate({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, templateId: body.templateId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-draft-create": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, proposal: createFounderProposalDraft({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, clientId: body.clientId, prospectiveProjectId: body.prospectiveProjectId, classification: body.classification, professionalFeePaise: Number(body.professionalFeePaise), appliedGstBasisPoints: Number(body.appliedGstBasisPoints), agreedAdvancePaise: Number(body.agreedAdvancePaise), feeDeviationReason: body.feeDeviationReason, classificationReason: body.classificationReason, gstDeviationReason: body.gstDeviationReason, advanceExceptionReason: body.advanceExceptionReason, idempotencyKey: body.idempotencyKey, expectedProjectVersion: body.expectedProjectVersion }) }; break;
+      }
+      case "founder-proposal-step-save": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, proposal: autosaveFounderProposalStep({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, step: Number(body.step) as 1 | 2 | 3 | 4 | 5 | 6, patch: body.patch ?? {}, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-review": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, proposal: reviewFounderProposal({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-approve": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, proposal: approveFounderProposal({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-artifact-generate": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, artifact: await generateFounderProposalArtifact({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, store: founderCommercialArtifactStore(), idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-send": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, result: await sendFounderProposal({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-proposal-successor": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, proposal: createFounderProposalSuccessor({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-commercial-payment-confirm": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, confirmation: confirmFounderCommercialPayment({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, paymentId: body.paymentId, type: body.type, amountPaise: Number(body.amountPaise), idempotencyKey: body.idempotencyKey, expectedProposalRecordVersion: body.expectedProposalRecordVersion }) }; break;
+      }
+      case "founder-balance-deadline-exception": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, deadline: applyFounderBalanceDeadlineException({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, action: body.exceptionAction, newDueAt: body.newDueAt, reason: body.reason, engagementClassification: body.engagementClassification, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-invoice-issue": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, invoice: await issueFounderAdvanceInvoice({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, store: founderCommercialArtifactStore(), idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-lead-profile-update": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, result: updateCanonicalLeadProfile({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, expectedRecordVersion: body.expectedRecordVersion, idempotencyKey: body.idempotencyKey, reason: body.reason, changes: body.changes ?? {} }) };
+        break;
+      }
+      case "founder-media-dry-run": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        return NextResponse.json({ ok: true, result: validateApprovedAssetDryRun({ actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, assetKey: body.assetKey, filename: body.filename, sizeBytes: Number(body.sizeBytes), pageCount: Number(body.pageCount), checksumSha256: body.checksumSha256 }) });
+      }
+      case "founder-media-register": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, result: registerMediaAssetVersion({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, assetKey: body.assetKey, privateObjectKey: body.privateObjectKey, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-media-transition": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, version: transitionMediaAssetVersion({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, versionId: body.versionId, target: body.target, expectedRecordVersion: body.expectedRecordVersion, reason: body.reason }) };
+        break;
+      }
+      case "founder-qualification-invite": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, result: await createQualificationInvitation({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, clientId: body.clientId, kind: body.kind, selectedServices: body.selectedServices ?? [], idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-communication-prepare": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, result: await prepareManualCommunication({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, clientId: body.clientId, prospectiveProjectIds: body.prospectiveProjectIds, templateKey: body.templateKey, values: body.values ?? {}, channel: body.channel, recipient: body.recipient, assetVersionIds: body.assetVersionIds, formDefinitionId: body.formDefinitionId, bookingId: body.bookingId, grantIds: body.grantIds, renderedTimeZoneSnapshot: body.renderedTimeZoneSnapshot, manualNote: body.manualNote, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-communication-opened": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, preparation: markCommunicationOpened({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, preparationId: body.preparationId, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-booking-assign": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, booking: assignReviewCall({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, responseVersionId: body.responseVersionId, startsAt: body.startsAt, timeZone: body.timeZone, confirmationGrantId: body.confirmationGrantId, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-booking-reschedule": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, booking: rescheduleReviewCall({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, bookingId: body.bookingId, startsAt: body.startsAt, timeZone: body.timeZone, confirmationGrantId: body.confirmationGrantId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-booking-cancel": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, booking: cancelReviewCall({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, bookingId: body.bookingId, reason: body.reason, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
       case "reset":
         if (!isExplicitLocalDemo(request.headers)) {
           return NextResponse.json({ ok: false, error: "Demo reset is unavailable outside an explicit local demo." }, { status: 403 });

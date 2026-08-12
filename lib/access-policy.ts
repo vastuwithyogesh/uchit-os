@@ -26,6 +26,7 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/assets", label: "Report Charts", minimumRole: "CONSULTANT" },
   { href: "/payment-proofs", label: "Payments", minimumRole: "SETTER" },
   { href: "/reports", label: "Reports", minimumRole: "CONSULTANT" },
+  { href: "/commercial-proposals", label: "Commercial Proposals", minimumRole: "SUPER_ADMIN" },
   { href: "/models", label: "Data Model", minimumRole: "ADMIN" },
   { href: "/diagnostics", label: "System Check", minimumRole: "ADMIN" },
   { href: "/insights", label: "Operations", minimumRole: "ADMIN" },

@@ -1,0 +1,27 @@
+# Founder Commercial Proposals — local implementation contract
+
+Status: implemented locally, not deployed. D1 v11 is defined but has not been executed in any environment.
+
+## Founder flow
+
+The commercial proposal workspace uses six exclusive pages: Client & Project; Requirements & Scope; Deliverables & Interactions; Timeline & Commercials; Policies & Next Steps; Preview, Review & Approve. Canonical CRM, qualification and prospective-project values are snapshotted instead of re-entered. Scope and deliverables come only from an explicitly activated service template; brochure wording is never parsed into commercial truth.
+
+Money is stored as integer paise. The default reference fee is ₹51,000, the reference advance is ₹11,000 and the default GST rate is 18%, but the fee is not a hard minimum. Every deviation and non-standard classification uses private Founder-only reasons. Internal complimentary work requires zero fee, zero GST and zero total.
+
+## Immutable lifecycle and fail-closed copy
+
+The lifecycle is DRAFT → SUPER_ADMIN_REVIEWED → SUPER_ADMIN_APPROVED → SENT, followed by ACCEPTED, CHANGES_REQUESTED, DECLINED or EXPIRED. Review and approval are distinct records even when Yogesh performs both. Approved or sent content is never edited; a change creates a successor draft.
+
+No P5 professional-boundary wording, P13 acceptance declaration, P14 cancellation/refund/delay policy or statutory invoice configuration is seeded. The separate review document is advisory and is not imported. Review, approval, send and acceptance remain blocked until P5, P13 and P14 have explicit active owner-approved versions. Invoice issuance remains `REVIEW_REQUIRED` until statutory configuration is active.
+
+## P17 invoice SLA
+
+Acceptance alone and payment-proof upload alone do not create an invoice. Acceptance creates a `NOT_DUE` invoice task. Exact Founder-confirmed advance starts the server clock, persists `dueAt = confirmedAt + 60 minutes` and binds the payment, accepted proposal version and GST snapshot. Missing statutory configuration produces `GENERATION_FAILED`; the confirmed payment is preserved. At the exact deadline an unissued task becomes `OVERDUE`. Tests can activate synthetic test-only statutory configuration and an in-memory artifact store, but no real invoice is issued.
+
+## P18 balance deadline
+
+The accepted commercial version owns one balance-deadline record. Exact confirmed advance persists `dueAt = advanceConfirmedAt + 7 × 24 hours` using the server timestamp. Only confirmed GST-inclusive payments reduce the balance. At the exact deadline an unpaid balance becomes `OVERDUE`. Only the configured Yogesh owner may extend or waive with CAS, idempotency, immutable prior/new values and a private reason. None of these states bypass case, evidence, methodology, evaluation, payment, report approval or delivery gates.
+
+## Security and privacy
+
+All Founder actions derive organisation, actor and Founder identity server-side and use allowlisted payloads, record/global CAS and idempotency. Client links use hashed, scoped, expiring tokens and private no-store responses. Client projections exclude reference prices, engagement classification and private exception reasons. Acceptance records exact version and artifact hashes and never creates a Case ID or payment confirmation.

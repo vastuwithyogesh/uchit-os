@@ -251,6 +251,217 @@ export const d1Migrations: readonly D1Migration[] = [
         UNIQUE (organisation_id,external_source_id)
       )`
     ]
+  },
+  {
+    version: 10,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS lead_profile_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, lead_id TEXT NOT NULL, client_id TEXT,
+        version INTEGER NOT NULL, canonical_snapshot_json TEXT NOT NULL, prior_snapshot_hash TEXT,
+        snapshot_hash TEXT NOT NULL, request_hash TEXT NOT NULL, reason TEXT NOT NULL, actor_user_id TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL, created_at TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,lead_id,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS media_assets (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, category TEXT NOT NULL,
+        audience TEXT NOT NULL CHECK (audience IN ('FOUNDER_PRIVATE','CLIENT_SENDABLE')),
+        service_applicability_json TEXT NOT NULL, title TEXT NOT NULL, description TEXT NOT NULL,
+        tags_json TEXT NOT NULL, active_version_id TEXT, created_at TEXT NOT NULL,
+        created_by_actor_user_id TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS media_asset_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, asset_id TEXT NOT NULL, version INTEGER NOT NULL,
+        filename TEXT NOT NULL, private_object_key TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL CHECK (mime_type='application/pdf'),
+        size_bytes INTEGER NOT NULL, checksum_sha256 TEXT NOT NULL, page_count INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('DRAFT','FOUNDER_APPROVED','ACTIVE','SUPERSEDED','ARCHIVED')),
+        client_sendable INTEGER NOT NULL CHECK (client_sendable IN (0,1)), uploaded_by_actor_user_id TEXT NOT NULL,
+        uploaded_at TEXT NOT NULL, approved_by_actor_user_id TEXT, approved_at TEXT,
+        supersedes_version_id TEXT, superseded_by_version_id TEXT, reason TEXT NOT NULL, registration_hash TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,asset_id,version)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_media_versions_active ON media_asset_versions(organisation_id,asset_id,status)",
+      `CREATE TABLE IF NOT EXISTS secure_access_grants (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, purpose TEXT NOT NULL,
+        lead_id TEXT NOT NULL, client_id TEXT, asset_version_id TEXT, form_definition_id TEXT, booking_id TEXT,
+        token_hash TEXT NOT NULL UNIQUE, expires_at TEXT NOT NULL, revoked_at TEXT, replaced_by_grant_id TEXT,
+        opened_at TEXT, created_at TEXT NOT NULL, created_by_actor_user_id TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_secure_grants_scope ON secure_access_grants(organisation_id,lead_id,purpose,expires_at)",
+      `CREATE TABLE IF NOT EXISTS communication_preparations (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, lead_id TEXT NOT NULL, client_id TEXT,
+        prospective_project_ids_json TEXT NOT NULL, template_key TEXT NOT NULL, template_version INTEGER NOT NULL,
+        channel TEXT NOT NULL CHECK (channel IN ('WHATSAPP','EMAIL')),
+        state TEXT NOT NULL CHECK (state IN ('NOT_PREPARED','PREPARED','OPENED')),
+        recipient_hash TEXT NOT NULL, rendered_content_hash TEXT NOT NULL, asset_version_ids_json TEXT NOT NULL,
+        form_definition_id TEXT, booking_id TEXT, grant_ids_json TEXT NOT NULL,
+        rendered_time_zone_snapshot TEXT, manual_note TEXT, prepared_at TEXT NOT NULL, opened_at TEXT,
+        actor_user_id TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS qualification_form_definitions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('RESIDENTIAL','COMMERCIAL','HYBRID')),
+        version INTEGER NOT NULL, title TEXT NOT NULL, source_asset_version_id TEXT NOT NULL,
+        source_checksum_sha256 TEXT NOT NULL, questions_json TEXT NOT NULL, definition_hash TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('DRAFT','FOUNDER_APPROVED','ACTIVE','RETIRED')),
+        created_at TEXT NOT NULL, approved_at TEXT, approved_by_actor_user_id TEXT,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,kind,version)
+      )`,
+      `CREATE TABLE IF NOT EXISTS qualification_invitations (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, lead_id TEXT NOT NULL, client_id TEXT NOT NULL,
+        form_definition_id TEXT NOT NULL, grant_id TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('OPEN','SUBMITTED','EXPIRED','REPLACED')),
+        selected_services_json TEXT NOT NULL, created_at TEXT NOT NULL, expires_at TEXT NOT NULL,
+        submitted_at TEXT, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS qualification_response_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, invitation_id TEXT NOT NULL, client_id TEXT NOT NULL,
+        form_definition_id TEXT NOT NULL, version INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('DRAFT','SUBMITTED','SUPERSEDED')),
+        answers_json TEXT NOT NULL, answers_hash TEXT NOT NULL, selected_services_json TEXT NOT NULL,
+        secondary_interest_selected INTEGER NOT NULL CHECK (secondary_interest_selected IN (0,1)),
+        source_question_ids_json TEXT NOT NULL, predecessor_response_id TEXT, saved_at TEXT NOT NULL,
+        submitted_at TEXT, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,invitation_id,version)
+      )`,
+      `CREATE TABLE IF NOT EXISTS prospective_projects (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, client_id TEXT NOT NULL, lead_id TEXT NOT NULL,
+        response_version_id TEXT NOT NULL, kind TEXT NOT NULL CHECK (kind IN ('RESIDENTIAL','COMMERCIAL')),
+        status TEXT NOT NULL, service_type TEXT, case_id TEXT, created_at TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,response_version_id,kind)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_review_bookings (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, client_id TEXT NOT NULL,
+        prospective_project_ids_json TEXT NOT NULL, response_version_id TEXT NOT NULL, form_definition_id TEXT NOT NULL,
+        starts_at TEXT NOT NULL, time_zone TEXT NOT NULL, duration_minutes INTEGER NOT NULL CHECK (duration_minutes=30),
+        buffer_minutes INTEGER NOT NULL CHECK (buffer_minutes=15), rendered_client_time TEXT NOT NULL, rendered_ist_time TEXT,
+        status TEXT NOT NULL CHECK (status IN ('ASSIGNED','CLIENT_CONFIRMED','RESCHEDULE_REQUESTED','MEETING_SETUP_FAILED','CONFIRMED','CANCELLED')),
+        confirmation_grant_id TEXT NOT NULL, assigned_by_actor_user_id TEXT NOT NULL, assigned_at TEXT NOT NULL,
+        confirmed_at TEXT, prior_booking_id TEXT, reason TEXT, idempotency_key TEXT NOT NULL, assignment_hash TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,idempotency_key)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_founder_bookings_time ON founder_review_bookings(organisation_id,starts_at,status)",
+      `CREATE TABLE IF NOT EXISTS zoom_meeting_bindings (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, booking_id TEXT NOT NULL, provider TEXT NOT NULL CHECK (provider='ZOOM'),
+        provider_meeting_id TEXT NOT NULL, private_join_metadata_ciphertext TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE','RETIRED','FAILED')), created_at TEXT NOT NULL,
+        retired_at TEXT, idempotency_key TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,booking_id,idempotency_key), UNIQUE (organisation_id,provider_meeting_id)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_reminder_tasks (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, booking_id TEXT NOT NULL,
+        threshold TEXT NOT NULL CHECK (threshold IN ('24H','2H')), due_at TEXT NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('PENDING','PREPARED','OPENED','SKIPPED','CANCELLED')),
+        whatsapp_state TEXT NOT NULL CHECK (whatsapp_state IN ('NOT_PREPARED','PREPARED','OPENED')),
+        email_state TEXT NOT NULL CHECK (email_state IN ('NOT_PREPARED','PREPARED','OPENED')),
+        template_key TEXT NOT NULL, template_version INTEGER NOT NULL, created_at TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,booking_id,threshold)
+      )`
+    ]
+  },
+  {
+    version: 11,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS founder_commercial_policy_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, version INTEGER NOT NULL,
+        status TEXT NOT NULL CHECK (status IN ('ACTIVE','SUPERSEDED')),
+        reference_fee_paise INTEGER NOT NULL, reference_advance_paise INTEGER NOT NULL,
+        default_gst_basis_points INTEGER NOT NULL, balance_deadline_days INTEGER NOT NULL CHECK (balance_deadline_days=7),
+        advance_invoice_sla_minutes INTEGER NOT NULL CHECK (advance_invoice_sla_minutes=60),
+        reason TEXT NOT NULL, actor_user_id TEXT NOT NULL, created_at TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_commercial_legal_policies (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, kind TEXT NOT NULL,
+        version INTEGER NOT NULL, status TEXT NOT NULL, title TEXT NOT NULL, exact_text TEXT NOT NULL,
+        content_hash TEXT NOT NULL, configuration_json TEXT, reason TEXT NOT NULL,
+        created_by_actor_user_id TEXT NOT NULL, created_at TEXT NOT NULL, approved_by_actor_user_id TEXT,
+        approved_at TEXT, activated_at TEXT, supersedes_policy_id TEXT, idempotency_key TEXT NOT NULL,
+        request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,kind,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_proposal_template_versions (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, service_type TEXT NOT NULL,
+        version INTEGER NOT NULL, name TEXT NOT NULL, kind TEXT NOT NULL, status TEXT NOT NULL,
+        scope_items_json TEXT NOT NULL, deliverables_json TEXT NOT NULL, source_proposal_version_id TEXT,
+        supersedes_template_id TEXT, content_hash TEXT NOT NULL, reason TEXT NOT NULL, actor_user_id TEXT NOT NULL,
+        created_at TEXT NOT NULL, activated_at TEXT, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,service_type,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_proposal_versions (
+        id TEXT PRIMARY KEY, proposal_id TEXT NOT NULL, organisation_id TEXT NOT NULL, version INTEGER NOT NULL,
+        client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL, service_type TEXT NOT NULL,
+        status TEXT NOT NULL, current_step INTEGER NOT NULL, content_json TEXT NOT NULL, content_hash TEXT NOT NULL,
+        validity_ends_at TEXT, predecessor_version_id TEXT, successor_version_id TEXT,
+        created_at TEXT NOT NULL, created_by_actor_user_id TEXT NOT NULL, reviewed_at TEXT, approved_at TEXT,
+        sent_at TEXT, accepted_at TEXT, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,proposal_id,version), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_proposal_approvals (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL,
+        checkpoint TEXT NOT NULL, actor_user_id TEXT NOT NULL, actor_name TEXT NOT NULL, actor_role TEXT NOT NULL,
+        reason TEXT NOT NULL, content_hash TEXT NOT NULL, created_at TEXT NOT NULL, idempotency_key TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,proposal_version_id,checkpoint), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_proposal_artifacts (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL UNIQUE,
+        proposal_content_hash TEXT NOT NULL, client_projection_hash TEXT NOT NULL, artifact_hash_sha256 TEXT NOT NULL,
+        private_object_key TEXT NOT NULL UNIQUE, mime_type TEXT NOT NULL, size_bytes INTEGER NOT NULL,
+        page_count INTEGER NOT NULL, renderer_version TEXT NOT NULL, generated_at TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_proposal_grants (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL,
+        client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL, token_hash TEXT NOT NULL UNIQUE,
+        expires_at TEXT NOT NULL, revoked_at TEXT, replaced_by_grant_id TEXT, opened_at TEXT,
+        created_at TEXT NOT NULL, created_by_actor_user_id TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_proposal_responses (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL,
+        proposal_content_hash TEXT NOT NULL, artifact_hash_sha256 TEXT NOT NULL, client_id TEXT NOT NULL,
+        prospective_project_id TEXT NOT NULL, response TEXT NOT NULL, full_name TEXT NOT NULL,
+        acceptance_checked INTEGER, typed_confirmation_hash TEXT, organisation_name TEXT, designation TEXT,
+        requested_changes TEXT, responded_at TEXT NOT NULL, idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL,
+        record_version INTEGER NOT NULL DEFAULT 1, UNIQUE (organisation_id,proposal_version_id), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_commercial_payment_confirmations (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL,
+        client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL, payment_id TEXT NOT NULL,
+        type TEXT NOT NULL CHECK (type IN ('ADVANCE','BALANCE')), amount_paise INTEGER NOT NULL,
+        confirmed_at TEXT NOT NULL, confirmed_by_actor_user_id TEXT NOT NULL, proposal_content_hash TEXT NOT NULL,
+        idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,payment_id), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_balance_deadlines (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL UNIQUE,
+        client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL, advance_payment_confirmation_id TEXT,
+        advance_confirmed_at TEXT, due_at TEXT, status TEXT NOT NULL, remaining_amount_paise INTEGER NOT NULL,
+        commercial_policy_id TEXT NOT NULL, commercial_policy_version INTEGER NOT NULL, engagement_classification TEXT NOT NULL,
+        prior_due_at TEXT, exception_reason TEXT, exception_actor_user_id TEXT, exception_at TEXT,
+        record_version INTEGER NOT NULL DEFAULT 1
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_commercial_invoices (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, proposal_version_id TEXT NOT NULL UNIQUE,
+        client_id TEXT NOT NULL, prospective_project_id TEXT NOT NULL, advance_payment_confirmation_id TEXT UNIQUE,
+        status TEXT NOT NULL, due_at TEXT, amount_received_paise INTEGER NOT NULL,
+        gst_basis_points INTEGER NOT NULL, gst_amount_snapshot_paise INTEGER NOT NULL, remaining_balance_paise INTEGER NOT NULL,
+        invoice_policy_id TEXT, invoice_number TEXT, artifact_hash_sha256 TEXT, private_object_key TEXT,
+        issued_at TEXT, issued_by_actor_user_id TEXT, failure_code TEXT, failure_at TEXT,
+        idempotency_key TEXT NOT NULL, request_hash TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,invoice_number), UNIQUE (organisation_id,idempotency_key)
+      )`,
+      `CREATE TABLE IF NOT EXISTS founder_commercial_audit_events (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, event_type TEXT NOT NULL, entity_type TEXT NOT NULL,
+        entity_id TEXT NOT NULL, actor_user_id TEXT NOT NULL, happened_at TEXT NOT NULL, reason TEXT NOT NULL,
+        proposal_version_id TEXT, prospective_project_id TEXT, before_hash TEXT, after_hash TEXT,
+        idempotency_key TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        UNIQUE (organisation_id,idempotency_key)
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_founder_proposals_scope ON founder_proposal_versions(organisation_id,client_id,prospective_project_id,status)",
+      "CREATE INDEX IF NOT EXISTS idx_founder_deadlines_due ON founder_balance_deadlines(organisation_id,status,due_at)",
+      "CREATE INDEX IF NOT EXISTS idx_founder_invoices_due ON founder_commercial_invoices(organisation_id,status,due_at)"
+    ]
   }
 ];
 

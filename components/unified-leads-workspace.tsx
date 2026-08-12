@@ -8,6 +8,8 @@ import { getAllowedPipelineTransitions, normalizeClientPipeline } from "@/lib/cr
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { LeadImportSheet } from "@/components/lead-import-sheet";
+import { LeadCommunicationSheet } from "@/components/lead-communication-sheet";
+import type { FounderTemplateKey } from "@/lib/founder-communication-templates";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
 type LeadPayload = { leads: InboundLeadRecord[] };
@@ -17,6 +19,7 @@ type Row = {
   serviceInterest?: string; source: string; sourceRecordId?: string; sourceSystem: string;
   stage: CanonicalPipelineStage; nextAction?: { summary: string; dueAt: string };
   syncStatus?: string; receivedAt?: string; submissions?: number;
+  recordVersion: number; country?: string; timeZone?: string;
   privateSourceDetails?: { dob?: string; sourceAssignedTo?: string; propertyStage?: string; sourceRecordId?: string; externalClientCode?: string; sourceDeletedAt?: string };
 };
 
@@ -63,6 +66,7 @@ function normaliseRows(state: Bootstrap | null, leads: InboundLeadRecord[]): Row
       sourceSystem: lead.sourceSystem ?? "UCHIT", stage: pipeline?.stage ?? (lead.status === "QUALIFIED" ? "QUALIFIED" : "NEW"),
       nextAction: pipeline?.nextAction, syncStatus: lead.syncStatus ?? "NATIVE", receivedAt: lead.firstSeenAt ?? lead.importedAt,
       submissions: lead.submissionCount,
+      recordVersion: lead.recordVersion ?? 0, country: lead.country, timeZone: lead.timeZone,
       privateSourceDetails: lead.sourceProfile || lead.sourceRecordId || lead.externalClientCode ? {
         dob: lead.sourceProfile?.dob, sourceAssignedTo: lead.sourceProfile?.sourceAssignedTo,
         propertyStage: lead.sourceProfile?.propertyStage, sourceRecordId: lead.sourceRecordId,
@@ -78,6 +82,7 @@ function normaliseRows(state: Bootstrap | null, leads: InboundLeadRecord[]): Row
       city: client.city, serviceInterest: intakes.get(client.id)?.propertyContext?.serviceInterest,
       source: client.source, sourceSystem: client.source === "LOVABLE" ? "LOVABLE" : "UCHIT",
       stage: pipeline.stage, nextAction: pipeline.nextAction, syncStatus: "NATIVE",
+      recordVersion: client.recordVersion ?? 0,
     });
   }
   return Array.from(rows.values());
@@ -96,6 +101,10 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const [selectedId, setSelectedId] = useState("");
   const [drawerOpen, setDrawerOpen] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  const [communication, setCommunication] = useState<{ key: FounderTemplateKey; serviceType?: "EXISTING_SPACE" | "NEW_CONSTRUCTION" }>();
+  const [editing, setEditing] = useState(false);
+  const [profileDraft, setProfileDraft] = useState({ fullName: "", email: "", phone: "", city: "", country: "", timeZone: "", serviceInterest: "" });
+  const [editReason, setEditReason] = useState("");
   const [moveGroupId, setMoveGroupId] = useState("");
   const [query, setQuery] = useState("");
   const [sourceFilter, setSourceFilter] = useState("ALL");
@@ -156,6 +165,12 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     key.current = crypto.randomUUID();
   }, [selected?.id, selected?.stage, selected?.nextAction?.dueAt, moveGroupId]);
 
+  useEffect(() => {
+    if (!selected) return;
+    setProfileDraft({ fullName: selected.name, email: selected.email ?? "", phone: selected.phone ?? "", city: selected.city ?? "", country: selected.country ?? "", timeZone: selected.timeZone ?? "", serviceInterest: selected.serviceInterest ?? "" });
+    setEditReason(""); setEditing(false); setCommunication(undefined);
+  }, [selected?.id]);
+
   function openLead(row: Row) { setSelectedId(row.id); setDrawerOpen(true); setMoveOpen(false); setMoveGroupId(""); }
   function proposeMove(row: Row, groupId: string) {
     setSelectedId(row.id); setMoveGroupId(groupId); setDrawerOpen(false);
@@ -193,11 +208,44 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     finally { setBusy(false); }
   }
 
+  async function saveProfile() {
+    if (!selected || !state || !editReason.trim()) { setMessage("Add a private reason before saving profile changes."); return; }
+    setBusy(true); setErrorKind("none");
+    try {
+      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
+        action: "founder-lead-profile-update", leadId: selected.id, changes: profileDraft, reason: editReason,
+        idempotencyKey: crypto.randomUUID(), expectedRecordVersion: selected.recordVersion, expectedRevision: state.persistenceRevision ?? null,
+      }) });
+      const result = await response.json();
+      if (!response.ok || result.ok === false) { if ([409, 428].includes(response.status)) setErrorKind("conflict"); throw new Error(result.error ?? "Profile changes could not be saved."); }
+      setEditing(false); setMessage("Profile changes saved with immutable Founder audit."); await refresh(selected.id);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Profile changes could not be saved."); }
+    finally { setBusy(false); }
+  }
+
+  async function latestRevision() { return (await fetchJson<Bootstrap>("/api/bootstrap")).persistenceRevision ?? null; }
+  async function prepareCommunication(channel: "WHATSAPP" | "EMAIL", values: Record<string, string>, idempotencyKey: string) {
+    if (!selected) throw new Error("Select a lead first.");
+    const expectedRevision = await latestRevision();
+    const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
+      action: "founder-communication-prepare", leadId: selected.id, clientId: selected.clientId,
+      templateKey: communication?.key, values,
+      channel, recipient: channel === "WHATSAPP" ? selected.phone : selected.email,
+      idempotencyKey, expectedRecordVersion: selected.recordVersion, expectedRevision,
+    }) });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "Communication could not be prepared.");
+    return { id: result.result.record.id as string, recordVersion: result.result.record.recordVersion as number };
+  }
+  async function markOpened(record: { id: string; recordVersion: number }) {
+    const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action: "founder-communication-opened", preparationId: record.id, idempotencyKey: crypto.randomUUID(), expectedRecordVersion: record.recordVersion, expectedRevision: await latestRevision() }) });
+    const result = await response.json(); if (!response.ok) throw new Error(result.error ?? "OPENED state could not be recorded.");
+  }
+
   const primaryLabel = selectedClient ? "Save & continue" : "Open client readiness";
   const selectedGroup = selected ? groupForStage(selected.stage) : undefined;
   const resetFilters = () => { setQuery(""); setSourceFilter("ALL"); setStageFilter("ALL"); setDateFrom(""); setDateTo(""); setShowArchived(false); };
 
-  return <section className={`lead-workspace ${isPipelinePage ? "lead-workspace-pipeline" : "lead-workspace-table"}`} aria-labelledby="unified-leads-title">
+  return <><section className={`lead-workspace ${isPipelinePage ? "lead-workspace-pipeline" : "lead-workspace-table"}`} aria-labelledby="unified-leads-title">
     <header className="lead-workspace-header"><div><h2 id="unified-leads-title">{isPipelinePage ? "Lead Pipeline" : "Leads / Opt-ins"}</h2><p>{isPipelinePage ? "Acquisition and qualification only. Every move is confirmed by the Uchit server." : `${activeCount} active leads · canonical Uchit records`}</p></div>{!isPipelinePage ? <div className="lead-header-actions"><label className="archive-toggle"><input type="checkbox" checked={showArchived} onChange={(event) => setShowArchived(event.target.checked)} /> Show archived</label><LeadImportSheet onImported={() => refresh(selected?.id)} /></div> : <span className="status-pill status-neutral">Lovable sync dormant</span>}</header>
 
     <div className="lead-filterbar" aria-label="Lead filters">
@@ -221,22 +269,22 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
       <div className="lead-table-wrap"><table className="lead-table"><thead><tr><th>Client ID</th><th>Name</th><th>Email</th><th>Phone</th><th>City</th><th>Service interest</th><th>Stage</th><th>Source</th><th>Received</th><th><span className="sr-only">Actions</span></th></tr></thead><tbody>{visibleRows.map((row) => <tr key={row.id} tabIndex={0} onClick={() => openLead(row)} onKeyDown={(event) => { if (event.key === "Enter" || event.key === " ") openLead(row); }}><td>{row.clientId ?? "Pending"}</td><td><strong>{row.name}</strong>{row.submissions && row.submissions > 1 ? <small>Repeat ×{row.submissions}</small> : null}</td><td>{maskEmail(row.email)}</td><td>{maskPhone(row.phone)}</td><td>{row.city || "—"}</td><td>{row.serviceInterest ? stageLabel(row.serviceInterest) : "—"}</td><td><span className={`status-pill status-${toneFor(row.stage)}`}>{stageLabel(row.stage)}</span></td><td>{row.sourceSystem}</td><td>{readableDate(row.receivedAt)}</td><td><button type="button" className="table-row-action" onClick={(event) => { event.stopPropagation(); openLead(row); }} aria-label={`Open ${row.name}`}>Open</button></td></tr>)}</tbody></table></div>}
 
     {drawerOpen && selected ? <div className="lead-drawer-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setDrawerOpen(false)} aria-label="Close lead profile" /><aside className="lead-profile-drawer" role="dialog" aria-modal="true" aria-labelledby="lead-drawer-title">
-      <header className="lead-drawer-header"><div><span className="eyebrow">Lead profile</span><h2 id="lead-drawer-title">{selected.name}</h2><p>{selected.clientId ?? "Permanent Client ID pending"}</p></div><button type="button" className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Close profile">×</button><div className="lead-drawer-status"><span className={`status-pill status-${toneFor(selected.stage)}`}>{stageLabel(selected.stage)}</span><span>{selected.sourceSystem}</span></div></header>
+      <header className="lead-drawer-header"><div><span className="eyebrow">Lead profile</span><h2 id="lead-drawer-title">{selected.name}</h2><p>{selected.clientId ?? "Permanent Client ID pending"}</p><button type="button" className="profile-edit-trigger" onClick={() => setEditing(true)} aria-label="Edit profile"><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20h4l11-11-4-4L4 16v4Zm13-17 4 4" /></svg>Edit profile</button></div><button type="button" className="drawer-close" onClick={() => setDrawerOpen(false)} aria-label="Close profile">×</button><div className="lead-drawer-status"><span className={`status-pill status-${toneFor(selected.stage)}`}>{stageLabel(selected.stage)}</span><span>{selected.sourceSystem}</span></div></header>
       <div className="lead-drawer-body">
-        <details className="lead-drawer-section" open><summary>Profile</summary><dl><div><dt>Contact</dt><dd>{maskEmail(selected.email)} · {maskPhone(selected.phone)}</dd></div><div><dt>City</dt><dd>{selected.city || "Not recorded"}</dd></div><div><dt>Service</dt><dd>{selected.serviceInterest ? stageLabel(selected.serviceInterest) : "Not recorded"}</dd></div></dl></details>
+        <details className="lead-drawer-section" open><summary>Profile</summary>{editing ? <div className="lead-profile-edit-form"><label>Full name<input value={profileDraft.fullName} onChange={(event) => setProfileDraft({ ...profileDraft, fullName: event.target.value })} /></label><label>Email<input type="email" value={profileDraft.email} onChange={(event) => setProfileDraft({ ...profileDraft, email: event.target.value })} /></label><label>Phone / WhatsApp<input value={profileDraft.phone} onChange={(event) => setProfileDraft({ ...profileDraft, phone: event.target.value })} /></label><label>City<input value={profileDraft.city} onChange={(event) => setProfileDraft({ ...profileDraft, city: event.target.value })} /></label><label>Country<input value={profileDraft.country} onChange={(event) => setProfileDraft({ ...profileDraft, country: event.target.value })} /></label><label>IANA time zone<input value={profileDraft.timeZone} onChange={(event) => setProfileDraft({ ...profileDraft, timeZone: event.target.value })} placeholder="Asia/Kolkata" /></label><label>Primary service interest<select value={profileDraft.serviceInterest} onChange={(event) => setProfileDraft({ ...profileDraft, serviceInterest: event.target.value })}><option value="">Choose service</option><option value="EXISTING_SPACE">Existing Space</option><option value="NEW_CONSTRUCTION">New Construction</option></select></label><label>Private change reason<textarea value={editReason} onChange={(event) => setEditReason(event.target.value)} required /></label><div><button className="button" type="button" disabled={busy || !editReason.trim()} onClick={() => void saveProfile()}>{busy ? "Saving…" : "Save changes"}</button><button className="button-secondary" type="button" onClick={() => setEditing(false)}>Cancel</button></div></div> : <dl><div><dt>Contact</dt><dd>{maskEmail(selected.email)} · {maskPhone(selected.phone)}</dd></div><div><dt>City</dt><dd>{selected.city || "Not recorded"}</dd></div><div><dt>Country / time zone</dt><dd>{[selected.country, selected.timeZone].filter(Boolean).join(" · ") || "Not recorded"}</dd></div><div><dt>Service</dt><dd>{selected.serviceInterest ? stageLabel(selected.serviceInterest) : "Not recorded"}</dd></div></dl>}</details>
         <details className="lead-drawer-section"><summary>Requirement / Intake</summary><p>{selected.serviceInterest ? `${stageLabel(selected.serviceInterest)} interest recorded.` : "Complete the Founder intake to capture property and service requirements."}</p><a href="/founder/03" className="text-link">Open intake step</a></details>
-        <details className="lead-drawer-section" open><summary>Next action</summary>{selectedClient ? <div className="lead-next-action-form"><label>Exact next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)} disabled={busy || !allowedTargets.length}>{allowedTargets.length ? allowedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>) : <option value={selected.stage}>No allowed next stage</option>}</select></label>{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} placeholder="What happens next?" /></label><label>Due date and time<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">A terminal move clears the current next action.</p>}</div> : <p>Create the permanent client record before scheduling an authoritative next action.</p>}</details>
+        <details className="lead-drawer-section" open><summary>Guided next action</summary><div className="lead-guided-actions"><button type="button" onClick={() => setCommunication({ key: "VSL" })}>Send VSL</button><div role="group" aria-label="Send deliverable brochure"><span>Send deliverable brochure</span><button type="button" onClick={() => setCommunication({ key: "BROCHURE", serviceType: "EXISTING_SPACE" })}>Existing Space</button><button type="button" onClick={() => setCommunication({ key: "BROCHURE", serviceType: "NEW_CONSTRUCTION" })}>New Construction</button></div><button type="button" onClick={() => setCommunication({ key: "QUALIFICATION" })}>Send qualification form</button></div><p className="meta">Pipeline transitions remain on Lead Pipeline. Opening a message never advances the lead automatically.</p></details>
         <details className="lead-drawer-section"><summary>Timeline</summary>{events.length ? <ol className="lead-timeline">{events.map((event) => <li key={event.id}><strong>{event.headline}</strong><span>{readableDate(event.happenedAt)} · {event.actorName ?? "Uchit"}</span></li>)}</ol> : <p>No Uchit activity yet.</p>}<p className="meta">Source history is labelled separately and never becomes authoritative audit.</p></details>
         <details className="lead-drawer-section"><summary>Follow-ups</summary><p>{selected.nextAction?.summary ?? "No follow-up scheduled."}</p><p className="meta">{readableDate(selected.nextAction?.dueAt)}</p></details>
         <details className="lead-drawer-section"><summary>Commercial</summary><p>Scope, proposal, advance and case creation remain Uchit-owned and server-gated.</p><a href="/founder/01" className="text-link">Open commercial readiness</a></details>
         {activeUser.role === "SUPER_ADMIN" && selected.privateSourceDetails ? <details className="lead-drawer-section"><summary>Private source details</summary><dl><div><dt>Date of birth</dt><dd>{selected.privateSourceDetails.dob || "Not supplied"}</dd></div><div><dt>Source assignment</dt><dd>{selected.privateSourceDetails.sourceAssignedTo || "Not supplied"}</dd></div><div><dt>Property stage</dt><dd>{selected.privateSourceDetails.propertyStage || "Not supplied"}</dd></div><div><dt>Source record</dt><dd>{selected.privateSourceDetails.sourceRecordId || "Not supplied"}</dd></div><div><dt>External client reference</dt><dd>{selected.privateSourceDetails.externalClientCode || "Not supplied"}</dd></div><div><dt>Source tombstone</dt><dd>{selected.privateSourceDetails.sourceDeletedAt ? "Recorded in source history" : "None"}</dd></div></dl><p className="meta">Restricted source metadata only. It does not change ownership, client identity, qualification, reports or evaluation.</p></details> : null}
         <details className="lead-drawer-section"><summary>Technical details</summary><p className="meta">Sync status: {selected.syncStatus ?? "native"}. Source payloads, private IDs and audit internals are intentionally excluded.</p></details>
       </div>
-      <footer className="lead-drawer-footer"><div className="lead-contact-actions">{selected.phone ? <><a href={`tel:${selected.phone}`}>Call</a><a href={`https://wa.me/${selected.phone.replace(/\D/g, "")}`} target="_blank" rel="noreferrer">WhatsApp</a></> : null}{selected.email ? <a href={`mailto:${selected.email}`}>Email</a> : null}</div>{selectedClient ? <button type="button" className="button" disabled={busy || !allowedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : primaryLabel}</button> : <a className="button" href="/founder/01">{primaryLabel}</a>}</footer>
+      <footer className="lead-drawer-footer"><div className="lead-contact-actions"><a className={!selected.phone ? "is-disabled" : ""} href={selected.phone ? `tel:${selected.phone}` : undefined} aria-disabled={!selected.phone}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h4l2 5-3 2a14 14 0 0 0 5 5l2-3 5 2v4c0 2-2 3-4 3C9 20 4 15 3 7c0-2 1-4 3-4Z" /></svg>Call</a><button type="button" disabled={!selected.phone} title={!selected.phone ? "Add a phone number first" : undefined} onClick={() => setCommunication({ key: "VSL" })}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20l1-4a8 8 0 1 1 3 3l-4 1Z" /></svg>WhatsApp</button><button type="button" disabled={!selected.email} title={!selected.email ? "Add an email address first" : undefined} onClick={() => setCommunication({ key: "VSL" })}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h18v14H3V5Zm0 1 9 7 9-7" /></svg>Email</button></div><span className="meta">Manual compose only</span></footer>
     </aside></div> : null}
 
     {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
 
     <div className="lead-workspace-footer" role={errorKind === "conflict" ? "alert" : "status"} aria-live="polite"><span>{message}{errorKind === "conflict" ? " Your draft remains here; reload before retrying." : ""}</span><button type="button" className="button-secondary" disabled={busy} onClick={() => void refresh(selected?.id)}>{busy ? "Refreshing…" : "Reload"}</button></div>
-  </section>;
+  </section>{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;
 }

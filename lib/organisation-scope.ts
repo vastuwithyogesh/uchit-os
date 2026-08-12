@@ -5,7 +5,13 @@ const ownedCollections = [
   "reviewCallBookings", "payments", "advanceVerifications", "vastuCases", "floorWorkspaces", "reportVersions",
   "rectificationRequests", "assessmentObservations", "recommendations", "implementationTasks", "caseDocuments",
   "deliveryMilestones", "evaluationSnapshots", "shaktiSnapshots", "timelineEvents", "optInLeads"
-  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures"
+  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures",
+  "aouMethodologyVersions", "aouReferenceRows", "leadProfileVersions", "mediaAssets", "mediaAssetVersions",
+  "secureAccessGrants", "communicationPreparations", "qualificationFormDefinitions", "qualificationInvitations",
+  "qualificationResponseVersions", "prospectiveProjects", "founderReviewBookings", "zoomMeetingBindings", "founderReminderTasks"
+  ,"founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
+  "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
+  "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialAuditEvents"
 ] as const satisfies readonly (keyof AppState)[];
 
 type Owned = { id?: string; organisationId?: string; createdByActorUserId?: string; updatedByActorUserId?: string; recordVersion?: number };
@@ -62,7 +68,7 @@ export function assertOrganisationRequestScope(state: AppState, body: Record<str
     error.statusCode = 400;
     throw error;
   }
-  for (const key of ["clientId", "proposalId", "caseId", "projectId", "floorId", "reportId", "invalidationId", "recordId", "requestId", "bookingId", "leadId"]) {
+  for (const key of ["clientId", "proposalId", "proposalVersionId", "caseId", "projectId", "prospectiveProjectId", "floorId", "reportId", "invalidationId", "recordId", "requestId", "bookingId", "leadId", "assetId", "assetVersionId", "formDefinitionId", "invitationId", "responseVersionId", "preparationId", "grantId", "templateVersionId", "policyId", "paymentConfirmationId", "invoiceId", "deadlineId"]) {
     const id = body[key];
     if (typeof id !== "string" || !id) continue;
     const owner = ownerForId(state, id);

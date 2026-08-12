@@ -1,0 +1,441 @@
+import type {
+  AppUser,
+  FounderCommercialLegalPolicyRecord,
+  FounderCommercialPolicyVersionRecord,
+  FounderCommercialInvoiceRecord,
+  FounderEngagementClassification,
+  FounderProposalContentSnapshot,
+  FounderProposalStep,
+  FounderProposalTemplateVersionRecord,
+  FounderProposalVersionRecord,
+  VastuServiceType
+} from "./domain.ts";
+import type { AppState } from "./store.ts";
+import { deterministicContentHash } from "./evaluation-provenance.ts";
+import { COMMERCIAL_INVOICE_RENDERER_VERSION, COMMERCIAL_PROPOSAL_RENDERER_VERSION, renderCommercialInvoicePdf, renderCommercialProposalPdf, type FounderProposalClientProjection } from "./commercial-document-renderer.ts";
+
+export class FounderCommercialError extends Error {
+  statusCode: number;
+  constructor(statusCode: number, message: string) { super(message); this.statusCode = statusCode; }
+}
+
+function fail(statusCode: number, message: string): never { throw new FounderCommercialError(statusCode, message); }
+const uuid = () => crypto.randomUUID();
+const nowIso = (now = new Date()) => now.toISOString();
+const trimmed = (value: string | undefined, label: string) => { const result = value?.trim() ?? ""; if (!result) fail(400, `${label} is required.`); return result; };
+const safeIdempotency = (value: string) => { if (!/^[A-Za-z0-9:_-]{8,160}$/.test(value)) fail(428, "A bounded idempotency key is required."); return value; };
+const safePaise = (value: number, label: string) => { if (!Number.isSafeInteger(value) || value < 0) fail(400, `${label} must be a non-negative whole number of paise.`); return value; };
+const safeBasisPoints = (value: number) => { if (!Number.isSafeInteger(value) || value < 0 || value > 10000) fail(400, "GST basis points must be between 0 and 10000."); return value; };
+const hashBytes = async (bytes: Uint8Array) => {
+  const stable = Uint8Array.from(bytes);
+  return Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", stable.buffer))).map((byte) => byte.toString(16).padStart(2, "0")).join("");
+};
+const hashText = async (text: string) => hashBytes(new TextEncoder().encode(text));
+const addDays = (date: Date, days: number) => new Date(date.getTime() + days * 86_400_000);
+const addMinutes = (date: Date, minutes: number) => new Date(date.getTime() + minutes * 60_000);
+
+export interface CommercialArtifactStore {
+  putImmutable(key: string, bytes: Uint8Array, contentType: "application/pdf", metadata: Record<string, string>): Promise<void>;
+}
+
+export class InMemoryCommercialArtifactStore implements CommercialArtifactStore {
+  readonly objects = new Map<string, Uint8Array>();
+  async putImmutable(key: string, bytes: Uint8Array) { if (this.objects.has(key)) fail(409, "The immutable commercial artifact already exists."); this.objects.set(key, bytes.slice()); }
+}
+
+function owner(input: { actor: AppUser; founderUserId: string; organisationId: string }) {
+  if (input.actor.id !== input.founderUserId || input.actor.organisationId !== input.organisationId || input.actor.organisationCapability !== "organisation_owner" || input.actor.role !== "SUPER_ADMIN") fail(403, "Only the configured Founder SUPER_ADMIN owner can perform this action.");
+}
+
+function assertExpected(actual: number | undefined, expected: number | undefined, label: string) {
+  if (expected === undefined) fail(428, `The latest ${label} version is required.`);
+  if ((actual ?? 0) !== expected) fail(409, `The ${label} changed. Reload before retrying.`);
+}
+
+function appendAudit(state: AppState, input: { organisationId: string; eventType: string; entityType: string; entityId: string; actorUserId: string; reason: string; proposalVersionId?: string; prospectiveProjectId?: string; beforeHash?: string; afterHash?: string; idempotencyKey: string }) {
+  const existing = state.founderCommercialAuditEvents.find((event) => event.organisationId === input.organisationId && event.idempotencyKey === input.idempotencyKey);
+  if (existing) return existing;
+  const event = { id: uuid(), ...input, happenedAt: nowIso(), recordVersion: 1 };
+  state.founderCommercialAuditEvents.push(event);
+  return event;
+}
+
+export function calculateGstPaise(professionalFeePaise: number, gstBasisPoints: number): number {
+  safePaise(professionalFeePaise, "Professional fee"); safeBasisPoints(gstBasisPoints);
+  const numerator = professionalFeePaise * gstBasisPoints;
+  if (!Number.isSafeInteger(numerator)) fail(400, "The commercial amount is outside the supported exact-money range.");
+  return Math.floor((numerator + 5_000) / 10_000);
+}
+
+export function ensureFounderCommercialPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; now?: Date }) {
+  owner(input);
+  const active = input.state.founderCommercialPolicies.find((policy) => policy.organisationId === input.organisationId && policy.status === "ACTIVE");
+  if (active) return active;
+  const policy: FounderCommercialPolicyVersionRecord = {
+    id: uuid(), organisationId: input.organisationId, version: 1, status: "ACTIVE",
+    referenceFeePaise: 5_100_000, referenceAdvancePaise: 1_100_000, defaultGstBasisPoints: 1_800,
+    balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60,
+    reason: "Founder commercial policy D1–D9, P17 and P18 initial version.", actorUserId: input.actor.id,
+    createdAt: nowIso(input.now), idempotencyKey: "founder-commercial-policy-v1", requestHash: deterministicContentHash({ fee: 5_100_000, advance: 1_100_000, gst: 1_800, deadlineDays: 7, invoiceMinutes: 60 }), recordVersion: 1
+  };
+  input.state.founderCommercialPolicies.push(policy);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "COMMERCIAL_POLICY_ACTIVATED", entityType: "COMMERCIAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: policy.reason, afterHash: policy.requestHash, idempotencyKey: "audit:founder-commercial-policy-v1" });
+  return policy;
+}
+
+export function publishFounderCommercialPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; referenceFeePaise: number; referenceAdvancePaise: number; defaultGstBasisPoints: number; reason: string; idempotencyKey: string; expectedActiveVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey); safePaise(input.referenceFeePaise, "Reference fee"); safePaise(input.referenceAdvancePaise, "Reference advance"); safeBasisPoints(input.defaultGstBasisPoints);
+  const requestHash = deterministicContentHash({ referenceFeePaise: input.referenceFeePaise, referenceAdvancePaise: input.referenceAdvancePaise, defaultGstBasisPoints: input.defaultGstBasisPoints, reason: trimmed(input.reason, "Private reason"), balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60 });
+  const replay = input.state.founderCommercialPolicies.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different policy content."); return replay; }
+  const active = ensureFounderCommercialPolicy(input);
+  assertExpected(active.version, input.expectedActiveVersion, "active commercial policy");
+  active.status = "SUPERSEDED"; active.recordVersion = (active.recordVersion ?? 1) + 1;
+  const next: FounderCommercialPolicyVersionRecord = { id: uuid(), organisationId: input.organisationId, version: active.version + 1, status: "ACTIVE", referenceFeePaise: input.referenceFeePaise, referenceAdvancePaise: input.referenceAdvancePaise, defaultGstBasisPoints: input.defaultGstBasisPoints, balanceDeadlineDays: 7, advanceInvoiceSlaMinutes: 60, reason: input.reason.trim(), actorUserId: input.actor.id, createdAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  input.state.founderCommercialPolicies.push(next);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "COMMERCIAL_POLICY_ACTIVATED", entityType: "COMMERCIAL_POLICY", entityId: next.id, actorUserId: input.actor.id, reason: next.reason, beforeHash: active.requestHash, afterHash: requestHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return next;
+}
+
+export function createFounderLegalPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; kind: FounderCommercialLegalPolicyRecord["kind"]; title: string; exactText: string; configuration?: FounderCommercialLegalPolicyRecord["configuration"]; reason: string; idempotencyKey: string; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const exactText = trimmed(input.exactText, "Owner/legal-approved exact text");
+  if (input.kind === "ACCEPTANCE_DECLARATION" && (!input.configuration?.acceptanceCheckboxLabel?.trim() || !input.configuration?.typedConfirmationPhrase?.trim())) fail(400, "Acceptance checkbox and typed confirmation wording require owner/legal input.");
+  if (input.kind === "INVOICE_STATUTORY_CONFIG" && (!input.configuration?.invoicePrefix?.trim() || !Number.isSafeInteger(input.configuration?.startingSequence) || (input.configuration?.startingSequence ?? 0) < 1 || !input.configuration?.jurisdictionLabel?.trim() || !input.configuration?.requiredFields?.length)) fail(400, "Statutory invoice numbering, jurisdiction and required fields require approved configuration.");
+  const requestHash = deterministicContentHash({ kind: input.kind, title: trimmed(input.title, "Policy title"), exactText, configuration: input.configuration, reason: trimmed(input.reason, "Reason") });
+  const replay = input.state.founderCommercialLegalPolicies.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different legal policy content."); return replay; }
+  const version = Math.max(0, ...input.state.founderCommercialLegalPolicies.filter((item) => item.organisationId === input.organisationId && item.kind === input.kind).map((item) => item.version)) + 1;
+  const policy: FounderCommercialLegalPolicyRecord = { id: uuid(), organisationId: input.organisationId, kind: input.kind, version, status: "DRAFT", title: input.title.trim(), exactText, contentHash: deterministicContentHash({ exactText, configuration: input.configuration }), configuration: structuredClone(input.configuration), reason: input.reason.trim(), createdByActorUserId: input.actor.id, createdAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  input.state.founderCommercialLegalPolicies.push(policy);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_DRAFTED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: policy.reason, afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return policy;
+}
+
+export function activateFounderLegalPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; policyId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const policy = input.state.founderCommercialLegalPolicies.find((item) => item.id === input.policyId && item.organisationId === input.organisationId);
+  if (!policy) fail(404, "Commercial legal policy not found.");
+  const replay = input.state.founderCommercialAuditEvents.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === `audit:${input.idempotencyKey}`);
+  if (replay) return policy;
+  assertExpected(policy.recordVersion, input.expectedRecordVersion, "legal policy");
+  if (policy.status !== "DRAFT" && policy.status !== "FOUNDER_APPROVED") fail(409, "Only a draft or Founder-approved policy can be activated.");
+  for (const prior of input.state.founderCommercialLegalPolicies.filter((item) => item.organisationId === input.organisationId && item.kind === policy.kind && item.status === "ACTIVE")) { prior.status = "SUPERSEDED"; prior.supersedesPolicyId = policy.id; prior.recordVersion = (prior.recordVersion ?? 1) + 1; }
+  policy.status = "ACTIVE"; policy.approvedByActorUserId = input.actor.id; policy.approvedAt ??= nowIso(input.now); policy.activatedAt = nowIso(input.now); policy.recordVersion = (policy.recordVersion ?? 1) + 1;
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_ACTIVATED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Activation reason"), afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return policy;
+}
+
+export function createFounderProposalTemplate(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; serviceType: VastuServiceType; name: string; kind: "DEFAULT" | "REUSABLE_VARIANT"; scopeItems: FounderProposalTemplateVersionRecord["scopeItems"]; deliverables: FounderProposalTemplateVersionRecord["deliverables"]; reason: string; idempotencyKey: string; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  if (!input.scopeItems.length || !input.deliverables.length) fail(400, "Scope and deliverables must be explicitly configured; brochure text is never inferred.");
+  const requestHash = deterministicContentHash({ serviceType: input.serviceType, name: trimmed(input.name, "Template name"), kind: input.kind, scopeItems: input.scopeItems, deliverables: input.deliverables, reason: trimmed(input.reason, "Reason") });
+  const replay = input.state.founderProposalTemplates.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different template content."); return replay; }
+  const version = Math.max(0, ...input.state.founderProposalTemplates.filter((item) => item.organisationId === input.organisationId && item.serviceType === input.serviceType).map((item) => item.version)) + 1;
+  const template: FounderProposalTemplateVersionRecord = { id: uuid(), organisationId: input.organisationId, serviceType: input.serviceType, version, name: input.name.trim(), kind: input.kind, status: "DRAFT", scopeItems: structuredClone(input.scopeItems), deliverables: structuredClone(input.deliverables), contentHash: deterministicContentHash({ scopeItems: input.scopeItems, deliverables: input.deliverables }), reason: input.reason.trim(), actorUserId: input.actor.id, createdAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  input.state.founderProposalTemplates.push(template);
+  return template;
+}
+
+export function activateFounderProposalTemplate(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; templateId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const template = input.state.founderProposalTemplates.find((item) => item.id === input.templateId && item.organisationId === input.organisationId);
+  if (!template) fail(404, "Proposal template not found.");
+  assertExpected(template.recordVersion, input.expectedRecordVersion, "proposal template");
+  if (template.status !== "DRAFT") fail(409, "Only a draft template can be activated.");
+  if (template.kind === "DEFAULT") for (const prior of input.state.founderProposalTemplates.filter((item) => item.organisationId === input.organisationId && item.serviceType === template.serviceType && item.kind === "DEFAULT" && item.status === "ACTIVE")) { prior.status = "SUPERSEDED"; prior.supersedesTemplateId = template.id; prior.recordVersion = (prior.recordVersion ?? 1) + 1; }
+  template.status = "ACTIVE"; template.activatedAt = nowIso(input.now); template.recordVersion = (template.recordVersion ?? 1) + 1;
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "PROPOSAL_TEMPLATE_ACTIVATED", entityType: "PROPOSAL_TEMPLATE", entityId: template.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Activation reason"), afterHash: template.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return template;
+}
+
+function commercialTerms(input: { classification: FounderEngagementClassification; professionalFeePaise: number; appliedGstBasisPoints: number; agreedAdvancePaise: number; policy: FounderCommercialPolicyVersionRecord; feeDeviationReason?: string; classificationReason?: string; gstDeviationReason?: string; advanceExceptionReason?: string }) {
+  safePaise(input.professionalFeePaise, "Professional fee"); safePaise(input.agreedAdvancePaise, "Agreed advance"); safeBasisPoints(input.appliedGstBasisPoints);
+  const nonStandard = input.classification !== "STANDARD_PAID";
+  if (nonStandard && !input.classificationReason?.trim()) fail(400, "A private reason is required for a non-standard engagement classification.");
+  if (input.classification === "INTERNAL_COMPLIMENTARY" && (input.professionalFeePaise !== 0 || input.appliedGstBasisPoints !== 0 || input.agreedAdvancePaise !== 0)) fail(400, "Internal complimentary engagements require fee, GST and advance to be zero.");
+  if (input.classification !== "INTERNAL_COMPLIMENTARY" && input.professionalFeePaise !== input.policy.referenceFeePaise && !input.feeDeviationReason?.trim()) fail(400, "A private fee deviation reason is required.");
+  if (input.classification !== "INTERNAL_COMPLIMENTARY" && input.appliedGstBasisPoints !== input.policy.defaultGstBasisPoints && !input.gstDeviationReason?.trim()) fail(400, "A private GST deviation reason is required.");
+  const advanceException = input.classification !== "INTERNAL_COMPLIMENTARY" && input.agreedAdvancePaise < input.policy.referenceAdvancePaise;
+  if (advanceException && (!nonStandard || !input.advanceExceptionReason?.trim())) fail(400, "A lower or zero advance requires a non-standard classification and Yogesh-approved private exception reason.");
+  const gstAmountPaise = calculateGstPaise(input.professionalFeePaise, input.appliedGstBasisPoints);
+  const totalPayablePaise = input.professionalFeePaise + gstAmountPaise;
+  if (!Number.isSafeInteger(totalPayablePaise) || input.agreedAdvancePaise > totalPayablePaise) fail(400, "Agreed advance cannot exceed total payable.");
+  return { engagementClassification: input.classification, professionalFeePaise: input.professionalFeePaise, referenceFeePaise: input.policy.referenceFeePaise, gstReferenceBasisPoints: input.policy.defaultGstBasisPoints, gstAppliedBasisPoints: input.appliedGstBasisPoints, gstAmountPaise, totalPayablePaise, agreedAdvancePaise: input.agreedAdvancePaise, remainingBalancePaise: totalPayablePaise, feeDeviationReason: input.feeDeviationReason?.trim(), classificationReason: input.classificationReason?.trim(), gstDeviationReason: input.gstDeviationReason?.trim(), advanceExceptionReason: input.advanceExceptionReason?.trim(), advanceExceptionApproved: !advanceException || Boolean(input.advanceExceptionReason?.trim()), paymentMilestones: [{ id: "advance", label: "Agreed advance", amountPaise: input.agreedAdvancePaise, trigger: "After proposal acceptance and before case creation, unless an authorised exception applies." }, { id: "balance", label: "Remaining balance", amountPaise: totalPayablePaise - input.agreedAdvancePaise, trigger: "Due seven calendar days after confirmed advance; workflow prerequisites remain enforced." }] };
+}
+
+export function createFounderProposalDraft(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; prospectiveProjectId: string; classification: FounderEngagementClassification; professionalFeePaise: number; appliedGstBasisPoints: number; agreedAdvancePaise: number; feeDeviationReason?: string; classificationReason?: string; gstDeviationReason?: string; advanceExceptionReason?: string; idempotencyKey: string; expectedProjectVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const requestHash = deterministicContentHash({ clientId: input.clientId, prospectiveProjectId: input.prospectiveProjectId, classification: input.classification, professionalFeePaise: input.professionalFeePaise, appliedGstBasisPoints: input.appliedGstBasisPoints, agreedAdvancePaise: input.agreedAdvancePaise, feeDeviationReason: input.feeDeviationReason, classificationReason: input.classificationReason, gstDeviationReason: input.gstDeviationReason, advanceExceptionReason: input.advanceExceptionReason });
+  const replay = input.state.founderProposalVersions.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different proposal content."); return replay; }
+  const client = input.state.clients.find((item) => item.id === input.clientId && (!item.organisationId || item.organisationId === input.organisationId));
+  const project = input.state.prospectiveProjects.find((item) => item.id === input.prospectiveProjectId && item.organisationId === input.organisationId && item.clientId === input.clientId);
+  if (!client || !project) fail(404, "Client and prospective project must share this organisation scope.");
+  assertExpected(project.recordVersion, input.expectedProjectVersion, "prospective project");
+  const response = input.state.qualificationResponseVersions.find((item) => item.id === project.responseVersionId && item.organisationId === input.organisationId && item.clientId === input.clientId && item.status === "SUBMITTED");
+  if (!response) fail(409, "An exact submitted qualification response is required before proposal drafting.");
+  const serviceType = project.serviceType;
+  if (!serviceType) fail(409, "Select Existing Space or New Construction on the prospective project before proposal drafting.");
+  const template = input.state.founderProposalTemplates.find((item) => item.organisationId === input.organisationId && item.serviceType === serviceType && item.kind === "DEFAULT" && item.status === "ACTIVE");
+  if (!template) fail(409, "An active approved service scope template is required; brochure wording is never inferred.");
+  const policy = ensureFounderCommercialPolicy(input);
+  const terms = commercialTerms({ classification: input.classification, professionalFeePaise: input.professionalFeePaise, appliedGstBasisPoints: input.appliedGstBasisPoints, agreedAdvancePaise: input.agreedAdvancePaise, policy, feeDeviationReason: input.feeDeviationReason, classificationReason: input.classificationReason, gstDeviationReason: input.gstDeviationReason, advanceExceptionReason: input.advanceExceptionReason });
+  const intake = input.state.clientIntakeProfiles.filter((item) => item.clientId === client.id && (!item.organisationId || item.organisationId === input.organisationId)).sort((a, b) => b.version - a.version)[0];
+  const proposalDate = nowIso(input.now);
+  const content: FounderProposalContentSnapshot = {
+    clientProject: { clientName: client.displayName, clientId: client.id, prospectiveProjectId: project.id, projectKind: project.kind, serviceType, propertyType: intake?.propertyContext?.propertyType, propertyLocation: intake?.propertyContext?.cityCountry ?? client.city, knownFloorCount: undefined, primaryRequirement: intake?.needs?.mainChallenge, proposalDate },
+    requirements: { qualificationResponseVersionId: response.id, qualificationResponseHash: response.answersHash, exactAnswerSnapshotHash: deterministicContentHash(response.answers) },
+    scopeItems: template.scopeItems.map((item) => ({ ...structuredClone(item), prospectiveProjectId: project.id })),
+    deliverables: template.deliverables.map((item) => ({ ...structuredClone(item), prospectiveProjectId: project.id })),
+    interactions: { includedReviewRounds: 0, includedPresentationCalls: 0, clarificationPeriodDays: 0, expectedResponseTime: "", additionalInteractionTreatment: "" },
+    timeline: { expectedCommencement: "", estimatedDateRange: "", milestones: [], prerequisites: [], clientDependencies: [], pauseOrExtensionConditions: [], isEstimate: true },
+    commercial: terms,
+    projectExclusions: [],
+    policyBindings: { commercialPolicyId: policy.id, templateVersionId: template.id },
+    nextSteps: { advanceRequired: input.classification !== "INTERNAL_COMPLIMENTARY", balanceAfterAdvanceDeadline: true, paymentProofRequiresConfirmation: true, reportGatesRemainServerEnforced: true }
+  };
+  const proposal: FounderProposalVersionRecord = { id: uuid(), proposalId: uuid(), version: 1, organisationId: input.organisationId, clientId: client.id, prospectiveProjectId: project.id, serviceType, status: "DRAFT", currentStep: 1, content, contentHash: deterministicContentHash(content), createdAt: proposalDate, createdByActorUserId: input.actor.id, recordVersion: 1, idempotencyKey: input.idempotencyKey, requestHash };
+  input.state.founderProposalVersions.push(proposal);
+  input.state.founderBalanceDeadlines.push({ id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, clientId: client.id, prospectiveProjectId: project.id, status: terms.totalPayablePaise === 0 ? "WAIVED" : "NOT_DUE", remainingAmountPaise: terms.totalPayablePaise, commercialPolicyId: policy.id, commercialPolicyVersion: policy.version, engagementClassification: input.classification, recordVersion: 1 });
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "PROPOSAL_DRAFT_CREATED", entityType: "PROPOSAL_VERSION", entityId: proposal.id, actorUserId: input.actor.id, reason: "Founder created a versioned proposal draft.", proposalVersionId: proposal.id, prospectiveProjectId: project.id, afterHash: proposal.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return proposal;
+}
+
+export function autosaveFounderProposalStep(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; step: FounderProposalStep; expectedRecordVersion?: number; idempotencyKey: string; patch: Record<string, unknown>; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal) fail(404, "Proposal version not found.");
+  const requestHash = deterministicContentHash({ proposalVersionId: proposal.id, step: input.step, patch: input.patch });
+  const replay = input.state.founderCommercialAuditEvents.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === `audit:${input.idempotencyKey}`);
+  if (replay) { if (replay.afterHash !== requestHash) fail(409, "This idempotency key was used for different proposal changes."); return proposal; }
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "proposal");
+  if (proposal.status !== "DRAFT") fail(409, "Approved or sent proposal content is immutable. Create a successor draft.");
+  const allowed: Record<number, string[]> = { 1: [], 2: ["refinedSummary"], 3: ["scopeItems", "projectExclusions"], 4: ["deliverables", "interactions"], 5: ["timeline", "commercial"], 6: ["validityEndsAt"] };
+  if (Object.keys(input.patch).some((key) => !allowed[input.step].includes(key))) fail(400, "The proposal step contains an unsupported field.");
+  const beforeHash = proposal.contentHash;
+  if (input.step === 2 && "refinedSummary" in input.patch) { proposal.content.requirements.refinedSummary = trimmed(String(input.patch.refinedSummary ?? ""), "Refined proposal summary"); proposal.content.requirements.refinedByActorUserId = input.actor.id; proposal.content.requirements.refinedAt = nowIso(input.now); }
+  if (input.step === 3 && Array.isArray(input.patch.scopeItems)) proposal.content.scopeItems = structuredClone(input.patch.scopeItems) as FounderProposalContentSnapshot["scopeItems"];
+  if (input.step === 3 && Array.isArray(input.patch.projectExclusions)) proposal.content.projectExclusions = structuredClone(input.patch.projectExclusions) as string[];
+  if (input.step === 4 && Array.isArray(input.patch.deliverables)) proposal.content.deliverables = structuredClone(input.patch.deliverables) as FounderProposalContentSnapshot["deliverables"];
+  if (input.step === 4 && input.patch.interactions && typeof input.patch.interactions === "object") proposal.content.interactions = structuredClone(input.patch.interactions) as FounderProposalContentSnapshot["interactions"];
+  if (input.step === 5 && input.patch.timeline && typeof input.patch.timeline === "object") proposal.content.timeline = { ...(structuredClone(input.patch.timeline) as FounderProposalContentSnapshot["timeline"]), isEstimate: true };
+  if (input.step === 5 && input.patch.commercial && typeof input.patch.commercial === "object") {
+    if (input.state.founderCommercialPaymentConfirmations.some((item) => item.proposalVersionId === proposal.id)) fail(409, "Commercial terms cannot change after a confirmed payment. Create a successor commercial version.");
+    const raw = input.patch.commercial as Record<string, unknown>; const policy = input.state.founderCommercialPolicies.find((item) => item.id === proposal.content.policyBindings.commercialPolicyId && item.organisationId === input.organisationId);
+    if (!policy) fail(409, "The bound commercial policy version is unavailable.");
+    proposal.content.commercial = commercialTerms({ classification: raw.engagementClassification as FounderEngagementClassification, professionalFeePaise: Number(raw.professionalFeePaise), appliedGstBasisPoints: Number(raw.gstAppliedBasisPoints), agreedAdvancePaise: Number(raw.agreedAdvancePaise), policy, feeDeviationReason: String(raw.feeDeviationReason ?? ""), classificationReason: String(raw.classificationReason ?? ""), gstDeviationReason: String(raw.gstDeviationReason ?? ""), advanceExceptionReason: String(raw.advanceExceptionReason ?? "") });
+    const deadline = input.state.founderBalanceDeadlines.find((item) => item.proposalVersionId === proposal.id); if (deadline) { deadline.remainingAmountPaise = proposal.content.commercial.totalPayablePaise; deadline.engagementClassification = proposal.content.commercial.engagementClassification; deadline.status = proposal.content.commercial.totalPayablePaise === 0 ? "WAIVED" : "NOT_DUE"; deadline.recordVersion = (deadline.recordVersion ?? 1) + 1; }
+  }
+  if (input.step === 6 && "validityEndsAt" in input.patch) { const value = new Date(String(input.patch.validityEndsAt)); if (!Number.isFinite(value.getTime())) fail(400, "Choose a valid proposal validity date."); proposal.validityEndsAt = value.toISOString(); }
+  proposal.currentStep = input.step; proposal.contentHash = deterministicContentHash(proposal.content); proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "PROPOSAL_DRAFT_AUTOSAVED", entityType: "PROPOSAL_VERSION", entityId: proposal.id, actorUserId: input.actor.id, reason: `Founder autosaved proposal step ${input.step}.`, proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, beforeHash, afterHash: requestHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return proposal;
+}
+
+function activeLegal(state: AppState, organisationId: string, kind: FounderCommercialLegalPolicyRecord["kind"]) { return state.founderCommercialLegalPolicies.find((item) => item.organisationId === organisationId && item.kind === kind && item.status === "ACTIVE"); }
+
+export function getFounderProposalBlockers(state: AppState, proposal: FounderProposalVersionRecord, now = new Date()) {
+  const blockers: Array<{ code: string; message: string; recovery: string }> = [];
+  if (!proposal.content.requirements.refinedSummary?.trim()) blockers.push({ code: "P2_REFINED_SUMMARY", message: "Project requirements need a Founder-refined proposal summary while preserving exact qualification answers.", recovery: "Complete Requirements & Scope." });
+  if (!proposal.content.scopeItems.length) blockers.push({ code: "P3_SCOPE", message: "At least one explicitly classified scope item is required.", recovery: "Complete Requirements & Scope." });
+  if (!proposal.content.deliverables.length) blockers.push({ code: "P4_DELIVERABLES", message: "At least one explicit deliverable is required.", recovery: "Complete Deliverables & Interactions." });
+  const interactions = proposal.content.interactions;
+  if (interactions.includedReviewRounds < 0 || interactions.includedPresentationCalls < 0 || interactions.clarificationPeriodDays < 0 || !interactions.expectedResponseTime.trim() || !interactions.additionalInteractionTreatment.trim()) blockers.push({ code: "P6_INTERACTIONS", message: "Review rounds, calls, clarification and additional-interaction treatment are incomplete.", recovery: "Complete Deliverables & Interactions." });
+  const timeline = proposal.content.timeline;
+  if (!timeline.expectedCommencement.trim() || !timeline.estimatedDateRange.trim() || !timeline.milestones.length || !timeline.prerequisites.length || !timeline.clientDependencies.length || !timeline.pauseOrExtensionConditions.length) blockers.push({ code: "P7_TIMELINE", message: "Estimated timeline, milestones, prerequisites, dependencies and pause conditions are incomplete.", recovery: "Complete Timeline & Commercials." });
+  if (!activeLegal(state, proposal.organisationId!, "PROFESSIONAL_BOUNDARIES")) blockers.push({ code: "P5_OWNER_LEGAL", message: "BLOCKED — OWNER/LEGAL INPUT REQUIRED: active professional-boundary wording is missing.", recovery: "Approve and activate P5 core professional boundaries." });
+  if (!activeLegal(state, proposal.organisationId!, "ACCEPTANCE_DECLARATION")) blockers.push({ code: "P13_OWNER_LEGAL", message: "BLOCKED — OWNER/LEGAL INPUT REQUIRED: active acceptance declaration is missing.", recovery: "Approve and activate P13 acceptance wording." });
+  if (!activeLegal(state, proposal.organisationId!, "CANCELLATION_REFUND_DELAY")) blockers.push({ code: "P14_OWNER_LEGAL", message: "BLOCKED — OWNER/LEGAL INPUT REQUIRED: active cancellation/refund/delay policy is missing.", recovery: "Approve and activate P14 policy wording." });
+  if (!proposal.validityEndsAt || new Date(proposal.validityEndsAt) <= now) blockers.push({ code: "P10_VALIDITY", message: "A future Yogesh-set proposal validity date is required.", recovery: "Complete Policies & Next Steps." });
+  return blockers;
+}
+
+function bindActivePolicies(state: AppState, proposal: FounderProposalVersionRecord) {
+  const p5 = activeLegal(state, proposal.organisationId!, "PROFESSIONAL_BOUNDARIES");
+  const p13 = activeLegal(state, proposal.organisationId!, "ACCEPTANCE_DECLARATION");
+  const p14 = activeLegal(state, proposal.organisationId!, "CANCELLATION_REFUND_DELAY");
+  if (!p5 || !p13 || !p14) fail(409, "BLOCKED — OWNER/LEGAL INPUT REQUIRED. P5, P13 and P14 must be approved and active.");
+  proposal.content.policyBindings.professionalBoundariesPolicyId = p5.id; proposal.content.policyBindings.acceptanceDeclarationPolicyId = p13.id; proposal.content.policyBindings.cancellationPolicyId = p14.id;
+}
+
+export function reviewFounderProposal(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal) fail(404, "Proposal version not found.");
+  const existing = input.state.founderProposalApprovals.find((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.checkpoint === "SUPER_ADMIN_REVIEWED");
+  if (existing) return proposal;
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "proposal");
+  if (proposal.status !== "DRAFT") fail(409, "Only a draft proposal can be reviewed.");
+  const blockers = getFounderProposalBlockers(input.state, proposal, input.now);
+  if (blockers.length) fail(409, blockers[0].message);
+  bindActivePolicies(input.state, proposal); proposal.contentHash = deterministicContentHash(proposal.content); proposal.status = "SUPER_ADMIN_REVIEWED"; proposal.reviewedAt = nowIso(input.now); proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
+  input.state.founderProposalApprovals.push({ id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, checkpoint: "SUPER_ADMIN_REVIEWED", actorUserId: input.actor.id, actorName: input.actor.fullName, actorRole: "SUPER_ADMIN", reason: trimmed(input.reason, "Review reason"), contentHash: proposal.contentHash, createdAt: proposal.reviewedAt, idempotencyKey: input.idempotencyKey, recordVersion: 1 });
+  return proposal;
+}
+
+export function approveFounderProposal(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal) fail(404, "Proposal version not found.");
+  const existing = input.state.founderProposalApprovals.find((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.checkpoint === "SUPER_ADMIN_APPROVED");
+  if (existing) return proposal;
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "proposal");
+  if (proposal.status !== "SUPER_ADMIN_REVIEWED") fail(409, "Separate Super Admin review is required before approval.");
+  if (getFounderProposalBlockers(input.state, proposal, input.now).length) fail(409, "Proposal approval is blocked by incomplete or inactive required content.");
+  proposal.status = "SUPER_ADMIN_APPROVED"; proposal.approvedAt = nowIso(input.now); proposal.contentHash = deterministicContentHash(proposal.content); proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
+  input.state.founderProposalApprovals.push({ id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, checkpoint: "SUPER_ADMIN_APPROVED", actorUserId: input.actor.id, actorName: input.actor.fullName, actorRole: "SUPER_ADMIN", reason: trimmed(input.reason, "Approval reason"), contentHash: proposal.contentHash, createdAt: proposal.approvedAt, idempotencyKey: input.idempotencyKey, recordVersion: 1 });
+  return proposal;
+}
+
+export function projectFounderProposalForClient(state: AppState, proposal: FounderProposalVersionRecord): FounderProposalClientProjection {
+  const p5 = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.professionalBoundariesPolicyId && item.organisationId === proposal.organisationId);
+  const p14 = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.cancellationPolicyId && item.organisationId === proposal.organisationId);
+  if (!p5 || !p14) fail(409, "The proposal legal-policy snapshot is unavailable.");
+  const commercial = proposal.content.commercial;
+  return { proposalVersion: proposal.version, proposalHash: proposal.contentHash, client: { name: proposal.content.clientProject.clientName, permanentClientId: proposal.clientId }, project: { kind: proposal.content.clientProject.projectKind, serviceType: proposal.serviceType, propertyType: proposal.content.clientProject.propertyType, propertyLocation: proposal.content.clientProject.propertyLocation, knownFloorCount: proposal.content.clientProject.knownFloorCount, primaryRequirement: proposal.content.clientProject.primaryRequirement }, requirements: { exactQualificationVersion: proposal.content.requirements.qualificationResponseVersionId, refinedSummary: proposal.content.requirements.refinedSummary }, scopeItems: proposal.content.scopeItems.map(({ order, title, status, floorIds, note }) => ({ order, title, status, floorIds, note })), deliverables: proposal.content.deliverables.map(({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency }) => ({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency })), interactions: structuredClone(proposal.content.interactions), timeline: structuredClone(proposal.content.timeline), commercial: { professionalFeePaise: commercial.professionalFeePaise, gstAppliedBasisPoints: commercial.gstAppliedBasisPoints, gstAmountPaise: commercial.gstAmountPaise, totalPayablePaise: commercial.totalPayablePaise, agreedAdvancePaise: commercial.agreedAdvancePaise, remainingBalancePaise: commercial.remainingBalancePaise, paymentMilestones: structuredClone(commercial.paymentMilestones) }, professionalBoundaries: p5.exactText, projectExclusions: [...proposal.content.projectExclusions], cancellationRefundDelayPolicy: p14.exactText, validityEndsAt: proposal.validityEndsAt!, postAcceptanceSequence: ["Uchit acknowledges acceptance.", "Payment instructions are issued where applicable.", "The agreed advance or approved exception is confirmed.", "A Case ID and workspace are created only after commercial clearance.", "Project intake and evidence collection begin."] };
+}
+
+export async function generateFounderProposalArtifact(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; store: CommercialArtifactStore; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal) fail(404, "Proposal version not found.");
+  const existing = input.state.founderProposalArtifacts.find((item) => item.proposalVersionId === proposal.id && item.organisationId === input.organisationId);
+  if (existing) return existing;
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "proposal");
+  if (proposal.status !== "SUPER_ADMIN_APPROVED") fail(409, "Super Admin approval is required before immutable artifact generation.");
+  const projection = projectFounderProposalForClient(input.state, proposal); const projectionHash = deterministicContentHash(projection); const bytes = renderCommercialProposalPdf(projection); const artifactHash = await hashBytes(bytes); const privateObjectKey = `commercial/proposals/${input.organisationId}/${proposal.id}/${artifactHash}.pdf`;
+  await input.store.putImmutable(privateObjectKey, bytes, "application/pdf", { immutable: "true", proposalVersionId: proposal.id, checksumSha256: artifactHash });
+  const artifact = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, proposalContentHash: proposal.contentHash, clientProjectionHash: projectionHash, artifactHashSha256: artifactHash, privateObjectKey, mimeType: "application/pdf" as const, sizeBytes: bytes.byteLength, pageCount: 1, rendererVersion: COMMERCIAL_PROPOSAL_RENDERER_VERSION, generatedAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, recordVersion: 1 };
+  input.state.founderProposalArtifacts.push(artifact); return artifact;
+}
+
+export async function sendFounderProposal(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  const artifact = input.state.founderProposalArtifacts.find((item) => item.proposalVersionId === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal || !artifact) fail(409, "An exact approved immutable proposal artifact is required before preparing a client link.");
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "proposal");
+  if (proposal.status !== "SUPER_ADMIN_APPROVED" || !proposal.validityEndsAt || new Date(proposal.validityEndsAt) <= (input.now ?? new Date())) fail(409, "Only a currently valid approved proposal can be sent.");
+  const token = `${uuid().replaceAll("-", "")}${uuid().replaceAll("-", "")}`;
+  const grant = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, tokenHash: await hashText(token), expiresAt: proposal.validityEndsAt, createdAt: nowIso(input.now), createdByActorUserId: input.actor.id, recordVersion: 1 };
+  input.state.founderProposalGrants.push(grant); proposal.status = "SENT"; proposal.sentAt = nowIso(input.now); proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
+  return { proposal, grant, token };
+}
+
+export async function resolveFounderProposalGrant(state: AppState, token: string, now = new Date()) {
+  const tokenHash = await hashText(token); const grant = state.founderProposalGrants.find((item) => item.tokenHash === tokenHash);
+  if (!grant || grant.revokedAt || new Date(grant.expiresAt) <= now) fail(404, "This proposal link is unavailable or expired.");
+  const proposal = state.founderProposalVersions.find((item) => item.id === grant.proposalVersionId && item.organisationId === grant.organisationId && item.clientId === grant.clientId && item.prospectiveProjectId === grant.prospectiveProjectId);
+  if (!proposal || proposal.status !== "SENT") fail(409, "This proposal version is no longer available for response.");
+  if (!grant.openedAt) { grant.openedAt = now.toISOString(); grant.recordVersion = (grant.recordVersion ?? 1) + 1; }
+  const acceptance = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.acceptanceDeclarationPolicyId && item.organisationId === proposal.organisationId);
+  if (!acceptance) fail(409, "The accepted legal declaration snapshot is unavailable.");
+  return { grant, proposal, projection: projectFounderProposalForClient(state, proposal), acceptanceDeclaration: { exactText: acceptance.exactText, checkboxLabel: acceptance.configuration?.acceptanceCheckboxLabel, typedConfirmationPhrase: acceptance.configuration?.typedConfirmationPhrase } };
+}
+
+export async function respondToFounderProposal(input: { state: AppState; token: string; response: "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED"; fullName: string; acceptanceChecked?: boolean; typedConfirmation?: string; organisationName?: string; designation?: string; requestedChanges?: string; idempotencyKey: string; now?: Date }) {
+  safeIdempotency(input.idempotencyKey); const resolved = await resolveFounderProposalGrant(input.state, input.token, input.now); const { proposal } = resolved;
+  const requestHash = deterministicContentHash({ proposalVersionId: proposal.id, response: input.response, fullName: input.fullName.trim(), acceptanceChecked: input.acceptanceChecked, typedConfirmation: input.typedConfirmation, organisationName: input.organisationName, designation: input.designation, requestedChanges: input.requestedChanges });
+  const replay = input.state.founderProposalResponses.find((item) => item.organisationId === proposal.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for a different proposal response."); return replay; }
+  if (input.state.founderProposalResponses.some((item) => item.proposalVersionId === proposal.id)) fail(409, "This immutable proposal version already has a recorded response.");
+  const artifact = input.state.founderProposalArtifacts.find((item) => item.proposalVersionId === proposal.id)!;
+  if (input.response === "ACCEPTED") {
+    if (!input.acceptanceChecked || !input.fullName.trim()) fail(400, "Full name and explicit acceptance checkbox are required.");
+    if (input.typedConfirmation !== resolved.acceptanceDeclaration.typedConfirmationPhrase) fail(400, "Typed confirmation must exactly match the approved acceptance declaration.");
+    if (proposal.content.clientProject.projectKind === "COMMERCIAL" && (!input.organisationName?.trim() || !input.designation?.trim())) fail(400, "Organisation and designation are required for commercial-project acceptance.");
+  }
+  if (input.response === "CHANGES_REQUESTED" && !input.requestedChanges?.trim()) fail(400, "Requested changes are required.");
+  const record = { id: uuid(), organisationId: proposal.organisationId, proposalVersionId: proposal.id, proposalContentHash: proposal.contentHash, artifactHashSha256: artifact.artifactHashSha256, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, response: input.response, fullName: input.fullName.trim(), acceptanceChecked: input.response === "ACCEPTED" ? true : undefined, typedConfirmationHash: input.response === "ACCEPTED" ? await hashText(input.typedConfirmation!) : undefined, organisationName: input.organisationName?.trim(), designation: input.designation?.trim(), requestedChanges: input.requestedChanges?.trim(), respondedAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  input.state.founderProposalResponses.push(record); proposal.status = input.response; if (input.response === "ACCEPTED") proposal.acceptedAt = record.respondedAt; proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
+  if (input.response === "ACCEPTED") input.state.founderCommercialInvoices.push({ id: uuid(), organisationId: proposal.organisationId, proposalVersionId: proposal.id, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, status: "NOT_DUE", amountReceivedPaise: 0, gstBasisPoints: proposal.content.commercial.gstAppliedBasisPoints, gstAmountSnapshotPaise: proposal.content.commercial.gstAmountPaise, remainingBalancePaise: proposal.content.commercial.totalPayablePaise, idempotencyKey: `invoice:not-due:${proposal.id}`, requestHash: deterministicContentHash({ proposalVersionId: proposal.id, state: "NOT_DUE" }), recordVersion: 1 });
+  return record;
+}
+
+export function confirmFounderCommercialPayment(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; paymentId: string; type: "ADVANCE" | "BALANCE"; amountPaise: number; idempotencyKey: string; expectedProposalRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey); safePaise(input.amountPaise, "Confirmed payment");
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal || proposal.status !== "ACCEPTED") fail(409, "Exact proposal acceptance is required before confirming commercial payment.");
+  assertExpected(proposal.recordVersion, input.expectedProposalRecordVersion, "proposal");
+  const requestHash = deterministicContentHash({ proposalVersionId: proposal.id, paymentId: input.paymentId, type: input.type, amountPaise: input.amountPaise });
+  const replay = input.state.founderCommercialPaymentConfirmations.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for a different payment confirmation."); return replay; }
+  if (input.state.founderCommercialPaymentConfirmations.some((item) => item.organisationId === input.organisationId && item.paymentId === input.paymentId)) fail(409, "This payment receipt is already bound to a commercial confirmation.");
+  const terms = proposal.content.commercial;
+  if (input.type === "ADVANCE" && input.amountPaise < terms.agreedAdvancePaise && terms.engagementClassification === "STANDARD_PAID") fail(409, "Confirmed advance is below the approved agreed advance and has no authorised exception.");
+  const confirmedAt = nowIso(input.now); const confirmation = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, paymentId: input.paymentId, type: input.type, amountPaise: input.amountPaise, confirmedAt, confirmedByActorUserId: input.actor.id, proposalContentHash: proposal.contentHash, idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  input.state.founderCommercialPaymentConfirmations.push(confirmation);
+  const confirmedTotal = input.state.founderCommercialPaymentConfirmations.filter((item) => item.proposalVersionId === proposal.id).reduce((sum, item) => sum + item.amountPaise, 0); const remaining = Math.max(0, terms.totalPayablePaise - confirmedTotal); terms.remainingBalancePaise = remaining;
+  const deadline = input.state.founderBalanceDeadlines.find((item) => item.proposalVersionId === proposal.id)!;
+  if (input.type === "ADVANCE" && !deadline.advanceConfirmedAt) {
+    const policy = input.state.founderCommercialPolicies.find((item) => item.id === deadline.commercialPolicyId)!; const instant = new Date(confirmedAt);
+    deadline.advancePaymentConfirmationId = confirmation.id; deadline.advanceConfirmedAt = confirmedAt; deadline.dueAt = addDays(instant, policy.balanceDeadlineDays).toISOString(); deadline.status = remaining === 0 ? "PAID" : "DUE"; deadline.remainingAmountPaise = remaining; deadline.recordVersion = (deadline.recordVersion ?? 1) + 1;
+    appendAudit(input.state, { organisationId: input.organisationId, eventType: "BALANCE_DEADLINE_CREATED", entityType: "BALANCE_DEADLINE", entityId: deadline.id, actorUserId: input.actor.id, reason: "Seven-day deadline created from immutable confirmed-advance timestamp.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, afterHash: deterministicContentHash({ advanceConfirmedAt: deadline.advanceConfirmedAt, dueAt: deadline.dueAt, policyVersion: deadline.commercialPolicyVersion }), idempotencyKey: `audit:deadline:${input.idempotencyKey}` });
+    const invoice = input.state.founderCommercialInvoices.find((item) => item.proposalVersionId === proposal.id)!; invoice.advancePaymentConfirmationId = confirmation.id; invoice.status = "DUE"; invoice.dueAt = addMinutes(instant, policy.advanceInvoiceSlaMinutes).toISOString(); invoice.amountReceivedPaise = input.amountPaise; invoice.remainingBalancePaise = remaining; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1;
+    appendAudit(input.state, { organisationId: input.organisationId, eventType: "ADVANCE_INVOICE_DUE", entityType: "COMMERCIAL_INVOICE", entityId: invoice.id, actorUserId: input.actor.id, reason: "Advance confirmation started the immutable sixty-minute invoice SLA.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, afterHash: deterministicContentHash({ advanceConfirmedAt: confirmedAt, dueAt: invoice.dueAt, policyVersion: policy.version }), idempotencyKey: `audit:invoice-due:${input.idempotencyKey}` });
+    if (!activeLegal(input.state, input.organisationId, "INVOICE_STATUTORY_CONFIG")) { invoice.status = "GENERATION_FAILED"; invoice.failureCode = "MISSING_STATUTORY_CONFIG"; invoice.failureAt = confirmedAt; }
+  }
+  if (remaining === 0) { deadline.status = "PAID"; deadline.remainingAmountPaise = 0; appendAudit(input.state, { organisationId: input.organisationId, eventType: "BALANCE_CONFIRMED", entityType: "BALANCE_DEADLINE", entityId: deadline.id, actorUserId: input.actor.id, reason: "Full GST-inclusive balance confirmed against the accepted proposal.", proposalVersionId: proposal.id, prospectiveProjectId: proposal.prospectiveProjectId, idempotencyKey: `audit:balance:${input.idempotencyKey}` }); }
+  proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
+  return confirmation;
+}
+
+export function projectFounderBalanceDeadline(state: AppState, proposalVersionId: string, now = new Date()) {
+  const deadline = state.founderBalanceDeadlines.find((item) => item.proposalVersionId === proposalVersionId); if (!deadline) fail(404, "Balance deadline not found.");
+  if (["DUE", "EXTENDED"].includes(deadline.status) && deadline.dueAt && now.getTime() >= new Date(deadline.dueAt).getTime() && deadline.remainingAmountPaise > 0) {
+    deadline.status = "OVERDUE"; deadline.recordVersion = (deadline.recordVersion ?? 1) + 1;
+    appendAudit(state, { organisationId: deadline.organisationId!, eventType: "BALANCE_OVERDUE", entityType: "BALANCE_DEADLINE", entityId: deadline.id, actorUserId: "SYSTEM", reason: "The snapshotted balance deadline has elapsed with an unpaid confirmed balance.", proposalVersionId, prospectiveProjectId: deadline.prospectiveProjectId, idempotencyKey: `audit:deadline-overdue:${deadline.id}` });
+  }
+  return deadline;
+}
+
+export function projectFounderInvoiceStatus(state: AppState, proposalVersionId: string, now = new Date()) {
+  const invoice = state.founderCommercialInvoices.find((item) => item.proposalVersionId === proposalVersionId); if (!invoice) return undefined;
+  if (["DUE", "GENERATION_FAILED"].includes(invoice.status) && invoice.dueAt && now.getTime() >= new Date(invoice.dueAt).getTime()) {
+    invoice.status = "OVERDUE"; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1;
+    appendAudit(state, { organisationId: invoice.organisationId!, eventType: "ADVANCE_INVOICE_OVERDUE", entityType: "COMMERCIAL_INVOICE", entityId: invoice.id, actorUserId: "SYSTEM", reason: "The sixty-minute invoice SLA elapsed before immutable issuance.", proposalVersionId, prospectiveProjectId: invoice.prospectiveProjectId, idempotencyKey: `audit:invoice-overdue:${invoice.id}` });
+  }
+  return invoice;
+}
+
+export function applyFounderBalanceDeadlineException(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; action: "EXTEND" | "WAIVE"; newDueAt?: string; reason: string; engagementClassification: FounderEngagementClassification; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey); const deadline = input.state.founderBalanceDeadlines.find((item) => item.proposalVersionId === input.proposalVersionId && item.organisationId === input.organisationId); if (!deadline) fail(404, "Balance deadline not found.");
+  const replay = input.state.founderCommercialAuditEvents.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === `audit:deadline-exception:${input.idempotencyKey}`); if (replay) return deadline;
+  assertExpected(deadline.recordVersion, input.expectedRecordVersion, "balance deadline"); trimmed(input.reason, "Private exception reason");
+  if (input.engagementClassification !== deadline.engagementClassification) fail(409, "The deadline exception classification does not match the immutable commercial version.");
+  const priorDueAt = deadline.dueAt; if (input.action === "EXTEND") { const next = new Date(input.newDueAt ?? ""); if (!Number.isFinite(next.getTime()) || !deadline.dueAt || next <= new Date(deadline.dueAt)) fail(400, "An extension must set a later valid deadline."); deadline.dueAt = next.toISOString(); deadline.status = "EXTENDED"; } else deadline.status = "WAIVED";
+  deadline.priorDueAt = priorDueAt; deadline.exceptionReason = input.reason.trim(); deadline.exceptionActorUserId = input.actor.id; deadline.exceptionAt = nowIso(input.now); deadline.recordVersion = (deadline.recordVersion ?? 1) + 1;
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: input.action === "EXTEND" ? "BALANCE_DEADLINE_EXTENDED" : "BALANCE_DEADLINE_WAIVED", entityType: "BALANCE_DEADLINE", entityId: deadline.id, actorUserId: input.actor.id, reason: input.reason.trim(), proposalVersionId: input.proposalVersionId, prospectiveProjectId: deadline.prospectiveProjectId, beforeHash: deterministicContentHash({ dueAt: priorDueAt }), afterHash: deterministicContentHash({ dueAt: deadline.dueAt, status: deadline.status }), idempotencyKey: `audit:deadline-exception:${input.idempotencyKey}` });
+  return deadline;
+}
+
+export async function issueFounderAdvanceInvoice(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; store: CommercialArtifactStore; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey); const invoice = input.state.founderCommercialInvoices.find((item) => item.proposalVersionId === input.proposalVersionId && item.organisationId === input.organisationId); const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!invoice || !proposal || proposal.status !== "ACCEPTED" || !invoice.advancePaymentConfirmationId || !invoice.dueAt) fail(409, "An accepted proposal and confirmed advance are required before invoice issuance.");
+  if (invoice.status === "ISSUED") return invoice; assertExpected(invoice.recordVersion, input.expectedRecordVersion, "invoice");
+  const policy = activeLegal(input.state, input.organisationId, "INVOICE_STATUTORY_CONFIG"); if (!policy) { invoice.status = "GENERATION_FAILED"; invoice.failureCode = "MISSING_STATUTORY_CONFIG"; invoice.failureAt = nowIso(input.now); invoice.recordVersion = (invoice.recordVersion ?? 1) + 1; fail(409, "REVIEW_REQUIRED — approved statutory invoice numbering and content configuration is missing."); }
+  const config = policy.configuration!; const sequence = (config.startingSequence ?? 1) + input.state.founderCommercialInvoices.filter((item) => item.organisationId === input.organisationId && item.invoiceNumber).length; const invoiceNumber = `${config.invoicePrefix}${sequence}`;
+  const client = input.state.clients.find((item) => item.id === proposal.clientId && (!item.organisationId || item.organisationId === input.organisationId))!; const issuedAt = nowIso(input.now);
+  const bytes = renderCommercialInvoicePdf({ invoiceNumber, clientName: client.displayName, proposalVersion: proposal.version, paymentId: input.state.founderCommercialPaymentConfirmations.find((item) => item.id === invoice.advancePaymentConfirmationId)!.paymentId, amountReceivedPaise: invoice.amountReceivedPaise, gstBasisPoints: invoice.gstBasisPoints, gstAmountSnapshotPaise: invoice.gstAmountSnapshotPaise, remainingBalancePaise: invoice.remainingBalancePaise, statutoryText: policy.exactText, issuedAt });
+  const artifactHash = await hashBytes(bytes); const key = `commercial/invoices/${input.organisationId}/${invoice.id}/${artifactHash}.pdf`;
+  try { await input.store.putImmutable(key, bytes, "application/pdf", { immutable: "true", invoiceId: invoice.id, checksumSha256: artifactHash, rendererVersion: COMMERCIAL_INVOICE_RENDERER_VERSION }); }
+  catch (error) { invoice.status = new Date(invoice.dueAt) <= (input.now ?? new Date()) ? "OVERDUE" : "GENERATION_FAILED"; invoice.failureCode = "ARTIFACT_GENERATION_FAILED"; invoice.failureAt = issuedAt; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1; throw error; }
+  invoice.status = "ISSUED"; invoice.invoicePolicyId = policy.id; invoice.invoiceNumber = invoiceNumber; invoice.artifactHashSha256 = artifactHash; invoice.privateObjectKey = key; invoice.issuedAt = issuedAt; invoice.issuedByActorUserId = input.actor.id; invoice.failureCode = undefined; invoice.failureAt = undefined; invoice.recordVersion = (invoice.recordVersion ?? 1) + 1;
+  return invoice;
+}
+
+export function createFounderProposalSuccessor(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey); const prior = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId); if (!prior) fail(404, "Proposal version not found.");
+  assertExpected(prior.recordVersion, input.expectedRecordVersion, "proposal"); if (!["SUPER_ADMIN_APPROVED", "SENT", "CHANGES_REQUESTED", "DECLINED", "EXPIRED"].includes(prior.status)) fail(409, "A successor is only created for immutable approved or client-reviewed content.");
+  const replay = input.state.founderProposalVersions.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey); if (replay) return replay;
+  const successor: FounderProposalVersionRecord = { ...structuredClone(prior), id: uuid(), version: prior.version + 1, status: "DRAFT", currentStep: 1, predecessorVersionId: prior.id, successorVersionId: undefined, createdAt: nowIso(input.now), createdByActorUserId: input.actor.id, reviewedAt: undefined, approvedAt: undefined, sentAt: undefined, acceptedAt: undefined, validityEndsAt: undefined, idempotencyKey: input.idempotencyKey, requestHash: deterministicContentHash({ prior: prior.id, reason: trimmed(input.reason, "Successor reason") }), recordVersion: 1 };
+  prior.status = "SUPERSEDED"; prior.successorVersionId = successor.id; prior.recordVersion = (prior.recordVersion ?? 1) + 1; input.state.founderProposalVersions.push(successor); return successor;
+}
+
+export function getFounderCommercialPublicSummary(state: AppState, proposalVersionId: string, now = new Date()) {
+  const proposal = state.founderProposalVersions.find((item) => item.id === proposalVersionId); if (!proposal) fail(404, "Proposal not found.");
+  const deadline = projectFounderBalanceDeadline(state, proposal.id, now); const invoice = projectFounderInvoiceStatus(state, proposal.id, now);
+  return { proposalStatus: proposal.status, proposalVersion: proposal.version, balance: { status: deadline.status, advanceConfirmedAt: deadline.advanceConfirmedAt, dueAt: deadline.dueAt, remainingAmountPaise: deadline.remainingAmountPaise }, invoice: invoice ? { status: invoice.status, dueAt: invoice.dueAt, issuedAt: invoice.issuedAt, invoiceNumber: invoice.invoiceNumber } : undefined, gates: { acceptanceDoesNotCreateCase: true, paymentProofDoesNotConfirmPayment: true, reportEvidenceMethodologyApprovalGatesRemainEnforced: true } };
+}
