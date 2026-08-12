@@ -390,6 +390,7 @@ export interface FounderReviewBookingRecord extends OrganisationOwnedRecord {
 
 export interface ZoomMeetingBindingRecord extends OrganisationOwnedRecord {
   id: string; bookingId: string; provider: "ZOOM"; providerMeetingId: string; privateJoinMetadataCiphertext: string;
+  hostUserEmail: "iyogesh2020@gmail.com"; oauthMode: "SERVER_TO_SERVER_OAUTH"; scopeSnapshot: string[];
   status: "ACTIVE" | "RETIRED" | "FAILED"; createdAt: string; retiredAt?: string; idempotencyKey: string; recordVersion: number;
 }
 

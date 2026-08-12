@@ -8,9 +8,9 @@ Run `pnpm test:founder-pre-staging`. The suite creates only temporary local SQLi
 
 The SQLite rehearsal executes the actual statements declared in `db/migrations.ts` and verifies:
 
-- clean v1 through v13 migration and repeated execution with exactly 13 markers;
-- a populated synthetic v9 database upgraded through v10, v11, v12 and v13 without changing the snapshot, lead, or external-source records;
-- required v12 tables, v13 owner-policy columns and indexes;
+- clean v1 through v14 migration and repeated execution with exactly 14 markers;
+- a populated synthetic v9 database upgraded through v10, v11, v12, v13 and v14 without changing the snapshot, lead, or external-source records;
+- required v12 tables, v13 owner-policy columns, v14 Zoom host/OAuth lineage columns and indexes;
 - unique organisation policy version, seven-calendar-day balance policy, and sixty-minute invoice SLA constraints;
 - a deliberately interrupted v13 transaction leaves neither its marker nor partial policy columns, then succeeds by forward-fix;
 - a v9 backup can be restored and upgraded, with `PRAGMA integrity_check` returning `ok`.
@@ -62,15 +62,15 @@ At that stop point there must be no proposal version, payment confirmation, invo
 | Statutory logo and signature images | Not uploaded/active | Document readiness remains blocked | Upload privately, Founder-approve and activate exact Media Library versions |
 | Statutory corrections/credit-debit policy | `BLOCKED_ACCOUNTANT_APPROVAL` | Issued bytes cannot be corrected in place | Supply accountant-approved correction policy |
 | Five approved PDF bytes | Not ingested | New client-sendable asset grants unavailable | Owner-observed checksum validation and private ingestion approval |
-| Zoom organisation connection | Not configured | Fake connector only; real meeting setup fails closed | Configure server-side OAuth/account and verify rotation without exposing secrets |
+| Zoom organisation connection | Internal app created; credentials not assumed configured | Fake connector only; real meeting setup fails closed | Configure private S2S OAuth secrets and the exact approved host binding, then run the separately approved bounded synthetic smoke |
 | Stage B remedial methodology | `BLOCKED_METHOD_INPUT` | No remedy logic or language | Supply and approve a separate remedial PRD/methodology |
 
 ## Zoom/provider readiness
 
-- Create a server-side organisation connection; never store OAuth values in browser state or application logs.
-- Verify owner-only configuration, token refresh/rotation, one unique meeting per booking idempotency key, reschedule retirement, and failure recovery.
-- Readiness must expose booleans/status only, never access tokens, join links, or provider secrets.
-- Use the fake connector until a separate real-provider activation approval.
+- Follow `docs/founder-zoom-s2s-readiness.md`. The connector is hard-bound to the approved Founder host and exact least-privilege scopes.
+- Store `ZOOM_ACCOUNT_ID`, `ZOOM_CLIENT_ID` and `ZOOM_CLIENT_SECRET` only as private staging secrets. Readiness validates presence/length and never returns values.
+- Verify one unique meeting per booking idempotency key, reschedule retirement, exactly one replacement, cleanup and failure recovery in the bounded synthetic smoke.
+- Use the fake connector until the private target is configured and the smoke is separately approved. Live activation remains false.
 
 WhatsApp and email remain manual compose. The only automated states are `PREPARED` and `OPENED`; the product must not claim sent, delivered, failed, or retried.
 

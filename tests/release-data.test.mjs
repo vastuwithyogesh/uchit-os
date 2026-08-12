@@ -47,7 +47,8 @@ class FakeD1 {
     if (/CREATE TABLE IF NOT EXISTS founder_commercial_policy_versions/i.test(sql)) this.columns.set("founder_commercial_policy_versions", new Set(["id"]));
     if (/CREATE TABLE IF NOT EXISTS founder_statutory_policy_versions/i.test(sql)) this.columns.set("founder_statutory_policy_versions", new Set(["id"]));
     if (/CREATE TABLE IF NOT EXISTS founder_billing_profile_versions/i.test(sql)) this.columns.set("founder_billing_profile_versions", new Set(["id"]));
-    const addColumn = sql.match(/ALTER TABLE (optin_leads|inbound_optin_events|audit_events|founder_commercial_policy_versions|founder_statutory_policy_versions|founder_billing_profile_versions) ADD COLUMN (\w+)/i);
+    if (/CREATE TABLE IF NOT EXISTS zoom_meeting_bindings/i.test(sql)) this.columns.set("zoom_meeting_bindings", new Set(["id"]));
+    const addColumn = sql.match(/ALTER TABLE (optin_leads|inbound_optin_events|audit_events|founder_commercial_policy_versions|founder_statutory_policy_versions|founder_billing_profile_versions|zoom_meeting_bindings) ADD COLUMN (\w+)/i);
     if (addColumn) this.columns.get(addColumn[1])?.add(addColumn[2]);
     const index = sql.match(/CREATE INDEX IF NOT EXISTS (\w+)/i); if (index) this.indexes.add(index[1]);
     if (/INSERT OR IGNORE INTO schema_migrations/i.test(sql)) this.applied.add(Number(values[0]));
@@ -61,10 +62,10 @@ class FakeD1 {
   }
 }
 
-test("v1 through v13 migrate an empty database and repeat without drift", async () => {
+test("v1 through v14 migrate an empty database and repeat without drift", async () => {
   const db = new FakeD1();
   await migrateD1(db);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   assert.ok(db.tables.has("app_state_snapshot"));
   assert.ok(db.tables.has("case_file_assets"));
   assert.ok(db.tables.has("staff_role_assignments"));
@@ -81,6 +82,7 @@ test("v1 through v13 migrate an empty database and repeat without drift", async 
   for (const column of ["operational_place_of_supply_selection", "receipt_voucher_trigger", "receipt_voucher_sla_minutes", "proforma_policy", "tax_invoice_trigger", "refund_policy", "correction_posture", "purchase_side_debit_notes_in_scope", "opex_tracking_scope", "accountant_approved_service_types_json"]) assert.ok(db.columns.get("founder_statutory_policy_versions").has(column));
   assert.ok(db.columns.get("founder_commercial_policy_versions").has("refund_policy"));
   assert.ok(db.columns.get("founder_billing_profile_versions").has("service_location"));
+  for (const column of ["host_user_email", "oauth_connection_type", "scope_snapshot_json"]) assert.ok(db.columns.get("zoom_meeting_bindings").has(column));
   for (const index of ["idx_case_file_assets_floor", "idx_case_file_assets_scope", "idx_case_file_assets_org_scope", "idx_inbound_optin_events_identity", "idx_inbound_optin_events_received", "idx_inbound_optin_events_external", "idx_optin_leads_external_link", "idx_staff_role_audit_target_time", "idx_audit_org_time", "idx_audit_entity", "idx_audit_integration_source", "idx_access_requests_target_state", "idx_final_pdf_scope", "idx_final_pdf_events_scope", "idx_external_sources_org_status", "idx_external_client_links_org_client", "idx_external_client_links_external_code", "idx_integration_events_org_time", "idx_integration_events_record", "idx_integration_outbox_pending", "idx_integration_conflicts_open"]) assert.ok(db.indexes.has(index));
   const before = JSON.stringify({ applied: [...db.applied], tables: [...db.tables], indexes: [...db.indexes], revision: db.revision });
   await migrateD1(db);
@@ -91,12 +93,12 @@ test("production-like v2 schema adopts migration markers without changing revisi
   const db = new FakeD1({ revisionColumn: true, revision: 37, applied: [1] });
   await migrateD1(db);
   assert.equal(db.revision, 37);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   assert.ok(db.tables.has("case_file_assets"));
 });
 
 test("migration list is deterministic and Sites packages the db directory", async () => {
-  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13]);
+  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14]);
   const prepare = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../scripts/prepare-sites.mjs", import.meta.url), "utf8"));
   assert.match(prepare, /"db"/);
 });

@@ -40,6 +40,14 @@ export type RuntimeEnv = {
   LOVABLE_INTEGRATION_ENVIRONMENT?: string;
   LOVABLE_INTEGRATION_SOURCE_KEY?: string;
   LOVABLE_INTEGRATION_OUTBOUND_URL?: string;
+  /** Dormant Zoom Server-to-Server OAuth credentials. Values are server-only and never projected. */
+  ZOOM_ACCOUNT_ID?: string;
+  ZOOM_CLIENT_ID?: string;
+  ZOOM_CLIENT_SECRET?: string;
+  /** Must exactly match the approved Founder Review Call host before a synthetic smoke can run. */
+  ZOOM_HOST_EMAIL?: string;
+  /** Exact value BOUNDED_SYNTHETIC_SMOKE_APPROVED enables only the owner-approved smoke harness. */
+  ZOOM_INTEGRATION_ACTIVATION?: string;
   /** Server-only owner secret used to encrypt immutable final PDFs. */
   PDF_OWNER_SECRET?: string;
 };

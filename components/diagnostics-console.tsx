@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { FounderStepCard } from "@/components/founder-step-card";
 
 type Check = { key: string; label: string; ready: boolean; recovery: string };
-type Payload = { scope: "FOUNDER_INTERNAL_PILOT"; status: "GO" | "NO_GO"; checkedAt: string; build: string; checks: Check[] };
+type Payload = { scope: "FOUNDER_INTERNAL_PILOT"; status: "GO" | "NO_GO"; checkedAt: string; build: string; checks: Check[]; deferredIntegrations?: { zoom: { status: "DORMANT" | "READY_FOR_BOUNDED_SYNTHETIC_SMOKE"; credentialsReady: boolean; hostBindingReady: boolean; boundedSyntheticSmokeApproved: boolean; liveActivationEnabled: false } } };
 
 const founderSignOff = [
   "Complete the synthetic Founder workflow from opt-in through protected files, evaluation and Stage A review.",
@@ -51,7 +51,20 @@ export function DiagnosticsConsole() {
         </FounderStepCard>
       </div>
       <details><summary>Build details</summary>
-        <div className="card span-12 founder-technical-details"><h3>Automated checks and recovery</h3><div className="details-body">{payload ? <div className="list">{payload.checks.map((check) => <div className="list-item" key={check.key}><strong>{check.label}</strong><span className={`tag ${check.ready ? "good" : "warn"}`}>{check.ready ? "Ready" : "Not ready"}</span>{!check.ready && <span className="meta">Next: {check.recovery}</span>}</div>)}</div> : <p className="subtle">No check result is available. Retry. If it still fails, review the deployment logs.</p>}<p className="meta">Build {payload?.build ?? "unknown"} · Checked {payload?.checkedAt ? new Date(payload.checkedAt).toLocaleString() : "not yet"}</p></div></div>
+        <div className="card span-12 founder-technical-details">
+          <h3>Automated checks and recovery</h3>
+          <div className="details-body">
+            {payload ? <div className="list">
+              {payload.checks.map((check) => <div className="list-item" key={check.key}><strong>{check.label}</strong><span className={`tag ${check.ready ? "good" : "warn"}`}>{check.ready ? "Ready" : "Not ready"}</span>{!check.ready && <span className="meta">Next: {check.recovery}</span>}</div>)}
+              {payload.deferredIntegrations?.zoom ? <div className="list-item">
+                <strong>Zoom Review Call connector</strong>
+                <span className={`tag ${payload.deferredIntegrations.zoom.status === "READY_FOR_BOUNDED_SYNTHETIC_SMOKE" ? "good" : "warn"}`}>{payload.deferredIntegrations.zoom.status === "READY_FOR_BOUNDED_SYNTHETIC_SMOKE" ? "Synthetic smoke ready" : "Dormant"}</span>
+                <span className="meta">Credentials: {payload.deferredIntegrations.zoom.credentialsReady ? "presence and length verified" : "incomplete"}. Host binding: {payload.deferredIntegrations.zoom.hostBindingReady ? "verified" : "not verified"}. Live activation remains disabled.</span>
+              </div> : null}
+            </div> : <p className="subtle">No check result is available. Retry. If it still fails, review the deployment logs.</p>}
+            <p className="meta">Build {payload?.build ?? "unknown"} · Checked {payload?.checkedAt ? new Date(payload.checkedAt).toLocaleString() : "not yet"}</p>
+          </div>
+        </div>
       </details>
       <div className="footer-note" role={blocked ? "alert" : "status"} aria-live="polite">{message}</div>
     </section>

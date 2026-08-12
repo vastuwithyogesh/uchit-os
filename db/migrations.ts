@@ -537,6 +537,15 @@ export const d1Migrations: readonly D1Migration[] = [
       "ALTER TABLE founder_statutory_policy_versions ADD COLUMN accountant_approved_service_types_json TEXT",
       "ALTER TABLE founder_billing_profile_versions ADD COLUMN service_location TEXT"
     ]
+  },
+  {
+    version: 14,
+    statements: [
+      "ALTER TABLE zoom_meeting_bindings ADD COLUMN host_user_email TEXT NOT NULL DEFAULT 'iyogesh2020@gmail.com' CHECK (host_user_email = 'iyogesh2020@gmail.com')",
+      "ALTER TABLE zoom_meeting_bindings ADD COLUMN oauth_connection_type TEXT NOT NULL DEFAULT 'SERVER_TO_SERVER_OAUTH' CHECK (oauth_connection_type = 'SERVER_TO_SERVER_OAUTH')",
+      `ALTER TABLE zoom_meeting_bindings ADD COLUMN scope_snapshot_json TEXT NOT NULL DEFAULT '["meeting:write:admin","meeting:read:admin","user:read:admin"]'`,
+      "CREATE INDEX IF NOT EXISTS idx_zoom_binding_host ON zoom_meeting_bindings(organisation_id,host_user_email,status,created_at)"
+    ]
   }
 ];
 

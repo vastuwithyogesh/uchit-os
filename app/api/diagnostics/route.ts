@@ -3,6 +3,7 @@ import { requireRouteActor } from "@/lib/auth";
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { getRuntimeEnv } from "@/lib/runtime-env";
 import { inspectIntegrity } from "@/lib/integrity";
+import { getFounderZoomReadiness } from "@/lib/founder-zoom.server";
 
 export async function GET(request: Request) {
   const access = await requireRouteActor(request, "ADMIN");
@@ -22,6 +23,7 @@ export async function GET(request: Request) {
   const d1Ready = Boolean(env.DB) && persistenceReady;
   const r2Ready = Boolean(env.R2);
   const pdfOwnerSecretReady = typeof env.PDF_OWNER_SECRET === "string" && env.PDF_OWNER_SECRET.length >= 32;
+  const zoom = getFounderZoomReadiness(env);
   const checks = [
     { key: "auth", label: "Founder authentication", ready: founderOwnerReady, recovery: "Sign in as the organisation SUPER_ADMIN/Founder owner, then retry." },
     { key: "d1", label: "Database connection", ready: d1Ready, recovery: "Check the D1 binding and database deployment." },
@@ -33,5 +35,5 @@ export async function GET(request: Request) {
     { key: "workflow", label: "Workflow build", ready: true, recovery: "Rebuild and redeploy the tested application version." }
   ];
   const status = checks.every((check) => check.ready) ? "GO" : "NO_GO";
-  return NextResponse.json({ scope: "FOUNDER_INTERNAL_PILOT", status, checkedAt: new Date().toISOString(), build: process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || process.env.npm_package_version || "local", checks }, { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
+  return NextResponse.json({ scope: "FOUNDER_INTERNAL_PILOT", status, checkedAt: new Date().toISOString(), build: process.env.CF_PAGES_COMMIT_SHA?.slice(0, 12) || process.env.npm_package_version || "local", checks, deferredIntegrations: { zoom } }, { headers: { "Cache-Control": "private, no-store", "X-Content-Type-Options": "nosniff" } });
 }

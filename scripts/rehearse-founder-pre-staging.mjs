@@ -21,7 +21,7 @@ function openDatabase(path) {
   return db;
 }
 
-function applyMigrations(db, fromVersion = 1, throughVersion = 13) {
+function applyMigrations(db, fromVersion = 1, throughVersion = 14) {
   db.exec(migrationsTableSql);
   const applied = new Set(db.prepare("SELECT version FROM schema_migrations").all().map((row) => Number(row.version)));
   for (const migration of d1Migrations) {
@@ -84,7 +84,7 @@ function verifyV11Constraints(db) {
   return failures;
 }
 
-export async function runFounderPreStagingRehearsal(throughVersion = 13) {
+export async function runFounderPreStagingRehearsal(throughVersion = 14) {
   const workspace = await mkdtemp(join(tmpdir(), "uchit-founder-rehearsal-"));
   const cleanPath = join(workspace, `clean-v${throughVersion}.sqlite`);
   const upgradePath = join(workspace, `upgrade-v9-v${throughVersion}.sqlite`);
@@ -98,6 +98,7 @@ export async function runFounderPreStagingRehearsal(throughVersion = 13) {
     const cleanTables = tableNames(clean);
     const cleanIndexes = indexNames(clean);
     const cleanStatPolicyColumns = columnNames(clean, "founder_statutory_policy_versions");
+    const cleanZoomBindingColumns = columnNames(clean, "zoom_meeting_bindings");
     const constraints = verifyV11Constraints(clean);
     applyMigrations(clean, 1, throughVersion);
     const repeatedMarkerCount = Number(clean.prepare("SELECT COUNT(*) AS count FROM schema_migrations").get().count);
@@ -142,7 +143,9 @@ export async function runFounderPreStagingRehearsal(throughVersion = 13) {
     const noPartialMarker = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=?").get(throughVersion).count) === 0;
     const noPartialTable = throughVersion === 12
       ? !tableNames(interrupted).includes("founder_statutory_policy_versions")
-      : !columnNames(interrupted, "founder_commercial_policy_versions").includes("refund_policy");
+      : throughVersion === 13
+        ? !columnNames(interrupted, "founder_commercial_policy_versions").includes("refund_policy")
+        : !columnNames(interrupted, "zoom_meeting_bindings").includes("host_user_email");
     applyMigrations(interrupted, throughVersion, throughVersion);
     const forwardFixed = Number(interrupted.prepare("SELECT COUNT(*) AS count FROM schema_migrations WHERE version=?").get(throughVersion).count) === 1;
     interrupted.close();
@@ -159,6 +162,8 @@ export async function runFounderPreStagingRehearsal(throughVersion = 13) {
         founderV12TableCount: cleanTables.filter((name) => name.startsWith("founder_")).length,
         requiredIndexesPresent: ["idx_founder_proposals_scope", "idx_founder_deadlines_due", "idx_founder_invoices_due", "idx_founder_statutory_due", "idx_founder_statutory_project"].every((name) => cleanIndexes.includes(name)),
         v13PolicyColumnsPresent: throughVersion < 13 || ["operational_place_of_supply_selection", "refund_policy", "correction_posture", "purchase_side_debit_notes_in_scope", "opex_tracking_scope", "accountant_approved_service_types_json"].every((name) => cleanStatPolicyColumns.includes(name)),
+        v14ZoomHostBindingColumnsPresent: throughVersion < 14 || ["host_user_email", "oauth_connection_type", "scope_snapshot_json"].every((name) => cleanZoomBindingColumns.includes(name)),
+        v14ZoomHostIndexPresent: throughVersion < 14 || cleanIndexes.includes("idx_zoom_binding_host"),
         constraintFailuresObserved: constraints
       },
       persistentEnvironmentTouched: false,
