@@ -5,7 +5,7 @@ import { source } from "./helpers/source-contracts.mjs";
 test("compact Founder shell exposes the six primary workspaces and contains legacy ops", () => {
   const policy = source("lib/access-policy.ts");
   const header = source("components/site-header.tsx");
-  for (const token of ["/crm", "/lead-pipeline", "/clients-cases", "/founder/08", "/reports"]) assert.match(header, new RegExp(token.replaceAll("/", "\\/")));
+  for (const token of ["/crm", "/lead-pipeline", "/clients-cases", "/founder/continue", "/reports"]) assert.match(header, new RegExp(token.replaceAll("/", "\\/")));
   assert.match(header, /app-sidebar/);
   assert.match(header, /mobile-nav-menu/);
   assert.match(header, /More/);

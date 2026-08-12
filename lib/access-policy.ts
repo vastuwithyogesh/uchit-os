@@ -14,7 +14,7 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/crm", label: "Leads", minimumRole: "SETTER" },
   { href: "/lead-pipeline", label: "Lead Pipeline", minimumRole: "SETTER" },
   { href: "/clients-cases", label: "Clients & Cases", minimumRole: "SETTER" },
-  { href: "/founder/08", label: "Evaluation", minimumRole: "SETTER" },
+  { href: "/founder/continue", label: "Evaluation", minimumRole: "SETTER" },
   { href: "/timeline", label: "History", minimumRole: "SETTER" },
   { href: "/ops", label: "Legacy technical console", minimumRole: "CONSULTANT" },
   { href: "/evaluation", label: "Evaluation tools", minimumRole: "CONSULTANT" },

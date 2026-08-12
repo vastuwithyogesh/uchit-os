@@ -49,6 +49,23 @@ test("each post-advance step renders only its scoped working component", () => {
   assert.doesNotMatch(`${workspace}\n${flow}`, /CaseMasterConsole|WorkflowConsole|CommercialConsole/);
 });
 
+test("Evaluation navigation resolves the server-derived case, floor and first actionable step", () => {
+  const route = source("app/founder/continue/page.tsx");
+  const policy = source("lib/access-policy.ts");
+  const header = source("components/site-header.tsx");
+  assert.match(route, /buildFounderScorecard/);
+  assert.match(route, /getCurrentFounderFlowStep/);
+  assert.match(route, /redirect\(current\.flowPath\)/);
+  assert.match(policy, new RegExp('href: "/founder/continue", label: "Evaluation"'));
+  assert.match(header, new RegExp('"/founder/continue"'));
+});
+
+test("Site and Post-Site step routes expose one focused editor at a time", () => {
+  const ui = source("components/site-analysis-console.tsx");
+  assert.match(ui, /focus !== "post-site"/);
+  assert.match(ui, /focus !== "site"/);
+});
+
 test("exact case and floor context is passed into every floor-scoped editor", () => {
   const workspace = source("components/founder-step-workspace.tsx");
   for (const field of ["scorecard.client?.id", "scorecard.caseRecord?.id", "scorecard.selectedFloorId"]) assert.match(workspace, new RegExp(field.replace(/[?.]/g, "\\$&")));

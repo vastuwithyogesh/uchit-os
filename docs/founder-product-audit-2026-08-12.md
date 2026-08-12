@@ -93,3 +93,12 @@ Public token routes for qualification, booking, proposals and protected media re
 3. Approve creation of a fresh, isolated synthetic visual-QA environment; do not reuse any database containing unknown/pre-existing leads.
 4. Decide whether the next UX slice should simplify all 17 embedded workspaces or prioritize only the highest-frequency steps (CRM, evidence/orientation, evaluation, Stage A, balance/report).
 5. Keep staff rollout deferred until a module-level permission and operating-queue contract is approved.
+
+## Follow-up implementation checkpoint
+
+The approved local follow-up addresses the first two high-priority navigation/composition findings without changing server actions or workflow gates:
+
+- Evaluation now uses `/founder/continue`, a server route that builds the authoritative scorecard and redirects to the current case/floor's first actionable module with its exact context query. The legacy `/founder/08` route remains available for direct historical links, but it is no longer the primary navigation target.
+- The Site Analysis console renders only the Site editor when the Founder step requests `focus="site"`; the Post-Site Findings editor is rendered only for `focus="post-site"`. The combined view remains available only to the legacy all-tools route.
+
+Focused navigation/flow contracts and the complete release suite passed after this change. Publication is intentionally not included in this local follow-up.

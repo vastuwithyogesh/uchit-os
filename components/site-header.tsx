@@ -18,7 +18,7 @@ export function SiteHeader({ title, subtitle, minimal = false }: { title: string
   const visibleNavigation = sessionStatus === "ready" ? getAccessiblePageRules(activeUser.role) : [];
   const primaryHrefs = activeUser.role === "CLIENT"
     ? ["/client"]
-    : ["/", "/crm", "/lead-pipeline", "/clients-cases", "/founder/08", "/reports"];
+    : ["/", "/crm", "/lead-pipeline", "/clients-cases", "/founder/continue", "/reports"];
   const primaryNavigation = primaryHrefs
     .map((href) => visibleNavigation.find((item) => item.href === href))
     .filter((item): item is (typeof visibleNavigation)[number] => Boolean(item));
