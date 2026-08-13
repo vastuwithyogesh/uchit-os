@@ -71,8 +71,6 @@ import type {
   FounderBillingProfileVersionRecord, FounderStatutorySequenceReservationRecord, FounderStatutoryDocumentRecord
 } from "./domain.ts";
 import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
-// @ts-expect-error The canonical synthetic fixture is intentionally shared with Node contract tests.
-import { buildReleaseableFounderPilotFixture } from "../tests/fixtures/founder-pilot-fixture.mjs";
 
 export interface AppState {
   /** Read-only response metadata used for optimistic concurrency; not a domain collection. */
@@ -276,13 +274,7 @@ const createDemoAppState = (): AppState => ({
   founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
 });
 
-const createInitialState = () => {
-  if (process.env.UCHIT_VASTU_WALKTHROUGH === "true") {
-    const fixture = buildReleaseableFounderPilotFixture();
-    return { ...createEmptyAppState(), ...structuredClone(fixture.state) } as AppState;
-  }
-  return process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();
-};
+const createInitialState = () => process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();
 
 declare global {
   // eslint-disable-next-line no-var

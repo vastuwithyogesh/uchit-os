@@ -6,6 +6,7 @@ import { requirePageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 import { headers } from "next/headers";
 import { isExplicitLocalDemo } from "@/lib/auth";
+import { buildLocalFounderWalkthroughState } from "@/lib/founder-walkthrough.server";
 
 export default async function FounderStepPage({ params, searchParams }: { params: Promise<{ step: string }>; searchParams: Promise<{ caseId?: string; floorId?: string; walkthrough?: string }> }) {
   const access = await requirePageAccess("SETTER");
@@ -19,19 +20,7 @@ export default async function FounderStepPage({ params, searchParams }: { params
     const requestHeaders = await headers();
     const walkthrough = context.walkthrough === "TEST_ONLY" && isExplicitLocalDemo(requestHeaders);
     // This adapter is intentionally impossible to activate on a hosted request.
-    // @ts-ignore JavaScript fixture is deliberately shared with Node contract tests.
-    const fixture = walkthrough ? await import("@/tests/fixtures/founder-pilot-fixture.mjs") : undefined;
-    const state = fixture ? fixture.buildReleaseableFounderPilotFixture().state : await loadStateFromPersistence();
-    if (fixture) {
-      const profile = state.clientIntakeProfiles[0];
-      if (profile) {
-        profile.contactPreference = { whatsapp: "+910000000001", preferredLanguage: "English" };
-        profile.decisionMakerStatus = "SOLE";
-        profile.propertyContext = { ...profile.propertyContext, propertyType: "Residential", floorCount: 1, locationLink: "https://maps.example.test/test-only", latitude: 28.6139, longitude: 77.209 };
-      }
-      const floor = state.floorWorkspaces[0];
-      if (floor) floor.stageAVerdictStatus = "PRESENTED";
-    }
+    const state = walkthrough ? await buildLocalFounderWalkthroughState() : await loadStateFromPersistence();
     const scorecard = buildFounderScorecard(state, access.actor, undefined, context.caseId, context.floorId);
     return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One module at a time" minimal /><FounderFlowPage scorecard={scorecard} stepNumber={stepNumber} walkthrough={walkthrough} /></main>;
   } catch {
