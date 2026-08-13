@@ -33,6 +33,17 @@ test("session success and auth failures cannot be cached", () => {
   assert.match(functionBody(sessionProvider, "fetchSession"), /cache: "no-store"/);
 });
 
+test("session verification cannot leave the workspace on an infinite loading state", () => {
+  const body = functionBody(sessionProvider, "fetchSession");
+  assert.match(sessionProvider, /SESSION_REQUEST_TIMEOUT_MS = 12_000/);
+  assert.match(body, /new AbortController\(\)/);
+  assert.match(body, /signal: controller\.signal/);
+  assert.match(body, /controller\.abort\(\)/);
+  assert.match(body, /Session verification timed out\. Check your connection and try again\./);
+  assert.match(body, /window\.clearTimeout\(timeoutId\)/);
+  assert.match(sessionProvider, /Try again/);
+});
+
 test("authenticated display names are decoded only with the declared encoding", () => {
   const body = functionBody(auth, "resolveAuthenticatedDisplayName");
   assert.match(body, /oai-authenticated-user-full-name-encoding/);

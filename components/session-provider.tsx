@@ -14,6 +14,8 @@ type SessionPayload = {
 
 type SessionErrorCode = "UNAUTHENTICATED" | "UNAUTHORIZED" | "SESSION_UNAVAILABLE";
 
+const SESSION_REQUEST_TIMEOUT_MS = 12_000;
+
 class SessionRequestError extends Error {
   readonly code: SessionErrorCode;
 
@@ -57,32 +59,43 @@ function isAppUser(value: unknown): value is AppUser {
 }
 
 async function fetchSession() {
-  const response = await fetch("/api/session", { cache: "no-store" });
-  if (!response.ok) {
-    let responseCode: unknown;
-    try {
-      const failure = (await response.json()) as { error?: { code?: unknown } };
-      responseCode = failure.error?.code;
-    } catch {
-      // The UI deliberately ignores server details and presents a safe message.
-    }
+  const controller = new AbortController();
+  const timeoutId = window.setTimeout(() => controller.abort(), SESSION_REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch("/api/session", { cache: "no-store", signal: controller.signal });
+    if (!response.ok) {
+      let responseCode: unknown;
+      try {
+        const failure = (await response.json()) as { error?: { code?: unknown } };
+        responseCode = failure.error?.code;
+      } catch {
+        // The UI deliberately ignores server details and presents a safe message.
+      }
 
-    if (response.status === 401 || responseCode === "UNAUTHENTICATED") {
-      throw new SessionRequestError("UNAUTHENTICATED", "Your sign-in could not be verified. Please sign in again.");
+      if (response.status === 401 || responseCode === "UNAUTHENTICATED") {
+        throw new SessionRequestError("UNAUTHENTICATED", "Your sign-in could not be verified. Please sign in again.");
+      }
+      if (response.status === 403 || responseCode === "UNAUTHORIZED") {
+        throw new SessionRequestError("UNAUTHORIZED", "Your account does not have access to this workspace.");
+      }
+      throw new SessionRequestError("SESSION_UNAVAILABLE", "The secure session service is temporarily unavailable.");
     }
-    if (response.status === 403 || responseCode === "UNAUTHORIZED") {
-      throw new SessionRequestError("UNAUTHORIZED", "Your account does not have access to this workspace.");
+    const payload = (await response.json()) as Partial<SessionPayload>;
+    if (payload.version !== 1 || payload.ok !== true || !isAppUser(payload.actor) || !Array.isArray(payload.availableUsers) || typeof payload.isLocalDemo !== "boolean") {
+      throw new Error("The server returned an invalid session.");
     }
-    throw new SessionRequestError("SESSION_UNAVAILABLE", "The secure session service is temporarily unavailable.");
+    if (!payload.availableUsers.every(isAppUser)) {
+      throw new Error("The server returned an invalid user list.");
+    }
+    return payload as SessionPayload;
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new SessionRequestError("SESSION_UNAVAILABLE", "Session verification timed out. Check your connection and try again.");
+    }
+    throw error;
+  } finally {
+    window.clearTimeout(timeoutId);
   }
-  const payload = (await response.json()) as Partial<SessionPayload>;
-  if (payload.version !== 1 || payload.ok !== true || !isAppUser(payload.actor) || !Array.isArray(payload.availableUsers) || typeof payload.isLocalDemo !== "boolean") {
-    throw new Error("The server returned an invalid session.");
-  }
-  if (!payload.availableUsers.every(isAppUser)) {
-    throw new Error("The server returned an invalid user list.");
-  }
-  return payload as SessionPayload;
 }
 
 export function SessionProvider({ children }: { children: ReactNode }) {
