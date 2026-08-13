@@ -10,7 +10,7 @@ async function selectedScope(organisationId: string, caseId: string, floorLabel?
   const caseRecord = state.vastuCases.find((item) => item.id === caseId);
   if (!caseRecord || (!localFixture && caseRecord.organisationId && caseRecord.organisationId !== organisationId)
     || getActiveCaseForClient(state, caseRecord.clientId)?.id !== caseId) throw new Error("Select the active case revision.");
-  if (floorLabel && !state.floorWorkspaces.some((item) => item.caseId === caseId && (!item.organisationId || item.organisationId === organisationId) && item.floorLabel === floorLabel)) throw new Error("Floor does not belong to the selected case revision.");
+  if (floorLabel && !state.floorWorkspaces.some((item) => item.caseId === caseId && (localFixture || !item.organisationId || item.organisationId === organisationId) && item.floorLabel === floorLabel)) throw new Error("Floor does not belong to the selected case revision.");
   return { organisationId: localFixture ? (caseRecord.organisationId ?? organisationId) : organisationId, caseId, caseRevisionNumber: caseRecord.revisionNumber ?? 1, serviceType: normalizeCaseService(caseRecord).serviceType, floorLabel };
 }
 

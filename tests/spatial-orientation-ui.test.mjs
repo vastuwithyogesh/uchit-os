@@ -22,3 +22,8 @@ test("Step 04 records only after the canonical action succeeds", () => {
   assert.match(source, /if \(recorded\) setGoogleUploadState\("RECORDED"\)/);
   assert.doesNotMatch(source, /setGoogleUploadState\("RECORDED"\);\s*void run/);
 });
+
+test("Step 05 auto-selects a successfully uploaded protected plan", () => {
+  assert.match(source, /upload\(file, floor\?\.floorLabel, \(asset\) => setPlanAssetRef\(asset\.evidenceRef\)\)/);
+  assert.match(source, /Selected file is ready to upload/);
+});
