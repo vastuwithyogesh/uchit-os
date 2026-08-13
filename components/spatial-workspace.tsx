@@ -9,8 +9,10 @@ import { useSession } from "@/components/session-provider";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
 type CaseFileAsset = { id: string; evidenceRef: string; caseId: string; floorLabel?: string; fileName: string; mimeType: string; sizeBytes: number; createdAt: string };
+type GoogleUploadState = "NOT_SELECTED" | "SELECTED" | "UPLOADING" | "UPLOADED_NOT_RECORDED" | "RECORDED" | "FAILED";
 class ActionError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 const uploadHeaders = (role: string) => typeof window !== "undefined" && window.location.hostname === "localhost" ? { "x-uchit-demo-role": role } : undefined;
+const readableFileSize = (size: number) => size < 1024 * 1024 ? `${Math.ceil(size / 1024)} KB` : `${(size / (1024 * 1024)).toFixed(1)} MB`;
 
 export function SpatialWorkspace({ focus = "all", clientId: initialClientId, caseId: requestedCaseId, floorId: initialFloorId }: { focus?: "all" | "plan" | "orientation" | "gridding"; clientId?: string; caseId?: string; floorId?: string }) {
   const { activeUser } = useSession();
@@ -28,6 +30,9 @@ export function SpatialWorkspace({ focus = "all", clientId: initialClientId, cas
   const [has32SectorChakra, setHas32SectorChakra] = useState(false);
   const [has16DirectionMapping, setHas16DirectionMapping] = useState(false);
   const [googleAssetRef, setGoogleAssetRef] = useState("");
+  const [googleUploadState, setGoogleUploadState] = useState<GoogleUploadState>("NOT_SELECTED");
+  const [googleUploadError, setGoogleUploadError] = useState("");
+  const [orientationErrors, setOrientationErrors] = useState<Record<string, string>>({});
   const [degree, setDegree] = useState("");
   const [orientationReason, setOrientationReason] = useState("");
   const [openingKind, setOpeningKind] = useState("MAIN_ENTRANCE");
@@ -40,6 +45,10 @@ export function SpatialWorkspace({ focus = "all", clientId: initialClientId, cas
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("Loading project and floor setup...");
   const keys = useRef<Record<string, string>>({});
+  const googleFileRef = useRef<HTMLInputElement>(null);
+  const googleAssetControlRef = useRef<HTMLSelectElement>(null);
+  const degreeRef = useRef<HTMLInputElement>(null);
+  const reasonRef = useRef<HTMLTextAreaElement>(null);
 
   const refresh = useCallback(async (preferredClientId?: string) => {
     setBusy(true);
@@ -55,9 +64,12 @@ export function SpatialWorkspace({ focus = "all", clientId: initialClientId, cas
   }, []);
 
   useEffect(() => { void refresh(); }, [refresh]);
-  const client = state?.clients.find((item) => item.id === clientId) ?? state?.clients[0];
-  const caseRecord = state?.vastuCases.find((item) => item.id === requestedCaseId && item.clientId === client?.id)
-    ?? (state && client ? getActiveCaseForClient(state, client.id) : undefined);
+  const requestedCase = requestedCaseId ? state?.vastuCases.find((item) => item.id === requestedCaseId) : undefined;
+  const selectedClient = state?.clients.find((item) => item.id === clientId) ?? state?.clients[0];
+  // A Founder step is bound to its exact case. Never fall back to another
+  // client or active case when a case context was supplied by the route.
+  const client = requestedCase ? state?.clients.find((item) => item.id === requestedCase.clientId) : selectedClient;
+  const caseRecord = requestedCase ?? (state && client ? getActiveCaseForClient(state, client.id) : undefined);
   const project = state?.projects.find((item) => item.id === caseRecord?.projectId);
   const floors = state?.floorWorkspaces.filter((item) => item.caseId === caseRecord?.id && item.projectId === project?.id) ?? [];
   const floor = floors.find((item) => item.id === floorId) ?? floors[0];
@@ -90,22 +102,23 @@ export function SpatialWorkspace({ focus = "all", clientId: initialClientId, cas
 
   function key(action: string) { keys.current[action] ??= crypto.randomUUID(); return keys.current[action]; }
   async function run(action: string, fields: Record<string, unknown>, success: string, recordVersion = caseRecord?.recordVersion ?? 0) {
-    if (!state || !caseRecord) return;
+    if (!state || !caseRecord) return false;
     setBusy(true);
     try {
       const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action, caseId: caseRecord.id,
         ...fields, idempotencyKey: key(action), expectedRecordVersion: recordVersion, expectedRevision: state.persistenceRevision ?? null }) });
       const result = await response.json();
       if (!response.ok || result.ok === false) throw new ActionError(typeof result.error === "string" ? result.error : "The step could not be saved.", response.status);
-      delete keys.current[action]; await refresh(client?.id); setMessage(success);
+      delete keys.current[action]; await refresh(client?.id); setMessage(success); return true;
     } catch (error) {
       if (error instanceof ActionError && error.status === 409) setMessage(`${error.message} Reload and review the current version. Nothing was silently retried.`);
       else if (error instanceof ActionError && error.status === 428) setMessage("Reload the latest case before saving this protected step.");
       else setMessage(error instanceof Error ? error.message : "The step could not be saved.");
     } finally { setBusy(false); }
+    return false;
   }
 
-  async function upload(selected: File | null, floorLabel?: string) {
+  async function upload(selected: File | null, floorLabel?: string, onUploaded?: (asset: CaseFileAsset) => void, onFailed?: (error: string) => void) {
     if (!selected || !caseRecord) return;
     if (!["application/pdf", "image/png", "image/jpeg", "image/webp"].includes(selected.type) || selected.size < 1 || selected.size > 20 * 1024 * 1024) {
       setMessage("Choose a PDF, PNG, JPG, or WebP file up to 20 MB."); return;
@@ -116,10 +129,37 @@ export function SpatialWorkspace({ focus = "all", clientId: initialClientId, cas
       const response = await fetch("/api/case-files", { method: "POST", headers: uploadHeaders(activeUser.role), body });
       const result = await response.json(); if (!response.ok || result.ok === false) throw new Error(typeof result.error === "string" ? result.error : "Upload failed.");
       const refreshed = await loadAssets(caseRecord.id, floorLabel); if (floorLabel) setAssets(refreshed); else setCaseAssets(refreshed);
+      const uploaded = result.asset as CaseFileAsset;
+      if (uploaded) onUploaded?.(uploaded);
       setMessage("Protected file uploaded. Choose it below to record the version.");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Upload failed."); }
+    } catch (error) { const explanation = error instanceof Error ? error.message : "Upload failed."; setMessage(explanation); onFailed?.(explanation); }
     finally { setBusy(false); }
   }
+
+  function validateOrientation() {
+    const errors: Record<string, string> = {};
+    const numericDegree = Number(degree);
+    if (!googleAssetRef && !googleEvidence) errors.googleEvidence = "Upload and select the Google Earth screenshot before recording orientation evidence.";
+    if (degree.trim() === "") errors.degree = "Enter the exact orientation degree.";
+    else if (!Number.isFinite(numericDegree) || numericDegree < 0 || numericDegree >= 360) errors.degree = "Enter a degree from 0 inclusive to less than 360.";
+    if (orientationReason.trim().length < 20) errors.reason = "Explain why this orientation is correct using at least 20 characters.";
+    setOrientationErrors(errors);
+    return errors;
+  }
+
+  function focusFirstOrientationError(errors: Record<string, string>) {
+    if (errors.googleEvidence) (googleAssetRef ? googleAssetControlRef : googleFileRef).current?.focus();
+    else if (errors.degree) degreeRef.current?.focus();
+    else if (errors.reason) reasonRef.current?.focus();
+  }
+
+  useEffect(() => {
+    const hasUnsavedOrientation = ["SELECTED", "UPLOADING", "UPLOADED_NOT_RECORDED"].includes(googleUploadState) || Boolean(degree.trim() || orientationReason.trim());
+    if (!hasUnsavedOrientation) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [googleUploadState, degree, orientationReason]);
 
   const polygon = useMemo(() => polygonText.split(";").map((pair) => pair.trim()).filter(Boolean).map((pair) => {
     const [x, y] = pair.split(",").map(Number); return { x: x / 100, y: y / 100 };
@@ -144,7 +184,13 @@ export function SpatialWorkspace({ focus = "all", clientId: initialClientId, cas
 
     <div className="card span-6"><div className="eyebrow">Step 3</div><h2>16-direction marked mapping</h2><p className="subtle">Select a separate manually prepared 16-direction marked mapping for this exact floor and plan. Computed 16D geometry and sector labels remain deferred.</p><div className="field"><label htmlFor="marked-16-asset">Full-colour 16-direction marked mapping</label><select id="marked-16-asset" value={marked16AssetRef} onChange={(event) => setMarked16AssetRef(event.target.value)}><option value="">Choose a protected file</option>{assets.map((asset) => <option key={asset.id} value={asset.evidenceRef}>{asset.fileName}</option>)}</select></div><label className="check-row" htmlFor="has-16-direction-mapping"><input id="has-16-direction-mapping" type="checkbox" checked={has16DirectionMapping} onChange={(event) => setHas16DirectionMapping(event.target.checked)} /> Founder confirmation: this 16-direction mapping belongs to this floor and plan.</label><button className="button" type="button" disabled={busy || !floor || !plan || !marked16AssetRef || !has16DirectionMapping} onClick={() => void run("spatial-evidence-create", { floorId: floor?.id, planVersionId: plan?.id, kind: "HAND_MARKED_PLAN", classification: "MARKED_16D_MAPPING_V1", has16DirectionMapping: true, evidenceRef: marked16AssetRef, fullColourConfirmed: true }, "16-direction marked mapping recorded and Founder-confirmed.")}>{marked16Evidence ? "Record replacement 16D evidence" : "Confirm 16D evidence"}</button><p className="meta">{marked16Evidence ? "Current 16D evidence is immutable and confirmed." : "Required separately; it never substitutes for 32D evidence."}</p></div>
 
-    <div className="card span-12"><div className="eyebrow">Step 4</div><h2>Google Earth evidence and exact orientation</h2><p className="subtle">Upload the Google Earth screenshot at project level, record it, then deliberately lock the exact degree. Direction boundaries are not guessed here.</p><div className="two-col"><div className="field"><label htmlFor="google-file">Google Earth screenshot</label><input id="google-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" onChange={(event) => setCaseFile(event.target.files?.[0] ?? null)} /><button className="button-secondary" type="button" disabled={!caseFile || busy} onClick={() => void upload(caseFile)}>Upload screenshot</button></div><div className="field"><label htmlFor="google-asset">Uploaded screenshot</label><select id="google-asset" value={googleAssetRef} onChange={(event) => setGoogleAssetRef(event.target.value)}><option value="">Choose a project file</option>{caseAssets.map((asset) => <option key={asset.id} value={asset.evidenceRef}>{asset.fileName}</option>)}</select><button className="button-secondary" type="button" disabled={busy || !googleAssetRef} onClick={() => void run("spatial-evidence-create", { kind: "GOOGLE_EARTH_ORIENTATION", evidenceRef: googleAssetRef, fullColourConfirmed: true }, "Google Earth orientation evidence recorded.")}>{googleEvidence ? "Record replacement evidence" : "Record orientation evidence"}</button></div><div className="field"><label htmlFor="orientation-degree">Exact degree (0 to less than 360)</label><input id="orientation-degree" type="number" min="0" max="359.9999" step="0.0001" value={degree} onChange={(event) => setDegree(event.target.value)} /></div><div className="field"><label htmlFor="orientation-reason">Why this orientation is correct</label><textarea id="orientation-reason" value={orientationReason} onChange={(event) => setOrientationReason(event.target.value)} minLength={20} maxLength={500} /></div></div><button className="button" type="button" disabled={busy || !googleEvidence || !degree || orientationReason.trim().length < 20} onClick={() => { if (window.confirm("Lock this exact orientation? Changing it later requires new evidence and regenerates dependent work.")) void run("orientation-version-lock", { exactDegree: Number(degree), googleEarthEvidenceVersionId: googleEvidence?.id, reason: orientationReason }, "Exact orientation locked with immutable evidence."); }}>{orientation ? "Create a new orientation version" : "Lock exact orientation"}</button></div>
+    <div className="card span-12"><div className="eyebrow">Step 4</div><h2>Google Earth evidence and exact orientation</h2><p className="subtle">Upload the Google Earth screenshot at project level, record it, then deliberately lock the exact degree. Direction boundaries are not guessed here.</p>
+      <div className={`founder-flow-status ${googleUploadState === "FAILED" ? "status-blocked" : googleUploadState === "RECORDED" ? "status-ready" : ""}`} role={googleUploadState === "FAILED" ? "alert" : "status"} aria-live="polite"><strong>Evidence status: {googleUploadState.replaceAll("_", " ")}</strong>{caseFile && <span className="meta"> {caseFile.name.replace(/[\\r\\n]/g, " ")} · {caseFile.type || "unknown type"} · {readableFileSize(caseFile.size)}</span>}{googleUploadState === "UPLOADING" && <span> Uploading securely…</span>}{googleUploadState === "UPLOADED_NOT_RECORDED" && <span> Uploaded securely; record it before locking.</span>}{googleUploadState === "RECORDED" && <span> Google Earth screenshot uploaded securely and recorded.</span>}{googleUploadError && <p>{googleUploadError}</p>}</div>
+      <div className="two-col"><div className="field"><label htmlFor="google-file">Google Earth screenshot</label><input ref={googleFileRef} id="google-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp" aria-invalid={Boolean(orientationErrors.googleEvidence)} aria-describedby={orientationErrors.googleEvidence ? "google-file-error" : undefined} onChange={(event) => { const selected = event.target.files?.[0] ?? null; setCaseFile(selected); setGoogleUploadError(""); setGoogleUploadState(selected ? "SELECTED" : "NOT_SELECTED"); setOrientationErrors((current) => ({ ...current, googleEvidence: "" })); }} />{orientationErrors.googleEvidence && <p id="google-file-error" className="field-error">{orientationErrors.googleEvidence}</p>}<button className="button-secondary" type="button" disabled={!caseFile || busy} onClick={() => { if (!caseFile) return; setGoogleUploadState("UPLOADING"); setGoogleUploadError(""); void upload(caseFile, undefined, (asset) => { setGoogleAssetRef(asset.evidenceRef); setGoogleUploadState("UPLOADED_NOT_RECORDED"); }, (error) => { setGoogleUploadState("FAILED"); setGoogleUploadError(error); }); }}>{googleUploadState === "FAILED" ? "Retry upload" : "Upload screenshot"}</button><p className="meta">{caseFile ? "Selected file is ready to upload." : "Upload is disabled until a file is selected."}</p></div>
+      <div className="field"><label htmlFor="google-asset">Uploaded screenshot</label><select ref={googleAssetControlRef} id="google-asset" value={googleAssetRef} aria-invalid={Boolean(orientationErrors.googleEvidence)} aria-describedby={orientationErrors.googleEvidence ? "google-file-error" : undefined} onChange={(event) => { setGoogleAssetRef(event.target.value); if (event.target.value) { setGoogleUploadState("UPLOADED_NOT_RECORDED"); setOrientationErrors((current) => ({ ...current, googleEvidence: "" })); } }}><option value="">Choose a project file</option>{caseAssets.map((asset) => <option key={asset.id} value={asset.evidenceRef}>{asset.fileName}</option>)}</select><button className="button-secondary" type="button" disabled={busy || !googleAssetRef} onClick={() => { void (async () => { const recorded = await run("spatial-evidence-create", { kind: "GOOGLE_EARTH_ORIENTATION", evidenceRef: googleAssetRef, fullColourConfirmed: true }, "Google Earth orientation evidence recorded."); if (recorded) setGoogleUploadState("RECORDED"); })(); }}>{googleEvidence ? "Replace file" : "Record orientation evidence"}</button><p className="meta">{googleAssetRef ? "Record is available after upload completes." : "Record is disabled until an uploaded file is selected."}</p></div>
+      <div className="field"><label htmlFor="orientation-degree">Exact degree (0 to less than 360)</label><input ref={degreeRef} id="orientation-degree" type="number" min="0" max="359.9999" step="0.0001" value={degree} aria-invalid={Boolean(orientationErrors.degree)} aria-describedby={orientationErrors.degree ? "orientation-degree-error" : undefined} onBlur={() => validateOrientation()} onChange={(event) => { setDegree(event.target.value); setOrientationErrors((current) => ({ ...current, degree: "" })); }} />{orientationErrors.degree && <p id="orientation-degree-error" className="field-error">{orientationErrors.degree}</p>}</div>
+      <div className="field"><label htmlFor="orientation-reason">Why this orientation is correct</label><textarea ref={reasonRef} id="orientation-reason" value={orientationReason} aria-invalid={Boolean(orientationErrors.reason)} aria-describedby={orientationErrors.reason ? "orientation-reason-error" : undefined} onBlur={() => validateOrientation()} onChange={(event) => { setOrientationReason(event.target.value); setOrientationErrors((current) => ({ ...current, reason: "" })); }} minLength={20} maxLength={500} />{orientationErrors.reason && <p id="orientation-reason-error" className="field-error">{orientationErrors.reason}</p>}</div></div>
+      <button className="button" type="button" disabled={busy || !googleEvidence || !degree || orientationReason.trim().length < 20} onClick={() => { const errors = validateOrientation(); if (Object.keys(errors).length) { focusFirstOrientationError(errors); return; } if (window.confirm("Lock this exact orientation? Changing it later requires new evidence and regenerates dependent work.")) void run("orientation-version-lock", { exactDegree: Number(degree), googleEarthEvidenceVersionId: googleEvidence?.id, reason: orientationReason }, "Exact orientation locked with immutable evidence."); }}>{orientation ? "Create a new orientation version" : "Lock exact orientation"}</button><p className="meta">{!googleEvidence ? "Lock is disabled until evidence is recorded." : !degree ? "Lock is disabled until a valid degree is entered." : orientationReason.trim().length < 20 ? "Lock is disabled until the rationale is complete." : "Ready to lock the exact orientation."}</p></div>
 
     <div className="card span-6"><div className="eyebrow">Step 4 · 32 directions</div><h2>Entrances and windows</h2><p className="subtle">Place verified markers using percentages from the left and top of the current plan. Automatic direction naming remains blocked until its methodology version is approved.</p><div className="field"><label htmlFor="opening-kind">Opening type</label><select id="opening-kind" value={openingKind} onChange={(event) => setOpeningKind(event.target.value)}><option value="MAIN_ENTRANCE">Main entrance</option><option value="ENTRANCE">Other entrance</option><option value="WINDOW">Window</option></select></div><div className="two-col"><div className="field"><label htmlFor="opening-x">From left (%)</label><input id="opening-x" type="number" min="0" max="100" value={openingX} onChange={(event) => setOpeningX(event.target.value)} /></div><div className="field"><label htmlFor="opening-y">From top (%)</label><input id="opening-y" type="number" min="0" max="100" value={openingY} onChange={(event) => setOpeningY(event.target.value)} /></div></div><button className="button" type="button" disabled={busy || !readyForMapping} onClick={() => void run("opening-mapping-create", { floorId: floor?.id, planVersionId: plan?.id, orientationVersionId: orientation?.id, evidenceVersionId: markedEvidence?.id, kind: openingKind, markerX: Number(openingX) / 100, markerY: Number(openingY) / 100, verified: true }, "Verified opening marker saved. Direction classification awaits approved methodology.")}>Save verified marker</button><p className="meta">{openings.length} marker{openings.length === 1 ? "" : "s"} on this floor version.</p></div>
 
