@@ -9,7 +9,7 @@ export default async function ReportsPage() {
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="Reports" subtitle="Prepare, approve, and release" />
+        <SiteHeader title="Legacy Report Tools" subtitle="Technical fallback; the Founder scorecard remains primary" />
         <AccessDeniedPanel area="Report flow" requiredRole="CONSULTANT" actorRole={access.actor.role} />
       </main>
     );
@@ -17,13 +17,13 @@ export default async function ReportsPage() {
 
   return (
     <main className="page-shell">
-      <SiteHeader title="Reports" subtitle="Prepare, approve, and release" />
+      <SiteHeader title="Legacy Report Tools" subtitle="Technical fallback; the Founder scorecard remains primary" />
 
       <FounderRouteIntro
         eyebrow="Reports"
         title="Release one protected report at a time."
         description="Prepare the watermarked preview, clear payment and Founder approval gates, then release an immutable report version. Historical releases never change in place."
-        primaryAction={{ href: "/clients-cases", label: "Open active case" }}
+        primaryAction={{ href: "/founder/15", label: "Continue Founder report assembly" }}
         secondaryAction={{ href: "/timeline", label: "View history" }}
         context="Founder Edition · preview, approval and protected release"
         status={{ label: "Gated release", tone: "attention" }}
@@ -35,7 +35,10 @@ export default async function ReportsPage() {
         </div>
       </FounderRouteIntro>
 
-      <ReportConsole />
+      <details className="route-secondary-links legacy-console-disclosure">
+        <summary>Open legacy report console</summary>
+        <ReportConsole />
+      </details>
     </main>
   );
 }

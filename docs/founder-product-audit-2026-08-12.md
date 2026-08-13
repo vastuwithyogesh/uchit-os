@@ -101,6 +101,7 @@ The approved local follow-up addresses the first two high-priority navigation/co
 - Evaluation now uses `/founder/continue`, a server route that builds the authoritative scorecard and redirects to the current case/floor's first actionable module with its exact context query. The legacy `/founder/08` route remains available for direct historical links, but it is no longer the primary navigation target.
 - `/evaluation` is retained as a technical fallback under More, but its dense console and chart tools are collapsed behind explicit disclosures; its primary recovery returns to `/founder/continue`.
 - `/payment-proofs` is retained as a technical fallback under More, with its legacy receipt uploader collapsed behind an explicit disclosure; its primary recovery returns to the Founder balance step (`/founder/12`).
+- `/reports` is retained as a technical fallback under More, with the legacy report console collapsed behind an explicit disclosure; its primary recovery returns to Founder report assembly (`/founder/15`).
 - The Site Analysis console renders only the Site editor when the Founder step requests `focus="site"`; the Post-Site Findings editor is rendered only for `focus="post-site"`. The combined view remains available only to the legacy all-tools route.
 
 Focused navigation/flow contracts and the complete release suite passed after this change. Publication is intentionally not included in this local follow-up.
