@@ -1,5 +1,6 @@
 import type {
   AppUser,
+  FloorWorkspaceRecord,
   FounderCommercialLegalPolicyRecord,
   FounderCommercialPolicyVersionRecord,
   FounderCommercialPolicyEventType,
@@ -8,6 +9,9 @@ import type {
   FounderProposalStep,
   FounderProposalTemplateVersionRecord,
   FounderProposalVersionRecord,
+  TimelineEvent,
+  VastuCaseRecord,
+  VastuProjectRecord,
   VastuServiceType
 } from "./domain.ts";
 import type { AppState } from "./store.ts";
@@ -441,6 +445,91 @@ export async function respondToFounderProposal(input: { state: AppState; token: 
   const record = { id: uuid(), organisationId: proposal.organisationId, proposalVersionId: proposal.id, proposalContentHash: proposal.contentHash, artifactHashSha256: artifact.artifactHashSha256, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, response: input.response, fullName: input.fullName.trim(), acceptanceChecked: input.response === "ACCEPTED" ? true : undefined, typedConfirmationHash: input.response === "ACCEPTED" ? await hashText(input.typedConfirmation!) : undefined, organisationName: input.organisationName?.trim(), designation: input.designation?.trim(), requestedChanges: input.requestedChanges?.trim(), respondedAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
   input.state.founderProposalResponses.push(record); proposal.status = input.response; if (input.response === "ACCEPTED") proposal.acceptedAt = record.respondedAt; proposal.recordVersion = (proposal.recordVersion ?? 1) + 1;
   return record;
+}
+
+/**
+ * Creates the Founder-only case/project handoff for an accepted complimentary
+ * proposal.  This deliberately lives beside the commercial invariants so the
+ * zero-value exception cannot be reached by the legacy payment-only case path.
+ */
+export function createFounderComplimentaryCaseHandoff(input: {
+  state: AppState;
+  actor: AppUser;
+  founderUserId: string;
+  organisationId: string;
+  proposalVersionId: string;
+  idempotencyKey: string;
+  expectedRecordVersion?: number;
+  now?: Date;
+}) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal) fail(404, "Proposal version not found.");
+  const commercialPolicy = input.state.founderCommercialPolicies.find((policy) => policy.id === proposal.content.policyBindings.commercialPolicyId && policy.organisationId === input.organisationId);
+  const requestHash = deterministicContentHash({
+    proposalVersionId: proposal.id,
+    predecessorVersionId: proposal.predecessorVersionId,
+    clientId: proposal.clientId,
+    prospectiveProjectId: proposal.prospectiveProjectId,
+    contentHash: proposal.contentHash,
+    classification: proposal.content.commercial.engagementClassification,
+    professionalFeePaise: proposal.content.commercial.professionalFeePaise,
+    gstAmountPaise: proposal.content.commercial.gstAmountPaise,
+    totalPayablePaise: proposal.content.commercial.totalPayablePaise,
+    agreedAdvancePaise: proposal.content.commercial.agreedAdvancePaise,
+    commercialPolicyId: proposal.content.policyBindings.commercialPolicyId,
+    commercialPolicyVersion: commercialPolicy?.version,
+    referenceFeePaise: proposal.content.commercial.referenceFeePaise,
+    referenceAdvancePaise: commercialPolicy?.referenceAdvancePaise
+  });
+  const auditKey = `audit:founder-complimentary-case-handoff:${input.idempotencyKey}`;
+  const replay = input.state.founderCommercialAuditEvents.find((event) => event.organisationId === input.organisationId && event.idempotencyKey === auditKey);
+  if (replay) {
+    if (replay.afterHash !== requestHash) fail(409, "This idempotency key was used for different case-handoff content.");
+    const replayCase = input.state.vastuCases.find((item) => item.id === replay.entityId && item.organisationId === input.organisationId);
+    if (!replayCase) fail(409, "The prior case-handoff result is unavailable; reload before retrying.");
+    return replayCase;
+  }
+  if (proposal.status !== "ACCEPTED") fail(409, "An accepted proposal version is required before case setup.");
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "accepted proposal");
+  const project = input.state.prospectiveProjects.find((item) => item.id === proposal.prospectiveProjectId && item.organisationId === input.organisationId && item.clientId === proposal.clientId);
+  if (!project) fail(409, "The proposal must link to an organisation-scoped prospective project for this client.");
+  if (!commercialPolicy) fail(409, "The accepted proposal's exact commercial policy version is unavailable.");
+  if (!project.responseVersionId || project.kind !== proposal.content.clientProject.projectKind || project.serviceType !== proposal.serviceType) fail(409, "The proposal and prospective project linkage is inconsistent.");
+  const client = input.state.clients.find((item) => item.id === proposal.clientId && (!item.organisationId || item.organisationId === input.organisationId));
+  if (!client) fail(409, "The proposal client is outside the active organisation scope.");
+  const terms = proposal.content.commercial;
+  if (terms.engagementClassification !== "INTERNAL_COMPLIMENTARY") fail(409, "Only an accepted INTERNAL_COMPLIMENTARY proposal can use the Founder exception handoff.");
+  if (terms.professionalFeePaise !== 0 || terms.gstAppliedBasisPoints !== 0 || terms.gstAmountPaise !== 0 || terms.totalPayablePaise !== 0 || terms.agreedAdvancePaise !== 0 || terms.remainingBalancePaise !== 0 || !terms.advanceExceptionApproved || !terms.classificationReason?.trim()) fail(409, "The complimentary exception must be an exact zero-value, privately reasoned commercial version.");
+  if (input.state.founderCommercialPaymentConfirmations.some((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id)
+    || input.state.founderCommercialInvoices.some((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id)
+    || input.state.payments.some((item) => item.organisationId === input.organisationId && item.proposalId === proposal.id)) fail(409, "Complimentary case setup cannot create or use a payment or invoice record.");
+  const response = input.state.founderProposalResponses.find((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.clientId === proposal.clientId && item.prospectiveProjectId === project.id && item.response === "ACCEPTED");
+  if (!response || response.proposalContentHash !== proposal.contentHash) fail(409, "The accepted response is not bound to this exact proposal version.");
+  const artifact = input.state.founderProposalArtifacts.find((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.proposalContentHash === proposal.contentHash && item.artifactHashSha256 === response.artifactHashSha256);
+  if (!artifact) fail(409, "The accepted proposal artifact hash is unavailable or does not match.");
+  const existing = input.state.vastuCases.find((item) => item.organisationId === input.organisationId && item.proposalId === proposal.id && item.clientId === proposal.clientId);
+  if (existing) return existing;
+
+  const now = nowIso(input.now);
+  const caseId = uuid();
+  const projectId = uuid();
+  const floorId = uuid();
+  const caseNumber = `UV-${new Date(now).getUTCFullYear()}-${String(input.state.vastuCases.length + 1).padStart(3, "0")}`;
+  const nextCase: VastuCaseRecord = {
+    id: caseId, organisationId: input.organisationId, caseNumber, clientId: proposal.clientId, proposalId: proposal.id, projectId,
+    status: "CASE_CREATED", reportStatus: "DRAFT", orientationLocked: false, balanceApproved: false, fullPaymentApproved: false,
+    serviceType: proposal.serviceType, canonicalStage: "UNDERSTAND", revisionNumber: 1, recordVersion: 1
+  };
+  const nextProject: VastuProjectRecord = { id: projectId, organisationId: input.organisationId, clientId: proposal.clientId, activeCaseId: caseId, propertyName: "Property project", status: "IN_PROGRESS", createdAt: now };
+  const nextFloor: FloorWorkspaceRecord = { id: floorId, organisationId: input.organisationId, caseId, projectId, floorLabel: "Ground floor", status: "DRAFT", locked: false, evidenceUploads: [], idempotencyKey: `handoff-floor:${input.idempotencyKey}` };
+  input.state.vastuCases.unshift(nextCase); input.state.projects.unshift(nextProject); input.state.floorWorkspaces.unshift(nextFloor);
+  project.caseId = caseId; project.status = "CONVERTED"; project.recordVersion = (project.recordVersion ?? 0) + 1;
+  proposal.recordVersion = (proposal.recordVersion ?? 0) + 1;
+  const timeline: TimelineEvent = { id: uuid(), organisationId: input.organisationId, clientId: proposal.clientId, category: "Commercial", headline: "Complimentary case setup", details: `Case ${caseNumber} opened from the accepted INTERNAL_COMPLIMENTARY proposal. No payment or invoice was created.`, happenedAt: now, actorRole: input.actor.role, actorId: input.actor.id, actorName: input.actor.fullName };
+  input.state.timelineEvents.unshift(timeline);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "COMPLIMENTARY_CASE_HANDOFF_CREATED", entityType: "VASTU_CASE", entityId: caseId, actorUserId: input.actor.id, reason: terms.classificationReason.trim(), proposalVersionId: proposal.id, prospectiveProjectId: project.id, beforeHash: proposal.contentHash, afterHash: requestHash, idempotencyKey: auditKey });
+  return nextCase;
 }
 
 export function confirmFounderCommercialPayment(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; paymentId: string; type: "ADVANCE" | "BALANCE"; amountPaise: number; idempotencyKey: string; expectedProposalRecordVersion?: number; now?: Date }) {

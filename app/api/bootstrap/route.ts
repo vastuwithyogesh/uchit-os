@@ -10,7 +10,12 @@ export async function GET(request: Request) {
     return access.response;
   }
   try {
-    const context = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
+    // The disposable local demo has no hosted identity headers or pre-existing
+    // organisation membership. Allow its synthetic SUPER_ADMIN to bootstrap a
+    // local Founder organisation only; hosted requests still require the
+    // configured initial-owner email or an active membership.
+    const allowBootstrap = isInitialOrganisationOwnerEmail(access.actor.email) || isExplicitLocalDemo(request.headers);
+    const context = await resolveActiveOrganisationContext(access.actor, allowBootstrap);
     const snapshot = await loadStateSnapshotFromPersistence();
     const scopedState = projectOrganisationState(snapshot.state, context.organisation.id);
     const optInLeads = access.actor.role === "SUPER_ADMIN" ? scopedState.optInLeads : scopedState.optInLeads.map((lead) => {

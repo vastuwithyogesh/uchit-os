@@ -27,6 +27,13 @@ test("all seventeen Founder modules have dedicated server-derived paths", () => 
   assert.match(route, /floorId/);
 });
 
+test("continue preserves exact case and floor context for the server-derived next step", () => {
+  const continuePage = read("app/founder/continue/page.tsx");
+  assert.match(continuePage, /searchParams/);
+  assert.match(continuePage, /context\.caseId/);
+  assert.match(continuePage, /context\.floorId/);
+});
+
 test("FE-SITE order is Stage A presentation then Site and Post-Site then balance", () => {
   const scorecard = read("lib/founder-scorecard.ts");
   const stageA = scorecard.indexOf('id: "stage-a"');

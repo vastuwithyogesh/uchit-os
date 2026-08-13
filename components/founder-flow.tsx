@@ -1,6 +1,7 @@
 import type { FounderScorecard } from "@/lib/founder-scorecard";
 import { canOpenFounderFlowStep, getCurrentFounderFlowStep, getFounderFlowSteps, getNextFounderFlowStep, getPreviousFounderFlowStep, type FounderFlowStep } from "@/lib/founder-flow";
 import { FounderStepWorkspace } from "@/components/founder-step-workspace";
+import { FounderCaseSelector } from "@/components/founder-case-selector";
 
 function statusTone(status: FounderFlowStep["status"]) {
   if (status === "BLOCKED" || status === "NEEDS_REGENERATION") return status === "NEEDS_REGENERATION" ? "needs-regeneration" : "blocked";
@@ -15,7 +16,7 @@ function statusLabel(status: FounderFlowStep["status"]) {
 }
 
 function contextLine(scorecard: FounderScorecard) {
-  const floor = scorecard.floors.find((item) => item.id === scorecard.selectedFloorId) ?? scorecard.floors[0];
+  const floor = scorecard.floors.find((item) => item.id === scorecard.selectedFloorId);
   return `${scorecard.client?.displayName ?? "No client selected"} · ${scorecard.project?.propertyName ?? scorecard.caseRecord?.caseNumber ?? "Case setup pending"} · ${floor?.label ?? "Floor setup pending"}`;
 }
 
@@ -35,6 +36,7 @@ export function FounderFlowHome({ scorecard }: { scorecard: FounderScorecard }) 
   const current = getCurrentFounderFlowStep(scorecard);
   const steps = getFounderFlowSteps(scorecard);
   const complete = steps.filter((step) => step.status === "COMPLETE").length;
+  if (!scorecard.caseRecord || !scorecard.selectedFloorId) return <section className="founder-flow-home"><FounderCaseSelector /><div className="workspace-state"><h1>Select a case to continue</h1><p>Case and floor context is required. Nothing is selected automatically.</p></div></section>;
   return (
     <section className="founder-flow-home" aria-labelledby="founder-flow-home-title">
       <section className="founder-flow-home-surface">
@@ -58,16 +60,18 @@ export function FounderFlowPage({ scorecard, stepNumber }: { scorecard: FounderS
   const next = getNextFounderFlowStep(scorecard, stepNumber);
   if (!step || !current) return <p className="subtle">This Founder step is not available.</p>;
   const isFuture = !canOpenFounderFlowStep(scorecard, stepNumber);
-  const tone = statusTone(step.status);
+  const displayStatus = isFuture ? "BLOCKED" : step.status;
+  const tone = statusTone(displayStatus);
   const isBlocked = step.status === "BLOCKED" || step.status === "NEEDS_REGENERATION" || isFuture;
   const isComplete = step.status === "COMPLETE" && !isFuture;
   const action = isComplete ? (next ? { href: next.flowPath, label: "Continue to next step" } : undefined) : isFuture ? { href: current.flowPath, label: `Go to step ${current.number.toString().padStart(2, "0")}` } : isBlocked ? (step.recoveryAction ?? { href: current.flowPath, label: "Go to required step" }) : step.primaryAction;
   return (
     <section className="founder-flow-page" aria-labelledby="founder-flow-title">
+      <FounderCaseSelector caseId={scorecard.caseRecord?.id} floorId={scorecard.selectedFloorId} caseLabel={scorecard.caseRecord?.caseNumber} />
       <ProgressControl scorecard={scorecard} currentNumber={stepNumber} />
       <section className="founder-flow-surface" data-tone={tone}>
         <div className="founder-flow-context" aria-label="Selected client, project and floor">{contextLine(scorecard)}</div>
-        <div className="founder-flow-step-number">Step {step.number.toString().padStart(2, "0")} · {statusLabel(step.status)}</div>
+        <div className="founder-flow-step-number">Step {step.number.toString().padStart(2, "0")} · {statusLabel(displayStatus)}</div>
         <h1 id="founder-flow-title">{step.title}</h1>
         <p className="founder-flow-description">{step.purpose}</p>
         <div className={`founder-flow-status status-${tone}`} role={isBlocked ? "alert" : "status"}>

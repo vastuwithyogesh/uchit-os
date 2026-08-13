@@ -236,7 +236,7 @@ export interface ClientIntakeProfile extends OrganisationOwnedRecord {
   contactPreference?: { whatsapp?: string; preferredLanguage?: string; preferredContactWindow?: string };
   businessContext?: { company?: string; industry?: string; designation?: string; vision?: string };
   decisionMakerStatus?: DecisionMakerStatus; otherDecisionMakers?: string;
-  propertyContext?: { serviceInterest?: VastuServiceType; propertyType?: string; propertyStatus?: string; areaValue?: number; areaUnit?: string; cityCountry?: string; constraints?: string };
+  propertyContext?: { serviceInterest?: VastuServiceType; propertyType?: string; propertyStatus?: string; areaValue?: number; areaUnit?: string; cityCountry?: string; constraints?: string; floorCount?: number; locationLink?: string; latitude?: number; longitude?: number; locationVersion?: number };
   needs?: { mainChallenge?: string; desiredOutcome?: string; urgency?: string };
   consent: { version: "uchit-intake/v1"; contact?: boolean; accuracy?: boolean; confidentiality?: boolean; confirmedAt?: string };
   created: AssessmentAudit; updated: AssessmentAudit;

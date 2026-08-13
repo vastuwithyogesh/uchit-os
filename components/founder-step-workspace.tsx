@@ -12,7 +12,7 @@ export function FounderStepWorkspace({ scorecard, stepNumber }: { scorecard: Fou
   const common = { clientId: scorecard.client?.id, caseId: scorecard.caseRecord?.id, floorId: scorecard.selectedFloorId };
   if (stepNumber === 1) return <FounderCaseSetupStep focus="case" {...common} />;
   if (stepNumber === 2) return <FounderCaseSetupStep focus="floor" {...common} />;
-  if (stepNumber === 3) return <ClientIntakeForm clientId={common.clientId} />;
+  if (stepNumber === 3) return <ClientIntakeForm clientId={common.clientId} caseId={common.caseId} projectId={scorecard.project?.id} />;
   if (stepNumber === 4) return <SpatialWorkspace focus="orientation" {...common} />;
   if (stepNumber === 5) return <SpatialWorkspace focus="plan" {...common} />;
   if (stepNumber === 6) return <SpatialWorkspace focus="gridding" {...common} />;

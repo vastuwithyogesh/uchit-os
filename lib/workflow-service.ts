@@ -191,6 +191,12 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
   const clientId = boundedRequiredString(input.clientId, "Client ID");
   const client = state.clients.find((item) => item.id === clientId);
   if (!client) throw new Error("Client not found.");
+  const caseId = input.caseId === undefined ? undefined : boundedRequiredString(input.caseId, "Case ID");
+  const projectId = input.projectId === undefined ? undefined : boundedRequiredString(input.projectId, "Project ID");
+  if (caseId || projectId) {
+    const caseRecord = state.vastuCases.find((item) => item.id === caseId && item.clientId === clientId);
+    if (!caseRecord || (projectId && caseRecord.projectId !== projectId)) throw new WorkflowConflictError("Intake context does not match the selected case, project and client.");
+  }
   if (input.actor.role === "SETTER" && client.assignedSetterId && client.assignedSetterId !== input.actor.id) throw new WorkflowConflictError("Setters may update intake only for clients assigned to them.");
   const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
   const existing = state.clientIntakeProfiles.find((item) => item.clientId === clientId);
@@ -213,7 +219,7 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
   const decisionMakerStatus = input.decisionMakerStatus === undefined || input.decisionMakerStatus === "" ? undefined : enumValue(input.decisionMakerStatus, decisionMakerStatuses, "decision-maker status") as DecisionMakerStatus;
   const otherDecisionMakers = optionalIntakeString(input.otherDecisionMakers, "Other decision makers", 500);
 
-  const propertyInput = intakeObject(input.propertyContext, "Property context", ["serviceInterest", "propertyType", "propertyStatus", "areaValue", "areaUnit", "cityCountry", "constraints"]);
+  const propertyInput = intakeObject(input.propertyContext, "Property context", ["serviceInterest", "propertyType", "propertyStatus", "areaValue", "areaUnit", "cityCountry", "constraints", "floorCount", "locationLink", "latitude", "longitude"]);
   let areaValue: number | undefined;
   if (propertyInput?.areaValue !== undefined && propertyInput.areaValue !== null && propertyInput.areaValue !== "") {
     if (typeof propertyInput.areaValue !== "number" || !Number.isFinite(propertyInput.areaValue) || propertyInput.areaValue <= 0 || propertyInput.areaValue > 1_000_000_000) throw new Error("Area must be a finite number greater than zero and no more than 1,000,000,000.");
@@ -222,7 +228,19 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
   const areaUnit = propertyInput ? optionalIntakeString(propertyInput.areaUnit, "Area unit", 40) : undefined;
   if ((areaValue === undefined) !== (areaUnit === undefined)) throw new Error("Area value and area unit must be provided together.");
   const serviceInterest = propertyInput?.serviceInterest === undefined || propertyInput.serviceInterest === "" ? undefined : enumValue(propertyInput.serviceInterest, serviceTypes, "service interest") as VastuServiceType;
-  const propertyContext = propertyInput ? { serviceInterest, propertyType: optionalIntakeString(propertyInput.propertyType, "Property type", 120), propertyStatus: optionalIntakeString(propertyInput.propertyStatus, "Property status", 120), areaValue, areaUnit, cityCountry: optionalIntakeString(propertyInput.cityCountry, "City and country", 160), constraints: optionalIntakeString(propertyInput.constraints, "Property constraints", 1000) } : undefined;
+  const allowedPropertyTypes = ["Residential", "Commercial", "Factory", "Shop", "Hospital", "Hotel", "Temple"] as const;
+  const requestedPropertyType = propertyInput ? optionalIntakeString(propertyInput.propertyType, "Property type", 120) : undefined;
+  if (requestedPropertyType && !allowedPropertyTypes.includes(requestedPropertyType as typeof allowedPropertyTypes[number])) throw new Error("Property type must be one of the approved Founder options.");
+  const floorCount = propertyInput?.floorCount === undefined || propertyInput.floorCount === null || propertyInput.floorCount === "" ? undefined : Number(propertyInput.floorCount);
+  if (floorCount !== undefined && (!Number.isInteger(floorCount) || floorCount < 1 || floorCount > 200)) throw new Error("Number of floors must be a whole number between 1 and 200.");
+  const locationLink = propertyInput?.locationLink === undefined ? undefined : String(propertyInput.locationLink).trim();
+  if (locationLink && !/^https:\/\//i.test(locationLink)) throw new Error("Location link must use HTTPS.");
+  const latitude = propertyInput?.latitude === undefined || propertyInput.latitude === "" ? undefined : Number(propertyInput.latitude);
+  const longitude = propertyInput?.longitude === undefined || propertyInput.longitude === "" ? undefined : Number(propertyInput.longitude);
+  if ((latitude === undefined) !== (longitude === undefined) || (latitude !== undefined && (!Number.isFinite(latitude) || latitude < -90 || latitude > 90 || !Number.isFinite(longitude) || longitude! < -180 || longitude! > 180))) throw new Error("Coordinates must include valid latitude and longitude together.");
+  const previousLocation = existing?.propertyContext?.locationLink ?? `${existing?.propertyContext?.latitude ?? ""},${existing?.propertyContext?.longitude ?? ""}`;
+  const nextLocation = locationLink ?? `${latitude ?? ""},${longitude ?? ""}`;
+  const propertyContext = propertyInput ? { serviceInterest, propertyType: requestedPropertyType, propertyStatus: optionalIntakeString(propertyInput.propertyStatus, "Property status", 120), areaValue, areaUnit, cityCountry: optionalIntakeString(propertyInput.cityCountry, "City and country", 160), constraints: optionalIntakeString(propertyInput.constraints, "Property constraints", 1000), floorCount, locationLink, latitude, longitude, locationVersion: previousLocation !== nextLocation ? (existing?.propertyContext?.locationVersion ?? 0) + 1 : existing?.propertyContext?.locationVersion } : undefined;
 
   const needsInput = intakeObject(input.needs, "Needs", ["mainChallenge", "desiredOutcome", "urgency"]);
   const needs = needsInput ? { mainChallenge: optionalIntakeString(needsInput.mainChallenge, "Main challenge", 1000), desiredOutcome: optionalIntakeString(needsInput.desiredOutcome, "Desired outcome", 1000), urgency: optionalIntakeString(needsInput.urgency, "Urgency", 120) } : undefined;

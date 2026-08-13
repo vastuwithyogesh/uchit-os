@@ -12,7 +12,7 @@ import { transitionFloorRegeneration } from "@/lib/founder-regeneration";
 import { assignReviewCall, cancelReviewCall, createFounderCommunicationContext, createQualificationInvitation, markCommunicationOpened, prepareManualCommunication, rescheduleReviewCall,
   registerMediaAssetVersion, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "@/lib/founder-engagement";
 import { activateFounderLegalPolicy, activateFounderNoRefundPolicy, activateFounderProposalTemplate, applyFounderBalanceDeadlineException, approveFounderProposal, autosaveFounderProposalStep,
-  confirmFounderCommercialPayment, createFounderLegalPolicy, createFounderProposalDraft, createFounderProposalSuccessor, createFounderProposalTemplate,
+  confirmFounderCommercialPayment, createFounderComplimentaryCaseHandoff, createFounderLegalPolicy, createFounderProposalDraft, createFounderProposalSuccessor, createFounderProposalTemplate,
   generateFounderProposalArtifact, issueFounderAdvanceInvoice, publishFounderCommercialPolicy, recordFounderCommercialPolicyEvent, reviewFounderProposal, sendFounderProposal } from "@/lib/founder-commercial";
 import { founderCommercialArtifactStore } from "@/lib/founder-commercial.server";
 import { activateFounderStatutoryPolicy, createFounderStatutoryPolicyDraft, issueFounderStatutoryDocument, saveFounderBillingProfile } from "@/lib/founder-statutory-documents";
@@ -80,7 +80,7 @@ export async function POST(request: Request) {
   let organisationStateBefore: AppState | undefined;
   const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
   const concurrencyActions = new Set(["founder-lead-profile-update", "founder-media-register", "founder-media-transition", "founder-qualification-invite", "founder-communication-context", "founder-communication-prepare", "founder-communication-opened", "founder-booking-assign", "founder-booking-reschedule", "founder-booking-cancel", "case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert", "proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve"]);
-  for (const founderCommercialAction of ["founder-commercial-policy-publish", "founder-commercial-legal-create", "founder-commercial-legal-activate", "founder-no-refund-policy-activate", "founder-commercial-policy-event-record", "founder-proposal-template-create", "founder-proposal-template-activate", "founder-proposal-draft-create", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send", "founder-proposal-successor", "founder-commercial-payment-confirm", "founder-balance-deadline-exception", "founder-invoice-issue", "founder-statutory-policy-create", "founder-statutory-policy-activate", "founder-billing-profile-save", "founder-statutory-document-issue"]) concurrencyActions.add(founderCommercialAction);
+  for (const founderCommercialAction of ["founder-commercial-policy-publish", "founder-commercial-legal-create", "founder-commercial-legal-activate", "founder-no-refund-policy-activate", "founder-commercial-policy-event-record", "founder-proposal-template-create", "founder-proposal-template-activate", "founder-proposal-draft-create", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send", "founder-proposal-successor", "founder-commercial-payment-confirm", "founder-complimentary-case-handoff", "founder-balance-deadline-exception", "founder-invoice-issue", "founder-statutory-policy-create", "founder-statutory-policy-activate", "founder-billing-profile-save", "founder-statutory-document-issue"]) concurrencyActions.add(founderCommercialAction);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -91,8 +91,12 @@ export async function POST(request: Request) {
 
   try {
     actor = await resolveRequestActor(request.headers, body.actorRole);
-    foundation = isExplicitLocalDemo(request.headers) ? null
-      : await resolveActiveOrganisationContext(actor, isInitialOrganisationOwnerEmail(actor.email));
+    // Explicit loopback demo runs use the same server-derived Founder
+    // organisation context as hosted requests. This gives the disposable
+    // synthetic owner a real capability binding for local rehearsal actions;
+    // non-local requests still require the configured owner or membership.
+    foundation = await resolveActiveOrganisationContext(actor,
+      isInitialOrganisationOwnerEmail(actor.email) || isExplicitLocalDemo(request.headers));
     if (foundation) {
       if (foundation.membership.role === "SPECIALIST") {
         return NextResponse.json({ ok: false, error: "Specialist access remains deferred until Team Edition." }, { status: 403 });
@@ -118,7 +122,7 @@ export async function POST(request: Request) {
     const crmAllowedFields: Record<string, string[]> = {
       "client-pipeline-transition": ["action", "actorRole", "clientId", "pipelineStage", "nextAction", "nextActionDueAt", "correction", "correctionReason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "commercial-policy-update": ["action", "actorRole", "defaultProposalAmountInr", "minimumAdvanceInr", "qualificationCallTargetMinutes", "nextActionDueSoonHours", "defaultReviewCallMinutes", "reason", "idempotencyKey", "expectedPolicyVersion", "expectedRevision"]
-      ,"client-intake-upsert": ["action", "actorRole", "clientId", "contactPreference", "businessContext", "decisionMakerStatus", "otherDecisionMakers", "propertyContext", "needs", "consent", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
+      ,"client-intake-upsert": ["action", "actorRole", "clientId", "caseId", "projectId", "contactPreference", "businessContext", "decisionMakerStatus", "otherDecisionMakers", "propertyContext", "needs", "consent", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
       ,"proposal-create": ["action", "actorRole", "clientId", "amountInr", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
       ,"proposal-approve": ["action", "actorRole", "clientId", "proposalId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
       ,"case-create": ["action", "actorRole", "clientId", "proposalId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
@@ -163,6 +167,7 @@ export async function POST(request: Request) {
       "founder-proposal-artifact-generate": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-proposal-send": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-proposal-successor": ["action", "actorRole", "proposalVersionId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-complimentary-case-handoff": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-commercial-payment-confirm": ["action", "actorRole", "proposalVersionId", "paymentId", "type", "amountPaise", "idempotencyKey", "expectedProposalRecordVersion", "expectedRecordVersion", "expectedRevision"],
       "founder-balance-deadline-exception": ["action", "actorRole", "proposalVersionId", "exceptionAction", "newDueAt", "reason", "engagementClassification", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-invoice-issue": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
@@ -302,6 +307,11 @@ export async function POST(request: Request) {
       }
       case "founder-proposal-successor": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, proposal: createFounderProposalSuccessor({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, reason: body.reason, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) }; break;
+      }
+      case "founder-complimentary-case-handoff": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, caseRecord: createFounderComplimentaryCaseHandoff({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
       }
       case "founder-commercial-payment-confirm": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!; response = { ok: true, confirmation: confirmFounderCommercialPayment({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, paymentId: body.paymentId, type: body.type, amountPaise: Number(body.amountPaise), idempotencyKey: body.idempotencyKey, expectedProposalRecordVersion: body.expectedProposalRecordVersion }) }; break;

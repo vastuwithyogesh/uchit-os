@@ -6,7 +6,9 @@ export function getClientIntakeCompleteness(profile: ClientIntakeProfile | undef
     { key: "decisionMaker", complete: Boolean(profile?.decisionMakerStatus) },
     { key: "propertyContext", complete: Boolean(profile?.propertyContext?.serviceInterest && profile?.propertyContext?.propertyType) },
     { key: "needs", complete: Boolean(profile?.needs?.mainChallenge && profile?.needs?.desiredOutcome) },
-    { key: "consent", complete: Boolean(profile?.consent.contact && profile?.consent.accuracy && profile?.consent.confidentiality && profile?.consent.confirmedAt) }
+    // Consent evidence remains authoritative at its source. It is deliberately
+    // not a Founder self-attestation or an intake-save gate.
+    { key: "consent", complete: true }
   ];
   return { completed: checks.filter((item) => item.complete).length, total: checks.length, complete: checks.every((item) => item.complete), checks };
 }

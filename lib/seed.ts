@@ -13,6 +13,7 @@ import type {
   TimelineEvent,
   UtilityRule,
   VastuCaseRecord,
+  VastuProjectRecord,
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
 } from "./domain.ts";
@@ -147,6 +148,7 @@ export const vastuCases: VastuCaseRecord[] = [
     caseNumber: "UV-2026-001",
     clientId: "client_001",
     proposalId: "proposal_001",
+    projectId: "project_001",
     status: "FLOOR_WORKSPACE_ACTIVE",
     reportStatus: "PAYMENT_BLOCKED",
     orientationLocked: true,
@@ -158,6 +160,7 @@ export const vastuCases: VastuCaseRecord[] = [
     caseNumber: "UV-2026-002",
     clientId: "client_002",
     proposalId: "proposal_002",
+    projectId: "project_002",
     status: "VERDICT_RELEASED",
     reportStatus: "RELEASED",
     orientationLocked: true,
@@ -166,10 +169,18 @@ export const vastuCases: VastuCaseRecord[] = [
   }
 ];
 
+// Disposable development-only projects make the demo cases explicit rather
+// than inferring a project from a payment, report or floor record.
+export const projects: VastuProjectRecord[] = [
+  { id: "project_001", clientId: "client_001", activeCaseId: "case_001", propertyName: "Synthetic Bengaluru residence", status: "IN_PROGRESS", createdAt: "2026-08-08T10:05:02+05:30" },
+  { id: "project_002", clientId: "client_002", activeCaseId: "case_002", propertyName: "Synthetic Pune residence", status: "IN_PROGRESS", createdAt: "2026-08-08T09:52:12+05:30" }
+];
+
 export const floorWorkspaces: FloorWorkspaceRecord[] = [
   {
     id: "floor_001",
     caseId: "case_001",
+    projectId: "project_001",
     floorLabel: "Ground floor",
     status: "NEEDS_REGENERATION",
     locked: true,
@@ -179,6 +190,7 @@ export const floorWorkspaces: FloorWorkspaceRecord[] = [
   {
     id: "floor_002",
     caseId: "case_002",
+    projectId: "project_002",
     floorLabel: "Second floor",
     status: "LOCKED",
     locked: true,

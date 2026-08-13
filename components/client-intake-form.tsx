@@ -16,7 +16,7 @@ class ActionError extends Error {
   }
 }
 
-export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: string } = {}) {
+export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId }: { clientId?: string; caseId?: string; projectId?: string } = {}) {
   const { activeUser } = useSession();
   const [state, setState] = useState<Bootstrap | null>(null);
   const [clientId, setClientId] = useState(initialClientId ?? "");
@@ -41,9 +41,10 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
   const [challenge, setChallenge] = useState("");
   const [outcome, setOutcome] = useState("");
   const [urgency, setUrgency] = useState("");
-  const [contact, setContact] = useState(false);
-  const [accuracy, setAccuracy] = useState(false);
-  const [confidentiality, setConfidentiality] = useState(false);
+  const [floorCount, setFloorCount] = useState("");
+  const [locationLink, setLocationLink] = useState("");
+  const [latitude, setLatitude] = useState("");
+  const [longitude, setLongitude] = useState("");
   const key = useRef(crypto.randomUUID());
 
   const refresh = useCallback(async (preferred?: string) => {
@@ -53,19 +54,22 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
       if (!response.ok) throw new Error("Intake could not be loaded.");
       const next = await response.json() as Bootstrap;
       setState(next);
-      setClientId((current) => (preferred ?? current) || next.clients[0]?.id || "");
+      const selectedCase = caseId ? next.vastuCases.find((item) => item.id === caseId) : undefined;
+      setClientId((current) => selectedCase?.clientId ?? initialClientId ?? preferred ?? current);
       setMessage("Intake is up to date.");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Intake could not be loaded.");
     } finally {
       setBusy(false);
     }
-  }, []);
+  }, [caseId, initialClientId]);
 
   useEffect(() => { void refresh(); }, [refresh]);
 
   const clients = state?.clients ?? [];
-  const client = clients.find((item) => item.id === clientId) ?? clients[0];
+  const selectedCase = state?.vastuCases.find((item) => item.id === caseId && item.clientId === clientId);
+  const project = state?.projects.find((item) => item.id === (projectId ?? selectedCase?.projectId));
+  const client = clients.find((item) => item.id === clientId);
   const profile = state?.clientIntakeProfiles.find((item) => item.clientId === client?.id);
   const completeness = getClientIntakeCompleteness(profile);
 
@@ -89,9 +93,10 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
     setChallenge(profile?.needs?.mainChallenge ?? "");
     setOutcome(profile?.needs?.desiredOutcome ?? "");
     setUrgency(profile?.needs?.urgency ?? "");
-    setContact(profile?.consent.contact ?? false);
-    setAccuracy(profile?.consent.accuracy ?? false);
-    setConfidentiality(profile?.consent.confidentiality ?? false);
+    setFloorCount(profile?.propertyContext?.floorCount?.toString() ?? "");
+    setLocationLink(profile?.propertyContext?.locationLink ?? "");
+    setLatitude(profile?.propertyContext?.latitude?.toString() ?? "");
+    setLongitude(profile?.propertyContext?.longitude?.toString() ?? "");
     key.current = crypto.randomUUID();
   }, [client?.id, profile?.version]);
 
@@ -101,14 +106,14 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
     try {
       const payload = {
         action:"client-intake-upsert",
-        clientId: client.id,
+        clientId: client.id, caseId, projectId: project?.id,
         contactPreference: { whatsapp: whatsapp || undefined, preferredLanguage: language || undefined, preferredContactWindow: windowText || undefined },
         businessContext: { company: company || undefined, industry: industry || undefined, designation: designation || undefined, vision: vision || undefined },
         decisionMakerStatus: decision || undefined,
         otherDecisionMakers: others || undefined,
-        propertyContext: { serviceInterest: service || undefined, propertyType: propertyType || undefined, propertyStatus: propertyStatus || undefined, areaValue: areaValue ? Number(areaValue) : undefined, areaUnit: areaUnit || undefined, cityCountry: cityCountry || undefined, constraints: constraints || undefined },
+        propertyContext: { serviceInterest: service || undefined, propertyType: propertyType || undefined, propertyStatus: propertyStatus || undefined, areaValue: areaValue ? Number(areaValue) : undefined, areaUnit: areaUnit || undefined, cityCountry: cityCountry || undefined, constraints: constraints || undefined, floorCount: floorCount ? Number(floorCount) : undefined, locationLink: locationLink || undefined, latitude: latitude ? Number(latitude) : undefined, longitude: longitude ? Number(longitude) : undefined },
         needs: { mainChallenge: challenge || undefined, desiredOutcome: outcome || undefined, urgency: urgency || undefined },
-        consent: { version: "uchit-intake/v1", contact, accuracy, confidentiality },
+        consent: { version: "uchit-intake/v1", contact: profile?.consent.contact, accuracy: profile?.consent.accuracy, confidentiality: profile?.consent.confidentiality },
         idempotencyKey: key.current,
         expectedRecordVersion: client.recordVersion ?? 0,
         expectedRevision: state.persistenceRevision ?? null,
@@ -132,14 +137,9 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
 
   return (
     <section className="card span-12 founder-work-surface" aria-labelledby="intake-title">
-      <div className="founder-context-bar" aria-label="Current intake context"><span>Clients</span><span aria-hidden="true">→</span><strong>{client?.displayName ?? "Choose a client"}</strong><span aria-hidden="true">→</span><span>Intake</span></div>
+      <div className="founder-context-bar" aria-label="Locked intake context"><span>Case</span><span aria-hidden="true">→</span><strong>{selectedCase?.caseNumber ?? "Select a case to continue"}</strong><span aria-hidden="true">→</span><span>{project?.propertyName ?? "Project pending"}</span><span aria-hidden="true">→</span><span>{client ? `${client.displayName} · ${client.id}` : "Client unavailable"}</span></div>
       <FounderStepCard step="Step 1 · context" title="Capture the decision that matters" description="Start with the client’s challenge and desired outcome. Complete the property context before saving the profile." tone={completionTone} status={`${completeness.completed}/${completeness.total} complete`} className="founder-step-card-primary">
-        <div className="field">
-          <label htmlFor="intake-client">Client</label>
-          <select id="intake-client" value={client?.id ?? ""} onChange={(e) => setClientId(e.target.value)} disabled={busy && !state}>
-            {clients.length ? clients.map((item) => <option key={item.id} value={item.id}>{item.displayName}</option>) : <option value="">No clients yet</option>}
-          </select>
-        </div>
+        <p className="meta">Client is locked to this Case and Project. Switch the full context from the case selector, not from intake.</p>
         <div className="founder-step-grid founder-intake-grid">
           <div className="field"><label htmlFor="intake-challenge">Main challenge</label><textarea id="intake-challenge" value={challenge} onChange={(e) => setChallenge(e.target.value)} disabled={busy} placeholder="What needs attention?" /></div>
           <div className="field"><label htmlFor="intake-outcome">Desired outcome</label><textarea id="intake-outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} disabled={busy} placeholder="What would a useful outcome look like?" /></div>
@@ -150,11 +150,15 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
       <FounderStepCard step="Step 2 · property" title="Set the project context" description="These fields carry forward into project and floor setup. Leave optional detail for the disclosure below." tone={service && propertyType && cityCountry ? "ready" : "attention"} status={service && propertyType ? "Ready to save" : "Needs detail"}>
         <div className="founder-step-grid founder-intake-grid">
           <div className="field"><label htmlFor="intake-service">Service interest</label><select id="intake-service" value={service} onChange={(e) => setService(e.target.value as VastuServiceType | "")} disabled={busy}><option value="">Choose</option><option value="EXISTING_SPACE">Existing space</option><option value="NEW_CONSTRUCTION">New construction</option></select></div>
-          <div className="field"><label htmlFor="intake-property-type">Property type</label><input id="intake-property-type" value={propertyType} onChange={(e) => setPropertyType(e.target.value)} disabled={busy} /></div>
+          <div className="field"><label htmlFor="intake-property-type">Property type</label><select id="intake-property-type" value={propertyType} onChange={(e) => setPropertyType(e.target.value)} disabled={busy}><option value="">Choose</option>{["Residential", "Commercial", "Factory", "Shop", "Hospital", "Hotel", "Temple"].map((type) => <option key={type} value={type}>{type}</option>)}</select></div>
           <div className="field"><label htmlFor="intake-property-status">Property status</label><input id="intake-property-status" value={propertyStatus} onChange={(e) => setPropertyStatus(e.target.value)} disabled={busy} /></div>
           <div className="field"><label htmlFor="intake-city-country">City and country</label><input id="intake-city-country" value={cityCountry} onChange={(e) => setCityCountry(e.target.value)} disabled={busy} /></div>
           <div className="field"><label htmlFor="intake-area-value">Area <span className="label-note">optional</span></label><input id="intake-area-value" value={areaValue} onChange={(e) => setAreaValue(e.target.value)} disabled={busy} inputMode="decimal" /></div>
           <div className="field"><label htmlFor="intake-area-unit">Area unit <span className="label-note">optional</span></label><input id="intake-area-unit" value={areaUnit} onChange={(e) => setAreaUnit(e.target.value)} disabled={busy} /></div>
+          <div className="field"><label htmlFor="intake-floor-count">Number of floors <span className="label-note">Add later if unknown</span></label><input id="intake-floor-count" value={floorCount} onChange={(e) => setFloorCount(e.target.value)} disabled={busy} inputMode="numeric" /></div>
+          <div className="field field-span-full"><label htmlFor="intake-location-link">Location link <span className="label-note">HTTPS map link optional</span></label><input id="intake-location-link" value={locationLink} onChange={(e) => setLocationLink(e.target.value)} disabled={busy} placeholder="https://maps.example/..." /></div>
+          <div className="field"><label htmlFor="intake-latitude">Latitude <span className="label-note">optional</span></label><input id="intake-latitude" value={latitude} onChange={(e) => setLatitude(e.target.value)} disabled={busy} inputMode="decimal" /></div>
+          <div className="field"><label htmlFor="intake-longitude">Longitude <span className="label-note">optional</span></label><input id="intake-longitude" value={longitude} onChange={(e) => setLongitude(e.target.value)} disabled={busy} inputMode="decimal" /></div>
           <div className="field field-span-full"><label htmlFor="intake-constraints">Constraints <span className="label-note">optional</span></label><textarea id="intake-constraints" value={constraints} onChange={(e) => setConstraints(e.target.value)} disabled={busy} /></div>
         </div>
       </FounderStepCard>
@@ -174,8 +178,7 @@ export function ClientIntakeForm({ clientId: initialClientId }: { clientId?: str
         </div>
       </details>
 
-      <FounderStepCard step="Step 3 · consent" title="Confirm how this intake may be used" description="All three confirmations are recorded with the intake version. This is the final save checkpoint." tone={contact && accuracy && confidentiality ? "approved" : "attention"} status={contact && accuracy && confidentiality ? "Confirmed" : "Awaiting confirmation"}>
-        <fieldset className="founder-consent-fieldset"><legend>Consent confirmations</legend><label className="list-item"><span><input type="checkbox" checked={contact} onChange={(e) => setContact(e.target.checked)} disabled={busy} /> May we contact the client about this service?</span></label><label className="list-item"><span><input type="checkbox" checked={accuracy} onChange={(e) => setAccuracy(e.target.checked)} disabled={busy} /> The recorded information is accurate to the best of our knowledge.</span></label><label className="list-item"><span><input type="checkbox" checked={confidentiality} onChange={(e) => setConfidentiality(e.target.checked)} disabled={busy} /> Confidential handling has been explained.</span></label></fieldset>
+      <FounderStepCard step="Save intake" title="Confirm the project context" description="Known client consent remains in its original source record. Missing consent blocks only the relevant outbound communication, not this intake save." tone="ready" status="Ready to save">
         <div className="workflow founder-primary-actions"><button className="button founder-action-primary" type="button" disabled={busy || !client} onClick={() => void save()}>Save intake</button><button className="button-secondary" type="button" disabled={busy} onClick={() => void refresh(client?.id)}>Reload latest</button></div>
       </FounderStepCard>
       <div className="footer-note" role={messageIsError ? "alert" : "status"} aria-live="polite">{message}</div>

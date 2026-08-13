@@ -1,6 +1,5 @@
 import type { AppState } from "./store.ts";
 import type { ClientRecord, FloorWorkspaceRecord, VastuCaseRecord, UserRole } from "./domain.ts";
-import { getActiveCaseForClient } from "./service-framework.ts";
 import { getClientIntakeCompleteness } from "./client-intake.ts";
 
 export const founderScorecardStatuses = ["NOT_STARTED", "IN_PROGRESS", "BLOCKED", "READY", "COMPLETE", "NEEDS_REGENERATION"] as const;
@@ -52,16 +51,34 @@ function floorProgress(state: AppState, caseRecord: VastuCaseRecord | undefined,
 export function buildFounderScorecard(state: AppState, actor: { role: UserRole }, clientId?: string, caseId?: string, floorId?: string): FounderScorecard {
   void actor;
   const exactCase = caseId ? state.vastuCases.find((item) => item.id === caseId) : undefined;
-  const client = state.clients.find((item) => item.id === (clientId ?? exactCase?.clientId)) ?? state.clients.find((item) => getActiveCaseForClient(state, item.id)) ?? state.clients[0];
-  const caseRecord = exactCase ?? (client ? getActiveCaseForClient(state, client.id) : undefined);
+  const client = state.clients.find((item) => item.id === (clientId ?? exactCase?.clientId));
+  const caseRecord = exactCase;
   const project = caseRecord?.projectId ? state.projects.find((item) => item.id === caseRecord.projectId) : undefined;
   const floors = caseRecord ? state.floorWorkspaces.filter((item) => item.caseId === caseRecord.id) : [];
-  const selectedFloor = floors.find((item) => item.id === floorId) ?? floors[0];
+  const selectedFloor = floors.find((item) => item.id === floorId);
   const facts = floorFacts(state, caseRecord, selectedFloor);
   const intakeProfile = state.clientIntakeProfiles.find((item) => item.clientId === client?.id);
   const intake = getClientIntakeCompleteness(intakeProfile);
   const proposal = client ? state.commercialProposals.find((item) => item.clientId === client.id && item.status === "APPROVED") : undefined;
   const advance = client ? state.advanceVerifications.find((item) => item.clientId === client.id && ["VERIFIED", "CASE_OPENED"].includes(item.status)) : undefined;
+  // A bound case/project is durable historical workflow state. Do not make an
+  // already-authorised case appear uncreated just because an older proposal or
+  // advance projection is absent from the current read model.
+  const existingBoundCase = Boolean(caseRecord?.projectId && project);
+  const acceptedComplimentaryHandoff = Boolean(client && (state.founderProposalVersions ?? []).some((item) => {
+    const terms = item.content.commercial;
+    return item.clientId === client.id
+      && item.status === "ACCEPTED"
+      && terms.engagementClassification === "INTERNAL_COMPLIMENTARY"
+      && terms.professionalFeePaise === 0
+      && terms.gstAmountPaise === 0
+      && terms.totalPayablePaise === 0
+      && terms.agreedAdvancePaise === 0
+      && terms.remainingBalancePaise === 0
+      && terms.advanceExceptionApproved
+      && Boolean(terms.classificationReason?.trim());
+  }));
+  const caseCreationReady = Boolean(proposal && advance) || acceptedComplimentaryHandoff;
   const contextPath = (number: number) => query(`/founder/${number.toString().padStart(2, "0")}`, caseRecord?.id, selectedFloor?.id);
   const orientationReady = Boolean(facts.lockedOrientation && facts.googleEvidence);
   const griddingReady = Boolean(facts.marked32?.has32SectorChakra && facts.marked16?.has16DirectionMapping);
@@ -74,7 +91,7 @@ export function buildFounderScorecard(state: AppState, actor: { role: UserRole }
   const previous = (number: number) => ({ href: contextPath(Math.max(1, number - 1)), label: "Go to required step" });
 
   const modules: FounderScorecardModule[] = [
-    { id: "case-project", number: 1, title: "Case and project creation", purpose: "Open the Vastu Case ID only after the confirmed advance, then bind its project.", status: status({ complete: Boolean(caseRecord?.projectId && project), started: Boolean(caseRecord), ready: Boolean(proposal && advance), blocked: !proposal || !advance }), explanation: !proposal ? "Approve the proposal first." : !advance ? "Confirmed advance is required before case creation." : caseRecord?.projectId ? "Case and project are ready." : "Commercial gates are clear; create the case.", primaryAction: { href: contextPath(1), label: caseRecord ? "Review case" : "Create case" }, recoveryAction: !advance ? { href: "/crm", label: "Return to commercial readiness" } : undefined, technical: `case=${caseRecord?.id ?? "none"}; project=${project?.id ?? "none"}` },
+    { id: "case-project", number: 1, title: "Case and project creation", purpose: "Open and bind the Vastu Case ID after a confirmed advance or an approved Internal Complimentary exception.", status: status({ complete: existingBoundCase, started: Boolean(caseRecord), ready: !existingBoundCase && caseCreationReady, blocked: !existingBoundCase && !caseCreationReady }), explanation: existingBoundCase ? "Case and project are already bound and ready for their recorded workflow history." : !proposal && !acceptedComplimentaryHandoff ? "Accept the exact commercial proposal first." : !caseCreationReady ? "Confirm the agreed advance or use the approved Internal Complimentary exception." : "Commercial gates are clear; create the case.", primaryAction: { href: contextPath(1), label: existingBoundCase ? "Review case" : "Create case" }, recoveryAction: !existingBoundCase && !caseCreationReady ? { href: "/crm", label: "Return to commercial readiness" } : undefined, technical: `case=${caseRecord?.id ?? "none"}; project=${project?.id ?? "none"}; complimentary=${acceptedComplimentaryHandoff}` },
     { id: "floor-setup", number: 2, title: "Floor setup", purpose: "Create and ready one independent workspace for every confirmed floor.", status: status({ complete: Boolean(selectedFloor?.locked), started: floors.length > 0, ready: Boolean(caseRecord && selectedFloor && !selectedFloor.locked), blocked: !caseRecord }), explanation: !caseRecord ? "Create the case first." : !selectedFloor ? "Add the first floor workspace." : selectedFloor.locked ? "This floor is ready for its independent workflow." : "Review and mark this floor ready.", primaryAction: { href: contextPath(2), label: selectedFloor ? "Review floor" : "Add floor" }, recoveryAction: !caseRecord ? previous(2) : undefined, technical: `floors=${floors.map((item) => item.id).join(",") || "none"}` },
     { id: "intake", number: 3, title: "Intake complete", purpose: "Confirm approved client, service, property, layout and location information once.", status: status({ complete: intake.complete, started: intake.completed > 0, ready: Boolean(client), blocked: !client || !caseRecord }), explanation: !caseRecord ? "Create the case before completing the project intake." : intake.complete ? "The approved intake can carry into every floor." : `${intake.completed} of ${intake.total} intake groups are complete.`, primaryAction: { href: contextPath(3), label: intake.complete ? "Review intake" : "Complete intake" }, recoveryAction: !caseRecord ? previous(3) : undefined, technical: `intake=${intake.completed}/${intake.total}` },
     { id: "direction", number: 4, title: "Direction verification", purpose: "Bind Google Earth evidence and deliberately lock the exact orientation degree.", status: status({ complete: orientationReady, started: Boolean(facts.lockedOrientation), blocked: !selectedFloor?.locked || facts.regeneration, regeneration: facts.regeneration }), explanation: facts.regeneration ? "An upstream change requires a new verified orientation lineage." : !selectedFloor?.locked ? "Ready the floor before orientation work." : orientationReady ? "Exact orientation and evidence are locked." : "Upload Google Earth evidence and lock the numeric degree.", primaryAction: { href: contextPath(4), label: orientationReady ? "Review direction" : "Verify direction" }, recoveryAction: !selectedFloor?.locked ? previous(4) : undefined, technical: `orientation=${facts.lockedOrientation?.id ?? "none"}` },
