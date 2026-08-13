@@ -9,6 +9,9 @@ import { createOpeningMapping, createPlanVersion, createSpatialEvidenceVersion, 
 import { createMethodologyVersion, publishMethodologyVersion, upsertMethodologyFixture, upsertMethodologyRule } from "@/lib/methodology-registry";
 import { approveAouDisplayCopy, initializeCanonicalAouSource, saveAouDisplayDraft } from "@/lib/aou-methodology";
 import { transitionFloorRegeneration } from "@/lib/founder-regeneration";
+import { deleteRemedyPlacement, finaliseStageBPage, initialiseStageB, resolveEligibleRemedies, selectFinalRevisedLayout, upsertRemedyPlacement, validateStageBIntegrity } from "@/lib/stage-b-remediation";
+import { deleteColourFrameComposition, deleteExistingLayoutAnnotation, deleteSectionAPlacement, finaliseSectionAPage, initialiseSectionA, registerSectionAAsset,
+  upsertColourFrameComposition, upsertExistingLayoutAnnotation, upsertSectionAPlacement, validateRemediationReportIntegrity, validateSectionAIntegrity } from "@/lib/section-a-remediation";
 import { assignReviewCall, cancelReviewCall, createFounderCommunicationContext, createQualificationInvitation, markCommunicationOpened, prepareManualCommunication, rescheduleReviewCall,
   registerMediaAssetVersion, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "@/lib/founder-engagement";
 import { activateFounderLegalPolicy, activateFounderNoRefundPolicy, activateFounderProposalTemplate, applyFounderBalanceDeadlineException, approveFounderProposal, autosaveFounderProposalStep,
@@ -80,6 +83,8 @@ export async function POST(request: Request) {
   let organisationStateBefore: AppState | undefined;
   const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
   const concurrencyActions = new Set(["founder-lead-profile-update", "founder-media-register", "founder-media-transition", "founder-qualification-invite", "founder-communication-context", "founder-communication-prepare", "founder-communication-opened", "founder-booking-assign", "founder-booking-reschedule", "founder-booking-cancel", "case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "delivery-milestone-upsert", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert", "proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve"]);
+  for (const stageBAction of ["stage-b-remediation-initialise", "stage-b-final-layout-select", "stage-b-remedy-resolve", "stage-b-remedy-placement-upsert", "stage-b-remedy-placement-delete", "stage-b-page-finalise", "stage-b-integrity-validate"]) concurrencyActions.add(stageBAction);
+  for (const sectionAAction of ["section-a-initialise", "section-a-asset-register", "section-a-annotation-upsert", "section-a-annotation-delete", "section-a-placement-upsert", "section-a-placement-delete", "section-a-colour-frame-upsert", "section-a-colour-frame-delete", "section-a-page-finalise", "section-a-integrity-validate", "remediation-report-integrity-validate"]) concurrencyActions.add(sectionAAction);
   for (const founderCommercialAction of ["founder-commercial-policy-publish", "founder-commercial-legal-create", "founder-commercial-legal-activate", "founder-no-refund-policy-activate", "founder-commercial-policy-event-record", "founder-proposal-template-create", "founder-proposal-template-activate", "founder-proposal-draft-create", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send", "founder-proposal-successor", "founder-commercial-payment-confirm", "founder-complimentary-case-handoff", "founder-case-intent-create", "founder-balance-deadline-exception", "founder-invoice-issue", "founder-statutory-policy-create", "founder-statutory-policy-activate", "founder-billing-profile-save", "founder-statutory-document-issue"]) concurrencyActions.add(founderCommercialAction);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
@@ -131,6 +136,34 @@ export async function POST(request: Request) {
       const allowed = new Set(crmAllowedFields[action]);
       const unknown = Object.keys(body).find((key) => !allowed.has(key));
       if (unknown) return NextResponse.json({ ok: false, error: `Unknown CRM field: ${unknown}.` }, { status: 400 });
+    }
+
+    const stageBAllowedFields: Record<string, string[]> = {
+      "stage-b-remediation-initialise": ["action", "actorRole", "caseId", "floorId", "reportId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "stage-b-final-layout-select": ["action", "actorRole", "remediationId", "candidateId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "stage-b-remedy-resolve": ["action", "actorRole", "remediationId", "verdictId", "remedialType", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "stage-b-remedy-placement-upsert": ["action", "actorRole", "remediationId", "pageId", "placementId", "eligibilityResolutionId", "baseLayoutVersionId", "placementType", "anchorX", "anchorY", "calloutX", "calloutY", "calloutWidth", "calloutHeight", "locationReference", "showCircle", "showFrame", "showHighlight", "completePlacement", "reconcileInvalidationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "stage-b-remedy-placement-delete": ["action", "actorRole", "remediationId", "pageId", "placementId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "stage-b-page-finalise": ["action", "actorRole", "remediationId", "pageId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "stage-b-integrity-validate": ["action", "actorRole", "remediationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
+    };
+    Object.assign(stageBAllowedFields, {
+      "section-a-initialise": ["action", "actorRole", "remediationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-asset-register": ["action", "actorRole", "remediationId", "assetType", "name", "attributePurpose", "assetId", "assetVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-annotation-upsert": ["action", "actorRole", "remediationId", "pageId", "annotationId", "annotationType", "points", "text", "colour", "strokeWidth", "opacity", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-annotation-delete": ["action", "actorRole", "remediationId", "pageId", "annotationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-placement-upsert": ["action", "actorRole", "remediationId", "pageId", "placementId", "sectionAAssetId", "baseLayoutVersionId", "placementType", "anchorX", "anchorY", "calloutX", "calloutY", "calloutWidth", "calloutHeight", "locationReference", "showCircle", "showFrame", "showHighlight", "completePlacement", "reconcileInvalidationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-placement-delete": ["action", "actorRole", "remediationId", "pageId", "placementId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-colour-frame-upsert": ["action", "actorRole", "remediationId", "pageId", "compositionId", "sectionAAssetId", "baseLayoutVersionId", "x", "y", "width", "height", "rotationDegrees", "opacityPreset", "preserveAspectRatio", "printFit", "locked", "reconcileInvalidationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-colour-frame-delete": ["action", "actorRole", "remediationId", "pageId", "compositionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-page-finalise": ["action", "actorRole", "remediationId", "pageId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "section-a-integrity-validate": ["action", "actorRole", "remediationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "remediation-report-integrity-validate": ["action", "actorRole", "remediationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"]
+    });
+    if (stageBAllowedFields[action]) {
+      const allowed = new Set(stageBAllowedFields[action]);
+      const unknown = Object.keys(body).find((key) => !allowed.has(key));
+      if (unknown) return NextResponse.json({ ok: false, error: `Unknown Stage B field: ${unknown}.` }, { status: 400 });
     }
 
     const founderEngagementAllowedFields: Record<string, string[]> = {
@@ -724,6 +757,78 @@ export async function POST(request: Request) {
           return deny("This role cannot run or save Shakti evaluations.");
         }
         response = { ok: true, ranking: rankShaktiValues(body.values ?? []), snapshot: body.caseId ? recordShaktiSnapshot(body.caseId, body.floorId, body.values ?? [], actor, body.expectedRecordVersion, body.idempotencyKey) : null };
+        break;
+      case "stage-b-remediation-initialise":
+        if (!canEvaluateCases(actor)) return deny("This role cannot initialise Stage B remediation.");
+        response = { ok: true, result: initialiseStageB({ ...body, actor }) };
+        break;
+      case "stage-b-final-layout-select":
+        if (!canEvaluateCases(actor)) return deny("This role cannot select the final revised layout.");
+        response = { ok: true, result: selectFinalRevisedLayout({ ...body, actor }) };
+        break;
+      case "stage-b-remedy-resolve":
+        if (!canEvaluateCases(actor)) return deny("This role cannot resolve Stage B remedies.");
+        response = { ok: true, result: resolveEligibleRemedies({ ...body, actor }) };
+        break;
+      case "stage-b-remedy-placement-upsert":
+        if (!canEvaluateCases(actor)) return deny("This role cannot place Stage B remedies.");
+        response = { ok: true, result: upsertRemedyPlacement({ ...body, actor }) };
+        break;
+      case "stage-b-remedy-placement-delete":
+        if (!canEvaluateCases(actor)) return deny("This role cannot delete Stage B remedy placements.");
+        response = { ok: true, result: deleteRemedyPlacement({ ...body, actor }) };
+        break;
+      case "stage-b-page-finalise":
+        if (!canApproveReport(actor)) return deny("This role cannot finalise Stage B report pages.");
+        response = { ok: true, result: finaliseStageBPage({ ...body, actor }) };
+        break;
+      case "stage-b-integrity-validate":
+        if (!canEvaluateCases(actor)) return deny("This role cannot validate Stage B integrity.");
+        response = { ok: true, result: validateStageBIntegrity({ ...body, actor }) };
+        break;
+      case "section-a-initialise":
+        if (!canEvaluateCases(actor)) return deny("This role cannot initialise Section A.");
+        response = { ok: true, result: initialiseSectionA({ ...body, actor }) };
+        break;
+      case "section-a-asset-register":
+        if (!canEvaluateCases(actor)) return deny("This role cannot register Section A assets.");
+        response = { ok: true, result: registerSectionAAsset({ ...body, actor }) };
+        break;
+      case "section-a-annotation-upsert":
+        if (!canEvaluateCases(actor)) return deny("This role cannot annotate the Existing Layout.");
+        response = { ok: true, result: upsertExistingLayoutAnnotation({ ...body, actor }) };
+        break;
+      case "section-a-annotation-delete":
+        if (!canEvaluateCases(actor)) return deny("This role cannot delete Existing Layout annotations.");
+        response = { ok: true, result: deleteExistingLayoutAnnotation({ ...body, actor }) };
+        break;
+      case "section-a-placement-upsert":
+        if (!canEvaluateCases(actor)) return deny("This role cannot place Section A items.");
+        response = { ok: true, result: upsertSectionAPlacement({ ...body, actor }) };
+        break;
+      case "section-a-placement-delete":
+        if (!canEvaluateCases(actor)) return deny("This role cannot delete Section A placements.");
+        response = { ok: true, result: deleteSectionAPlacement({ ...body, actor }) };
+        break;
+      case "section-a-colour-frame-upsert":
+        if (!canEvaluateCases(actor)) return deny("This role cannot compose Section A Colour Frames.");
+        response = { ok: true, result: upsertColourFrameComposition({ ...body, actor }) };
+        break;
+      case "section-a-colour-frame-delete":
+        if (!canEvaluateCases(actor)) return deny("This role cannot delete Section A Colour Frames.");
+        response = { ok: true, result: deleteColourFrameComposition({ ...body, actor }) };
+        break;
+      case "section-a-page-finalise":
+        if (!canApproveReport(actor)) return deny("This role cannot finalise Section A report pages.");
+        response = { ok: true, result: finaliseSectionAPage({ ...body, actor }) };
+        break;
+      case "section-a-integrity-validate":
+        if (!canEvaluateCases(actor)) return deny("This role cannot validate Section A integrity.");
+        response = { ok: true, result: validateSectionAIntegrity({ ...body, actor }) };
+        break;
+      case "remediation-report-integrity-validate":
+        if (!canEvaluateCases(actor)) return deny("This role cannot validate remediation report integrity.");
+        response = { ok: true, result: validateRemediationReportIntegrity({ ...body, actor }) };
         break;
       case "utility-evaluate":
         if (!canEvaluateCases(actor)) {

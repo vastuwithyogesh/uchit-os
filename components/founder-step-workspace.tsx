@@ -8,6 +8,7 @@ import { FounderReportStep } from "@/components/founder-report-step";
 import { SiteAnalysisConsole } from "@/components/site-analysis-console";
 import { PaymentProofConsole } from "@/components/payment-proof-console";
 import { FounderWalkthroughWorkspace } from "@/components/founder-walkthrough-workspace";
+import { RemediationReportWorkspace } from "@/components/remediation-report-workspace";
 
 export function FounderStepWorkspace({ scorecard, stepNumber, walkthrough = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean }) {
   if (walkthrough) return <FounderWalkthroughWorkspace stepNumber={stepNumber} />;
@@ -24,6 +25,8 @@ export function FounderStepWorkspace({ scorecard, stepNumber, walkthrough = fals
   if (stepNumber === 10) return <SiteAnalysisConsole focus="site" {...common} />;
   if (stepNumber === 11) return <SiteAnalysisConsole focus="post-site" {...common} />;
   if (stepNumber === 12) return <PaymentProofConsole focus="balance" clientId={common.clientId} caseId={common.caseId} />;
+  // RemediationReportWorkspace composes Section A with the frozen StageBRemedyWorkspace child.
+  if (stepNumber === 13) return <RemediationReportWorkspace caseId={common.caseId} floorId={common.floorId} />;
   if (stepNumber === 14) return <FounderReportStep focus="assembly" {...common} />;
   if (stepNumber === 15) return <FounderReportStep focus="approval" {...common} />;
   if (stepNumber === 16) return <FounderReportStep focus="pdf" {...common} />;

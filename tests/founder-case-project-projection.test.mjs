@@ -34,3 +34,16 @@ test("a missing case remains blocked instead of being inferred from downstream r
   assert.equal(scorecard.modules[0].status, "BLOCKED");
   assert.equal(getCurrentFounderFlowStep(scorecard)?.number, 1);
 });
+
+test("a new locked orientation completes Step 04 while downstream invalidation advances to Step 05", () => {
+  const { state, actor } = buildReleaseableFounderPilotFixture();
+  state.dependencyInvalidations.push({
+    caseId: pilotIds.caseId,
+    floorId: pilotIds.floorId,
+    status: "NEEDS_REGENERATION",
+  });
+  const scorecard = buildFounderScorecard(state, actor, pilotIds.clientId, pilotIds.caseId, pilotIds.floorId);
+  assert.equal(scorecard.modules[3].status, "COMPLETE");
+  assert.equal(scorecard.modules[4].status, "NEEDS_REGENERATION");
+  assert.equal(getCurrentFounderFlowStep(scorecard)?.number, 5);
+});

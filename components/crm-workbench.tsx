@@ -87,7 +87,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
     if (!activeProposal) {
       return "No proposal is loaded for this client yet.";
     }
-    return `${activeProposal.status} · ${formatMoney(activeProposal.amountInr)} · minimum advance ${formatMoney(activeProposal.minAdvanceInr)}`;
+    return `${activeProposal.status} · ${formatMoney(activeProposal.amountInr)} · reference advance ${formatMoney(activeProposal.minAdvanceInr)}`;
   }, [activeProposal]);
 
   const utilityMatrix = useMemo(
@@ -522,7 +522,7 @@ export function CrmWorkbench(props: CrmWorkbenchProps) {
         <h3>₹51,000 default package</h3>
         <div className="list">
           <div className="list-item">
-            <strong>Minimum advance</strong>
+            <strong>Suggested reference advance</strong>
             <span className="meta">{formatMoney(activeProposal?.minAdvanceInr ?? commercialPolicy.minimumAdvanceInr)}</span>
           </div>
           <div className="list-item">

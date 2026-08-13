@@ -3,6 +3,7 @@ import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { SiteHeader } from "@/components/site-header";
 import { buildFounderScorecard } from "@/lib/founder-scorecard";
 import { getCurrentFounderFlowStep } from "@/lib/founder-flow";
+import { FounderFlowHome } from "@/components/founder-flow";
 import { requirePageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 
@@ -13,15 +14,17 @@ export default async function FounderContinuePage({ searchParams }: { searchPara
   }
 
   let current;
+  let scorecard: ReturnType<typeof buildFounderScorecard> | undefined;
   try {
     const state = await loadStateFromPersistence();
     const context = await searchParams;
-    const scorecard = buildFounderScorecard(state, access.actor, undefined, context.caseId, context.floorId);
+    scorecard = buildFounderScorecard(state, access.actor, undefined, context.caseId, context.floorId);
     current = getCurrentFounderFlowStep(scorecard);
   } catch {
     return <main className="page-shell"><SiteHeader title="Evaluation" subtitle="Continue the current floor" minimal /><section className="workspace-state" role="alert"><h1>Evaluation context is unavailable</h1><p>Nothing has changed. Return to the scorecard and retry after the current case and floor context is available.</p><a className="button-secondary" href="/">Back to scorecard</a></section></main>;
   }
 
+  if (!scorecard?.caseRecord || !scorecard.selectedFloorId) return <main className="page-shell"><SiteHeader title="Evaluation" subtitle="Select one case and floor" minimal /><FounderFlowHome scorecard={scorecard} /></main>;
   if (current) redirect(current.flowPath);
   return null;
 }

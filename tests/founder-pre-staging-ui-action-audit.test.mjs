@@ -54,3 +54,11 @@ test("no automatic provider delivery or blocker weakening is introduced", async 
   for (const blocker of ["P5_OWNER_LEGAL", "P13_OWNER_LEGAL", "P14_OWNER_LEGAL", "INVOICE_STATUTORY_CONFIG"]) assert.match(sources, new RegExp(blocker));
   assert.match(sources, /Activate the exact approved brochure|approved brochure/i);
 });
+
+test("commercial index reflects the approved brochure-as-scope contract", async () => {
+  const page = await read("app/commercial-proposals/page.tsx");
+  assert.match(page, /activate the exact approved brochure for the selected service/i);
+  assert.match(page, /brochure is pinned as the scope reference/i);
+  assert.match(page, /Active brochure scope references/);
+  assert.doesNotMatch(page, /configure an active service scope template/i);
+});

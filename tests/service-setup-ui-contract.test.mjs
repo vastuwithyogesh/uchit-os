@@ -27,7 +27,7 @@ test("both evaluation actions remain disabled until service inputs are ready", (
   assert.match(evaluation, /getCaseEvaluationBlockers/);
   assert.match(evaluation, /evaluationBlockers\.slice\(0, 3\)\.map/);
   assert.match(evaluation, /!snapshotName\.trim\(\)/);
-  assert.equal((evaluation.match(/disabled=\{busy \|\| !evaluationReady/g) ?? []).length, 2);
+  assert.equal((evaluation.match(/disabled=\{busy[^}]*!evaluationReady/g) ?? []).length, 2);
   assert.match(evaluation, /Complete the case setup first/);
   assert.match(evaluation, /href="\/clients-cases">Complete case setup/);
   assert.match(evaluation, /evaluationReady \? <div className="card span-4 founder-support-surface"/);

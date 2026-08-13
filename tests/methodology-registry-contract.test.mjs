@@ -32,10 +32,13 @@ test("published methodology is immutable, versioned, hashed and requires approve
   assert.match(publish, /version\.lifecycleStatus = "ACTIVE"/);
 });
 
-test("Stage B cannot be published without the remedial PRD", () => {
+test("Stage B publication is authority, adapter, rule and fixture bound", () => {
   const publish = functionBody(source("lib/methodology-registry.ts"), "publishMethodologyVersion");
   assert.match(publish, /version\.module === "STAGE_B_REMEDIAL"/);
-  assert.match(publish, /Blocked — Methodology Input Required/);
+  assert.match(publish, /STAGE_B_AUTHORITY_HASH/);
+  assert.match(publish, /STAGE_B_RESOLVER_VERSION/);
+  assert.match(publish, /rules\.length < 5/);
+  assert.match(publish, /fixtures\.length < 6/);
 });
 
 test("approved register still cannot execute until an adapter is reviewed and bound", () => {

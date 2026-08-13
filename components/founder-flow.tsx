@@ -62,10 +62,11 @@ export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: 
   const isFuture = !canOpenFounderFlowStep(scorecard, stepNumber);
   const displayStatus = isFuture ? "BLOCKED" : step.status;
   const tone = statusTone(displayStatus);
+  const isRegeneration = step.status === "NEEDS_REGENERATION" && !isFuture;
   const isBlocked = step.status === "BLOCKED" || step.status === "NEEDS_REGENERATION" || isFuture;
   const isComplete = step.status === "COMPLETE" && !isFuture;
-  const action = isComplete ? (next ? { href: next.flowPath, label: "Continue to next step" } : undefined) : isFuture ? { href: current.flowPath, label: `Go to step ${current.number.toString().padStart(2, "0")}` } : isBlocked ? (step.recoveryAction ?? { href: current.flowPath, label: "Go to required step" }) : step.primaryAction;
-  const nextReason = isComplete ? "This step is complete. Continue to the next server-derived step." : isBlocked ? (isFuture ? `Complete step ${current.number.toString().padStart(2, "0")} to unlock the next step.` : step.explanation) : "Complete the current action above to unlock the next step.";
+  const action = isComplete ? { href: "#founder-step-workspace", label: "Review current step" } : isRegeneration ? { href: "#founder-step-workspace", label: "Resolve regeneration" } : isFuture ? { href: current.flowPath, label: `Go to step ${current.number.toString().padStart(2, "0")}` } : isBlocked ? (step.recoveryAction ?? { href: current.flowPath, label: "Go to required step" }) : step.primaryAction;
+  const nextReason = isComplete ? "This step is complete. Continue to the next server-derived step." : isFuture ? `Complete step ${current.number.toString().padStart(2, "0")} to unlock the next step.` : step.explanation;
   return (
     <section className="founder-flow-page" aria-labelledby="founder-flow-title">
       <FounderCaseSelector caseId={scorecard.caseRecord?.id} floorId={scorecard.selectedFloorId} caseLabel={scorecard.caseRecord?.caseNumber} />
@@ -81,7 +82,7 @@ export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: 
         </div>
         <details className="founder-flow-inputs" open={!isBlocked && !isComplete}><summary>Required now</summary><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></details>
         {step.status === "COMPLETE" && !isFuture ? <div className="founder-flow-success" role="status">This step is complete. Continue when you are ready for the next server-derived step.</div> : null}
-        {walkthrough ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} walkthrough /></div> : !isBlocked && !isComplete ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
+        {walkthrough ? <div id="founder-step-workspace" className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} walkthrough /></div> : !isBlocked || isRegeneration ? <div id="founder-step-workspace" className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
         <div className="founder-flow-action-bar" aria-label="Step navigation">
           {previous ? <a className="button-secondary" href={previous.flowPath}>Previous</a> : <a className="button-secondary" href="/">Back to scorecard</a>}
           {(isBlocked || isComplete) && action ? <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}

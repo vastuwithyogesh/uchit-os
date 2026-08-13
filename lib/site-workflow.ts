@@ -13,6 +13,7 @@ import { getActiveCaseForClient } from "@/lib/service-framework";
 import { getAppState } from "@/lib/store";
 import type { AppState } from "@/lib/store";
 import { deterministicContentHash } from "@/lib/evaluation-provenance";
+import { ensureStageBReservation } from "@/lib/stage-b-remediation";
 
 export class SiteWorkflowError extends Error {
   readonly statusCode: 400 | 403 | 404 | 409 | 428 | 503;
@@ -298,7 +299,9 @@ function postSiteCheckpoint(input: {
 }
 
 export function checkpointPostSiteFindings(input: Parameters<typeof postSiteCheckpoint>[0]) {
-  return postSiteCheckpoint(input);
+  const result = postSiteCheckpoint(input);
+  if (input.checkpoint === "FOUNDER_APPROVED") ensureStageBReservation({ state: getAppState(), caseId: result.record.caseId, floorId: result.record.floorId, actor: input.actor });
+  return result;
 }
 
 export function approveManualUtilitySheet(input: {

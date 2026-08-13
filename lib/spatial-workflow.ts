@@ -83,7 +83,10 @@ export async function createPlanVersion(input: { caseId: unknown; floorId: unkno
   state.planVersions.unshift(plan);
   caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   floor!.status = "NEEDS_REGENERATION";
-  floor!.locked = false;
+  // A replacement plan invalidates dependent spatial/evaluation lineage, but it
+  // does not undo the historical fact that this floor workspace was created and
+  // readied in Step 02. Reopening Floor setup here creates a navigation loop.
+  floor!.locked = true;
   floor!.regenerationReason = "A new plan version requires spatial mappings and dependent evaluation to be regenerated.";
   const currentOrientation = state.orientationVersions.find((item) => item.caseId === caseRecord.id && item.status === "LOCKED");
   if (currentOrientation) appendFloorInvalidations({ projectId: project.id, caseId: caseRecord.id, floorId: floor!.id,

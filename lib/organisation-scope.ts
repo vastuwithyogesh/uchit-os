@@ -5,7 +5,7 @@ const ownedCollections = [
   "reviewCallBookings", "payments", "advanceVerifications", "vastuCases", "floorWorkspaces", "reportVersions",
   "rectificationRequests", "assessmentObservations", "recommendations", "implementationTasks", "caseDocuments",
   "deliveryMilestones", "evaluationSnapshots", "shaktiSnapshots", "timelineEvents", "optInLeads"
-  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures",
+  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "stageBRemediations", "revisedLayoutCandidates", "remediationBaseLayoutVersions", "remedyRepositoryRecords", "remedyEligibilityResolutions", "reportPlacementPages", "physicalPlacements", "placementImplementationRows", "masterAppendixRows", "stageBIntegrityRuns", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures",
   "aouMethodologyVersions", "aouReferenceRows", "leadProfileVersions", "mediaAssets", "mediaAssetVersions",
   "secureAccessGrants", "communicationPreparations", "qualificationFormDefinitions", "qualificationInvitations",
   "qualificationResponseVersions", "prospectiveProjects", "founderReviewBookings", "zoomMeetingBindings", "founderReminderTasks"
@@ -69,7 +69,7 @@ export function assertOrganisationRequestScope(state: AppState, body: Record<str
     error.statusCode = 400;
     throw error;
   }
-  for (const key of ["clientId", "proposalId", "proposalVersionId", "caseId", "projectId", "prospectiveProjectId", "floorId", "reportId", "invalidationId", "recordId", "requestId", "bookingId", "leadId", "assetId", "assetVersionId", "formDefinitionId", "invitationId", "responseVersionId", "preparationId", "grantId", "templateVersionId", "policyId", "paymentConfirmationId", "invoiceId", "deadlineId"]) {
+  for (const key of ["clientId", "proposalId", "proposalVersionId", "caseId", "projectId", "prospectiveProjectId", "floorId", "reportId", "remediationId", "candidateId", "pageId", "placementId", "eligibilityResolutionId", "baseLayoutVersionId", "invalidationId", "reconcileInvalidationId", "recordId", "requestId", "bookingId", "leadId", "assetId", "assetVersionId", "formDefinitionId", "invitationId", "responseVersionId", "preparationId", "grantId", "templateVersionId", "policyId", "paymentConfirmationId", "invoiceId", "deadlineId"]) {
     const id = body[key];
     if (typeof id !== "string" || !id) continue;
     const owner = ownerForId(state, id);

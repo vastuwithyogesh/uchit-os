@@ -132,6 +132,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
             payload.availableUsers.find((user) => user.role === storedRole) ??
             payload.actor;
           setActiveUserState(nextUser);
+          document.cookie = `uchit-vastu-demo-role=${encodeURIComponent(nextUser.role)}; Path=/; SameSite=Strict`;
         }
         setSessionStatus("ready");
       } catch (error) {
@@ -165,6 +166,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setActiveUserState(nextUser);
         window.localStorage.setItem("uchit-vastu-role", role);
         window.localStorage.setItem("uchit-vastu-user-id", nextUser.id);
+        document.cookie = `uchit-vastu-demo-role=${encodeURIComponent(nextUser.role)}; Path=/; SameSite=Strict`;
       },
       setActiveUser: (userId) => {
         if (!isLocalDemo) {
@@ -176,6 +178,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
         setActiveUserState(nextUser);
         window.localStorage.setItem("uchit-vastu-role", nextUser.role);
         window.localStorage.setItem("uchit-vastu-user-id", nextUser.id);
+        document.cookie = `uchit-vastu-demo-role=${encodeURIComponent(nextUser.role)}; Path=/; SameSite=Strict`;
       },
       availableUsers,
       isLocalDemo,

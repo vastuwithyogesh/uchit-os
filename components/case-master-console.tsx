@@ -132,7 +132,8 @@ export function CaseMasterConsole() {
       setDirty(false);
       setMessage("Service setup saved. Evaluation readiness has been refreshed.");
     } catch (error) {
-      if (error instanceof ActionError && error.status === 409) { setConflict(true); setMessage("This case changed after you opened it. Reload the latest case, then review and reapply your changes. Nothing was saved."); }
+      if (error instanceof ActionError && error.status === 409 && /changed|stale|version/i.test(error.message)) { setConflict(true); setMessage("This case changed after you opened it. Reload the latest case, then review and reapply your changes. Nothing was saved."); }
+      else if (error instanceof ActionError && error.status === 409) { setConflict(false); setMessage(error.message); }
       else if (error instanceof ActionError && error.status === 428) setMessage("The case version is missing. Reload the latest case before saving.");
       else setMessage(error instanceof Error ? error.message : "The service setup could not be saved. Try again.");
     } finally {

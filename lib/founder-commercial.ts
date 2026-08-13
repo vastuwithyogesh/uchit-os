@@ -521,7 +521,7 @@ export function createFounderComplimentaryCaseHandoff(input: {
     status: "CASE_CREATED", reportStatus: "DRAFT", orientationLocked: false, balanceApproved: false, fullPaymentApproved: false,
     serviceType: proposal.serviceType, canonicalStage: "UNDERSTAND", revisionNumber: 1, recordVersion: 1
   };
-  const nextProject: VastuProjectRecord = { id: projectId, organisationId: input.organisationId, clientId: proposal.clientId, activeCaseId: caseId, propertyName: "Property project", status: "IN_PROGRESS", createdAt: now };
+  const nextProject: VastuProjectRecord = { id: projectId, organisationId: input.organisationId, clientId: proposal.clientId, activeCaseId: caseId, propertyName: project.displayName ?? proposal.content.clientProject.propertyType ?? "Property project", status: "IN_PROGRESS", createdAt: now };
   const nextFloor: FloorWorkspaceRecord = { id: floorId, organisationId: input.organisationId, caseId, projectId, floorLabel: "Ground floor", status: "DRAFT", locked: false, evidenceUploads: [], idempotencyKey: `handoff-floor:${input.idempotencyKey}` };
   input.state.vastuCases.unshift(nextCase); input.state.projects.unshift(nextProject); input.state.floorWorkspaces.unshift(nextFloor);
   project.caseId = caseId; project.status = "CONVERTED"; project.recordVersion = (project.recordVersion ?? 0) + 1;

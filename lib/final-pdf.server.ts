@@ -63,7 +63,12 @@ function binding(state: AppState, reportIdValue: unknown, organisationId: string
   const floor = report.floorId ? state.floorWorkspaces.find((item) => item.id === report.floorId && item.caseId === caseRecord?.id && item.projectId === project?.id && item.organisationId === organisationId) : undefined;
   if (!caseRecord || !project || !floor) throw new FinalPdfError(404, "Report, case, project, and floor scope do not match.");
   if (report.isPreview) throw new FinalPdfError(403, "Internal preview reports cannot be downloaded, printed, exported, or converted into a final PDF.");
-  if (!(report.artifact?.templateVersion === "uchit-verdict/v3" || report.artifact?.templateVersion === "uchit-verdict/v4") || report.artifact.floorId !== floor.id) throw new FinalPdfError(409, "Protected final PDF requires an exact one-floor v3/v4 report artifact.");
+  if (!(report.artifact?.templateVersion === "uchit-verdict/v3" || report.artifact?.templateVersion === "uchit-verdict/v4" || report.artifact?.templateVersion === "uchit-verdict/v5") || report.artifact.floorId !== floor.id) throw new FinalPdfError(409, "Protected final PDF requires an exact one-floor v3/v4/v5 report artifact.");
+  if (report.artifact.templateVersion === "uchit-verdict/v5" && report.artifact.stageBRenderManifest?.integrityStatus !== "PASS") throw new FinalPdfError(409, "Protected final PDF requires Stage B integrity PASS.");
+  if (report.artifact.templateVersion === "uchit-verdict/v5" && report.artifact.sectionARenderManifest
+    && (report.artifact.sectionARenderManifest.integrityStatus !== "PASS" || report.artifact.remediationReportIntegrity?.status !== "PASS")) {
+    throw new FinalPdfError(409, "Protected final PDF requires Section A and report-wide integrity PASS.");
+  }
   const evidence = state.spatialEvidenceVersions.find((item) => item.id === report.artifact?.handMarkedEvidenceVersionId
     && item.organisationId === organisationId && item.projectId === project.id && item.caseId === caseRecord.id && item.floorId === floor.id
     && item.planVersionId === report.artifact?.planVersionId && item.kind === "HAND_MARKED_PLAN" && item.status === "CURRENT" && item.fullColour);

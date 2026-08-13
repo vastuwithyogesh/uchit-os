@@ -1,19 +1,19 @@
 import type { FounderScorecard, FounderScorecardModule } from "./founder-scorecard.ts";
 
 export const founderFlowRequiredInputs: Record<string, string[]> = {
-  "case-project": ["Approved proposal", "Confirmed advance", "Permanent Client ID"],
+  "case-project": ["Approved proposal", "Confirmed advance or approved Internal Complimentary exception", "Permanent Client ID"],
   "floor-setup": ["Confirmed floor count", "Independent floor workspace", "Exact case and project scope"],
-  intake: ["Approved client and service fields", "Property and layout context", "Location and consent"],
+  intake: ["Client requirement and desired outcome", "Service, property type and property status", "City and project context"],
   direction: ["Google Earth evidence", "Numeric orientation degree", "Deliberate Founder lock"],
   layout: ["Current protected 2D plan", "Exact floor and plan version", "Immutable replacement history"],
-  gridding: ["Founder-confirmed 32-sector chakra", "Founder-confirmed 16-direction evidence", "Manual Brahmasthan/Marmaa evidence when supplied"],
+  gridding: ["Founder-confirmed 32-sector chakra", "Founder-confirmed 16-direction evidence", "Verified main entrance marker for this floor"],
   "manual-sheet": ["Original full-colour hand-marked sheet", "Exact floor/plan binding", "Founder approval"],
   evaluation: ["Approved Utility methodology", "Approved graph inputs", "Exact evidence and version lineage"],
   "stage-a": ["Current Utility/Shakti outputs", "Human evidence verification", "Verdict presentation record"],
   site: ["Presented Stage A version", "Video analysis or physical visit evidence", "Required observations"],
   "post-site": ["Approved Site Analysis", "Differences and corrections", "New findings and additional observations"],
   balance: ["Presented verdict", "Approved post-site review", "Remaining balance evidence"],
-  remedial: ["Released Stage A version", "Approved remedial methodology"],
+  remedial: ["Approved Post-Site Findings", "Full balance clearance", "Approved Stage B methodology"],
   "report-assembly": ["Full payment", "Approved Stage B content when methodology exists", "Current one-floor report lineage"],
   "founder-approval": ["Exact assembled report version", "Founder review reason", "Founder approval checkpoint"],
   "protected-pdf": ["Founder-approved report", "Embedded approved manual sheet", "Verified immutable artifact hash"],

@@ -69,6 +69,11 @@ import type {
   FounderProposalResponseRecord, FounderCommercialPaymentConfirmationRecord, FounderBalanceDeadlineRecord,
   FounderCommercialInvoiceRecord, FounderCommercialPolicyEventRecord, FounderCommercialAuditEventRecord, FounderStatutoryPolicyVersionRecord,
   FounderBillingProfileVersionRecord, FounderStatutorySequenceReservationRecord, FounderStatutoryDocumentRecord
+  ,StageBRemediationRecord, RevisedLayoutCandidateRecord, RemediationBaseLayoutVersionRecord, RemedyRepositoryRecord,
+  RemedyEligibilityResolutionRecord, ReportPlacementPageRecord, PhysicalPlacementRecord, PlacementImplementationRowRecord,
+  MasterAppendixRowRecord, StageBIntegrityRunRecord
+  ,SectionAWorkspaceRecord, SectionAVisualPageRecord, SectionAAssetRecord, ExistingLayoutAnnotationRecord,
+  ColourFrameCompositionRecord, SectionAIntegrityRunRecord, RemediationReportIntegrityRunRecord
 } from "./domain.ts";
 import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
 
@@ -102,6 +107,23 @@ export interface AppState {
   stageAFloorReviews: StageAFloorReviewSnapshotRecord[];
   stageAFloorApprovalCheckpoints: StageAFloorApprovalCheckpointRecord[];
   remedialWorkflowReservations: RemedialWorkflowReservation[];
+  stageBRemediations: StageBRemediationRecord[];
+  revisedLayoutCandidates: RevisedLayoutCandidateRecord[];
+  remediationBaseLayoutVersions: RemediationBaseLayoutVersionRecord[];
+  remedyRepositoryRecords: RemedyRepositoryRecord[];
+  remedyEligibilityResolutions: RemedyEligibilityResolutionRecord[];
+  reportPlacementPages: ReportPlacementPageRecord[];
+  physicalPlacements: PhysicalPlacementRecord[];
+  placementImplementationRows: PlacementImplementationRowRecord[];
+  masterAppendixRows: MasterAppendixRowRecord[];
+  stageBIntegrityRuns: StageBIntegrityRunRecord[];
+  sectionAWorkspaces: SectionAWorkspaceRecord[];
+  sectionAVisualPages: SectionAVisualPageRecord[];
+  sectionAAssets: SectionAAssetRecord[];
+  existingLayoutAnnotations: ExistingLayoutAnnotationRecord[];
+  colourFrameCompositions: ColourFrameCompositionRecord[];
+  sectionAIntegrityRuns: SectionAIntegrityRunRecord[];
+  remediationReportIntegrityRuns: RemediationReportIntegrityRunRecord[];
   methodologyVersions: MethodologyVersionRecord[];
   methodologyRules: MethodologyRuleRecord[];
   methodologyGoldenFixtures: MethodologyGoldenFixtureRecord[];
@@ -184,6 +206,10 @@ export const createEmptyAppState = (): AppState => ({
   stageAFloorReviews: [],
   stageAFloorApprovalCheckpoints: [],
   remedialWorkflowReservations: [],
+  stageBRemediations: [], revisedLayoutCandidates: [], remediationBaseLayoutVersions: [], remedyRepositoryRecords: [],
+  remedyEligibilityResolutions: [], reportPlacementPages: [], physicalPlacements: [], placementImplementationRows: [],
+  masterAppendixRows: [], stageBIntegrityRuns: [], sectionAWorkspaces: [], sectionAVisualPages: [], sectionAAssets: [],
+  existingLayoutAnnotations: [], colourFrameCompositions: [], sectionAIntegrityRuns: [], remediationReportIntegrityRuns: [],
   methodologyVersions: [],
   methodologyRules: [],
   methodologyGoldenFixtures: [],
@@ -243,6 +269,10 @@ const createDemoAppState = (): AppState => ({
   stageAFloorReviews: [],
   stageAFloorApprovalCheckpoints: [],
   remedialWorkflowReservations: [],
+  stageBRemediations: [], revisedLayoutCandidates: [], remediationBaseLayoutVersions: [], remedyRepositoryRecords: [],
+  remedyEligibilityResolutions: [], reportPlacementPages: [], physicalPlacements: [], placementImplementationRows: [],
+  masterAppendixRows: [], stageBIntegrityRuns: [], sectionAWorkspaces: [], sectionAVisualPages: [], sectionAAssets: [],
+  existingLayoutAnnotations: [], colourFrameCompositions: [], sectionAIntegrityRuns: [], remediationReportIntegrityRuns: [],
   methodologyVersions: [],
   methodologyRules: [],
   methodologyGoldenFixtures: [],

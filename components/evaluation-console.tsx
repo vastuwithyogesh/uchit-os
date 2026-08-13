@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AppState } from "@/lib/store";
 import type { ReportVersionRecord, UtilityRule } from "@/lib/domain";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { isPreviewWatermarked, formatMoney } from "@/lib/workflows";
-import { getActiveCaseForClient, getCaseEvaluationBlockers, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import { getCaseEvaluationBlockers, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
 
 async function fetchMaster() {
   const response = await fetch("/api/utility/master", { cache: "no-store" });
@@ -40,21 +41,18 @@ async function postAction(payload: Record<string, unknown>, role?: string) {
 
 export function EvaluationConsole({ clientId: initialClientId, caseId: requestedCaseId, floorId: initialFloorId }: { clientId?: string; caseId?: string; floorId?: string } = {}) {
   const { activeUser } = useSession();
+  const router = useRouter();
   const [rules, setRules] = useState<UtilityRule[]>([]);
   const [state, setState] = useState<AppState | null>(null);
   const [message, setMessage] = useState("Load the master table to inspect the residential rules.");
   const [busy, setBusy] = useState(false);
-  const [selectedClientId, setSelectedClientId] = useState(initialClientId ?? "");
-  const [selectedFloorId, setSelectedFloorId] = useState(initialFloorId ?? "");
   const [snapshotName, setSnapshotName] = useState("Residential tab evaluation");
   const [shaktiValuesText, setShaktiValuesText] = useState("9,8,8,7,6,9,8,7,6,7,8,9,8,7,6,8");
 
-  const clients = state?.clients ?? [];
-  const selectedClient = clients.find((client) => client.id === selectedClientId) ?? clients[0];
-  const currentCase = state?.vastuCases.find((item) => item.id === requestedCaseId && item.clientId === selectedClient?.id)
-    ?? (state && selectedClient ? getActiveCaseForClient(state, selectedClient.id) : undefined);
+  const currentCase = state?.vastuCases.find((item) => item.id === requestedCaseId && (!initialClientId || item.clientId === initialClientId));
+  const selectedClient = state?.clients.find((client) => client.id === currentCase?.clientId);
   const floors = state?.floorWorkspaces.filter((item) => item.caseId === currentCase?.id && (!currentCase?.projectId || item.projectId === currentCase.projectId)) ?? [];
-  const selectedFloor = floors.find((item) => item.id === selectedFloorId) ?? floors[0];
+  const selectedFloor = floors.find((item) => item.id === initialFloorId);
   const readiness = currentCase ? getServiceReadiness(currentCase) : null;
   const service = currentCase ? normalizeCaseService(currentCase) : null;
   const evaluationBlockers = currentCase && state && selectedFloor ? getCaseEvaluationBlockers(state, currentCase.id, selectedFloor.id) : ["Open a case and select one floor."];
@@ -65,6 +63,8 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
   const report = (reports.find((item) => item.isPreview) ?? reports[0] ?? null) as ReportVersionRecord | null;
   const evaluationSnapshots = state?.evaluationSnapshots?.filter((item) => item.caseId === currentCase?.id && item.floorId === selectedFloor?.id) ?? [];
   const shaktiSnapshots = state?.shaktiSnapshots?.filter((item) => item.caseId === currentCase?.id && item.floorId === selectedFloor?.id) ?? [];
+  const utilitySnapshotRecorded = evaluationSnapshots.length > 0;
+  const shaktiSnapshotRecorded = shaktiSnapshots.length > 0;
   const shaktiValues = useMemo(
     () =>
       shaktiValuesText
@@ -86,13 +86,12 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
     [rules]
   );
 
-  async function refresh(preferredClientId?: string) {
+  async function refresh() {
     setBusy(true);
     try {
       const [master, bootstrap] = await Promise.all([fetchMaster(), fetchBootstrap()]);
       setRules(master.rules);
       setState(bootstrap);
-      setSelectedClientId((current) => preferredClientId ?? current ?? bootstrap.clients?.[0]?.id ?? "");
       setMessage(`Loaded ${master.counts.total} utility rules and refreshed the evaluation state.`);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
@@ -107,7 +106,8 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
       if (!state || state.persistenceRevision === undefined || state.persistenceRevision === null || !currentCase || !selectedFloor) throw new Error("Reload the latest case and select one floor before evaluating.");
       await postAction({ ...action, floorId: selectedFloor.id, expectedRecordVersion: currentCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision,
         idempotencyKey: `floor-evaluation:${String(action.action)}:${currentCase.id}:${selectedFloor.id}:${currentCase.recordVersion ?? 0}` }, activeUser.role);
-      await refresh(selectedClient?.id);
+      await refresh();
+      router.refresh();
       setMessage(successMessage);
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Action failed");
@@ -119,7 +119,6 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
   useEffect(() => {
     refresh().catch(() => undefined);
   }, []);
-  useEffect(() => { if (floors.length && !floors.some((item) => item.id === selectedFloorId)) setSelectedFloorId(floors[0].id); }, [floors, selectedFloorId]);
 
   return (
     <section className="section-grid">
@@ -128,7 +127,7 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
         <div className="eyebrow">Case evaluation</div>
         <h2>{evaluationReady ? "Run the verified case evaluation" : "Complete setup before evaluating"}</h2>
         <p className="subtle">
-          Choose a client, complete the required case inputs, then save the two evaluation snapshots.
+          Review this exact Case and floor, then save the two evaluation snapshots.
         </p>
         <details className="founder-technical-details">
           <summary>Evaluation status details</summary>
@@ -151,23 +150,15 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
           </div>
           </div>
         </details>
-        <div className="workflow" style={{ marginTop: 14 }}>
+        <div className="workflow" style={{ marginTop: 14 }} aria-label="Locked evaluation context">
           <button type="button" className="button-secondary" onClick={() => refresh()} disabled={busy}>
             Reload master table
           </button>
-          <label htmlFor="evaluation-client"><strong>Client</strong></label>
-          <select id="evaluation-client" value={selectedClient?.id ?? ""} onChange={(event) => setSelectedClientId(event.target.value)} style={{ minWidth: 220 }}>
-            {clients.map((client) => (
-              <option key={client.id} value={client.id}>
-                {client.displayName}
-              </option>
-            ))}
-          </select>
-          <label htmlFor="evaluation-floor"><strong>Floor</strong></label>
-          <select id="evaluation-floor" value={selectedFloor?.id ?? ""} onChange={(event) => setSelectedFloorId(event.target.value)}>
-            {floors.map((item) => <option key={item.id} value={item.id}>{item.floorLabel}</option>)}
-          </select>
+          <strong>{currentCase?.caseNumber ?? "Case unavailable"}</strong>
+          <span>{selectedClient?.displayName ?? "Client unavailable"}</span>
+          <span>{selectedFloor?.floorLabel ?? "Floor unavailable"}</span>
         </div>
+        {(!currentCase || !selectedFloor) && <p role="alert">The authorised Case or floor in this route is unavailable. Re-select the complete context before evaluating.</p>}
         <details className="founder-technical-details">
           <summary>Rule summary</summary>
           <div className="pill-row details-body">
@@ -186,11 +177,12 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
           type="button"
           className="button founder-action-primary"
           style={{ marginTop: 10 }}
-          disabled={busy || !evaluationReady || !snapshotName.trim() || snapshotName.trim().length > 120}
+          disabled={busy || utilitySnapshotRecorded || !evaluationReady || !snapshotName.trim() || snapshotName.trim().length > 120}
           onClick={() => run({ action: "utility-evaluate", caseId: currentCase?.id, snapshotName }, "Utility evaluation snapshot saved for this floor.")}
         >
-          Save Utility snapshot
+          {utilitySnapshotRecorded ? "Utility snapshot recorded" : "Save Utility snapshot"}
         </button>
+        {utilitySnapshotRecorded ? <p className="meta">The immutable Utility snapshot for this exact Case, floor, plan and orientation is already recorded. Use formal regeneration after an approved upstream change.</p> : null}
         </> : null}
         <details style={{ marginTop: 14 }}>
           <summary>View rule master and technical details</summary>
@@ -225,11 +217,12 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
           type="button"
           className="button-secondary"
           style={{ marginTop: 10 }}
-          disabled={busy || !evaluationReady || shaktiValues.length !== 16}
+          disabled={busy || shaktiSnapshotRecorded || !evaluationReady || shaktiValues.length !== 16}
           onClick={() => run({ action: "shakti-rank", caseId: currentCase?.id, values: shaktiValues }, "Shakti snapshot saved for this floor.")}
         >
-          Save Shakti snapshot
+          {shaktiSnapshotRecorded ? "Shakti snapshot recorded" : "Save Shakti snapshot"}
         </button>
+        {shaktiSnapshotRecorded ? <p className="meta">The immutable Shakti snapshot for this exact lineage is already recorded.</p> : shaktiValues.length !== 16 ? <p className="meta">Enter exactly 16 finite values before saving.</p> : null}
         <details className="founder-technical-details">
           <summary>Release and payment context</summary>
           <div className="details-body">

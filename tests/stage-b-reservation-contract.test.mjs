@@ -8,24 +8,23 @@ const domain = source("lib/domain.ts");
 const reportUi = source("components/report-console.tsx");
 const printRoute = source("app/api/reports/[reportId]/print/route.ts");
 
-test("Stage B reservation is created only from a released floor report", () => {
-  const release = functionBody(workflow, "releaseVerdict");
-  const releasedIndex = release.indexOf('report.status = "RELEASED"');
-  const reservationIndex = release.indexOf("state.remedialWorkflowReservations.unshift");
-  assert.ok(releasedIndex >= 0 && reservationIndex > releasedIndex);
-  assert.match(release, /stageAReportId: report\.id/);
-  assert.match(release, /floorId: floor\.id/);
-  assert.match(release, /status: "BLOCKED_METHOD_INPUT"/);
-  assert.match(release, /!state\.remedialWorkflowReservations\.some/);
+test("Stage B reservation begins after approved Post-Site Findings and balance, before release", () => {
+  const stageB = source("lib/stage-b-remediation.ts");
+  const reservation = functionBody(stageB, "ensureStageBReservation");
+  assert.match(reservation, /fullPaymentApproved/);
+  assert.match(reservation, /balanceApproved/);
+  assert.match(reservation, /FOUNDER_APPROVED/);
+  assert.match(reservation, /item\.isPreview/);
+  assert.doesNotMatch(functionBody(workflow, "releaseVerdict"), /remedialWorkflowReservations\.unshift/);
 });
 
 test("reserved Stage B has no remedy selection or invented methodology", () => {
-  const reservation = domain.slice(domain.indexOf("export interface RemedialWorkflowReservation"), domain.indexOf("export const methodologyModules"));
+  const reservation = domain.slice(domain.indexOf("export interface RemedialWorkflowReservation"), domain.indexOf("export type StageBRemedyType"));
   assert.match(reservation, /stageAReportId/);
   assert.match(reservation, /BLOCKED_METHOD_INPUT/);
   assert.doesNotMatch(reservation, /remedyName|selectedRemedy|threshold|priority|sequence|reportText/);
   assert.match(functionBody(methodology, "publishMethodologyVersion"), /STAGE_B_REMEDIAL/);
-  assert.match(methodology, /Blocked.*Methodology Input Required/is);
+  assert.match(methodology, /STAGE_B_AUTHORITY_HASH/);
   assert.doesNotMatch(workflow, /generic remedy|yantra|crystal|numerology remedy/i);
 });
 

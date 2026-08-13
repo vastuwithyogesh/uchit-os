@@ -1,10 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { PaymentProofRecord, PaymentProofKey } from "@/lib/payment-proof-types";
 import { prepareImageUpload } from "@/lib/image-upload";
 import type { AppState } from "@/lib/store";
-import { getActiveCaseForClient } from "@/lib/service-framework";
 import { FounderStepCard } from "@/components/founder-step-card";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
@@ -58,8 +58,8 @@ async function uploadProof(key: PaymentProofKey, file: File, context: PaymentCon
 
 export function PaymentProofConsole({ focus = "all", clientId: initialClientId, caseId: requestedCaseId }: { focus?: "all" | "balance"; clientId?: string; caseId?: string }) {
   const { activeUser } = useSession();
+  const router = useRouter();
   const [appState, setAppState] = useState<AppState | null>(null);
-  const [selectedClientId, setSelectedClientId] = useState(initialClientId ?? "");
   const [payload, setPayload] = useState<PaymentProofPayload | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<Record<PaymentProofKey, File | null>>({
     "advance-proof": null,
@@ -82,13 +82,13 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
     [appState]
   );
 
-  const activeClient = appState?.clients.find((item) => item.id === selectedClientId) ?? appState?.clients[0];
+  const activeCase = appState?.vastuCases.find((item) => item.id === requestedCaseId && (!initialClientId || item.clientId === initialClientId));
+  const activeClient = appState?.clients.find((item) => item.id === activeCase?.clientId);
   const activeProposal = appState?.commercialProposals.find((item) => item.clientId === activeClient?.id);
-  const activeCase = appState?.vastuCases.find((item) => item.id === requestedCaseId && item.clientId === activeClient?.id)
-    ?? (appState && activeClient ? getActiveCaseForClient(appState, activeClient.id) : undefined);
   const advancePayment = appState?.payments.find((item) => item.clientId === activeClient?.id && item.type === "ADVANCE");
   const balancePayment = appState?.payments.find((item) => item.caseId === activeCase?.id && item.type === "BALANCE");
   const context = activeClient ? { clientId: activeClient.id, proposalId: activeProposal?.id, caseId: activeCase?.id } : null;
+  const balanceConfirmed = balancePayment?.status === "APPROVED";
 
   useEffect(() => {
     const fee = activeProposal?.amountInr ?? appState?.commercialPolicy.defaultProposalAmountInr ?? 0;
@@ -96,18 +96,16 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
     setBalanceAmount(Math.max(0, fee - advance));
   }, [activeClient?.id, activeProposal?.id, activeProposal?.amountInr, advancePayment?.amountInr, appState?.commercialPolicy]);
 
-  async function refresh(preferredClientId?: string) {
+  async function refresh() {
     setBusy(true);
     try {
       const stateResponse = await fetch("/api/bootstrap", { cache: "no-store" });
       if (!stateResponse.ok) throw new Error("Failed to load clients and cases");
       const nextState = await stateResponse.json() as AppState;
-      const nextClientId = preferredClientId || selectedClientId || nextState.clients[0]?.id || "";
       setAppState(nextState);
-      setSelectedClientId(nextClientId);
-      const client = nextState.clients.find((item) => item.id === nextClientId) ?? nextState.clients[0];
+      const caseRecord = nextState.vastuCases.find((item) => item.id === requestedCaseId && (!initialClientId || item.clientId === initialClientId));
+      const client = nextState.clients.find((item) => item.id === caseRecord?.clientId);
       const proposal = nextState.commercialProposals.find((item) => item.clientId === client?.id);
-      const caseRecord = client ? getActiveCaseForClient(nextState, client.id) : undefined;
       if (!client || (!proposal && !caseRecord)) {
         setPayload({ assets: [], summary: { required: 0, uploaded: 0, pending: 0, complete: false, missingKeys: [] } });
         setMessage("Open a proposal or case before uploading payment receipts.");
@@ -140,7 +138,8 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
           ? `${result.proof.label} uploaded after trimming the image for a safer upload.`
           : `${result.proof.label} uploaded.`
       );
-      await refresh(context.clientId);
+      await refresh();
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");
     } finally {
@@ -165,7 +164,8 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
       if (!response.ok || result.ok === false) throw new Error(result.error?.message ?? result.error ?? "Balance verification failed.");
       verificationKey.current = crypto.randomUUID();
       setMessage("Balance confirmed. The Founder report gates can now continue.");
-      await refresh(activeClient.id);
+      await refresh();
+      router.refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Balance verification failed. Your selected proof remains available.");
     } finally { setBusy(false); }
@@ -183,21 +183,14 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
         <div className="founder-context-bar" aria-label="Current payment context"><span>Payments</span><span aria-hidden="true">→</span><strong>{activeClient?.displayName ?? "Choose a client"}</strong><span aria-hidden="true">→</span><span>{payload?.summary.complete ? "Complete" : "Receipts"}</span></div>
         <FounderStepCard
           step="Current payment task"
-          title={focus === "balance" ? balancePayment?.verifiedAt ? "Full balance is confirmed" : "Confirm the full balance" : payload?.summary.complete ? "Receipts are complete" : activeProposal ? "Secure the next payment checkpoint" : "Start with the advance receipt"}
+          title={focus === "balance" ? balanceConfirmed ? "Full balance is confirmed" : "Confirm the full balance" : payload?.summary.complete ? "Receipts are complete" : activeProposal ? "Secure the next payment checkpoint" : "Start with the advance receipt"}
           description="Upload immutable evidence for one payment checkpoint at a time. Verification remains a separate protected action."
-          tone={focus === "balance" ? balancePayment?.verifiedAt ? "approved" : "attention" : payload?.summary.complete ? "approved" : payload?.summary.uploaded ? "attention" : "neutral"}
-          status={focus === "balance" ? balancePayment?.verifiedAt ? "Complete" : "Payment gate" : payload?.summary.complete ? "Complete" : `${payload?.summary.pending ?? 0} pending`}
+          tone={focus === "balance" ? balanceConfirmed ? "approved" : "attention" : payload?.summary.complete ? "approved" : payload?.summary.uploaded ? "attention" : "neutral"}
+          status={focus === "balance" ? balanceConfirmed ? "Complete" : "Payment gate" : payload?.summary.complete ? "Complete" : `${payload?.summary.pending ?? 0} pending`}
           className="founder-step-card-primary"
         >
-        <div className="field" style={{ marginTop: 16 }}>
-          <label htmlFor="payment-proof-client">Client</label>
-          <select id="payment-proof-client" value={activeClient?.id ?? ""} onChange={(event) => {
-            setSelectedFiles({ "advance-proof": null, "balance-proof": null });
-            void refresh(event.target.value);
-          }}>
-            {(appState?.clients ?? []).map((client) => <option key={client.id} value={client.id}>{client.displayName}</option>)}
-          </select>
-        </div>
+        <div className="founder-context-bar" style={{ marginTop: 16 }} aria-label="Locked payment context"><strong>{activeCase?.caseNumber ?? "Case unavailable"}</strong><span>{activeClient?.displayName ?? "Client unavailable"}</span><button type="button" className="button-secondary" onClick={() => void refresh()} disabled={busy}>Refresh proofs</button></div>
+        {(!activeCase || !activeClient) && <p role="alert">The authorised Case and Client context is unavailable. Re-select the case before handling payment evidence.</p>}
         {focus === "balance" ? <details className="founder-technical-details"><summary>Payment status details</summary><div className="stat-grid details-body">{[
           [payload?.summary.required ?? 0, "receipts needed"],
           [payload?.summary.uploaded ?? 0, "receipts uploaded"],
@@ -237,15 +230,16 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
           {proofKeys.map((key) => {
             const asset = assetsByKey[key];
             const file = selectedFiles[key];
-            const isVerified = Boolean(asset?.id && boundProofIds.has(asset.id));
+            const confirmedPayment = key === "balance-proof" ? balancePayment : advancePayment;
+            const isVerified = Boolean(confirmedPayment?.status === "APPROVED" || (asset?.id && boundProofIds.has(asset.id)));
             return (
               <div key={key} className="panel">
                 <div className="panel-head">
                   <div>
                     <strong>{uploadLabels[key]}</strong>
-                    <div className="meta">{asset ? `Uploaded ${new Date(asset.uploadedAt).toLocaleString()}` : "Waiting for upload"}</div>
+                    <div className="meta">{isVerified ? "Confirmed payment evidence is locked" : asset ? `Uploaded ${new Date(asset.uploadedAt).toLocaleString()}` : "Waiting for upload"}</div>
                   </div>
-                  <span className={`tag ${asset ? "good" : "warn"}`}>{asset ? "Ready" : "Pending"}</span>
+                  <span className={`tag ${isVerified || asset ? "good" : "warn"}`}>{isVerified ? "Verified" : asset ? "Ready" : "Pending"}</span>
                 </div>
                 {asset?.url && asset.mimeType !== "application/pdf" ? (
                   <img
@@ -270,7 +264,7 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
                       textAlign: "center"
                     }}
                   >
-                    No screenshot uploaded yet
+                    {isVerified ? "Confirmed receipt remains in the immutable payment record" : "No screenshot uploaded yet"}
                   </div>
                 )}
                 <div className="field" style={{ marginTop: 12 }}>
@@ -294,17 +288,18 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
             );
           })}
         </div>
-        {focus === "balance" ? <div className="focused-payment-verification"><label className="field"><span>Reconciled balance amount</span><input type="number" min={1} value={balanceAmount} onChange={(event) => setBalanceAmount(Number(event.target.value))} disabled={busy || Boolean(balancePayment?.verifiedAt)} /></label><button type="button" className="button" disabled={busy || Boolean(balancePayment?.verifiedAt) || !assetsByKey["balance-proof"] || activeCase?.stageAVerdictStatus !== "PRESENTED"} onClick={() => void verifyBalance()}>{busy ? "Confirming…" : balancePayment?.verifiedAt ? "Balance confirmed" : "Confirm full balance"}</button><div className="footer-note" role={/failed|could not|upload|before/i.test(message) ? "alert" : "status"} aria-live="polite">{message}</div></div> : null}
+        {focus === "balance" ? <div className="focused-payment-verification"><label className="field"><span>Reconciled balance amount</span><input type="number" min={1} value={balanceAmount} onChange={(event) => setBalanceAmount(Number(event.target.value))} disabled={busy || balanceConfirmed} /></label><button type="button" className="button" disabled={busy || balanceConfirmed || !assetsByKey["balance-proof"] || activeCase?.stageAVerdictStatus !== "PRESENTED"} onClick={() => void verifyBalance()}>{busy ? "Confirming…" : balanceConfirmed ? "Balance confirmed" : "Confirm full balance"}</button><div className="footer-note" role={!balanceConfirmed && /failed|could not|upload|before/i.test(message) ? "alert" : "status"} aria-live="polite">{balanceConfirmed ? "Full balance confirmation is immutable and already bound to this exact Case." : message}</div></div> : null}
         </FounderStepCard>
       </div>
 
       <div className="card span-4 founder-support-surface">
         <div className="eyebrow">Your next step</div>
-        <h2>{payload?.summary.complete ? "Receipts are complete" : "Upload the missing receipt"}</h2>
+        <h2>{focus === "balance" && balanceConfirmed ? "Balance confirmation is complete" : payload?.summary.complete ? "Receipts are complete" : "Upload the missing receipt"}</h2>
         <p className="meta">Founder Edition permits the organisation owner to upload and confirm this checkpoint; the immutable approval remains auditable.</p>
         {focus === "balance" ? <details className="founder-technical-details"><summary>Receipt history and gate context</summary><div className="details-body"><div className="list">{proofKeys.map((key) => {
           const asset = assetsByKey[key];
-          return <div key={key} className="list-item"><strong>{uploadLabels[key]}</strong><span className={`tag ${asset ? "good" : "warn"}`}>{asset ? "Uploaded" : "Missing"}</span><span className="meta">{asset ? asset.fileName : "No proof uploaded yet"}</span></div>;
+          const confirmed = key === "balance-proof" ? balanceConfirmed : advancePayment?.status === "APPROVED";
+          return <div key={key} className="list-item"><strong>{uploadLabels[key]}</strong><span className={`tag ${asset || confirmed ? "good" : "warn"}`}>{confirmed ? "Verified" : asset ? "Uploaded" : "Missing"}</span><span className="meta">{asset ? asset.fileName : confirmed ? "Immutable confirmed payment record" : "No proof uploaded yet"}</span></div>;
         })}</div><div className="panel"><strong>Why this is needed</strong><div className="meta" style={{ marginTop: 6 }}>The advance receipt opens the case. The balance receipt lets the report move to final approval.</div></div></div></details> : <><div className="list" style={{ marginTop: 14 }}>
           {proofKeys.map((key) => {
             const asset = assetsByKey[key];

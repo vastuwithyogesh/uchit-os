@@ -18,6 +18,26 @@ type PersistedStateSnapshot = {
   revision: number;
 };
 
+declare global {
+  // eslint-disable-next-line no-var
+  var uchitLocalWalkthroughSnapshot: PersistedStateSnapshot | undefined;
+}
+
+function localWalkthroughEnabled() {
+  return process.env.NODE_ENV !== "production"
+    && process.env.UCHIT_VASTU_DEMO_MODE === "true"
+    && process.env.UCHIT_VASTU_WALKTHROUGH === "true";
+}
+
+/** Activates a disposable in-memory persistence boundary for explicit local walkthroughs. */
+export function activateLocalWalkthroughState(state: AppState) {
+  if (!localWalkthroughEnabled()) throw new Error("Local walkthrough state is unavailable outside the explicit disposable demo.");
+  const snapshot = { state: structuredClone(state), revision: 1 };
+  globalThis.uchitLocalWalkthroughSnapshot = snapshot;
+  setAppState(structuredClone(snapshot.state));
+  return snapshot;
+}
+
 async function readStateFromD1(): Promise<PersistedStateSnapshot | null> {
   const env = getRuntimeEnv();
   if (!env.DB) {
@@ -66,6 +86,12 @@ export async function loadStateFromPersistence(): Promise<AppState> {
 }
 
 export async function loadStateSnapshotFromPersistence(): Promise<{ state: AppState; revision: number | null }> {
+  if (localWalkthroughEnabled() && globalThis.uchitLocalWalkthroughSnapshot) {
+    const snapshot = globalThis.uchitLocalWalkthroughSnapshot;
+    const state = structuredClone(snapshot.state);
+    setAppState(state);
+    return { state, revision: snapshot.revision };
+  }
   const base = getAppState();
   const fromDb = await readStateFromD1();
   if (fromDb) {
@@ -83,6 +109,13 @@ export async function loadStateSnapshotFromPersistence(): Promise<{ state: AppSt
 
 export async function persistStateToDatabase(state: AppState = getAppState(), expectedRevision?: number) {
   const nextState = structuredClone(state);
+  if (localWalkthroughEnabled() && globalThis.uchitLocalWalkthroughSnapshot) {
+    const current = globalThis.uchitLocalWalkthroughSnapshot;
+    if (expectedRevision !== undefined && expectedRevision !== current.revision) throw new PersistenceConflictError();
+    globalThis.uchitLocalWalkthroughSnapshot = { state: nextState, revision: current.revision + 1 };
+    setAppState(structuredClone(nextState));
+    return nextState;
+  }
   await writeStateToD1(nextState, expectedRevision);
   await Promise.all([
     writeOptInLeadRecords(nextState.optInLeads),

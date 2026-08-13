@@ -1,8 +1,8 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AppState } from "@/lib/store";
-import { getActiveCaseForClient } from "@/lib/service-framework";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 
@@ -12,6 +12,7 @@ type PdfArtifact = { artifactId: string; status: "GENERATED" | "VERIFIED" | "REL
 
 export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus: Focus; clientId?: string; caseId?: string; floorId?: string }) {
   const { activeUser } = useSession();
+  const router = useRouter();
   const [state, setState] = useState<Bootstrap | null>(null);
   const [pdf, setPdf] = useState<PdfArtifact | null>(null);
   const [note, setNote] = useState("Reviewed against the exact floor evidence, evaluation version and report composition.");
@@ -23,7 +24,7 @@ export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus:
     setBusy(true); setConflict(false);
     try {
       const response = await fetch("/api/bootstrap", { cache: "no-store" }); const value = await response.json() as Bootstrap; if (!response.ok) throw new Error("The report context could not be loaded."); setState(value);
-      const exactCase = value.vastuCases.find((item) => item.id === caseId); const client = value.clients.find((item) => item.id === (clientId ?? exactCase?.clientId)) ?? value.clients[0]; const activeCase = exactCase ?? (client ? getActiveCaseForClient(value, client.id) : undefined); const floor = value.floorWorkspaces.find((item) => item.id === floorId) ?? value.floorWorkspaces.find((item) => item.caseId === activeCase?.id); const report = value.reportVersions.find((item) => item.caseId === activeCase?.id && item.floorId === floor?.id && !item.isPreview);
+      const activeCase = value.vastuCases.find((item) => item.id === caseId && (!clientId || item.clientId === clientId)); const floor = value.floorWorkspaces.find((item) => item.id === floorId && item.caseId === activeCase?.id); const report = value.reportVersions.find((item) => item.caseId === activeCase?.id && item.floorId === floor?.id && !item.isPreview);
       if (report) { const pdfResponse = await fetch(`/api/reports/${encodeURIComponent(report.id)}/pdf?mode=status`, { cache: "no-store" }); setPdf(pdfResponse.ok ? ((await pdfResponse.json()).artifact ?? null) : null); } else setPdf(null);
       setMessage("Report context is up to date.");
     } catch (error) { setMessage(error instanceof Error ? error.message : "The report context could not be loaded."); }
@@ -32,9 +33,9 @@ export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus:
   useEffect(() => { void refresh(); }, [refresh]);
 
   const exactCase = state?.vastuCases.find((item) => item.id === caseId);
-  const client = state?.clients.find((item) => item.id === (clientId ?? exactCase?.clientId)) ?? state?.clients[0];
-  const caseRecord = exactCase ?? (state && client ? getActiveCaseForClient(state, client.id) : undefined);
-  const floor = state?.floorWorkspaces.find((item) => item.id === floorId) ?? state?.floorWorkspaces.find((item) => item.caseId === caseRecord?.id);
+  const caseRecord = exactCase && (!clientId || exactCase.clientId === clientId) ? exactCase : undefined;
+  const client = state?.clients.find((item) => item.id === caseRecord?.clientId);
+  const floor = state?.floorWorkspaces.find((item) => item.id === floorId && item.caseId === caseRecord?.id);
   const preview = state?.reportVersions.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && item.isPreview);
   const report = state?.reportVersions.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && !item.isPreview);
   const reviewed = Boolean(report?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_REVIEWED"));
@@ -54,7 +55,7 @@ export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus:
           : null;
     if (confirmation && !window.confirm(confirmation)) return;
     setBusy(true); setConflict(false);
-    try { const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ ...payload, idempotencyKey: key.current, expectedRecordVersion: entity.recordVersion ?? 0, expectedRevision: state.persistenceRevision }) }); const result = await response.json(); if (!response.ok || result.ok === false) { if (response.status === 409 || response.status === 428) setConflict(true); throw new Error(result.error?.message ?? result.error ?? "The report action could not be saved."); } key.current = crypto.randomUUID(); setMessage(action === "preview-report" ? "Watermarked Stage A preview created." : action === "stage-a-present" ? "Stage A presentation recorded." : action === "final-report-prepare" ? "Exact floor report assembled." : reviewed ? "Founder approval recorded." : "Founder review recorded."); await refresh(); }
+    try { const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ ...payload, idempotencyKey: key.current, expectedRecordVersion: entity.recordVersion ?? 0, expectedRevision: state.persistenceRevision }) }); const result = await response.json(); if (!response.ok || result.ok === false) { if (response.status === 409 || response.status === 428) setConflict(true); throw new Error(result.error?.message ?? result.error ?? "The report action could not be saved."); } key.current = crypto.randomUUID(); setMessage(action === "preview-report" ? "Watermarked Stage A preview created." : action === "stage-a-present" ? "Stage A presentation recorded." : action === "final-report-prepare" ? "Exact floor report assembled." : reviewed ? "Founder approval recorded." : "Founder review recorded."); await refresh(); router.refresh(); }
     catch (error) { setMessage(error instanceof Error ? error.message : "The report action could not be saved."); }
     finally { setBusy(false); }
   }
@@ -63,7 +64,7 @@ export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus:
     if (!state || !report || state.persistenceRevision === null || state.persistenceRevision === undefined) return;
     if (!window.confirm(action === "release" ? "Release this verified protected PDF? Released bytes cannot be edited in place." : action === "verify" ? "Verify the immutable PDF hash and permission profile?" : "Generate a protected PDF for this exact approved report version?")) return;
     setBusy(true); setConflict(false);
-    try { const response = await fetch(`/api/reports/${encodeURIComponent(report.id)}/pdf`, { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action, expectedRecordVersion: report.recordVersion ?? 0, expectedRevision: state.persistenceRevision, ...(action === "generate" ? {} : { expectedArtifactVersion: pdf?.recordVersion }), idempotencyKey: key.current }) }); const result = await response.json(); if (!response.ok || result.ok === false) { if (response.status === 409 || response.status === 428) setConflict(true); throw new Error(result.error?.message ?? result.error ?? "The protected PDF action failed."); } key.current = crypto.randomUUID(); setPdf(result.result.artifact); setMessage(action === "generate" ? "Protected PDF generated." : action === "verify" ? "PDF hash and permissions verified." : "Protected PDF released."); await refresh(); }
+    try { const response = await fetch(`/api/reports/${encodeURIComponent(report.id)}/pdf`, { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action, expectedRecordVersion: report.recordVersion ?? 0, expectedRevision: state.persistenceRevision, ...(action === "generate" ? {} : { expectedArtifactVersion: pdf?.recordVersion }), idempotencyKey: key.current }) }); const result = await response.json(); if (!response.ok || result.ok === false) { if (response.status === 409 || response.status === 428) setConflict(true); throw new Error(result.error?.message ?? result.error ?? "The protected PDF action failed."); } key.current = crypto.randomUUID(); setPdf(result.result.artifact); setMessage(action === "generate" ? "Protected PDF generated." : action === "verify" ? "PDF hash and permissions verified." : "Protected PDF released."); await refresh(); router.refresh(); }
     catch (error) { setMessage(error instanceof Error ? error.message : "The protected PDF action failed."); }
     finally { setBusy(false); }
   }

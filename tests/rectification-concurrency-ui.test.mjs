@@ -29,7 +29,8 @@ test("active revision helpers and predecessor history are visible", () => {
   const evaluation = source("components/evaluation-console.tsx");
   const workspace = source("components/case-workspace.tsx");
   assert.match(setup, /getActiveCaseForClient/);
-  assert.match(evaluation, /getActiveCaseForClient/);
+  assert.doesNotMatch(evaluation, /getActiveCaseForClient|clients\[0\]|floors\[0\]|evaluation-client|evaluation-floor/);
+  assert.match(evaluation, /Locked evaluation context/);
   assert.match(setup, /Case revision/);
   assert.match(setup, /parentCaseId/);
   assert.match(workspace, /View revision history/);

@@ -169,7 +169,11 @@ export function resolveActor(role?: string | null) {
 
 export async function resolveRequestActor(headers: Headers, demoRole?: string | null) {
   if (isExplicitLocalDemo(headers)) {
-    const role = demoRole && roles.includes(demoRole as UserRole) ? (demoRole as UserRole) : "SUPER_ADMIN";
+    const cookieRole = headers.get("cookie")?.match(/(?:^|;\s*)uchit-vastu-demo-role=([^;]+)/)?.[1];
+    let decodedCookieRole: string | null = null;
+    try { decodedCookieRole = cookieRole ? decodeURIComponent(cookieRole) : null; } catch { decodedCookieRole = null; }
+    const requestedRole = demoRole ?? decodedCookieRole;
+    const role = requestedRole && roles.includes(requestedRole as UserRole) ? (requestedRole as UserRole) : "SUPER_ADMIN";
     return getUserByRole(role);
   }
 
@@ -309,7 +313,7 @@ export async function revokeStaffRoleAssignment(email: string, actor: AppUser) {
 export async function requireRouteActor(request: Request, minimumRole: UserRole) {
   let actor: AppUser;
   try {
-    actor = await resolveRequestActor(request.headers);
+    actor = await resolveRequestActor(request.headers, request.headers.get("x-uchit-demo-role"));
   } catch (error) {
     if (error instanceof AuthenticationError) {
       return {

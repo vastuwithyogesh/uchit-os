@@ -6,8 +6,9 @@ test("spatial workspace presents one plain sequential founder workflow", () => {
   const ui = source("components/spatial-workspace.tsx");
   for (const step of ["Current digital plan", "Original hand-marked evidence", "Google Earth evidence and exact orientation", "Entrances and windows", "Mapped spaces"]) assert.match(ui, new RegExp(step));
   assert.doesNotMatch(ui, /role="tab"|tablist|activeTab/);
-  assert.match(ui, /one floor at a time/i);
-  assert.match(ui, /reports remain separate for every floor/i);
+  assert.match(ui, /exact permission-validated route/);
+  assert.match(ui, /item\.floorId === floor\?\.id/);
+  assert.match(ui, /Resolve one floor without changing another/i);
 });
 
 test("UI uses only protected uploads and canonical spatial actions", () => {

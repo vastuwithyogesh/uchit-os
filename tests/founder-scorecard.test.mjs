@@ -18,10 +18,16 @@ test("scorecard projection exposes the canonical seventeen-step workflow", () =>
     "Case and project creation", "Floor setup", "Intake complete", "Direction verification", "Layout preparation",
     "Gridding and 32D/16D evidence", "Manual utility mapping", "Utility and Shakti evaluation",
     "Stage A verdict and presentation", "Site Analysis", "Post-Site Findings and Layout Review", "Full balance clearance",
-    "Stage B remedial reservation", "Report assembly", "Founder review and approval", "Protected PDF", "Delivery history"
+    "Stage B · Disha Balancer", "Report assembly", "Founder review and approval", "Protected PDF", "Delivery history"
   ]) assert.match(helper, new RegExp(title.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")), title);
   assert.match(helper, /selectedFloorId/);
   assert.match(helper, /caseId/);
+});
+
+test("floor-ready writes the exact state consumed by the Founder scorecard", () => {
+  const service = read("lib/workflow-service.ts");
+  assert.match(service, /workspace\.locked\s*=\s*true/);
+  assert.match(service, /workspace\.status\s*=\s*"LOCKED"/);
 });
 
 test("scorecard preserves regeneration, methodology, floor and delivery gates", () => {
@@ -32,6 +38,14 @@ test("scorecard preserves regeneration, methodology, floor and delivery gates", 
   assert.match(helper, /Client delivery is intentionally disabled/);
   assert.match(helper, /one immutable report for this floor/i);
   assert.match(helper, /contextPath/);
+});
+
+test("Step 06 includes the existing verified-main-entrance gate and Step 08 shares engine readiness", () => {
+  const scorecard = read("lib/founder-scorecard.ts");
+  assert.match(scorecard, /facts\.mainEntrance/);
+  assert.match(scorecard, /getCaseEvaluationBlockers/);
+  assert.match(scorecard, /evaluationBlockers\.length/);
+  assert.match(scorecard, /Complete evaluation readiness/);
 });
 
 test("case cards resolve Continue from the exact case and floor projection", () => {

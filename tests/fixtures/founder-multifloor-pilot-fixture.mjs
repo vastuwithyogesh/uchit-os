@@ -40,7 +40,8 @@ export function buildReleaseableMultiFloorFounderPilotFixture() {
   const groundEvaluation = state.evaluationSnapshots[0];
   const groundShakti = state.shaktiSnapshots[0];
   const groundVerdict = state.utilityVerdicts[0];
-  const groundManual = state.caseDocuments[0];
+  const groundManual = state.caseDocuments.find((item) => item.assetType === "MANUAL_UTILITY_SHEET" && item.floorLabel === groundFloor.floorLabel);
+  if (!groundManual) throw new Error("The releaseable multi-floor fixture requires the approved Ground-floor manual utility sheet.");
   const groundPreview = state.reportVersions.find((item) => item.id === pilotIds.previewReportId);
   const groundOfficial = state.reportVersions.find((item) => item.id === pilotIds.officialReportId);
   const groundSite = state.siteAnalyses[0];

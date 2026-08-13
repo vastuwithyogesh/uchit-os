@@ -132,7 +132,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     if (!activeProposal) {
       return "No proposal is loaded for this client yet.";
     }
-    return `${activeProposal.status} · ${formatMoney(activeProposal.amountInr)} · minimum advance ${formatMoney(activeProposal.minAdvanceInr)}`;
+    return `${activeProposal.status} · ${formatMoney(activeProposal.amountInr)} · reference advance ${formatMoney(activeProposal.minAdvanceInr)}`;
   }, [activeProposal]);
 
   const journeySteps = useMemo(
@@ -670,7 +670,7 @@ export function CommercialConsole(props: CommercialConsoleProps) {
             <span className="meta">{formatMoney(commercialPolicy.defaultProposalAmountInr)} · policy v{commercialPolicy.version}</span>
           </div>
           <div className="list-item">
-            <strong>Minimum advance</strong>
+            <strong>Suggested reference advance</strong>
             <span className="meta">{formatMoney(commercialPolicy.minimumAdvanceInr)}</span>
           </div>
           <div className="list-item">

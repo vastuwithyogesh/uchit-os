@@ -94,7 +94,7 @@ export function WorkflowConsole() {
   const workflowBlockers = [
     !proposal ? "Create or load the commercial proposal first." : null,
     proposal && proposal.status !== "APPROVED" ? "The proposal still needs Super-Admin approval." : null,
-    proposal && !advancePayment ? "The minimum advance has not been recorded yet." : null,
+    proposal && !advancePayment ? "The agreed advance has not been confirmed, and no approved complimentary handoff is recorded." : null,
     proposal && advancePayment && !caseCanOpen ? "Advance exists but does not yet clear the case-opening rule." : null,
     caseRecord && floorWorkspaces.length === 0 ? "Add the first floor workspace to begin operational work." : null,
     caseRecord && readyFloors === 0 ? "No floor is marked ready for review yet." : null,

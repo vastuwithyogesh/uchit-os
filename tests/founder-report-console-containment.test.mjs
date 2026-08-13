@@ -5,11 +5,11 @@ import { resolve } from "node:path";
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 
-test("legacy report tools keep the Founder report assembly step as primary recovery", () => {
+test("report tools require explicit Case selection before continuing", () => {
   const route = read("app/reports/page.tsx");
-  assert.match(route, /Legacy Report Tools/);
-  assert.match(route, /href: "\/founder\/15"/);
-  assert.match(route, /Continue Founder report assembly/);
-  assert.match(route, /<summary>Open legacy report console<\/summary>/);
+  assert.match(route, /title="Reports"/);
+  assert.match(route, /href: "\/founder\/continue"/);
+  assert.match(route, /Select a case and continue/);
+  assert.match(route, /<summary>Open advanced report console<\/summary>/);
   assert.match(route, /<ReportConsole \/>/);
 });

@@ -2,6 +2,7 @@ import { deterministicContentHash } from "@/lib/evaluation-provenance";
 import { methodologyDecisionStatuses, methodologyModules, type AppUser, type MethodologyDecisionStatus, type MethodologyModule } from "@/lib/domain";
 import { getAppState } from "@/lib/store";
 import { appendFloorInvalidations } from "@/lib/founder-regeneration";
+import { STAGE_B_AUTHORITY_HASH, STAGE_B_RESOLVER_VERSION } from "@/lib/stage-b-remediation";
 export { getActiveMethodologyVersion, getMethodologyReadiness } from "@/lib/methodology-readiness";
 
 export class MethodologyRegistryError extends Error {
@@ -114,9 +115,9 @@ export function publishMethodologyVersion(input: { methodologyVersionId: unknown
   if (version.lifecycleStatus === "ACTIVE" && version.idempotencyKey === stableKey) return version;
   if (version.lifecycleStatus !== "DRAFT") throw new MethodologyRegistryError("Published methodology is immutable. Create a new version for changes.", 409);
   assertExpected(version, input.expectedRecordVersion);
-  if (version.module === "STAGE_B_REMEDIAL") throw new MethodologyRegistryError("Stage B remains Blocked — Methodology Input Required until Yogesh supplies and approves the remedial PRD.", 409);
   const rules = state.methodologyRules.filter((item) => item.organisationId === organisationId && item.methodologyVersionId === version.id);
   const fixtures = state.methodologyGoldenFixtures.filter((item) => item.organisationId === organisationId && item.methodologyVersionId === version.id);
+  if (version.module === "STAGE_B_REMEDIAL" && (version.sourceAssetHash !== STAGE_B_AUTHORITY_HASH || version.executionAdapterVersion !== STAGE_B_RESOLVER_VERSION || rules.length < 5 || fixtures.length < 6)) throw new MethodologyRegistryError("Stage B publication requires the canonical authority hash, resolver v1, five approved framing rules, and six approved golden fixtures.", 409);
   if (!rules.length || rules.some((item) => item.decisionStatus !== "APPROVED")) throw new MethodologyRegistryError("Every rule must be Approved before publication.", 409);
   if (!fixtures.length || fixtures.some((item) => item.decisionStatus !== "APPROVED")) throw new MethodologyRegistryError("At least one approved golden fixture is required and none may be unresolved.", 409);
   const content = { module: version.module, version: version.version, rules: rules.map(({ ruleKey, sourceReference, decisionStatus, conditionJson, outcomeJson, contentHash }) => ({ ruleKey, sourceReference, decisionStatus, conditionJson, outcomeJson, contentHash })).sort((a, b) => a.ruleKey.localeCompare(b.ruleKey)), fixtures: fixtures.map(({ fixtureKey, inputJson, expectedOutputJson, contentHash }) => ({ fixtureKey, inputJson, expectedOutputJson, contentHash })).sort((a, b) => a.fixtureKey.localeCompare(b.fixtureKey)) };

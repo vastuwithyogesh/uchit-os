@@ -22,6 +22,7 @@ import { alignmentStatuses, attentionClasses, canonicalPipelineStages, canonical
 import { buildInboundLeadIdentity, normalizeCsvDate, normalizeLeadEmail, toInboundLeadRecord, type LeadImportPreview, type ParsedInboundLeadRow } from "@/lib/lead-import";
 import { canCreateCase, generateUtilityEvaluation, lockWorkspace, rankShakti } from "@/lib/workflows";
 import { getAppState, resetAppState } from "@/lib/store";
+import { ensureStageBReservation } from "@/lib/stage-b-remediation";
 import { formatMoney } from "@/lib/workflows";
 import { writeOptInLeadRecords } from "@/lib/optin-leads-store";
 import { writeReviewCallBookingRecords } from "@/lib/review-call-bookings-store";
@@ -203,8 +204,8 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
   const existing = state.clientIntakeProfiles.find((item) => item.clientId === clientId);
   if (existing?.idempotencyKey === idempotencyKey) return existing;
   assertExpectedRecordVersion(client, input.expectedRecordVersion);
-  const activeCase = getActiveCaseForClient(state, clientId);
-  if (activeCase && state.reportVersions.some((item) => item.caseId === activeCase.id && item.artifact)) throw new WorkflowConflictError("Client intake is locked by an immutable report. Use formal case rectification before changing intake evidence.");
+  const exactCase = caseId ? state.vastuCases.find((item) => item.id === caseId && item.clientId === clientId) : getActiveCaseForClient(state, clientId);
+  if (exactCase && state.reportVersions.some((item) => item.caseId === exactCase.id && item.artifact)) throw new WorkflowConflictError("Client intake is locked by an immutable report. Use formal case rectification before changing intake evidence.");
 
   const contactInput = intakeObject(input.contactPreference, "Contact preference", ["whatsapp", "preferredLanguage", "preferredContactWindow"]);
   let whatsapp: string | undefined;
@@ -1301,7 +1302,11 @@ export function markFloorWorkspaceReady(floorId: string, actor: AppUser) {
     throw new Error("Case not found.");
   }
 
-  workspace.status = workspace.locked ? "LOCKED" : "READY_FOR_REVIEW";
+  // `locked` is the authoritative Floor Setup completion marker consumed by the
+  // Founder scorecard. Previously this action only wrote READY_FOR_REVIEW,
+  // leaving the UI to report success while Steps 03–04 stayed blocked.
+  workspace.locked = true;
+  workspace.status = "LOCKED";
   if (!caseRecord.orientationLocked) {
     caseRecord.status = "FLOOR_WORKSPACE_ACTIVE";
   }
@@ -1431,6 +1436,10 @@ export async function verifyBalanceProof(input: {
     "Payments",
     input.actor
   );
+
+  for (const floor of state.floorWorkspaces.filter((item) => item.caseId === caseRecord.id)) {
+    ensureStageBReservation({ state, caseId: caseRecord.id, floorId: floor.id, actor: input.actor });
+  }
 
   return { payment, caseRecord };
 }
@@ -1901,14 +1910,6 @@ export function releaseVerdict(reportId: string, actor: AppUser, policy = TEAM_R
   if (floor) {
     floor.reportStatus = "RELEASED";
     floor.recordVersion = (floor.recordVersion ?? 0) + 1;
-    if (!state.remedialWorkflowReservations.some((item) => item.stageAReportId === report.id)) {
-      state.remedialWorkflowReservations.unshift({
-        id: nextId("remedial-reservation"), organisationId: caseRecord.organisationId ?? actor.organisationId,
-        createdByActorUserId: actor.id, updatedByActorUserId: actor.id, recordVersion: 1,
-        projectId: floor.projectId ?? caseRecord.projectId ?? "", caseId: caseRecord.id, floorId: floor.id,
-        stageAReportId: report.id, status: "BLOCKED_METHOD_INPUT", createdAt: nowIso()
-      });
-    }
   }
   const caseFloors = state.floorWorkspaces.filter((item) => item.caseId === report.caseId);
   const allFloorsReleased = floor ? caseFloors.length > 0 && caseFloors.every((item) => item.reportStatus === "RELEASED") : true;

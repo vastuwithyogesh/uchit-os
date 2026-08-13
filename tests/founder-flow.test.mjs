@@ -15,6 +15,12 @@ test("Founder home remains compact and Continue opens the exact current module",
   assert.doesNotMatch(page, /<FounderScorecard|operations spine|CaseMasterConsole/);
 });
 
+test("Founder Continue never invents a Case or floor when context is absent", () => {
+  const page = read("app/founder/continue/page.tsx");
+  assert.match(page, /!scorecard\?\.caseRecord \|\| !scorecard\.selectedFloorId/);
+  assert.match(page, /<FounderFlowHome scorecard=\{scorecard\}/);
+});
+
 test("all seventeen Founder modules have dedicated server-derived paths", () => {
   const scorecard = read("lib/founder-scorecard.ts");
   const flow = read("lib/founder-flow.ts");
@@ -46,6 +52,17 @@ test("FE-SITE order is Stage A presentation then Site and Post-Site then balance
   assert.match(scorecard, /Post-Site Findings must be approved first/);
 });
 
+test("required-input copy matches the approved complimentary and consent-free intake contracts", () => {
+  const helper = read("lib/founder-flow.ts");
+  assert.match(helper, /Confirmed advance or approved Internal Complimentary exception/);
+  assert.doesNotMatch(helper, /Location and consent/);
+});
+
+test("Step 06 exposes the verified entrance recovery required by evaluation", () => {
+  assert.match(read("lib/founder-flow.ts"), /Verified main entrance marker for this floor/);
+  assert.match(read("app/globals.css"), /spatial-focus-gridding[^\n]+nth-child\(6\)/);
+});
+
 test("future gates stay closed while previous steps and exact recovery remain accessible", () => {
   const helper = read("lib/founder-flow.ts");
   const component = read("components/founder-flow.tsx");
@@ -56,13 +73,28 @@ test("future gates stay closed while previous steps and exact recovery remain ac
   assert.doesNotMatch(component, /next\/link|<Link\b|prefetch=/);
 });
 
+test("regeneration keeps its exact workspace visible without opening ordinary blocked steps", () => {
+  const component = read("components/founder-flow.tsx");
+  assert.match(component, /const isRegeneration = step\.status === "NEEDS_REGENERATION" && !isFuture/);
+  assert.match(component, /Resolve regeneration/);
+  assert.match(component, /!isBlocked \|\| isRegeneration/);
+  assert.match(component, /step\.status === "BLOCKED" \|\| step\.status === "NEEDS_REGENERATION"/);
+});
+
 test("every Founder page keeps a visible context-preserving Next action with recovery copy", () => {
   const component = read("components/founder-flow.tsx");
   assert.match(component, /Next step/);
   assert.match(component, /founder-flow-next-reason/);
   assert.match(component, /next\.flowPath/);
   assert.match(component, /Delivery remains disabled/);
-  assert.match(component, /Complete the current action above to unlock the next step/);
+  assert.match(component, /const nextReason = .*step\.explanation/);
+});
+
+test("completed steps keep their real workspace available for review", () => {
+  const component = read("components/founder-flow.tsx");
+  assert.match(component, /!isBlocked \|\| isRegeneration \? <div id="founder-step-workspace"/);
+  assert.match(component, /Review current step/);
+  assert.doesNotMatch(component, /!isBlocked && !isComplete \? <div id="founder-step-workspace"/);
 });
 
 test("active module renders its real editing surface without the legacy ops console", () => {
@@ -74,9 +106,18 @@ test("active module renders its real editing surface without the legacy ops cons
   assert.match(flow, /founder-flow-details/);
 });
 
-test("Stage B and delivery remain explicitly blocked", () => {
+test("the local walkthrough never exposes Stage B mutation controls", () => {
+  const workspace = read("components/founder-step-workspace.tsx");
+  assert.match(workspace, /if \(walkthrough\) return <FounderWalkthroughWorkspace/);
+  assert.doesNotMatch(workspace, /StageBRemedyWorkspaceVisualPreview/);
+});
+
+test("Stage B activates conditionally while client delivery remains blocked", () => {
   const helper = read("lib/founder-scorecard.ts");
   assert.match(helper, /BLOCKED — METHOD INPUT REQUIRED/);
+  assert.match(helper, /stageBComplete/);
+  assert.match(helper, /stageBReady/);
+  assert.match(helper, /Stage B · Disha Balancer/);
   assert.match(helper, /Client delivery is intentionally disabled/);
   assert.match(helper, /status: "BLOCKED"/);
 });

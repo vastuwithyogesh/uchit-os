@@ -24,6 +24,8 @@ test("each floor has one current immutable plan version and full-colour marked e
   assert.match(plan, /item\.floorId === floor!\.id && item\.status === "CURRENT"/);
   assert.match(plan, /current\.status = "SUPERSEDED"/);
   assert.match(plan, /floor!\.status = "NEEDS_REGENERATION"/);
+  assert.match(plan, /floor!\.locked = true/);
+  assert.doesNotMatch(plan, /floor!\.locked = false/);
   assert.match(evidence, /HAND_MARKED_PLAN/);
   assert.match(evidence, /input\.fullColourConfirmed !== true/);
   assert.match(evidence, /plan\.status !== "CURRENT"/);

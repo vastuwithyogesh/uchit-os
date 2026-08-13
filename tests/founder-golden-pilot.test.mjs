@@ -31,8 +31,9 @@ test("releaseable Founder pilot preserves permanent identity, commercial gates a
   assert.equal(state.orientationVersions[0].googleEarthEvidenceVersionId, pilotIds.googleEvidenceId);
   assert.equal(state.spatialEvidenceVersions.some((item) => item.id === pilotIds.marked32Id && item.has32SectorChakra === true), true);
   assert.equal(state.spatialEvidenceVersions.some((item) => item.id === pilotIds.marked16Id && item.has16DirectionMapping === true), true);
-  assert.equal(state.caseDocuments[0].founderApprovalStatus, "APPROVED");
-  assert.equal(state.caseDocuments[0].evidenceRef, "case-file-pilot-manual-sheet");
+  const manualSheet = state.caseDocuments.find((item) => item.assetType === "MANUAL_UTILITY_SHEET");
+  assert.equal(manualSheet?.founderApprovalStatus, "APPROVED");
+  assert.equal(manualSheet?.evidenceRef, "case-file-pilot-manual-sheet");
   assert.equal(state.auditEvents.length, new Set(state.auditEvents.map((item) => item.idempotencyKey)).size);
   assert.equal(state.timelineEvents.length, new Set(state.timelineEvents.map((item) => item.id)).size);
 });
@@ -128,7 +129,9 @@ test("adversarial pilot fails closed without contaminating releaseable inputs", 
   const releaseable = buildReleaseableFounderPilotFixture();
   await createArtifactManifest(releaseable.state, releaseable.report, releaseable.actor);
   releaseable.state.spatialEvidenceVersions = releaseable.state.spatialEvidenceVersions.filter((item) => item.id !== pilotIds.marked16Id);
-  releaseable.state.caseDocuments[0].founderApprovalStatus = "PENDING";
+  const manualSheet = releaseable.state.caseDocuments.find((item) => item.assetType === "MANUAL_UTILITY_SHEET");
+  assert.ok(manualSheet);
+  manualSheet.founderApprovalStatus = "PENDING";
   const blockers = getStageAFloorReviewBlockers(releaseable.state, releaseable.report).join(" ");
   assert.match(blockers, /16-direction/);
   assert.match(blockers, /manual utility sheet/);
@@ -153,7 +156,9 @@ test("protected API bypass, concurrency, commercial and Stage B gates remain ser
   assert.match(pdfRoute, /mode=export|mode === "export"/);
   assert.match(pdfRoute, /mode=print|mode === "print"/);
   assert.match(printRoute, /report\.isPreview[\s\S]*403/);
-  assert.match(functionBody(workflow, "releaseVerdict"), /status: "BLOCKED_METHOD_INPUT"/);
+  const stageB = source("lib/stage-b-remediation.ts");
+  assert.match(functionBody(stageB, "ensureStageBReservation"), /FOUNDER_APPROVED/);
+  assert.doesNotMatch(functionBody(workflow, "releaseVerdict"), /remedialWorkflowReservations\.unshift/);
 });
 
 test("fixture and canonical payload contain synthetic data only and no source-document residue", async () => {
@@ -163,6 +168,8 @@ test("fixture and canonical payload contain synthetic data only and no source-do
   assert.match(serialized, /Synthetic|PILOT/);
   assert.match(serialized, /example\.invalid/);
   assert.doesNotMatch(serialized, /codex-remote-attachments|Downloads|Aankvidyaa|personal watermark|registration number/i);
-  assert.doesNotMatch(serialized, /https?:\/\/|data:|blob:/i);
+  const urls = serialized.match(/https?:\\?\/\\?\/[^\"\\]+/gi) ?? [];
+  assert.deepEqual(urls, ["https://maps.example.invalid/test-only-founder-pilot"]);
+  assert.doesNotMatch(serialized, /data:|blob:/i);
   assert.doesNotMatch(serialized, /latitude|longitude|coordinates/i);
 });

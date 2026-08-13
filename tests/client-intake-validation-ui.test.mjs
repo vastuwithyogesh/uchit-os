@@ -10,5 +10,11 @@ test("Step 03 uses the shared validator, accessible inline errors and first-erro
   assert.match(page, /aria-invalid/);
   assert.match(page, /aria-describedby/);
   assert.match(page, /field-error/);
-  assert.match(page, /document\.getElementById\(`intake-\$\{first\}`\)\?\.focus/);
+  assert.match(page, /document\.getElementById\(fieldIds\[first\]\)\?\.focus/);
+  assert.match(page, /resolveClientIntakePrefill/);
+  assert.match(page, /qualification form/);
+  assert.match(page, /intakeComplete \? "Ready to save"/);
+  assert.match(page, /window\.addEventListener\("beforeunload", warn\)/);
+  assert.match(page, /draftSnapshot !== savedSnapshot/);
+  assert.doesNotMatch(page, /tone="ready" status="Ready to save"/);
 });

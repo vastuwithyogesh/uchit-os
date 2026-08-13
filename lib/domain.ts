@@ -715,7 +715,7 @@ export interface OpeningMappingRecord extends OrganisationOwnedRecord {
 
 export interface DependencyInvalidationRecord extends OrganisationOwnedRecord {
   id: string; projectId: string; caseId: string; floorId?: string;
-  targetType: "OPENING_MAPPING" | "SPACE_MAPPING" | "UTILITY_EVALUATION" | "UTILITY_VERDICT" | "SHAKTI_EVALUATION" | "FINDING" | "DRAFT_REPORT";
+  targetType: "OPENING_MAPPING" | "SPACE_MAPPING" | "UTILITY_EVALUATION" | "UTILITY_VERDICT" | "SHAKTI_EVALUATION" | "FINDING" | "DRAFT_REPORT" | "STAGE_B_PLACEMENT" | "SECTION_A_PLACEMENT" | "COLOUR_FRAME_COMPOSITION";
   targetId: string;
   causeType?: "ORIENTATION" | "PLAN" | "EVIDENCE" | "MAPPING" | "METHODOLOGY" | "EVALUATION" | "SITE_ANALYSIS";
   sourceVersionId?: string;
@@ -918,6 +918,160 @@ export interface RemedialWorkflowReservation extends OrganisationOwnedRecord {
   methodologyVersionId?: string; createdAt: string;
 }
 
+export type StageBRemedyType = "DISHA_BALANCER" | "DISHA_ACTIVATION" | "TATTAV_BALANCER" | "TATTAV_ACTIVATION" | "EQUALISER";
+export type StageBWorkflowState = "NOT_STARTED" | "LAYOUT_SELECTED" | "EDITING" | "PAGE_FINALISED" | "REPORT_PROTECTED" | "DELIVERED";
+
+export interface StageBRemediationRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; reportId: string; state: StageBWorkflowState;
+  existingLayoutAssetId: string; existingLayoutAssetVersionId: string; existingLayoutSnapshotId: string;
+  finalRevisedLayoutCandidateId?: string; finalRevisedLayoutAssetId?: string; finalRevisedLayoutAssetVersionId?: string;
+  baseLayoutVersionId?: string; protectedReportVersionId?: string; deliveredAt?: string;
+  idempotencyKey: string; requestHash: string; createdAt: string;
+}
+
+export interface RevisedLayoutCandidateRecord extends OrganisationOwnedRecord {
+  id: string; projectId: string; caseId: string; floorId: string; postSiteFindingsId: string;
+  evidenceRef: string; checksumSha256: string; label: string; version: number; status: "AVAILABLE" | "WITHDRAWN";
+  createdAt: string;
+}
+
+export interface RemediationBaseLayoutVersionRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; projectId: string; caseId: string; floorId: string; candidateId: string;
+  assetId: string; assetVersionId: string; assetContentHash: string; snapshotId: string; versionNumber: number;
+  state: "SELECTED" | "LOCKED" | "SUPERSEDED"; selectedAt: string; selectedBy: string; lockedAt?: string; lockedBy?: string;
+}
+
+export interface RemedyRepositoryRecord extends OrganisationOwnedRecord {
+  id: string; name: string; remedialType: StageBRemedyType; elements: string[]; directions: string[];
+  attributePurpose: string; preferredAssetId: string; preferredAssetVersionId: string;
+  status: "DRAFT" | "APPROVED" | "ARCHIVED"; approvalTimestamp?: string; approvedBy?: string;
+}
+
+export interface RemedyEligibilityResolutionRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; caseId: string; floorId: string; verdictId: string; verdictContentHash: string;
+  methodologyVersionId: string; methodologyContentHash: string; resolverVersion: "stage-b-remedy-resolver/v1";
+  remedialType: StageBRemedyType; remedyId: string; remedyRecordVersion: number; remedyAssetVersionId: string;
+  eligibilityRuleIds: string[]; explanationCodes: string[]; resolvedAt: string; resolutionHash: string;
+  status: "ELIGIBLE" | "INVALIDATED"; invalidatedAt?: string; invalidationReason?: string;
+  idempotencyKey: string; requestHash: string;
+}
+
+export interface ReportPlacementPageRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; reportId: string; caseId: string; floorId: string;
+  section: "A" | "B" | "C"; pageType: "FURNITURE_ADDON" | "APPLIANCE" | StageBRemedyType | "EXTRA";
+  ordinal: number; state: "DRAFT" | "FINALISED"; baseLayoutVersionId?: string;
+  finalisedAt?: string; finalisedBy?: string; finalisationHash?: string; finalisationIdempotencyKey?: string; finalisationRequestHash?: string;
+}
+
+export interface PhysicalPlacementRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; caseId: string; floorId: string; reportId: string; pageId: string;
+  baseLayoutVersionId: string; placementType: "FURNITURE_ADDON" | "APPLIANCE" | "REMEDY" | "EXTRA";
+  eligibilityResolutionId?: string; remedyId?: string; masterNumber?: number;
+  anchorX: number; anchorY: number; anchorLocked: boolean; calloutX: number; calloutY: number;
+  calloutWidth: number; calloutHeight: number; imageAssetId: string; imageAssetVersionId: string;
+  imageAssetSnapshotId: string; nameSnapshot: string; attributePurposeSnapshot: string; locationReference?: string;
+  showCircle: boolean; showFrame: boolean; showHighlight: boolean; state: "ACTIVE" | "LOCKED" | "DELETED";
+  dependencyReviewState: "CURRENT" | "NEEDS_REVIEW"; idempotencyKey: string; requestHash: string;
+  deletedAt?: string; deletedBy?: string; deletionIdempotencyKey?: string; deletionRequestHash?: string;
+}
+
+export interface PlacementImplementationRowRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; reportId: string; pageId: string; placementId: string; masterNumber: number;
+  imageAssetSnapshotId: string; itemNameSnapshot: string; attributePurposeSnapshot: string; locationReference?: string;
+}
+
+export interface MasterAppendixRowRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; reportId: string; caseId: string; floorId: string; placementId: string;
+  sourcePageId: string; baseLayoutVersionId: string; masterNumber: number; imageAssetSnapshotId: string;
+  itemNameSnapshot: string; attributePurposeSnapshot: string; locationReference?: string;
+}
+
+export interface StageBIntegrityRunRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; reportId: string; scopeHash: string; status: "PASS" | "FAIL";
+  issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
+  checkedAt: string; checkedBy: string;
+}
+
+export interface StageBRenderProvenance {
+  eligibilityResolutionId: string; remedialType: StageBRemedyType; verdictId: string; verdictContentHash: string;
+  methodologyVersionId: string; methodologyContentHash: string; resolverVersion: string; eligibilityResolutionHash: string;
+}
+
+export interface StageBRenderManifest {
+  schemaVersion: "stage-b-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId: string;
+  existingLayout: { assetId: string; versionId: string; snapshotId: string; contentHash: string };
+  baseLayout: { versionId: string; snapshotId: string; contentHash: string };
+  /** Legacy first-placement summary retained for single-page consumers; per-page provenance is authoritative. */
+  provenance?: Omit<StageBRenderProvenance, "eligibilityResolutionId" | "remedialType">;
+  pages: Array<{ pageId: string; pageType: StageBRemedyType; ordinal: number; finalisationHash: string; provenance: StageBRenderProvenance[]; placements: PhysicalPlacementRecord[]; implementationRows: Array<PlacementImplementationRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }> }>;
+  appendixRows: Array<MasterAppendixRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }>;
+  integrityRunId: string; integrityScopeHash: string; integrityStatus: "PASS";
+}
+
+export type SectionAAssetType = "FURNITURE_ADDON" | "APPLIANCE" | "COLOUR_FRAME";
+export type SectionAVisualPageType = "EXISTING_LAYOUT" | "FINAL_REVISED_LAYOUT" | "COLOUR_FRAME";
+export type ExistingLayoutAnnotationType = "CIRCLE" | "ARROW" | "HIGHLIGHT" | "PEN" | "TEXT";
+
+export interface SectionAWorkspaceRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; projectId: string; caseId: string; floorId: string; reportId: string;
+  state: "EDITING" | "FINALISED"; idempotencyKey: string; requestHash: string; createdAt: string;
+}
+
+export interface SectionAVisualPageRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; reportId: string; caseId: string; floorId: string;
+  pageType: SectionAVisualPageType; ordinal: 1 | 2 | 7; state: "DRAFT" | "FINALISED";
+  baseLayoutVersionId?: string; finalisedAt?: string; finalisedBy?: string; finalisationHash?: string;
+  finalisationIdempotencyKey?: string; finalisationRequestHash?: string;
+}
+
+export interface SectionAAssetRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; caseId: string; floorId: string;
+  assetType: SectionAAssetType; name: string; attributePurpose: string;
+  assetId: string; assetVersionId: string; assetSnapshotId: string; status: "APPROVED" | "ARCHIVED";
+  idempotencyKey: string; requestHash: string;
+}
+
+export interface ExistingLayoutAnnotationRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; reportId: string; caseId: string; floorId: string; pageId: string;
+  existingLayoutSnapshotId: string; annotationType: ExistingLayoutAnnotationType;
+  points: Array<{ x: number; y: number }>; textSnapshot?: string;
+  colour: string; strokeWidth: number; opacity: number; state: "ACTIVE" | "DELETED";
+  idempotencyKey: string; requestHash: string; deletedAt?: string; deletedBy?: string;
+  deletionIdempotencyKey?: string; deletionRequestHash?: string;
+}
+
+export interface ColourFrameCompositionRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; reportId: string; caseId: string; floorId: string; pageId: string;
+  baseLayoutVersionId: string; sectionAAssetId: string; assetId: string; assetVersionId: string; assetSnapshotId: string;
+  x: number; y: number; width: number; height: number; rotationDegrees: number;
+  opacityPreset: "LOW" | "MEDIUM" | "FULL"; preserveAspectRatio: boolean; printFit: boolean; locked: boolean;
+  dependencyReviewState: "CURRENT" | "NEEDS_REVIEW"; state: "ACTIVE" | "LOCKED" | "DELETED";
+  idempotencyKey: string; requestHash: string; deletedAt?: string; deletedBy?: string;
+  deletionIdempotencyKey?: string; deletionRequestHash?: string;
+}
+
+export interface SectionAIntegrityRunRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; reportId: string; scopeHash: string; status: "PASS" | "FAIL";
+  issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
+  checkedAt: string; checkedBy: string;
+}
+
+export interface RemediationReportIntegrityRunRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; reportId: string; scopeHash: string; status: "PASS" | "FAIL";
+  issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
+  checkedAt: string; checkedBy: string;
+}
+
+export interface SectionARenderManifest {
+  schemaVersion: "section-a-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId: string;
+  existingLayoutPage: { pageId: string; ordinal: 1; finalisationHash: string; assetId: string; versionId: string; snapshotId: string; annotations: ExistingLayoutAnnotationRecord[] };
+  finalRevisedLayoutPage: { pageId: string; ordinal: 2; finalisationHash: string; baseLayoutVersionId: string; snapshotId: string; contentHash: string };
+  placementPages: Array<{ pageId: string; pageType: "FURNITURE_ADDON" | "APPLIANCE"; ordinal: 3 | 5; finalisationHash: string; placements: PhysicalPlacementRecord[]; implementationRows: Array<PlacementImplementationRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }> }>;
+  colourFramePage: { pageId: string; ordinal: 7; finalisationHash: string; compositions: ColourFrameCompositionRecord[] };
+  appendixRows: Array<MasterAppendixRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }>;
+  integrityRunId: string; integrityScopeHash: string; integrityStatus: "PASS";
+}
+
 export const methodologyModules = ["DIRECTION_32", "DIRECTION_16", "SITE_ENVIRONMENT", "UTILITY", "SHAKTI_ELEMENT", "AOU_REFERENCE", "STAGE_B_REMEDIAL"] as const;
 export type MethodologyModule = (typeof methodologyModules)[number];
 export const methodologyDecisionStatuses = ["APPROVED", "CONFIGURABLE", "REVIEW_REQUIRED", "BLOCKED_METHOD_INPUT", "DEFERRED", "NEEDS_REGENERATION"] as const;
@@ -1043,6 +1197,9 @@ export interface ReportArtifactManifest {
   manualUtilitySheetDocumentId?: string;
   siteAnalysisId?: string;
   postSiteFindingsId?: string;
+  stageBRenderManifest?: StageBRenderManifest;
+  sectionARenderManifest?: SectionARenderManifest;
+  remediationReportIntegrity?: { runId: string; scopeHash: string; status: "PASS" };
   contentHash: string;
   immutable: true;
   downloadPath: string;

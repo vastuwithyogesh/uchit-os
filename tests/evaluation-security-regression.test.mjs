@@ -58,7 +58,7 @@ test("a differing evaluation retry requires formal rectification", () => {
 });
 
 test("client controls use the same complete server prerequisite helper", () => {
-  assert.equal((evaluationUi.match(/disabled=\{busy \|\| !evaluationReady/g) ?? []).length, 2);
+  assert.equal((evaluationUi.match(/disabled=\{busy[^}]*!evaluationReady/g) ?? []).length, 2);
   assert.match(evaluationUi, /getCaseEvaluationBlockers/);
   assert.match(evaluationUi, /evaluationBlockers\.slice\(0, 3\)\.map/);
   assert.match(evaluationUi, /href="\/clients-cases">Complete case setup/);

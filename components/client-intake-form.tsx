@@ -3,10 +3,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { AppState } from "@/lib/store";
 import type { DecisionMakerStatus, VastuServiceType } from "@/lib/domain";
-import { getClientIntakeCompleteness, validateClientIntake, type IntakeFieldErrors, type IntakeFieldKey } from "@/lib/client-intake";
+import { resolveClientIntakePrefill, validateClientIntake, type IntakeFieldErrors, type IntakeFieldKey } from "@/lib/client-intake";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { FounderStepCard } from "@/components/founder-step-card";
+import { useRouter } from "next/navigation";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
 
@@ -18,6 +19,7 @@ class ActionError extends Error {
 
 export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId }: { clientId?: string; caseId?: string; projectId?: string } = {}) {
   const { activeUser } = useSession();
+  const router = useRouter();
   const [state, setState] = useState<Bootstrap | null>(null);
   const [clientId, setClientId] = useState(initialClientId ?? "");
   const [busy, setBusy] = useState(true);
@@ -73,16 +75,36 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
   const project = state?.projects.find((item) => item.id === (projectId ?? selectedCase?.projectId));
   const client = clients.find((item) => item.id === clientId);
   const profile = state?.clientIntakeProfiles.find((item) => item.clientId === client?.id);
-  const completeness = getClientIntakeCompleteness(profile);
+  const prefill = state ? resolveClientIntakePrefill(state, { caseId, projectId: project?.id, clientId: client?.id }) : { values: {}, provenance: {} };
   const caseService = selectedCase?.serviceType;
   const serviceConflict = Boolean(profile?.propertyContext?.serviceInterest && caseService && profile.propertyContext.serviceInterest !== caseService);
   const actualFloorCount = selectedCase ? (state?.floorWorkspaces.filter((item) => item.caseId === selectedCase.id).length ?? 0) : 0;
   const floorMismatch = Boolean(floorCount && actualFloorCount && Number(floorCount) !== actualFloorCount);
   const validation = validateClientIntake({ challenge, outcome, service, propertyType, propertyStatus, cityCountry, floorCount, locationLink, latitude, longitude });
+  const correctionCount = Object.keys(validation).length;
+  const intakeComplete = correctionCount === 0;
   const errors = showValidation ? { ...validation, ...serverErrors } : serverErrors;
+  const fieldIds: Record<IntakeFieldKey, string> = { challenge: "intake-challenge", outcome: "intake-outcome", service: "intake-service", propertyType: "intake-property-type", propertyStatus: "intake-property-status", cityCountry: "intake-city-country", floorCount: "intake-floor-count", locationLink: "intake-location-link", latitude: "intake-latitude", longitude: "intake-longitude" };
   const errorFor = (field: IntakeFieldKey) => errors[field];
   const inputProps = (field: IntakeFieldKey) => ({ "aria-invalid": Boolean(errorFor(field)), "aria-describedby": errorFor(field) ? `intake-${field}-error` : undefined });
   const inlineError = (field: IntakeFieldKey) => errorFor(field) ? <p id={`intake-${field}-error`} className="field-error" role="alert">{errorFor(field)}</p> : null;
+  const draftSnapshot = JSON.stringify([whatsapp, language, windowText, company, industry, designation, vision, decision, others, service, propertyType, propertyStatus, areaValue, areaUnit, cityCountry, constraints, challenge, outcome, urgency, floorCount, locationLink, latitude, longitude]);
+  const savedSnapshot = JSON.stringify([
+    profile?.contactPreference?.whatsapp ?? "", profile?.contactPreference?.preferredLanguage ?? "", profile?.contactPreference?.preferredContactWindow ?? "",
+    profile?.businessContext?.company ?? "", profile?.businessContext?.industry ?? "", profile?.businessContext?.designation ?? "", profile?.businessContext?.vision ?? "",
+    profile?.decisionMakerStatus ?? "", profile?.otherDecisionMakers ?? "", (prefill.values.service as VastuServiceType | undefined) ?? "", prefill.values.propertyType ?? "",
+    prefill.values.propertyStatus ?? "", profile?.propertyContext?.areaValue?.toString() ?? "", profile?.propertyContext?.areaUnit ?? "", prefill.values.cityCountry ?? "",
+    prefill.values.constraints ?? "", prefill.values.challenge ?? "", prefill.values.outcome ?? "", prefill.values.urgency ?? "", prefill.values.floorCount ?? "",
+    prefill.values.locationLink ?? "", prefill.values.latitude ?? "", prefill.values.longitude ?? "",
+  ]);
+  const draftDirty = !busy && Boolean(client) && draftSnapshot !== savedSnapshot;
+
+  useEffect(() => {
+    if (!draftDirty) return;
+    const warn = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+    window.addEventListener("beforeunload", warn);
+    return () => window.removeEventListener("beforeunload", warn);
+  }, [draftDirty]);
 
   useEffect(() => {
     setWhatsapp(profile?.contactPreference?.whatsapp ?? "");
@@ -94,27 +116,27 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
     setVision(profile?.businessContext?.vision ?? "");
     setDecision(profile?.decisionMakerStatus ?? "");
     setOthers(profile?.otherDecisionMakers ?? "");
-    setService(profile?.propertyContext?.serviceInterest ?? caseService ?? "");
-    setPropertyType(profile?.propertyContext?.propertyType ?? "");
-    setPropertyStatus(profile?.propertyContext?.propertyStatus ?? "");
+    setService((prefill.values.service as VastuServiceType | undefined) ?? "");
+    setPropertyType(prefill.values.propertyType ?? "");
+    setPropertyStatus(prefill.values.propertyStatus ?? "");
     setAreaValue(profile?.propertyContext?.areaValue?.toString() ?? "");
     setAreaUnit(profile?.propertyContext?.areaUnit ?? "");
-    setCityCountry(profile?.propertyContext?.cityCountry ?? client?.city ?? "");
-    setConstraints(profile?.propertyContext?.constraints ?? "");
-    setChallenge(profile?.needs?.mainChallenge ?? "");
-    setOutcome(profile?.needs?.desiredOutcome ?? "");
-    setUrgency(profile?.needs?.urgency ?? "");
-    setFloorCount(profile?.propertyContext?.floorCount?.toString() ?? "");
-    setLocationLink(profile?.propertyContext?.locationLink ?? "");
-    setLatitude(profile?.propertyContext?.latitude?.toString() ?? "");
-    setLongitude(profile?.propertyContext?.longitude?.toString() ?? "");
+    setCityCountry(prefill.values.cityCountry ?? "");
+    setConstraints(prefill.values.constraints ?? "");
+    setChallenge(prefill.values.challenge ?? "");
+    setOutcome(prefill.values.outcome ?? "");
+    setUrgency(prefill.values.urgency ?? "");
+    setFloorCount(prefill.values.floorCount ?? "");
+    setLocationLink(prefill.values.locationLink ?? "");
+    setLatitude(prefill.values.latitude ?? "");
+    setLongitude(prefill.values.longitude ?? "");
     key.current = crypto.randomUUID();
-  }, [client?.id, client?.city, profile?.version, caseService]);
+  }, [client?.id, profile?.version, caseService, prefill.values.challenge, prefill.values.outcome, prefill.values.service, prefill.values.propertyType, prefill.values.propertyStatus, prefill.values.cityCountry, prefill.values.floorCount, prefill.values.locationLink, prefill.values.latitude, prefill.values.longitude, prefill.values.constraints, prefill.values.urgency]);
 
   async function save() {
     if (!state || !client) return;
     const attemptedErrors = validateClientIntake({ challenge, outcome, service, propertyType, propertyStatus, cityCountry, floorCount, locationLink, latitude, longitude });
-    if (Object.keys(attemptedErrors).length) { setShowValidation(true); setServerErrors({}); setMessage(`${Object.keys(attemptedErrors).length} required correction${Object.keys(attemptedErrors).length === 1 ? "" : "s"} needed before saving.`); const first = Object.keys(attemptedErrors)[0]; queueMicrotask(() => document.getElementById(`intake-${first}`)?.focus()); return; }
+    if (Object.keys(attemptedErrors).length) { setShowValidation(true); setServerErrors({}); setMessage(`${Object.keys(attemptedErrors).length} required correction${Object.keys(attemptedErrors).length === 1 ? "" : "s"} needed before saving.`); const first = Object.keys(attemptedErrors)[0] as IntakeFieldKey; queueMicrotask(() => document.getElementById(fieldIds[first])?.focus()); return; }
     if (serviceConflict) { setMessage("Review Required: saved intake service conflicts with this case. Review case setup before saving."); return; }
     if (floorMismatch) { setMessage("Review Required: floor count differs from Floor setup. Review floor setup; no history changed."); return; }
     setBusy(true);
@@ -137,6 +159,7 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
       const result = await response.json();
       if (!response.ok || result.ok === false) throw new ActionError(typeof result.error === "string" ? result.error : result.error?.message ?? "Intake could not be saved.", response.status);
       await refresh(client.id);
+      router.refresh();
       setMessage("Intake saved.");
     } catch (error) {
       if (error instanceof ActionError && error.status===409) setMessage("This client changed while you were editing. Your draft is still here. Reload, compare, then save again.");
@@ -148,35 +171,39 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
   }
 
   const messageIsError = message.includes("could not") || message.includes("changed") || message.includes("missing") || message.includes("correction") || message.includes("Review Required");
-  const completionTone = Object.keys(validation).length === 0 ? "ready" : "attention";
+  const completionTone = intakeComplete ? "ready" : "attention";
+  const sourceLabel = (field: IntakeFieldKey | "constraints" | "urgency") => {
+    const source = prefill.provenance[field];
+    return source ? <span className="label-note">From {source === "INTAKE" ? "saved intake" : source === "QUALIFICATION" ? "qualification form" : source === "PROPOSAL" ? "approved proposal" : source === "CASE_SETUP" ? "case setup" : "client profile"}</span> : null;
+  };
 
   return (
     <section className="card span-12 founder-work-surface" aria-labelledby="intake-title">
       <div className="founder-context-bar" aria-label="Locked intake context"><span>Case</span><span aria-hidden="true">→</span><strong>{selectedCase?.caseNumber ?? "Select a case to continue"}</strong><span aria-hidden="true">→</span><span>{project?.propertyName ?? "Project pending"}</span><span aria-hidden="true">→</span><span>{client ? `${client.displayName} · ${client.id}` : "Client unavailable"}</span></div>
-      <FounderStepCard step="Step 1 · context" title="Capture the decision that matters" description="Start with the client’s challenge and desired outcome. Complete the property context before saving the profile." tone={completionTone} status={Object.keys(validation).length === 0 ? "All required information is complete" : `${Object.keys(validation).length} required correction${Object.keys(validation).length === 1 ? "" : "s"}`} className="founder-step-card-primary">
+      <FounderStepCard step="Step 1 · context" title="Capture the decision that matters" description="Start with the client’s challenge and desired outcome. Complete the property context before saving the profile." tone={completionTone} status={intakeComplete ? "All required information is complete" : `${correctionCount} required correction${correctionCount === 1 ? "" : "s"}`} className="founder-step-card-primary">
         <p className="meta">Client is locked to this Case and Project. Switch the full context from the case selector, not from intake.</p>
         <p className="meta">Known values are prefilled from intake, then case setup, then the permanent client profile. Conflicting source values require review; nothing is silently overwritten.</p>
         {serviceConflict ? <p className="blocked-note" role="alert">Review Required: intake service conflicts with the selected case. Review case setup before saving.</p> : null}
         {floorMismatch ? <p className="blocked-note" role="alert">Review Required: Floor setup has {actualFloorCount} floor(s), while intake says {floorCount}. Review floor setup; existing floor history is preserved.</p> : null}
         <div className="founder-step-grid founder-intake-grid">
-          <div className={`field ${errorFor("challenge") ? "field-invalid" : ""}`}><label htmlFor="intake-challenge">Main challenge</label><textarea id="intake-challenge" value={challenge} onChange={(e) => setChallenge(e.target.value)} disabled={busy} placeholder="What needs attention?" {...inputProps("challenge")} />{inlineError("challenge")}</div>
-          <div className={`field ${errorFor("outcome") ? "field-invalid" : ""}`}><label htmlFor="intake-outcome">Desired outcome</label><textarea id="intake-outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} disabled={busy} placeholder="What would a useful outcome look like?" {...inputProps("outcome")} />{inlineError("outcome")}</div>
+          <div className={`field ${errorFor("challenge") ? "field-invalid" : ""}`}><label htmlFor="intake-challenge">Main challenge {sourceLabel("challenge")}</label><textarea id="intake-challenge" value={challenge} onChange={(e) => setChallenge(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} placeholder="What needs attention?" {...inputProps("challenge")} />{inlineError("challenge")}</div>
+          <div className={`field ${errorFor("outcome") ? "field-invalid" : ""}`}><label htmlFor="intake-outcome">Desired outcome {sourceLabel("outcome")}</label><textarea id="intake-outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} placeholder="What would a useful outcome look like?" {...inputProps("outcome")} />{inlineError("outcome")}</div>
           <div className="field"><label htmlFor="intake-urgency">Urgency <span className="label-note">optional</span></label><input id="intake-urgency" value={urgency} onChange={(e) => setUrgency(e.target.value)} disabled={busy} /></div>
         </div>
       </FounderStepCard>
 
-      <FounderStepCard step="Step 2 · property" title="Set the project context" description="These fields carry forward into project and floor setup. Leave optional detail for the disclosure below." tone={Object.keys(validation).length === 0 ? "ready" : "attention"} status={Object.keys(validation).length === 0 ? "Ready to save" : `${Object.keys(validation).length} required correction${Object.keys(validation).length === 1 ? "" : "s"}`}>
+      <FounderStepCard step="Step 2 · property" title="Set the project context" description="These fields carry forward into project and floor setup. Leave optional detail for the disclosure below." tone={completionTone} status={intakeComplete ? "Ready to save" : `${correctionCount} required correction${correctionCount === 1 ? "" : "s"}`}>
         <div className="founder-step-grid founder-intake-grid">
-          <div className={`field ${errorFor("service") ? "field-invalid" : ""}`}><label htmlFor="intake-service">Service interest</label><select id="intake-service" value={service} onChange={(e) => setService(e.target.value as VastuServiceType | "")} disabled={busy} {...inputProps("service")}><option value="">Choose</option><option value="EXISTING_SPACE">Existing space</option><option value="NEW_CONSTRUCTION">New construction</option></select>{inlineError("service")}</div>
-          <div className={`field ${errorFor("propertyType") ? "field-invalid" : ""}`}><label htmlFor="intake-property-type">Property type</label><select id="intake-property-type" value={propertyType} onChange={(e) => setPropertyType(e.target.value)} disabled={busy} {...inputProps("propertyType")}><option value="">Choose</option>{["Residential", "Commercial", "Factory", "Shop", "Hospital", "Hotel", "Temple"].map((type) => <option key={type} value={type}>{type}</option>)}</select>{inlineError("propertyType")}</div>
-          <div className={`field ${errorFor("propertyStatus") ? "field-invalid" : ""}`}><label htmlFor="intake-property-status">Property status</label><input id="intake-property-status" value={propertyStatus} onChange={(e) => setPropertyStatus(e.target.value)} disabled={busy} {...inputProps("propertyStatus")} />{inlineError("propertyStatus")}</div>
-          <div className={`field ${errorFor("cityCountry") ? "field-invalid" : ""}`}><label htmlFor="intake-city-country">City and country</label><input id="intake-city-country" value={cityCountry} onChange={(e) => setCityCountry(e.target.value)} disabled={busy} {...inputProps("cityCountry")} />{inlineError("cityCountry")}</div>
+          <div className={`field ${errorFor("service") ? "field-invalid" : ""}`}><label htmlFor="intake-service">Service interest {sourceLabel("service")}</label><select id="intake-service" value={service} onChange={(e) => setService(e.target.value as VastuServiceType | "")} onBlur={() => setShowValidation(true)} disabled={busy} {...inputProps("service")}><option value="">Choose</option><option value="EXISTING_SPACE">Existing space</option><option value="NEW_CONSTRUCTION">New construction</option></select>{inlineError("service")}</div>
+          <div className={`field ${errorFor("propertyType") ? "field-invalid" : ""}`}><label htmlFor="intake-property-type">Property type {sourceLabel("propertyType")}</label><select id="intake-property-type" value={propertyType} onChange={(e) => setPropertyType(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} {...inputProps("propertyType")}><option value="">Choose</option>{["Residential", "Commercial", "Factory", "Shop", "Hospital", "Hotel", "Temple"].map((type) => <option key={type} value={type}>{type}</option>)}</select>{inlineError("propertyType")}</div>
+          <div className={`field ${errorFor("propertyStatus") ? "field-invalid" : ""}`}><label htmlFor="intake-property-status">Property status {sourceLabel("propertyStatus")}</label><input id="intake-property-status" value={propertyStatus} onChange={(e) => setPropertyStatus(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} {...inputProps("propertyStatus")} />{inlineError("propertyStatus")}</div>
+          <div className={`field ${errorFor("cityCountry") ? "field-invalid" : ""}`}><label htmlFor="intake-city-country">City and country {sourceLabel("cityCountry")}</label><input id="intake-city-country" value={cityCountry} onChange={(e) => setCityCountry(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} {...inputProps("cityCountry")} />{inlineError("cityCountry")}</div>
           <div className="field"><label htmlFor="intake-area-value">Area <span className="label-note">optional</span></label><input id="intake-area-value" value={areaValue} onChange={(e) => setAreaValue(e.target.value)} disabled={busy} inputMode="decimal" /></div>
           <div className="field"><label htmlFor="intake-area-unit">Area unit <span className="label-note">optional</span></label><input id="intake-area-unit" value={areaUnit} onChange={(e) => setAreaUnit(e.target.value)} disabled={busy} /></div>
-          <div className={`field ${errorFor("floorCount") ? "field-invalid" : ""}`}><label htmlFor="intake-floor-count">Number of floors <span className="label-note">Add later if unknown</span></label><input id="intake-floor-count" value={floorCount} onChange={(e) => setFloorCount(e.target.value)} disabled={busy} inputMode="numeric" {...inputProps("floorCount")} />{inlineError("floorCount")}</div>
-          <div className={`field field-span-full ${errorFor("locationLink") ? "field-invalid" : ""}`}><label htmlFor="intake-location-link">Location link <span className="label-note">HTTPS map link optional</span></label><input id="intake-location-link" value={locationLink} onChange={(e) => setLocationLink(e.target.value)} disabled={busy} placeholder="https://maps.example/..." {...inputProps("locationLink")} />{inlineError("locationLink")}</div>
-          <div className={`field ${errorFor("latitude") ? "field-invalid" : ""}`}><label htmlFor="intake-latitude">Latitude <span className="label-note">optional</span></label><input id="intake-latitude" value={latitude} onChange={(e) => setLatitude(e.target.value)} disabled={busy} inputMode="decimal" {...inputProps("latitude")} />{inlineError("latitude")}</div>
-          <div className={`field ${errorFor("longitude") ? "field-invalid" : ""}`}><label htmlFor="intake-longitude">Longitude <span className="label-note">optional</span></label><input id="intake-longitude" value={longitude} onChange={(e) => setLongitude(e.target.value)} disabled={busy} inputMode="decimal" {...inputProps("longitude")} />{inlineError("longitude")}</div>
+          <div className={`field ${errorFor("floorCount") ? "field-invalid" : ""}`}><label htmlFor="intake-floor-count">Number of floors <span className="label-note">Add later if unknown</span> {sourceLabel("floorCount")}</label><input id="intake-floor-count" value={floorCount} onChange={(e) => setFloorCount(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} inputMode="numeric" {...inputProps("floorCount")} />{inlineError("floorCount")}</div>
+          <div className={`field field-span-full ${errorFor("locationLink") ? "field-invalid" : ""}`}><label htmlFor="intake-location-link">Location link <span className="label-note">HTTPS map link optional</span> {sourceLabel("locationLink")}</label><input id="intake-location-link" value={locationLink} onChange={(e) => setLocationLink(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} placeholder="https://maps.example/..." {...inputProps("locationLink")} />{inlineError("locationLink")}</div>
+          <div className={`field ${errorFor("latitude") ? "field-invalid" : ""}`}><label htmlFor="intake-latitude">Latitude <span className="label-note">optional</span></label><input id="intake-latitude" value={latitude} onChange={(e) => setLatitude(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} inputMode="decimal" {...inputProps("latitude")} />{inlineError("latitude")}</div>
+          <div className={`field ${errorFor("longitude") ? "field-invalid" : ""}`}><label htmlFor="intake-longitude">Longitude <span className="label-note">optional</span></label><input id="intake-longitude" value={longitude} onChange={(e) => setLongitude(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} inputMode="decimal" {...inputProps("longitude")} />{inlineError("longitude")}</div>
           <div className="field field-span-full"><label htmlFor="intake-constraints">Constraints <span className="label-note">optional</span></label><textarea id="intake-constraints" value={constraints} onChange={(e) => setConstraints(e.target.value)} disabled={busy} /></div>
         </div>
       </FounderStepCard>
@@ -196,8 +223,8 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
         </div>
       </details>
 
-      <FounderStepCard step="Save intake" title="Confirm the project context" description="Known client consent remains in its original source record. Missing consent blocks only the relevant outbound communication, not this intake save." tone="ready" status="Ready to save">
-        <div className="workflow founder-primary-actions"><button className="button founder-action-primary" type="button" disabled={busy || !client} onClick={() => void save()}>Save intake</button><button className="button-secondary" type="button" disabled={busy} onClick={() => void refresh(client?.id)}>Reload latest</button></div>
+      <FounderStepCard step="Save intake" title="Confirm the project context" description="Known client consent remains in its original source record. Missing consent blocks only the relevant outbound communication, not this intake save." tone={completionTone} status={intakeComplete ? "Ready to save" : `${correctionCount} required correction${correctionCount === 1 ? "" : "s"}`}>
+        <div className="workflow founder-primary-actions"><button className="button founder-action-primary" type="button" disabled={busy || !client} onClick={() => void save()}>{busy ? "Saving…" : intakeComplete ? "Save intake" : "Review required fields"}</button><button className="button-secondary" type="button" disabled={busy} onClick={() => void refresh(client?.id)}>Reload latest</button></div>
       </FounderStepCard>
       <div className="footer-note" role={messageIsError ? "alert" : "status"} aria-live="polite">{message}</div>
     </section>

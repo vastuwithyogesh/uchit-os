@@ -76,10 +76,12 @@ test("orientation and mapping reserve exact evidence-bound versions without inve
   assert.doesNotMatch(domain, /degreeBoundary|sectorStart|sectorEnd/);
 });
 
-test("Stage B is only a blocked reservation and contains no invented remedy selection", () => {
+test("Stage B remains exact-floor scoped and authority-bound", () => {
   const domain = source("lib/domain.ts");
-  const reservation = domain.slice(domain.indexOf("export interface RemedialWorkflowReservation"), domain.indexOf("export interface ReportVersionRecord"));
+  const reservation = domain.slice(domain.indexOf("export interface RemedialWorkflowReservation"), domain.indexOf("export type StageBRemedyType"));
   assert.match(reservation, /stageAReportId: string/);
   assert.match(reservation, /BLOCKED_METHOD_INPUT/);
-  assert.doesNotMatch(reservation, /remedy|threshold|priority|sequence/i);
+  const remediation = domain.slice(domain.indexOf("export interface StageBRemediationRecord"), domain.indexOf("export interface RevisedLayoutCandidateRecord"));
+  assert.match(remediation, /caseId: string; floorId: string; reportId: string/);
+  assert.doesNotMatch(remediation, /resolverVersion|verdictSnapshotId|pageId/);
 });

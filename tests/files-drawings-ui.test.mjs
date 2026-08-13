@@ -2,9 +2,10 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { source } from "./helpers/source-contracts.mjs";
 
-test("files workspace uses service requirements and the active case", () => {
+test("files workspace uses service requirements and the exact routed case", () => {
   const ui = source("components/files-drawings-console.tsx");
-  assert.match(ui, /getActiveCaseForClient/);
+  assert.doesNotMatch(ui, /getActiveCaseForClient|clients\[0\]|files-client/);
+  assert.match(ui, /Locked file context/);
   assert.match(ui, /getCaseDocumentReadiness/);
   assert.match(ui, /readiness\?\.requirements/);
   for (const state of ["Missing", "Received", "Needs correction", "Verified"]) assert.match(ui, new RegExp(state));
@@ -50,4 +51,23 @@ test("protected uploads are scoped, validated, and keep technical storage data h
   assert.match(ui, /Only uploads for this case and exact floor are shown/);
   assert.match(ui, /<summary>File details<\/summary>/);
   assert.doesNotMatch(ui.slice(ui.indexOf("return <section")), /checksumSha256|uploadedBy\.id|storageKey|objectKey/);
+});
+
+test("protected upload exposes persistent state and recovery", () => {
+  const ui = source("components/files-drawings-console.tsx");
+  for (const state of ["NOT_SELECTED", "SELECTED", "UPLOADING", "UPLOADED_NOT_RECORDED", "RECORDED", "FAILED"]) assert.match(ui, new RegExp(state));
+  assert.match(ui, /Retry upload/);
+  assert.match(ui, /Upload is disabled until/);
+  assert.match(ui, /router\.refresh\(\)/);
+});
+
+test("verified manual utility sheet exposes separate Founder approval", () => {
+  const ui = source("components/files-drawings-console.tsx");
+  assert.match(ui, /action: "manual-sheet-approve"/);
+  assert.match(ui, /Founder approve sheet/);
+  assert.match(ui, /approvalReason\.trim\(\)\.length < 20/);
+  assert.match(ui, /documentId: currentDocument\.id/);
+  assert.match(ui, /floorId: requestedFloorId/);
+  assert.match(ui, /expectedRecordVersion: activeCase\.recordVersion/);
+  assert.match(ui, /approvalKey\.current/);
 });

@@ -1,7 +1,8 @@
 import { NextResponse } from "next/server";
 import { isExplicitLocalDemo, requireRouteActor } from "@/lib/auth";
 import { resolveActiveOrganisationContext } from "@/lib/foundation.server";
-import { createEmptyAppState, setAppState, type AppState } from "@/lib/store";
+import { createEmptyAppState, type AppState } from "@/lib/store";
+import { activateLocalWalkthroughState } from "@/lib/persistence";
 import { clients, commercialProposals, leadQualifications, payments, reportVersions, timelineEvents, utilityRules, vastuCases, whatsappTemplates } from "@/lib/seed";
 
 export async function GET(request: Request) {
@@ -34,6 +35,13 @@ export async function POST(request: Request) {
   if (!access.ok) return access.response;
   if (!isExplicitLocalDemo(request.headers)) return NextResponse.json({ ok: false, error: "Walkthrough fixtures are local-only." }, { status: 403 });
   const body = await request.json().catch(() => ({}));
+  if (body.mode === "FOUNDER_CONTINUOUS_TEST_ONLY") {
+    const context = await resolveActiveOrganisationContext(access.actor, true);
+    const { buildContinuousFounderWalkthrough } = await import("@/lib/founder-local-walkthrough.server");
+    const fixture = await buildContinuousFounderWalkthrough({ organisation: context.organisation, membership: context.membership, actor: access.actor });
+    activateLocalWalkthroughState(fixture.state);
+    return NextResponse.json({ ok: true, label: "TEST_ONLY · Continuous Founder rehearsal", clientId: fixture.clientId, prospectiveProjectId: fixture.prospectiveProjectId, proposalVersionId: fixture.proposalVersionId, caseId: fixture.caseId, floorId: fixture.floorId, startUrl: `/founder/01?caseId=${fixture.caseId}&floorId=${fixture.floorId}` }, { headers: { "Cache-Control": "no-store" } });
+  }
   if (body.mode !== "FOUNDER_WALKTHROUGH_TEST_ONLY") return NextResponse.json({ ok: false, error: "Unknown local fixture mode." }, { status: 400 });
   // Test fixtures are intentionally JavaScript so they can also be exercised by Node's
   // contract runner; this route is a guarded local-only adapter.
@@ -49,6 +57,6 @@ export async function POST(request: Request) {
   const state = { ...createEmptyAppState(), ...structuredClone(remapped) } as AppState;
   // The pilot fixture is intentionally complete through the protected-report boundary.
   // It leaves Stage B and delivery blocked by the canonical scorecard, not a fixture override.
-  setAppState(state);
+  activateLocalWalkthroughState(state);
   return NextResponse.json({ ok: true, label: "TEST_ONLY · Founder complete-flow snapshot", caseId: pilotIds.caseId, floorId: pilotIds.floorId, routes: Array.from({ length: 17 }, (_, index) => `/founder/${String(index + 1).padStart(2, "0")}?caseId=${pilotIds.caseId}&floorId=${pilotIds.floorId}`) }, { headers: { "Cache-Control": "no-store" } });
 }
