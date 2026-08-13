@@ -427,6 +427,20 @@ h3,
   text-transform: uppercase;
 }
 
+.field-invalid input,
+.field-invalid textarea,
+.field-invalid select {
+  border-color: var(--danger, #b42318);
+  background: color-mix(in srgb, #b42318 7%, var(--surface, #fff));
+}
+
+.field-error {
+  margin: 0.35rem 0 0;
+  color: var(--danger, #b42318);
+  font-size: 0.82rem;
+  font-weight: 650;
+}
+
 .field input,
 .field textarea,
 .field select {

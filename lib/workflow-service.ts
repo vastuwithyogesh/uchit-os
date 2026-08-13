@@ -43,6 +43,7 @@ import { getMethodologyReadiness } from "@/lib/methodology-readiness";
 import { getUtilityMasterMethodologyBinding, resolveUtilityMasterRows, utilityMasterRuleId, UTILITY_MASTER_SOURCE_VERSION, UTILITY_MASTER_WORKBOOK_HASH } from "@/lib/utility-master";
 import { calculateUtilityGraphVerdict, UtilityVerdictValidationError } from "@/lib/utility-verdict";
 import { getStageAFloorReviewBlockers, recordStageAFloorCheckpoint } from "@/lib/founder-regeneration";
+import { validateClientIntake } from "@/lib/client-intake";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -244,6 +245,9 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
 
   const needsInput = intakeObject(input.needs, "Needs", ["mainChallenge", "desiredOutcome", "urgency"]);
   const needs = needsInput ? { mainChallenge: optionalIntakeString(needsInput.mainChallenge, "Main challenge", 1000), desiredOutcome: optionalIntakeString(needsInput.desiredOutcome, "Desired outcome", 1000), urgency: optionalIntakeString(needsInput.urgency, "Urgency", 120) } : undefined;
+  const requiredErrors = validateClientIntake({ challenge: needs?.mainChallenge, outcome: needs?.desiredOutcome, service: propertyContext?.serviceInterest, propertyType: propertyContext?.propertyType, propertyStatus: propertyContext?.propertyStatus, cityCountry: propertyContext?.cityCountry, floorCount: propertyContext?.floorCount?.toString(), locationLink: propertyContext?.locationLink, latitude: propertyContext?.latitude?.toString(), longitude: propertyContext?.longitude?.toString() });
+  const firstRequiredError = Object.values(requiredErrors)[0];
+  if (firstRequiredError) throw new Error(firstRequiredError);
 
   const consentInput = intakeObject(input.consent, "Consent", ["version", "contact", "accuracy", "confidentiality"]);
   if (!consentInput || consentInput.version !== "uchit-intake/v1") throw new Error("Consent version must be uchit-intake/v1.");
