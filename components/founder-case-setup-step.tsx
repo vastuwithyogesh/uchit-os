@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import type { AppState } from "@/lib/store";
 import { getActiveCaseForClient } from "@/lib/service-framework";
 import { buildActionHeaders } from "@/lib/request-helpers";
@@ -11,6 +12,7 @@ type Focus = "case" | "floor";
 
 export function FounderCaseSetupStep({ focus, clientId, caseId, floorId }: { focus: Focus; clientId?: string; caseId?: string; floorId?: string }) {
   const { activeUser } = useSession();
+  const router = useRouter();
   const [state, setState] = useState<Bootstrap | null>(null);
   const [label, setLabel] = useState("Ground floor");
   const [addingFloor, setAddingFloor] = useState(false);
@@ -51,7 +53,7 @@ export function FounderCaseSetupStep({ focus, clientId, caseId, floorId }: { foc
       const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ ...payload, idempotencyKey: key.current, expectedRecordVersion: entity.recordVersion ?? 0, expectedRevision: state.persistenceRevision }) });
       const result = await response.json();
       if (!response.ok || result.ok === false) { if (response.status === 409 || response.status === 428) setConflict(true); throw new Error(result.error?.message ?? result.error ?? "The protected action could not be saved."); }
-      key.current = crypto.randomUUID(); setAddingFloor(false); setMessage(action === "case-create" ? "Vastu Case ID and project created." : action === "floor-create" ? "Independent floor workspace created." : "Floor marked ready."); await refresh();
+      key.current = crypto.randomUUID(); setAddingFloor(false); setMessage(action === "case-create" ? "Vastu Case ID and project created." : action === "floor-create" ? "Independent floor workspace created." : "Floor marked ready."); await refresh(); router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "The protected action could not be saved."); }
     finally { setBusy(false); }
   }

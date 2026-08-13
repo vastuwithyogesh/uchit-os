@@ -56,6 +56,15 @@ test("future gates stay closed while previous steps and exact recovery remain ac
   assert.doesNotMatch(component, /next\/link|<Link\b|prefetch=/);
 });
 
+test("every Founder page keeps a visible context-preserving Next action with recovery copy", () => {
+  const component = read("components/founder-flow.tsx");
+  assert.match(component, /Next step/);
+  assert.match(component, /founder-flow-next-reason/);
+  assert.match(component, /next\.flowPath/);
+  assert.match(component, /Delivery remains disabled/);
+  assert.match(component, /Complete the current action above to unlock the next step/);
+});
+
 test("active module renders its real editing surface without the legacy ops console", () => {
   const workspace = read("components/founder-step-workspace.tsx");
   const flow = read("components/founder-flow.tsx");

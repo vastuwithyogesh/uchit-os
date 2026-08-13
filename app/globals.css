@@ -3582,6 +3582,21 @@ body .founder-flow-action-bar {
   background: #fff;
 }
 
+.founder-flow-current-action,
+.founder-flow-next-reason {
+  font-size: 13px;
+  color: #625f59;
+}
+
+.founder-flow-current-action {
+  margin-left: auto;
+}
+
+.founder-flow-next-reason {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .lead-profile-drawer,
 .lead-communication-sheet,
 .lead-import-sheet {
