@@ -53,7 +53,7 @@ export function FounderFlowHome({ scorecard }: { scorecard: FounderScorecard }) 
   );
 }
 
-export function FounderFlowPage({ scorecard, stepNumber }: { scorecard: FounderScorecard; stepNumber: number }) {
+export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean }) {
   const step = getFounderFlowSteps(scorecard).find((item) => item.number === stepNumber);
   const current = getCurrentFounderFlowStep(scorecard);
   const previous = getPreviousFounderFlowStep(scorecard, stepNumber);
@@ -80,7 +80,7 @@ export function FounderFlowPage({ scorecard, stepNumber }: { scorecard: FounderS
         </div>
         <details className="founder-flow-inputs" open={!isBlocked && !isComplete}><summary>Required now</summary><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></details>
         {step.status === "COMPLETE" && !isFuture ? <div className="founder-flow-success" role="status">This step is complete. Continue when you are ready for the next server-derived step.</div> : null}
-        {!isBlocked && !isComplete ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
+        {walkthrough ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} walkthrough /></div> : !isBlocked && !isComplete ? <div className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
         <div className="founder-flow-action-bar">
           {(isBlocked || isComplete) && action ? <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}
           {previous ? <a className="button-secondary" href={previous.flowPath}>Back</a> : <a className="button-secondary" href="/">Back to scorecard</a>}

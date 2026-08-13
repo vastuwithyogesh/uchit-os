@@ -72,6 +72,10 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
   const client = clients.find((item) => item.id === clientId);
   const profile = state?.clientIntakeProfiles.find((item) => item.clientId === client?.id);
   const completeness = getClientIntakeCompleteness(profile);
+  const caseService = selectedCase?.serviceType;
+  const serviceConflict = Boolean(profile?.propertyContext?.serviceInterest && caseService && profile.propertyContext.serviceInterest !== caseService);
+  const actualFloorCount = selectedCase ? (state?.floorWorkspaces.filter((item) => item.caseId === selectedCase.id).length ?? 0) : 0;
+  const floorMismatch = Boolean(floorCount && actualFloorCount && Number(floorCount) !== actualFloorCount);
 
   useEffect(() => {
     setWhatsapp(profile?.contactPreference?.whatsapp ?? "");
@@ -83,12 +87,12 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
     setVision(profile?.businessContext?.vision ?? "");
     setDecision(profile?.decisionMakerStatus ?? "");
     setOthers(profile?.otherDecisionMakers ?? "");
-    setService(profile?.propertyContext?.serviceInterest ?? "");
+    setService(profile?.propertyContext?.serviceInterest ?? caseService ?? "");
     setPropertyType(profile?.propertyContext?.propertyType ?? "");
     setPropertyStatus(profile?.propertyContext?.propertyStatus ?? "");
     setAreaValue(profile?.propertyContext?.areaValue?.toString() ?? "");
     setAreaUnit(profile?.propertyContext?.areaUnit ?? "");
-    setCityCountry(profile?.propertyContext?.cityCountry ?? "");
+    setCityCountry(profile?.propertyContext?.cityCountry ?? client?.city ?? "");
     setConstraints(profile?.propertyContext?.constraints ?? "");
     setChallenge(profile?.needs?.mainChallenge ?? "");
     setOutcome(profile?.needs?.desiredOutcome ?? "");
@@ -98,10 +102,12 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
     setLatitude(profile?.propertyContext?.latitude?.toString() ?? "");
     setLongitude(profile?.propertyContext?.longitude?.toString() ?? "");
     key.current = crypto.randomUUID();
-  }, [client?.id, profile?.version]);
+  }, [client?.id, client?.city, profile?.version, caseService]);
 
   async function save() {
     if (!state || !client) return;
+    if (serviceConflict) { setMessage("Review Required: saved intake service conflicts with this case. Review case setup before saving."); return; }
+    if (floorMismatch) { setMessage("Review Required: floor count differs from Floor setup. Review floor setup; no history changed."); return; }
     setBusy(true);
     try {
       const payload = {
@@ -140,6 +146,9 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
       <div className="founder-context-bar" aria-label="Locked intake context"><span>Case</span><span aria-hidden="true">→</span><strong>{selectedCase?.caseNumber ?? "Select a case to continue"}</strong><span aria-hidden="true">→</span><span>{project?.propertyName ?? "Project pending"}</span><span aria-hidden="true">→</span><span>{client ? `${client.displayName} · ${client.id}` : "Client unavailable"}</span></div>
       <FounderStepCard step="Step 1 · context" title="Capture the decision that matters" description="Start with the client’s challenge and desired outcome. Complete the property context before saving the profile." tone={completionTone} status={`${completeness.completed}/${completeness.total} complete`} className="founder-step-card-primary">
         <p className="meta">Client is locked to this Case and Project. Switch the full context from the case selector, not from intake.</p>
+        <p className="meta">Known values are prefilled from intake, then case setup, then the permanent client profile. Conflicting source values require review; nothing is silently overwritten.</p>
+        {serviceConflict ? <p className="blocked-note" role="alert">Review Required: intake service conflicts with the selected case. Review case setup before saving.</p> : null}
+        {floorMismatch ? <p className="blocked-note" role="alert">Review Required: Floor setup has {actualFloorCount} floor(s), while intake says {floorCount}. Review floor setup; existing floor history is preserved.</p> : null}
         <div className="founder-step-grid founder-intake-grid">
           <div className="field"><label htmlFor="intake-challenge">Main challenge</label><textarea id="intake-challenge" value={challenge} onChange={(e) => setChallenge(e.target.value)} disabled={busy} placeholder="What needs attention?" /></div>
           <div className="field"><label htmlFor="intake-outcome">Desired outcome</label><textarea id="intake-outcome" value={outcome} onChange={(e) => setOutcome(e.target.value)} disabled={busy} placeholder="What would a useful outcome look like?" /></div>

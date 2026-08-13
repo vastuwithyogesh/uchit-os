@@ -380,7 +380,7 @@ export interface QualificationResponseVersionRecord extends OrganisationOwnedRec
 
 export interface ProspectiveProjectRecord extends OrganisationOwnedRecord {
   id: string; clientId: string; leadId: string; responseVersionId: string; kind: "RESIDENTIAL" | "COMMERCIAL"; status: "QUALIFICATION_SUBMITTED" | "REVIEW_PENDING" | "COMMERCIAL_PENDING" | "CONVERTED";
-  serviceType?: VastuServiceType; caseId?: string; createdAt: string; recordVersion: number;
+  serviceType?: VastuServiceType; caseId?: string; displayName?: string; variation?: string; propertyType?: "Residential" | "Commercial" | "Factory" | "Shop" | "Hospital" | "Hotel" | "Temple"; propertyLocation?: string; floorCount?: number; importantNotes?: string; createdAt: string; recordVersion: number; idempotencyKey?: string;
 }
 
 export interface FounderReviewBookingRecord extends OrganisationOwnedRecord {

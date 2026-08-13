@@ -252,6 +252,15 @@ export function upsertClientIntake(input: Record<string, unknown> & { actor: App
   const stamp = audit(input.actor);
   const profile = { clientId, version: (existing?.version ?? 0) + 1, idempotencyKey, contactPreference, businessContext, decisionMakerStatus, otherDecisionMakers, propertyContext, needs, consent: { version: "uchit-intake/v1" as const, contact: consentInput.contact as boolean | undefined, accuracy: consentInput.accuracy as boolean | undefined, confidentiality: consentInput.confidentiality as boolean | undefined, confirmedAt: consentComplete ? (existing?.consent.confirmedAt ?? stamp.at) : undefined }, created: existing?.created ?? stamp, updated: stamp };
   if (existing) Object.assign(existing, profile); else state.clientIntakeProfiles.unshift(profile);
+  // A replacement location changes the evidence context used for orientation and
+  // downstream evaluation. Preserve history and require deliberate regeneration;
+  // never silently reuse a prior direction/evaluation result.
+  if (existing && caseId && projectId && previousLocation !== nextLocation) {
+    for (const floor of state.floorWorkspaces.filter((item) => item.caseId === caseId)) {
+      const targetId = `location:${profile.propertyContext?.locationVersion ?? 1}:${floor.id}`;
+      if (!state.dependencyInvalidations.some((item) => item.targetType === "UTILITY_EVALUATION" && item.targetId === targetId)) state.dependencyInvalidations.unshift({ id: nextId("location-invalidation"), organisationId: client.organisationId, projectId, caseId, floorId: floor.id, targetType: "UTILITY_EVALUATION", targetId, causeType: "EVIDENCE", sourceVersionId: `location:${profile.propertyContext?.locationVersion ?? 1}`, status: "REPLACEMENT_REQUIRED", reason: "Project location changed; re-verify direction and regenerate affected evaluations.", createdAt: stamp.at, createdByActorUserId: input.actor.id });
+    }
+  }
   client.recordVersion = (client.recordVersion ?? 0) + 1;
   appendTimeline(clientId, "Client intake updated", `${input.actor.fullName} recorded client intake profile version ${profile.version}.`, "CRM", input.actor);
   return profile;

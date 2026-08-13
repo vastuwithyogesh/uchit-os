@@ -4,6 +4,8 @@ import { SiteHeader } from "@/components/site-header";
 import { buildFounderScorecard } from "@/lib/founder-scorecard";
 import { requirePageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
+import { headers } from "next/headers";
+import { isExplicitLocalDemo } from "@/lib/auth";
 
 export default async function FounderStepPage({ params, searchParams }: { params: Promise<{ step: string }>; searchParams: Promise<{ caseId?: string; floorId?: string; walkthrough?: string }> }) {
   const access = await requirePageAccess("SETTER");
@@ -14,8 +16,11 @@ export default async function FounderStepPage({ params, searchParams }: { params
     const context = await searchParams;
     // TEST_ONLY is a read-only local review projection. It never changes the
     // workflow service, storage or gate decisions used by normal routes.
-    // @ts-expect-error JavaScript fixture is also consumed by Node contract tests.
-    const fixture = context.walkthrough === "TEST_ONLY" ? await import("@/tests/fixtures/founder-pilot-fixture.mjs") : undefined;
+    const requestHeaders = await headers();
+    const walkthrough = context.walkthrough === "TEST_ONLY" && isExplicitLocalDemo(requestHeaders);
+    // This adapter is intentionally impossible to activate on a hosted request.
+    // @ts-ignore JavaScript fixture is deliberately shared with Node contract tests.
+    const fixture = walkthrough ? await import("@/tests/fixtures/founder-pilot-fixture.mjs") : undefined;
     const state = fixture ? fixture.buildReleaseableFounderPilotFixture().state : await loadStateFromPersistence();
     if (fixture) {
       const profile = state.clientIntakeProfiles[0];
@@ -28,7 +33,7 @@ export default async function FounderStepPage({ params, searchParams }: { params
       if (floor) floor.stageAVerdictStatus = "PRESENTED";
     }
     const scorecard = buildFounderScorecard(state, access.actor, undefined, context.caseId, context.floorId);
-    return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One module at a time" minimal /><FounderFlowPage scorecard={scorecard} stepNumber={stepNumber} /></main>;
+    return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One module at a time" minimal /><FounderFlowPage scorecard={scorecard} stepNumber={stepNumber} walkthrough={walkthrough} /></main>;
   } catch {
     return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One module at a time" minimal /><section className="workspace-state" role="alert"><h1>We could not load this step</h1><p>Nothing has changed. Refresh to retry or return to the scorecard.</p><a className="button-secondary" href="/">Back to scorecard</a></section></main>;
   }

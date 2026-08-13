@@ -7,8 +7,10 @@ import { EvaluationConsole } from "@/components/evaluation-console";
 import { FounderReportStep } from "@/components/founder-report-step";
 import { SiteAnalysisConsole } from "@/components/site-analysis-console";
 import { PaymentProofConsole } from "@/components/payment-proof-console";
+import { FounderWalkthroughWorkspace } from "@/components/founder-walkthrough-workspace";
 
-export function FounderStepWorkspace({ scorecard, stepNumber }: { scorecard: FounderScorecard; stepNumber: number }) {
+export function FounderStepWorkspace({ scorecard, stepNumber, walkthrough = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean }) {
+  if (walkthrough) return <FounderWalkthroughWorkspace stepNumber={stepNumber} />;
   const common = { clientId: scorecard.client?.id, caseId: scorecard.caseRecord?.id, floorId: scorecard.selectedFloorId };
   if (stepNumber === 1) return <FounderCaseSetupStep focus="case" {...common} />;
   if (stepNumber === 2) return <FounderCaseSetupStep focus="floor" {...common} />;
