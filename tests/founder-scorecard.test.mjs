@@ -5,10 +5,16 @@ import { resolve } from "node:path";
 
 const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 
-test("Founder home opens the sequential flow rather than a module dashboard", () => {
+test("Founder home opens a command center before the sequential flow", () => {
   const page = read("app/page.tsx");
+  const home = read("components/founder-flow.tsx");
   assert.match(page, /FounderFlowHome/);
   assert.match(page, /buildFounderScorecard/);
+  assert.match(page, /Founder Command Center/);
+  assert.match(page, /searchParams/);
+  assert.match(home, /No active cases yet/);
+  assert.match(home, /Start New Client/);
+  assert.match(home, /Continue current work/);
   assert.doesNotMatch(page, /<FounderScorecard|founder-scorecard-modules/);
 });
 

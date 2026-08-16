@@ -48,3 +48,29 @@ test("different request headers do not share organisation or role-scoped reads",
   await coordinator.fetch("http://localhost/api/founder/cases", { headers: { "x-uchit-demo-role": "CONSULTANT" } });
   assert.equal(calls, 2);
 });
+
+test("session and branding reads share single-flight while logout invalidates session state", async () => {
+  let calls = 0;
+  const coordinator = createClientReadCoordinator(async (input) => {
+    calls += 1;
+    const url = new URL(input instanceof Request ? input.url : input.toString());
+    if (url.pathname === "/api/logout") return new Response("{}", { status: 200 });
+    return new Response(JSON.stringify({ path: url.pathname, calls }), { status: 200 });
+  }, () => 100);
+
+  const [sessionA, sessionB] = await Promise.all([
+    coordinator.fetch("http://localhost/api/session"),
+    coordinator.fetch("http://localhost/api/session")
+  ]);
+  assert.equal(calls, 1);
+  assert.deepEqual(await sessionA.json(), await sessionB.json());
+
+  await Promise.all([
+    coordinator.fetch("http://localhost/api/branding"),
+    coordinator.fetch("http://localhost/api/branding")
+  ]);
+  assert.equal(calls, 2);
+  await coordinator.fetch("http://localhost/api/logout", { method: "POST" });
+  await coordinator.fetch("http://localhost/api/session");
+  assert.equal(calls, 4);
+});

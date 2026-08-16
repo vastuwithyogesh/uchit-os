@@ -15,7 +15,7 @@ export type FounderScorecardModule = {
   explanation: string; blockerCodes?: string[]; primaryAction: { href: string; label: string }; recoveryAction?: { href: string; label: string }; technical: string;
 };
 export type FounderFloorProgress = { id: string; label: string; status: "NOT_STARTED" | "IN_PROGRESS" | "READY" | "COMPLETE" | "NEEDS_REGENERATION"; completedModules: number; totalModules: number; reportStatus?: string };
-export type FounderScorecard = { client?: ClientRecord; caseRecord?: VastuCaseRecord; project?: AppState["projects"][number]; selectedFloor?: FloorWorkspaceRecord; selectedFloorId?: string; modules: FounderScorecardModule[]; floors: FounderFloorProgress[]; recommendedModuleId: string; stageBReady?: boolean };
+export type FounderScorecard = { client?: ClientRecord; caseRecord?: VastuCaseRecord; project?: AppState["projects"][number]; selectedFloor?: FloorWorkspaceRecord; selectedFloorId?: string; modules: FounderScorecardModule[]; floors: FounderFloorProgress[]; recommendedModuleId: string; availableCaseCount: number; stageBReady?: boolean };
 
 const status = (value: { complete: boolean; started?: boolean; ready?: boolean; blocked?: boolean; regeneration?: boolean }): FounderScorecardStatus => value.regeneration ? "NEEDS_REGENERATION" : value.blocked ? "BLOCKED" : value.complete ? "COMPLETE" : value.ready ? "READY" : value.started ? "IN_PROGRESS" : "NOT_STARTED";
 const query = (path: string, caseId?: string, floorId?: string) => `${path}${caseId || floorId ? `?${new URLSearchParams({ ...(caseId ? { caseId } : {}), ...(floorId ? { floorId } : {}) }).toString()}` : ""}`;
@@ -70,7 +70,7 @@ function floorProgress(state: AppState, caseRecord: VastuCaseRecord | undefined,
 }
 
 export function buildFounderScorecard(state: AppState, actor: { role: UserRole }, clientId?: string, caseId?: string, floorId?: string): FounderScorecard {
-  void actor;
+  const availableCaseCount = state.vastuCases.filter((candidate) => canAccessFounderCase(state, actor, candidate)).length;
   const candidateCase = caseId ? state.vastuCases.find((item) => item.id === caseId) : undefined;
   const exactCase = candidateCase && canAccessFounderCase(state, actor, candidateCase) ? candidateCase : undefined;
   const client = state.clients.find((item) => item.id === (clientId ?? exactCase?.clientId));
@@ -156,5 +156,5 @@ export function buildFounderScorecard(state: AppState, actor: { role: UserRole }
     return item;
   }) : modules;
   const recommended = reconciledModules.find((item) => item.status !== "COMPLETE") ?? reconciledModules[reconciledModules.length - 1];
-  return { client, caseRecord, project, selectedFloor, selectedFloorId: selectedFloor?.id, modules: reconciledModules, floors: floors.map((floor) => floorProgress(state, caseRecord, client, floor)), recommendedModuleId: recommended.id, stageBReady };
+  return { client, caseRecord, project, selectedFloor, selectedFloorId: selectedFloor?.id, modules: reconciledModules, floors: floors.map((floor) => floorProgress(state, caseRecord, client, floor)), recommendedModuleId: recommended.id, availableCaseCount, stageBReady };
 }

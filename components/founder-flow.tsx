@@ -27,6 +27,17 @@ function ProgressControl({ scorecard, currentNumber }: { scorecard: FounderScore
   return (
     <nav className="founder-flow-progress" aria-label="Founder progress">
       <span className="founder-flow-progress-current" aria-current="step">Step {current?.number.toString().padStart(2, "0")} of {steps.length} / {current?.title}</span>
+      <div className="founder-flow-stepper" aria-label="Available Founder steps">
+        {steps.map((step) => {
+          const available = canOpenFounderFlowStep(scorecard, step.number);
+          const active = step.number === currentNumber;
+          return available ? <a key={step.id} className={`founder-flow-stepper-item${active ? " active" : ""}`} href={step.flowPath} aria-current={active ? "step" : undefined}>
+            <span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong><small>{statusLabel(step.status)}</small>
+          </a> : <span key={step.id} className="founder-flow-stepper-item locked" aria-disabled="true" title={step.explanation}>
+            <span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong><small>Locked · {step.explanation}</small>
+          </span>;
+        })}
+      </div>
       {previous.length ? <details className="founder-flow-progress-previous-menu"><summary>Previous steps</summary><div>{previous.map((step) => <a key={step.id} href={step.flowPath} className="founder-flow-progress-item founder-flow-progress-previous"><span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong></a>)}</div></details> : null}
     </nav>
   );
@@ -36,19 +47,34 @@ export function FounderFlowHome({ scorecard }: { scorecard: FounderScorecard }) 
   const current = getCurrentFounderFlowStep(scorecard);
   const steps = getFounderFlowSteps(scorecard);
   const complete = steps.filter((step) => step.status === "COMPLETE").length;
-  if (!scorecard.caseRecord || !scorecard.selectedFloorId) return <section className="founder-flow-home"><FounderCaseSelector /><div className="workspace-state"><h1>Select a case to continue</h1><p>Case and floor context is required. Nothing is selected automatically.</p></div></section>;
+  const attention = steps.filter((step) => ["IN_PROGRESS", "READY", "NEEDS_REGENERATION"].includes(step.status)).length;
+  if (!scorecard.caseRecord || !scorecard.selectedFloorId) return <section className="founder-command-center" aria-labelledby="founder-command-center-title">
+    <section className="founder-command-center-hero">
+      <div className="founder-flow-kicker">Founder Command Center</div>
+      <h1 id="founder-command-center-title">{scorecard.availableCaseCount ? "Choose the work to continue" : "No active cases yet"}</h1>
+      <p>{scorecard.availableCaseCount ? "Select an authorised case and floor to continue from its server-derived workflow position." : "Start a governed client journey from Leads. A Case appears here only after the required commercial, qualification and handoff gates are complete."}</p>
+      <div className="founder-command-center-actions">
+        {scorecard.availableCaseCount ? <a className="button" href="/clients-cases">Open Clients &amp; Cases</a> : <a className="button" href="/crm">Start New Client</a>}
+        <a className="button-secondary" href="/crm">Open Leads</a>
+      </div>
+    </section>
+    <div className="founder-command-center-grid">
+      <section className="founder-command-center-card"><span className="eyebrow">Current work</span><h2>{scorecard.availableCaseCount ? "Select one case and floor" : "Nothing is waiting for case work"}</h2><p>{scorecard.availableCaseCount ? "Recent and permitted cases remain available through the case selector." : "No case or floor has been fabricated. The next legitimate action is to start with an existing lead."}</p>{scorecard.availableCaseCount ? <FounderCaseSelector /> : <a className="text-link" href="/clients-cases">Review Clients &amp; Cases</a>}</section>
+      <section className="founder-command-center-card"><span className="eyebrow">What happens next</span><h2>Use the governed journey</h2><p>Leads, qualification, proposal, acceptance and case handoff remain server-gated. Navigation exposes destinations; it does not unlock them.</p><a className="text-link" href="/workspace">Open My Workspace</a></section>
+    </div>
+  </section>;
   return (
-    <section className="founder-flow-home" aria-labelledby="founder-flow-home-title">
+    <section className="founder-command-center" aria-labelledby="founder-command-center-title">
       <section className="founder-flow-home-surface">
-        <div className="founder-flow-kicker">Founder Edition · {complete} of {steps.length} modules complete</div>
+        <div className="founder-flow-kicker">Founder Command Center · {complete} of {steps.length} modules complete</div>
         <div className="founder-flow-context" aria-label="Selected project context">{contextLine(scorecard)}</div>
         <div className="founder-flow-progress-meter" aria-label={`${complete} of ${steps.length} modules complete`}><span style={{ width: `${Math.round((complete / steps.length) * 100)}%` }} /></div>
-        <div className="founder-flow-step-number">Step {current?.number.toString().padStart(2, "0")}</div>
-        <h1 id="founder-flow-home-title">{current?.title ?? "Founder workflow complete"}</h1>
-        <p className="founder-flow-home-description">{current?.explanation ?? "All available Founder steps are complete. Stage B remains reserved until its approved methodology is supplied."}</p>
-        {current ? <a className="button founder-flow-continue" href={current.flowPath}>Continue</a> : null}
+        <div className="founder-flow-step-number">{current ? `Next step ${current.number.toString().padStart(2, "0")}` : "Workflow complete"}</div>
+        <h1 id="founder-command-center-title">{current?.title ?? "Review released work"}</h1>
+        <p className="founder-flow-home-description">{current?.explanation ?? "All available Founder steps are complete. Review the report and controlled delivery surfaces for this case."}</p>
+        <div className="founder-command-center-actions">{current ? <a className="button founder-flow-continue" href={current.flowPath}>Continue current work</a> : <a className="button" href="/reports">Review reports</a>}<a className="button-secondary" href="/clients-cases">Change case or floor</a></div>
       </section>
-      <div className="founder-flow-home-note">Previous steps remain available from the progress control inside each module. Future gated steps stay closed until the server reports them ready.</div>
+      <div className="founder-command-center-grid"><section className="founder-command-center-card"><span className="eyebrow">Needs attention</span><h2>{attention ? `${attention} workflow item${attention === 1 ? "" : "s"}` : "No open workflow items"}</h2><p>{attention ? "Continue the highlighted server-derived action. Locked steps remain unavailable until their prerequisite is recorded." : "The selected case has no open step requiring attention."}</p></section><section className="founder-command-center-card"><span className="eyebrow">Case context</span><h2>One floor at a time</h2><p>{contextLine(scorecard)}</p><FounderCaseSelector caseId={scorecard.caseRecord.id} floorId={scorecard.selectedFloorId} caseLabel={scorecard.caseRecord.caseNumber} /></section></div>
     </section>
   );
 }
@@ -92,6 +118,7 @@ export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: 
           {next ? (isComplete || isOptionalV1ManualSheet) ? <a className="button founder-flow-next" href={next.flowPath}>Next step</a> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Next step</button> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Delivery remains disabled</button>}
           <p id="founder-flow-next-reason" className="founder-flow-next-reason">{nextReason}</p>
         </div>
+        <p className="founder-flow-save-guidance">Save and Save &amp; Continue controls stay inside the active workspace so each action uses its exact server-side validation and concurrency contract.</p>
         <details className="founder-technical-details founder-flow-details"><summary>Details</summary><p>Technical status, IDs, hashes, audit history and advanced controls remain in the focused module workspace and history surfaces.</p></details>
       </section>
     </section>

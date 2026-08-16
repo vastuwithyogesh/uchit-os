@@ -5,12 +5,12 @@ import { buildFounderScorecard } from "@/lib/founder-scorecard";
 import { requirePageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 
-export default async function HomePage() {
+export default async function HomePage({ searchParams }: { searchParams?: Promise<{ caseId?: string; floorId?: string }> }) {
   const access = await requirePageAccess("SETTER");
   if (!access.allowed) {
     return (
       <main className="page-shell">
-        <SiteHeader title="Uchit Vastu" subtitle="Founder workflow" minimal />
+        <SiteHeader title="Uchit Vastu" subtitle="Founder workflow" />
         <AccessDeniedPanel area="Founder scorecard" requiredRole="SETTER" actorRole={access.actor.role} />
       </main>
     );
@@ -18,17 +18,18 @@ export default async function HomePage() {
 
   try {
     const state = await loadStateFromPersistence();
-    const scorecard = buildFounderScorecard(state, access.actor);
+    const context = await searchParams;
+    const scorecard = buildFounderScorecard(state, access.actor, undefined, context?.caseId, context?.floorId);
     return (
       <main className="page-shell">
-        <SiteHeader title="Founder workflow" subtitle="One module at a time" minimal />
+        <SiteHeader title="Founder Command Center" subtitle="Start, continue, and monitor governed work" />
         <FounderFlowHome scorecard={scorecard} />
       </main>
     );
   } catch {
     return (
       <main className="page-shell">
-        <SiteHeader title="Founder workflow" subtitle="One module at a time" minimal />
+        <SiteHeader title="Founder Command Center" subtitle="Start, continue, and monitor governed work" />
         <section className="workspace-state" role="alert">
           <h1>We could not load the scorecard</h1>
           <p>Nothing has been changed. Refresh this page to try again. If it still does not load, open System check for recovery guidance.</p>
