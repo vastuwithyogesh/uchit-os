@@ -12,11 +12,14 @@ export const REPORT_WIDE_PLACEMENT_PAGES = [
 ] as const;
 
 export function isReportWidePlacementPage(page: ReportPlacementPageRecord) {
-  return REPORT_WIDE_PLACEMENT_PAGES.some((item) => item.section === page.section && item.pageType === page.pageType && item.ordinal === page.ordinal);
+  return REPORT_WIDE_PLACEMENT_PAGES.some((item) => item.section === page.section && item.pageType === page.pageType && item.ordinal === page.ordinal)
+    || (page.section === "C" && page.pageType === "EXTRA" && page.ordinal >= 18 && page.ordinal % 2 === 0);
 }
 
 export function reportWidePlacementPages(state: AppState, remediationId: string) {
-  return state.reportPlacementPages.filter((page) => page.remediationId === remediationId && isReportWidePlacementPage(page))
+  const activeExtraPageIds = new Set(state.sectionCExtraPages.filter((item) => item.remediationId === remediationId && item.status === "ACTIVE").map((item) => item.pageId));
+  return state.reportPlacementPages.filter((page) => page.remediationId === remediationId && isReportWidePlacementPage(page)
+      && (page.section !== "C" || activeExtraPageIds.has(page.id)))
     .sort((a, b) => a.ordinal - b.ordinal || a.id.localeCompare(b.id));
 }
 

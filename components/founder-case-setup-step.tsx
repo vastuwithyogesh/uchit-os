@@ -43,25 +43,25 @@ export function FounderCaseSetupStep({ focus, clientId, caseId, floorId }: { foc
   const canCreateFloor = Boolean(caseRecord && label.trim().length >= 2);
   const canReadyFloor = Boolean(caseRecord && floor && !floor.locked);
 
-  const action = useMemo(() => focus === "case" ? (caseRecord ? null : "case-create") : addingFloor || (!floor && floors.length === 0) ? "floor-create" : !floor || floor.locked ? null : "floor-ready", [focus, caseRecord, floor, floors.length, addingFloor]);
+  const action = useMemo(() => focus === "case" ? (caseRecord ? null : "case-create-v1") : addingFloor || (!floor && floors.length === 0) ? "floor-create" : !floor || floor.locked ? null : "floor-ready", [focus, caseRecord, floor, floors.length, addingFloor]);
   async function save() {
     if (!state || !action) return;
-    const entity = action === "case-create" ? proposal : caseRecord;
+    const entity = action === "case-create-v1" ? proposal : caseRecord;
     if (!entity || state.persistenceRevision === null || state.persistenceRevision === undefined) { setMessage("Reload the latest record before this protected action."); return; }
     setBusy(true); setConflict(false);
     try {
-      const payload = action === "case-create" ? { action, clientId: client?.id, proposalId: proposal?.id }
+      const payload = action === "case-create-v1" ? { action, clientId: client?.id, proposalId: proposal?.id }
         : action === "floor-create" ? { action, caseId: caseRecord?.id, floorLabel: label.trim() }
           : { action, floorId: floor?.id };
       const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ ...payload, idempotencyKey: key.current, expectedRecordVersion: entity.recordVersion ?? 0, expectedRevision: state.persistenceRevision }) });
       const result = await response.json();
       if (!response.ok || result.ok === false) { if (response.status === 409 || response.status === 428) setConflict(true); throw new Error(result.error?.message ?? result.error ?? "The protected action could not be saved."); }
-      key.current = crypto.randomUUID(); setAddingFloor(false); setMessage(action === "case-create" ? "Vastu Case ID and project created." : action === "floor-create" ? "Independent floor workspace created." : "Floor marked ready."); await refresh(); router.refresh();
+      key.current = crypto.randomUUID(); setAddingFloor(false); setMessage(action === "case-create-v1" ? "V1 Vastu Case ID and project created." : action === "floor-create" ? "Independent floor workspace created." : "Floor marked ready."); await refresh(); router.refresh();
     } catch (error) { setMessage(error instanceof Error ? error.message : "The protected action could not be saved."); }
     finally { setBusy(false); }
   }
 
-  const disabled = busy || !action || (action === "case-create" ? !canCreateCase : action === "floor-create" ? !canCreateFloor : !canReadyFloor);
+  const disabled = busy || !action || (action === "case-create-v1" ? !canCreateCase : action === "floor-create" ? !canCreateFloor : !canReadyFloor);
   const showFloorForm = addingFloor || (!floor && floors.length === 0);
   return <section className="focused-step-form" aria-label={focus === "case" ? "Case and project creation" : "Floor setup"}>
     <div className="focused-context-row"><span>{client?.displayName ?? "No client"}</span><span>{caseRecord?.caseNumber ?? "Case pending"}</span><span>{project?.propertyName ?? "Project pending"}</span></div>

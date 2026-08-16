@@ -32,7 +32,7 @@ const journeyStages: Array<{ status: VastuCaseStatus; label: string }> = [
   { status: "FULL_PAYMENT_APPROVED", label: "Payment complete" },
   { status: "REPORT_APPROVAL_PENDING", label: "Final checks" },
   { status: "REPORT_APPROVED", label: "Report approved" },
-  { status: "VERDICT_RELEASED", label: "Verdict delivered" }
+  { status: "VERDICT_RELEASED", label: "Report released" }
 ];
 
 function normalizeEmail(email: string) {
@@ -59,12 +59,12 @@ function nextActionFor(status?: VastuCaseStatus) {
     case "FULL_PAYMENT_APPROVED": return "Payment is complete. Your report is in final checks.";
     case "REPORT_APPROVAL_PENDING": return "Your report is being checked by two team members.";
     case "REPORT_APPROVED": return "Your report is approved and will be released shortly.";
-    case "VERDICT_RELEASED": return "Your final verdict is ready. Download it below.";
+    case "VERDICT_RELEASED": return "Your approved report is awaiting controlled delivery. It will appear below only after release to your account.";
     default: return "Your details are linked. Our team will open your case soon.";
   }
 }
 
-export function buildClientPortalView(state: AppState, actor: AppUser) {
+export function buildClientPortalView(state: AppState, actor: AppUser, revision: number | null = state.persistenceRevision ?? null) {
   const client = findOwnedClient(actor, state.clients);
   const cases = state.vastuCases.filter((item) => item.clientId === client.id);
   const caseIds = new Set(cases.map((item) => item.id));
@@ -72,6 +72,7 @@ export function buildClientPortalView(state: AppState, actor: AppUser) {
   const currentIndex = currentCase ? journeyStages.findIndex((item) => item.status === currentCase.status) : -1;
 
   return {
+    revision,
     client: { displayName: client.displayName, city: client.city },
     currentCase: currentCase ? {
       caseNumber: currentCase.caseNumber,
@@ -89,18 +90,22 @@ export function buildClientPortalView(state: AppState, actor: AppUser) {
     payments: state.payments
       .filter((item) => item.clientId === client.id)
       .map((item) => ({ id: item.id, type: item.type, amountInr: item.amountInr, status: item.status, approvedAt: item.approvedAt })),
-    reports: state.reportVersions
-      .filter((item) => caseIds.has(item.caseId))
+    reports: (state.documentDeliveries ?? [])
+      .filter((item) => caseIds.has(item.caseId) && item.recipientClientId === client.id
+        && (item.status === "DELIVERED" || item.status === "ACKNOWLEDGED"))
+      .sort((a, b) => (b.delivered?.occurredAt ?? b.updatedAt).localeCompare(a.delivered?.occurredAt ?? a.updatedAt))
       .map((item) => ({
-        id: item.id,
-        label: item.versionLabel,
-        kind: item.isPreview ? "PREVIEW" : "FINAL",
-        status: item.status,
-        available: Boolean(item.artifact?.immutable && (item.isPreview || item.status === "RELEASED")),
-        downloadPath: item.artifact?.immutable && (item.isPreview || item.status === "RELEASED")
-          ? `/api/client/reports/${encodeURIComponent(item.id)}`
-          : null
+        id: item.reportId, deliveryId: item.id, label: item.reportVersionLabel, kind: "FINAL" as const,
+        status: item.status, floorLabel: state.floorWorkspaces.find((floor) => floor.id === item.floorId)?.floorLabel ?? "Floor report",
+        deliveredAt: item.delivered?.occurredAt ?? item.updatedAt, acknowledgedAt: item.acknowledged?.occurredAt,
+        recordVersion: item.recordVersion ?? 0,
+        viewPath: `/api/client/reports/${encodeURIComponent(item.reportId)}?deliveryId=${encodeURIComponent(item.id)}&mode=view`,
+        downloadPath: `/api/client/reports/${encodeURIComponent(item.reportId)}?deliveryId=${encodeURIComponent(item.id)}&mode=download`
       })),
+    deliveryAccess: (state.documentDeliveryEvents ?? [])
+      .filter((item) => caseIds.has(item.caseId) && item.recipientClientId === client.id && ["VIEWED", "DOWNLOADED", "ACKNOWLEDGED"].includes(item.eventType))
+      .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt))
+      .map((item) => ({ id: item.id, deliveryId: item.deliveryId, eventType: item.eventType, occurredAt: item.occurredAt })),
     deliveryMilestones: currentCase ? getClientSafeDeliveryMilestones(state, currentCase.id) : [],
     timeline: state.timelineEvents
       .filter((item) => item.clientId === client.id)

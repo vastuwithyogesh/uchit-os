@@ -1,5 +1,6 @@
 import "server-only";
 import type { AppState } from "./store.ts";
+import { activateLocalEntranceZoneCatalogV1 } from "./entrance-zone-catalog-v1.ts";
 
 /**
  * Loopback page adapter only. The Node-backed pilot fixture never crosses into
@@ -10,6 +11,13 @@ export async function buildLocalFounderWalkthroughState(): Promise<AppState> {
   // @ts-ignore This test fixture is intentionally JavaScript and server-only.
   const fixture = await import("../tests/fixtures/founder-pilot-fixture.mjs");
   const state = structuredClone(fixture.buildReleaseableFounderPilotFixture().state) as AppState;
+  // Older canonical pilot fixtures predate this additive audit collection.
+  // Initialise it only inside the disposable walkthrough projection so local
+  // methodology activation remains auditable without changing normal state.
+  state.founderCommercialAuditEvents ??= [];
+  const organisationId = state.vastuCases[0]?.organisationId;
+  const actorUserId = state.methodologyVersions[0]?.createdByActorUserId ?? "yogesh-owner";
+  if (organisationId) activateLocalEntranceZoneCatalogV1({ state, organisationId, actorUserId });
   const profile = state.clientIntakeProfiles[0];
   if (profile) {
     profile.contactPreference = { whatsapp: "+910000000001", preferredLanguage: "English" };

@@ -18,7 +18,6 @@ import { formatTimeStamp } from "@/lib/format";
 import { canApproveReport, canReleaseVerdict, canVerifyPayments } from "@/lib/permissions";
 import { approvalSummary, canCreateCase, canReleaseOfficialVerdict, formatMoney } from "@/lib/workflows";
 import { buildActionHeaders } from "@/lib/request-helpers";
-import { prepareImageUpload } from "@/lib/image-upload";
 import type { PaymentProofRecord } from "@/lib/payment-proof-types";
 
 interface CommercialConsoleProps {
@@ -205,10 +204,9 @@ export function CommercialConsole(props: CommercialConsoleProps) {
     }
     setBusy(true);
     try {
-      const prepared = await prepareImageUpload(file);
       const formData = new FormData();
       formData.append("key", kind === "advance" ? "advance-proof" : "balance-proof");
-      formData.append("file", prepared.file);
+      formData.append("file", file);
       formData.append("clientId", activeClient.id);
       if (kind === "advance" && activeProposal) formData.append("proposalId", activeProposal.id);
       if (kind === "balance" && activeCase) formData.append("caseId", activeCase.id);
@@ -221,12 +219,12 @@ export function CommercialConsole(props: CommercialConsoleProps) {
         setProofId(result.proof.id);
         setProofFileName(result.proof.fileName);
         setProofUrl(result.proof.url);
-        setMessage(prepared.compressed ? "Advance proof screenshot uploaded after trimming the file." : "Advance proof screenshot uploaded.");
+        setMessage("Advance proof screenshot uploaded.");
       } else {
         setBalanceProofId(result.proof.id);
         setBalanceProofFileName(result.proof.fileName);
         setBalanceProofUrl(result.proof.url);
-        setMessage(prepared.compressed ? "Balance proof screenshot uploaded after trimming the file." : "Balance proof screenshot uploaded.");
+        setMessage("Balance proof screenshot uploaded.");
       }
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");

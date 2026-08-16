@@ -15,6 +15,7 @@ import {
   reviewFounderProposal,
   sendFounderProposal
 } from "./founder-commercial.ts";
+import { activateLocalEntranceZoneCatalogV1 } from "./entrance-zone-catalog-v1.ts";
 
 const TEST_TIME = "2026-08-13T12:00:00.000Z";
 const CLIENT_ID = "UC-TEST-ONLY-CONTINUOUS";
@@ -39,6 +40,7 @@ export async function buildContinuousFounderWalkthrough(input: {
   };
   const owner = { actor, founderUserId: actor.id, organisationId };
   const state = createEmptyAppState();
+  activateLocalEntranceZoneCatalogV1({ state, organisationId, actorUserId: actor.id, activatedAt: TEST_TIME });
   state.clients.push({
     id: CLIENT_ID,
     organisationId,

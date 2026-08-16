@@ -31,6 +31,10 @@ export type RuntimeEnv = {
   // local development can intentionally provide an empty environment.
   DB: D1DatabaseBinding;
   R2: R2BucketBinding;
+  /** Explicit local acceptance flags; never used as production credentials. */
+  NODE_ENV?: string;
+  UCHIT_VASTU_DEMO_MODE?: string;
+  UCHIT_VASTU_LOCAL_FOUNDER_OWNER_FIXTURE?: string;
   /** Server-only inbound signing key. It is never serialized into AppState or client responses. */
   OPTIN_WEBHOOK_SECRET?: string;
   /** Dormant Lovable wrapper configuration; activation requires explicit approval. */

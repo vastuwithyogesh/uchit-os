@@ -7,7 +7,8 @@ test("client portal explains progress and uses plain payment states", () => {
   assert.match(portal, /aria-label="Case progress"/);
   assert.match(portal, /Current step/);
   assert.match(portal, /Being checked/);
-  assert.match(portal, /We will show the report here as soon as it is ready/);
+  assert.match(portal, /Only reports released to you through a delivery record appear here/);
+  assert.match(portal, /Download protected PDF/);
   assert.doesNotMatch(portal, /item\.status\.toLowerCase/);
 });
 

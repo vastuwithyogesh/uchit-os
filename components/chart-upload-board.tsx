@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { chartAssetDefinitions, type ChartAssetRecord } from "@/lib/chart-asset-definitions";
-import { prepareImageUpload } from "@/lib/image-upload";
 
 type ChartAssetPayload = {
   assets: ChartAssetRecord[];
@@ -63,10 +62,9 @@ export function ChartUploadBoard() {
 
     setBusy(true);
     try {
-      const prepared = await prepareImageUpload(file);
       const formData = new FormData();
       formData.append("key", key);
-      formData.append("file", prepared.file);
+      formData.append("file", file);
 
       const response = await fetch("/api/chart-assets", {
         method: "POST",
@@ -79,7 +77,7 @@ export function ChartUploadBoard() {
       }
 
       setSelectedFiles((current) => ({ ...current, [key]: null }));
-      setMessage(prepared.compressed ? `Uploaded ${result.asset.label} after trimming the image.` : `Uploaded ${result.asset.label}.`);
+      setMessage(`Uploaded ${result.asset.label}.`);
       await refresh();
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Upload failed");

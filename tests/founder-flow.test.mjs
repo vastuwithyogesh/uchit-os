@@ -40,6 +40,28 @@ test("continue preserves exact case and floor context for the server-derived nex
   assert.match(continuePage, /context\.floorId/);
 });
 
+test("V1 Continue skips non-authoritative Step 07 without creating a completion record", () => {
+  const flow = read("lib/founder-flow.ts");
+  const scorecard = read("lib/founder-scorecard.ts");
+  assert.match(flow, /const progressionSteps = isV1 \? steps\.filter\(\(step\) => step\.id !== "manual-sheet"\) : steps/);
+  assert.match(scorecard, /id: "manual-sheet"/);
+  assert.match(scorecard, /legacy manual utility-sheet approval is not a V1 gate/);
+  assert.doesNotMatch(flow, /manual-sheet.*status.*COMPLETE/);
+});
+
+test("Legacy Continue progression still includes the manual-sheet module", () => {
+  const flow = read("lib/founder-flow.ts");
+  assert.match(flow, /const progressionSteps = isV1 \? steps\.filter\(\(step\) => step\.id !== "manual-sheet"\) : steps/);
+  assert.match(flow, /const isV1 = scorecard\.caseRecord\?\.evaluationArchitectureVersion === "V1"/);
+});
+
+test("V1 Step 07 remains directly reviewable but visibly optional", () => {
+  const component = read("components/founder-flow.tsx");
+  assert.match(component, /isOptionalV1ManualSheet = isV1 && step\.id === "manual-sheet"/);
+  assert.match(component, /Optional V1 supporting evidence\. Continue skips this legacy-only surface/);
+  assert.match(component, /isComplete \|\| isOptionalV1ManualSheet/);
+});
+
 test("FE-SITE order is Stage A presentation then Site and Post-Site then balance", () => {
   const scorecard = read("lib/founder-scorecard.ts");
   const stageA = scorecard.indexOf('id: "stage-a"');
@@ -59,7 +81,7 @@ test("required-input copy matches the approved complimentary and consent-free in
 });
 
 test("Step 06 exposes the verified entrance recovery required by evaluation", () => {
-  assert.match(read("lib/founder-flow.ts"), /Verified main entrance marker for this floor/);
+  assert.match(read("lib/founder-flow.ts"), /At least one confirmed property or floor entrance zone/);
   assert.match(read("app/globals.css"), /spatial-focus-gridding[^\n]+nth-child\(6\)/);
 });
 
@@ -92,7 +114,7 @@ test("every Founder page keeps a visible context-preserving Next action with rec
 
 test("completed steps keep their real workspace available for review", () => {
   const component = read("components/founder-flow.tsx");
-  assert.match(component, /!isBlocked \|\| isRegeneration \? <div id="founder-step-workspace"/);
+  assert.match(component, /!isBlocked \|\| isRegeneration \|\| step\.selfRemediableOnCurrentStep \? <div id="founder-step-workspace"/);
   assert.match(component, /Review current step/);
   assert.doesNotMatch(component, /!isBlocked && !isComplete \? <div id="founder-step-workspace"/);
 });
@@ -112,14 +134,16 @@ test("the local walkthrough never exposes Stage B mutation controls", () => {
   assert.doesNotMatch(workspace, /StageBRemedyWorkspaceVisualPreview/);
 });
 
-test("Stage B activates conditionally while client delivery remains blocked", () => {
+test("Stage B activates conditionally while report delivery uses the controlled domain", () => {
   const helper = read("lib/founder-scorecard.ts");
   assert.match(helper, /BLOCKED — METHOD INPUT REQUIRED/);
   assert.match(helper, /stageBComplete/);
   assert.match(helper, /stageBReady/);
   assert.match(helper, /Stage B · Disha Balancer/);
-  assert.match(helper, /Client delivery is intentionally disabled/);
-  assert.match(helper, /status: "BLOCKED"/);
+  assert.match(helper, /Prepare and record controlled client access/);
+  assert.match(helper, /documentDeliveries/);
+  assert.match(helper, /\/report-deliveries/);
+  assert.doesNotMatch(helper, /Client delivery is intentionally disabled/);
 });
 
 test("sequential flow preserves mobile, focus and reduced-motion contracts", () => {

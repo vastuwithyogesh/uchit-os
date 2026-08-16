@@ -1,5 +1,5 @@
 import type {
-  PhysicalPlacementRecord, PlacementImplementationRowRecord, RemedyEligibilityResolutionRecord,
+  CaseUsedRemedyRecord, PhysicalPlacementRecord, PlacementImplementationRowRecord, RemedyEligibilityResolutionRecord,
   RemedyRepositoryRecord, StageBRemedyType
 } from "./domain.ts";
 
@@ -31,6 +31,21 @@ export function eligibleRemediesForPage(
   return resolutions.filter((resolution) => resolution.remediationId === remediationId && resolution.status === "ELIGIBLE" && resolution.remedialType === pageType)
     .flatMap((resolution) => {
       const remedy = remedies.find((item) => item.id === resolution.remedyId && item.status === "APPROVED" && item.remedialType === pageType);
+      return remedy ? [{ resolution, remedy }] : [];
+    });
+}
+
+export function eligibleCaseUsedRemediesForPage(
+  resolutions: readonly RemedyEligibilityResolutionRecord[],
+  remedies: readonly CaseUsedRemedyRecord[],
+  remediationId: string,
+  pageId: string,
+  pageType: StageBRemedyType
+) {
+  return resolutions.filter((resolution) => resolution.remediationId === remediationId && resolution.status === "ELIGIBLE" && resolution.remedialType === pageType)
+    .flatMap((resolution) => {
+      const remedy = remedies.find((item) => item.id === resolution.remedyId && item.remediationId === remediationId && item.pageId === pageId
+        && item.status === "ACTIVE" && item.remedialType === pageType && (item.recordVersion ?? 0) === resolution.remedyRecordVersion);
       return remedy ? [{ resolution, remedy }] : [];
     });
 }

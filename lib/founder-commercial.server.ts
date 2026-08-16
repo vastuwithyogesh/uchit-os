@@ -3,6 +3,12 @@ import type { CommercialArtifactStore } from "./founder-commercial.ts";
 
 export function founderCommercialArtifactStore(): CommercialArtifactStore {
   return {
+    async readImmutable(key) {
+      const r2 = getRuntimeEnv().R2;
+      if (!r2) throw Object.assign(new Error("Private R2 storage is unavailable. Founder template rendering remains fail-closed."), { statusCode: 503 });
+      const object = await r2.get(key);
+      return object ? new Uint8Array(await new Response(object.body).arrayBuffer()) : undefined;
+    },
     async putImmutable(key, bytes, contentType, metadata) {
       const r2 = getRuntimeEnv().R2;
       if (!r2) throw Object.assign(new Error("Private R2 storage is unavailable. Commercial artifact generation remains fail-closed."), { statusCode: 503 });

@@ -8,6 +8,8 @@ import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { FounderStepCard } from "@/components/founder-step-card";
 import { useRouter } from "next/navigation";
+import { resolveEffectivePropertyContext } from "@/lib/case-property-context";
+import { resolveEvaluationArchitecture } from "@/lib/evaluation-architecture";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
 
@@ -75,9 +77,13 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
   const project = state?.projects.find((item) => item.id === (projectId ?? selectedCase?.projectId));
   const client = clients.find((item) => item.id === clientId);
   const profile = state?.clientIntakeProfiles.find((item) => item.clientId === client?.id);
+  const architecture = state && caseId ? (() => { try { return resolveEvaluationArchitecture({ state, caseId }); } catch { return undefined; } })() : undefined;
+  const effectiveCaseContext = state && caseId ? (() => { try { return resolveEffectivePropertyContext({ state, caseId, clientId }); } catch { return undefined; } })() : undefined;
+  const isV1 = architecture?.caseVersion === "V1";
+  const propertyOwner = isV1 ? effectiveCaseContext?.propertyContext : profile?.propertyContext;
   const prefill = state ? resolveClientIntakePrefill(state, { caseId, projectId: project?.id, clientId: client?.id }) : { values: {}, provenance: {} };
   const caseService = selectedCase?.serviceType;
-  const serviceConflict = Boolean(profile?.propertyContext?.serviceInterest && caseService && profile.propertyContext.serviceInterest !== caseService);
+  const serviceConflict = Boolean(propertyOwner?.serviceInterest && caseService && propertyOwner.serviceInterest !== caseService);
   const actualFloorCount = selectedCase ? (state?.floorWorkspaces.filter((item) => item.caseId === selectedCase.id).length ?? 0) : 0;
   const floorMismatch = Boolean(floorCount && actualFloorCount && Number(floorCount) !== actualFloorCount);
   const validation = validateClientIntake({ challenge, outcome, service, propertyType, propertyStatus, cityCountry, floorCount, locationLink, latitude, longitude });
@@ -116,31 +122,37 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
     setVision(profile?.businessContext?.vision ?? "");
     setDecision(profile?.decisionMakerStatus ?? "");
     setOthers(profile?.otherDecisionMakers ?? "");
-    setService((prefill.values.service as VastuServiceType | undefined) ?? "");
-    setPropertyType(prefill.values.propertyType ?? "");
-    setPropertyStatus(prefill.values.propertyStatus ?? "");
-    setAreaValue(profile?.propertyContext?.areaValue?.toString() ?? "");
-    setAreaUnit(profile?.propertyContext?.areaUnit ?? "");
-    setCityCountry(prefill.values.cityCountry ?? "");
-    setConstraints(prefill.values.constraints ?? "");
+    setService(((propertyOwner?.serviceInterest ?? prefill.values.service) as VastuServiceType | "") || "");
+    setPropertyType(propertyOwner?.propertyType ?? prefill.values.propertyType ?? "");
+    setPropertyStatus(propertyOwner?.propertyStatus ?? prefill.values.propertyStatus ?? "");
+    setAreaValue(propertyOwner?.areaValue?.toString() ?? "");
+    setAreaUnit(propertyOwner?.areaUnit ?? "");
+    setCityCountry(propertyOwner?.cityCountry ?? prefill.values.cityCountry ?? "");
+    setConstraints(propertyOwner?.constraints ?? prefill.values.constraints ?? "");
     setChallenge(prefill.values.challenge ?? "");
     setOutcome(prefill.values.outcome ?? "");
     setUrgency(prefill.values.urgency ?? "");
-    setFloorCount(prefill.values.floorCount ?? "");
-    setLocationLink(prefill.values.locationLink ?? "");
-    setLatitude(prefill.values.latitude ?? "");
-    setLongitude(prefill.values.longitude ?? "");
+    setFloorCount(propertyOwner?.floorCount?.toString() ?? prefill.values.floorCount ?? "");
+    setLocationLink(propertyOwner?.locationLink ?? prefill.values.locationLink ?? "");
+    setLatitude(propertyOwner?.latitude?.toString() ?? prefill.values.latitude ?? "");
+    setLongitude(propertyOwner?.longitude?.toString() ?? prefill.values.longitude ?? "");
     key.current = crypto.randomUUID();
-  }, [client?.id, profile?.version, caseService, prefill.values.challenge, prefill.values.outcome, prefill.values.service, prefill.values.propertyType, prefill.values.propertyStatus, prefill.values.cityCountry, prefill.values.floorCount, prefill.values.locationLink, prefill.values.latitude, prefill.values.longitude, prefill.values.constraints, prefill.values.urgency]);
+  }, [client?.id, profile?.version, effectiveCaseContext?.record?.version, caseService, propertyOwner?.serviceInterest, propertyOwner?.propertyType, propertyOwner?.propertyStatus, propertyOwner?.cityCountry, propertyOwner?.floorCount, propertyOwner?.locationLink, propertyOwner?.latitude, propertyOwner?.longitude, propertyOwner?.constraints, prefill.values.challenge, prefill.values.outcome, prefill.values.service, prefill.values.propertyType, prefill.values.propertyStatus, prefill.values.cityCountry, prefill.values.floorCount, prefill.values.locationLink, prefill.values.latitude, prefill.values.longitude, prefill.values.constraints, prefill.values.urgency]);
 
   async function save() {
     if (!state || !client) return;
     const attemptedErrors = validateClientIntake({ challenge, outcome, service, propertyType, propertyStatus, cityCountry, floorCount, locationLink, latitude, longitude });
-    if (Object.keys(attemptedErrors).length) { setShowValidation(true); setServerErrors({}); setMessage(`${Object.keys(attemptedErrors).length} required correction${Object.keys(attemptedErrors).length === 1 ? "" : "s"} needed before saving.`); const first = Object.keys(attemptedErrors)[0] as IntakeFieldKey; queueMicrotask(() => document.getElementById(fieldIds[first])?.focus()); return; }
+    if (Object.keys(attemptedErrors).length) { setShowValidation(true); setServerErrors({}); setMessage(`${Object.keys(attemptedErrors).length} correction${Object.keys(attemptedErrors).length === 1 ? "" : "s"} needed before saving.`); const first = Object.keys(attemptedErrors)[0] as IntakeFieldKey; queueMicrotask(() => document.getElementById(fieldIds[first])?.focus()); return; }
     if (serviceConflict) { setMessage("Review Required: saved intake service conflicts with this case. Review case setup before saving."); return; }
     if (floorMismatch) { setMessage("Review Required: floor count differs from Floor setup. Review floor setup; no history changed."); return; }
     setBusy(true);
     try {
+      if (isV1 && caseId) {
+        const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action: "client-intake-save-v1", clientId: client.id, caseId, projectId: project?.id, propertyContext: { serviceInterest: service || undefined, propertyType: propertyType || undefined, propertyStatus: propertyStatus || undefined, areaValue: areaValue ? Number(areaValue) : undefined, areaUnit: areaUnit || undefined, cityCountry: cityCountry || undefined, constraints: constraints || undefined, floorCount: floorCount ? Number(floorCount) : undefined, locationLink: locationLink || undefined, latitude: latitude ? Number(latitude) : undefined, longitude: longitude ? Number(longitude) : undefined }, contactPreference: { whatsapp: whatsapp || undefined, preferredLanguage: language || undefined, preferredContactWindow: windowText || undefined }, businessContext: { company: company || undefined, industry: industry || undefined, designation: designation || undefined, vision: vision || undefined }, decisionMakerStatus: decision || undefined, otherDecisionMakers: others || undefined, needs: { mainChallenge: challenge || undefined, desiredOutcome: outcome || undefined, urgency: urgency || undefined }, consent: { version: "uchit-intake/v1", contact: profile?.consent.contact, accuracy: profile?.consent.accuracy, confidentiality: profile?.consent.confidentiality }, idempotencyKey: key.current, propertyContextExpectedRecordVersion: effectiveCaseContext?.record?.recordVersion ?? 0, clientExpectedRecordVersion: client.recordVersion ?? 0, expectedRecordVersion: client.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null }) });
+        const result = await response.json();
+        if (!response.ok || result.ok === false) throw new ActionError(result.error?.message ?? result.error ?? "V1 intake could not be saved.", response.status);
+        await refresh(client.id); router.refresh(); setMessage("V1 case property context and client intake saved."); return;
+      }
       const payload = {
         action:"client-intake-upsert",
         clientId: client.id, caseId, projectId: project?.id,
@@ -180,8 +192,8 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
   return (
     <section className="card span-12 founder-work-surface" aria-labelledby="intake-title">
       <div className="founder-context-bar" aria-label="Locked intake context"><span>Case</span><span aria-hidden="true">→</span><strong>{selectedCase?.caseNumber ?? "Select a case to continue"}</strong><span aria-hidden="true">→</span><span>{project?.propertyName ?? "Project pending"}</span><span aria-hidden="true">→</span><span>{client ? `${client.displayName} · ${client.id}` : "Client unavailable"}</span></div>
-      <FounderStepCard step="Step 1 · context" title="Capture the decision that matters" description="Start with the client’s challenge and desired outcome. Complete the property context before saving the profile." tone={completionTone} status={intakeComplete ? "All required information is complete" : `${correctionCount} required correction${correctionCount === 1 ? "" : "s"}`} className="founder-step-card-primary">
-        <p className="meta">Client is locked to this Case and Project. Switch the full context from the case selector, not from intake.</p>
+      <FounderStepCard step="Step 1 · context" title="Capture the decision that matters" description="Add what is known now. Save accepts a partial draft; evaluation readiness is checked at the evaluation gate." tone={completionTone} status={intakeComplete ? "Ready to save" : `${correctionCount} correction${correctionCount === 1 ? "" : "s"}`} className="founder-step-card-primary">
+        <p className="meta">Client is locked to this Case and Project. Switch the full context from the case selector, not from intake. Architecture: <strong>{isV1 ? "V1 case-scoped property context" : "LEGACY client intake"}</strong>.</p>
         <p className="meta">Known values are prefilled from intake, then case setup, then the permanent client profile. Conflicting source values require review; nothing is silently overwritten.</p>
         {serviceConflict ? <p className="blocked-note" role="alert">Review Required: intake service conflicts with the selected case. Review case setup before saving.</p> : null}
         {floorMismatch ? <p className="blocked-note" role="alert">Review Required: Floor setup has {actualFloorCount} floor(s), while intake says {floorCount}. Review floor setup; existing floor history is preserved.</p> : null}
@@ -192,7 +204,7 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
         </div>
       </FounderStepCard>
 
-      <FounderStepCard step="Step 2 · property" title="Set the project context" description="These fields carry forward into project and floor setup. Leave optional detail for the disclosure below." tone={completionTone} status={intakeComplete ? "Ready to save" : `${correctionCount} required correction${correctionCount === 1 ? "" : "s"}`}>
+      <FounderStepCard step="Step 2 · property" title="Set the project context" description="These fields carry forward into project and floor setup. Add them as they become available." tone={completionTone} status={intakeComplete ? "Ready to save" : "Partial draft accepted"}>
         <div className="founder-step-grid founder-intake-grid">
           <div className={`field ${errorFor("service") ? "field-invalid" : ""}`}><label htmlFor="intake-service">Service interest {sourceLabel("service")}</label><select id="intake-service" value={service} onChange={(e) => setService(e.target.value as VastuServiceType | "")} onBlur={() => setShowValidation(true)} disabled={busy} {...inputProps("service")}><option value="">Choose</option><option value="EXISTING_SPACE">Existing space</option><option value="NEW_CONSTRUCTION">New construction</option></select>{inlineError("service")}</div>
           <div className={`field ${errorFor("propertyType") ? "field-invalid" : ""}`}><label htmlFor="intake-property-type">Property type {sourceLabel("propertyType")}</label><select id="intake-property-type" value={propertyType} onChange={(e) => setPropertyType(e.target.value)} onBlur={() => setShowValidation(true)} disabled={busy} {...inputProps("propertyType")}><option value="">Choose</option>{["Residential", "Commercial", "Factory", "Shop", "Hospital", "Hotel", "Temple"].map((type) => <option key={type} value={type}>{type}</option>)}</select>{inlineError("propertyType")}</div>
@@ -223,8 +235,8 @@ export function ClientIntakeForm({ clientId: initialClientId, caseId, projectId 
         </div>
       </details>
 
-      <FounderStepCard step="Save intake" title="Confirm the project context" description="Known client consent remains in its original source record. Missing consent blocks only the relevant outbound communication, not this intake save." tone={completionTone} status={intakeComplete ? "Ready to save" : `${correctionCount} required correction${correctionCount === 1 ? "" : "s"}`}>
-        <div className="workflow founder-primary-actions"><button className="button founder-action-primary" type="button" disabled={busy || !client} onClick={() => void save()}>{busy ? "Saving…" : intakeComplete ? "Save intake" : "Review required fields"}</button><button className="button-secondary" type="button" disabled={busy} onClick={() => void refresh(client?.id)}>Reload latest</button></div>
+      <FounderStepCard step="Save intake" title="Confirm the project context" description="Known client consent remains in its original source record. Missing optional information does not block this save." tone={completionTone} status={intakeComplete ? "Ready to save" : "Partial draft accepted"}>
+        <div className="workflow founder-primary-actions"><button className="button founder-action-primary" type="button" disabled={busy || !client} onClick={() => void save()}>{busy ? "Saving…" : "Save intake"}</button><button className="button-secondary" type="button" disabled={busy} onClick={() => void refresh(client?.id)}>Reload latest</button></div>
       </FounderStepCard>
       <div className="footer-note" role={messageIsError ? "alert" : "status"} aria-live="polite">{message}</div>
     </section>

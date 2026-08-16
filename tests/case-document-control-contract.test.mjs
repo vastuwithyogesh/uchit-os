@@ -44,7 +44,10 @@ test("current version transitions are unique, atomic, versioned and audited", ()
   assert.match(body, /received: existing\?\.received \?\? stamp/);
   assert.match(body, /verified: revisionStatus === "VERIFIED"/);
   assert.match(body, /appendTimeline/);
-  assert.match(body, /Every document requirement must retain one current version/);
+  assert.match(body, /const isManualSuccessor = assetType === "MANUAL_UTILITY_SHEET"/);
+  assert.match(body, /A non-current manual sheet must be an explicit successor of the exact approved current version/);
+  assert.match(body, /only Founder approval may replace the approved current version/);
+  assert.match(body, /if \(next\.isCurrent\) for \(const item of state\.caseDocuments\)/);
   assert.match(body, /item\.caseRevisionNumber === revisionNumber && item\.serviceType === serviceType/);
 });
 

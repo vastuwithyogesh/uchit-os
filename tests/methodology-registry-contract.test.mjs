@@ -37,7 +37,7 @@ test("Stage B publication is authority, adapter, rule and fixture bound", () => 
   assert.match(publish, /version\.module === "STAGE_B_REMEDIAL"/);
   assert.match(publish, /STAGE_B_AUTHORITY_HASH/);
   assert.match(publish, /STAGE_B_RESOLVER_VERSION/);
-  assert.match(publish, /rules\.length < 5/);
+  assert.match(publish, /rules\.length !== STAGE_B_CANONICAL_REMEDY_MAPPINGS\.length/);
   assert.match(publish, /fixtures\.length < 6/);
 });
 

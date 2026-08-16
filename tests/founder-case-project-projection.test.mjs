@@ -35,15 +35,27 @@ test("a missing case remains blocked instead of being inferred from downstream r
   assert.equal(getCurrentFounderFlowStep(scorecard)?.number, 1);
 });
 
-test("a new locked orientation completes Step 04 while downstream invalidation advances to Step 05", () => {
+test("a new locked orientation preserves Steps 04 and 05 while mapping invalidation advances to Step 06", () => {
   const { state, actor } = buildReleaseableFounderPilotFixture();
   state.dependencyInvalidations.push({
+    id: "pilot-invalidation-opening",
+    organisationId: pilotIds.organisationId,
+    projectId: pilotIds.projectId,
     caseId: pilotIds.caseId,
     floorId: pilotIds.floorId,
+    targetType: "OPENING_MAPPING",
+    targetId: "pilot-opening-main",
+    causeType: "ORIENTATION",
+    sourceVersionId: pilotIds.orientationId,
     status: "NEEDS_REGENERATION",
+    reason: "The locked orientation changed, so the exact opening mapping must be regenerated.",
+    createdAt: "2026-08-11T06:30:00.000Z",
+    createdByActorUserId: pilotIds.founderId,
+    recordVersion: 1,
   });
   const scorecard = buildFounderScorecard(state, actor, pilotIds.clientId, pilotIds.caseId, pilotIds.floorId);
   assert.equal(scorecard.modules[3].status, "COMPLETE");
-  assert.equal(scorecard.modules[4].status, "NEEDS_REGENERATION");
-  assert.equal(getCurrentFounderFlowStep(scorecard)?.number, 5);
+  assert.equal(scorecard.modules[4].status, "COMPLETE");
+  assert.equal(scorecard.modules[5].status, "NEEDS_REGENERATION");
+  assert.equal(getCurrentFounderFlowStep(scorecard)?.number, 6);
 });

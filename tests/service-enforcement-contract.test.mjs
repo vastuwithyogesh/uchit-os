@@ -62,5 +62,5 @@ test("evaluation readiness requires orientation, complete inputs, and locked flo
   const assertion = functionBody(framework, "assertCaseReadyForEvaluation");
   assert.match(assertion, /getCaseEvaluationBlockers/);
   assert.match(assertion, /CaseReadinessError/);
-  assert.match(actions, /\[400, 401, 403, 404, 409, 428, 503\]\.includes\(Number\(error\.statusCode\)\)/);
+  assert.match(actions, /\[400, 401, 403, 404, 409, 413, 428, 503\]\.includes\(Number\(error\.statusCode\)\)/);
 });

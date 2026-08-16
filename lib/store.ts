@@ -26,10 +26,13 @@ import type {
   SiteAnalysisApprovalRecord,
   PostSiteFindingsRecord,
   PostSiteFindingsApprovalRecord,
+  V1FullBalanceClearanceRecord,
   LeadQualificationRecord,
   PaymentRecord,
   ReviewCallBookingRecord,
   ReportVersionRecord,
+  DocumentDeliveryRecord,
+  DocumentDeliveryEventRecord,
   RectificationRequestRecord,
   AssessmentObservation,
   Recommendation,
@@ -38,6 +41,7 @@ import type {
   ManualSheetApprovalRecord,
   DeliveryMilestone,
   ClientIntakeProfile,
+  CasePropertyContextRecord,
   ShaktiSnapshotRecord,
   TimelineEvent,
   UtilityRule,
@@ -47,7 +51,12 @@ import type {
   PlanVersionRecord,
   SpatialEvidenceVersionRecord,
   OrientationVersionRecord,
+  D8OrientationSnapshotV1, DirectionalInputVersionV1, DirectionalEvaluationSnapshotV1,
+  DirectionalReportCardSnapshotV1, DirectionalStageAPresentationV1,
+  ElementalReportSnapshotV1, EvaluationRemedyHandoffRecordV1, CombinedEvaluationReportSnapshotV1,
+  StageBInputV1Record,
   OpeningMappingRecord,
+  EntranceZoneVersionRecord,
   SpaceMappingRecord,
   DependencyInvalidationRecord,
   RegenerationResolutionRecord,
@@ -55,13 +64,15 @@ import type {
   StageAFloorApprovalCheckpointRecord,
   RemedialWorkflowReservation,
   MethodologyVersionRecord,
+  D16UtilityMappingVersionRecord,
   MethodologyRuleRecord,
   MethodologyGoldenFixtureRecord,
   AouMethodologyVersionRecord,
   AouReferenceRowRecord,
   WhatsAppTemplateLogRecord,
   WhatsAppTemplateRecord
-  ,LeadProfileVersionRecord, MediaAssetRecord, MediaAssetVersionRecord, SecureAccessGrantRecord, CommunicationPreparationRecord,
+  ,LeadProfileVersionRecord, MediaAssetRecord, MediaAssetVersionRecord, ImageProcessingTaskRecord, ImageDerivativeRecord,
+  ImageProcessingBatchRecord, ImageUtilityAuditEventRecord, SecureAccessGrantRecord, CommunicationPreparationRecord,
   QualificationFormDefinitionRecord, QualificationInvitationRecord, QualificationResponseVersionRecord, ProspectiveProjectRecord,
   FounderReviewBookingRecord, ZoomMeetingBindingRecord, FounderReminderTaskRecord
   ,FounderCommercialPolicyVersionRecord, FounderCommercialLegalPolicyRecord, FounderProposalTemplateVersionRecord,
@@ -69,12 +80,20 @@ import type {
   FounderProposalResponseRecord, FounderCommercialPaymentConfirmationRecord, FounderBalanceDeadlineRecord,
   FounderCommercialInvoiceRecord, FounderCommercialPolicyEventRecord, FounderCommercialAuditEventRecord, FounderStatutoryPolicyVersionRecord,
   FounderBillingProfileVersionRecord, FounderStatutorySequenceReservationRecord, FounderStatutoryDocumentRecord
-  ,StageBRemediationRecord, RevisedLayoutCandidateRecord, RemediationBaseLayoutVersionRecord, RemedyRepositoryRecord,
+  ,OrganisationBrandProfileRecord, DocumentTemplateRecord, BrandingAuditEventRecord, LegacyBrandingSourceRecord
+  ,StageBRemediationRecord, RevisedLayoutCandidateRecord, RemediationBaseLayoutVersionRecord, RemedyRepositoryRecord, CaseUsedRemedyRecord,
+  ContextualRepositoryRecord, RepositoryAuditEventRecord, RepositoryImportBatchRecord, RepositoryImportRowRecord,
   RemedyEligibilityResolutionRecord, ReportPlacementPageRecord, PhysicalPlacementRecord, PlacementImplementationRowRecord,
   MasterAppendixRowRecord, StageBIntegrityRunRecord
   ,SectionAWorkspaceRecord, SectionAVisualPageRecord, SectionAAssetRecord, ExistingLayoutAnnotationRecord,
   ColourFrameCompositionRecord, SectionAIntegrityRunRecord, RemediationReportIntegrityRunRecord
+  ,SectionCWorkspaceRecord, SectionCExtraPageRecord, SectionCAssetRecord, SectionCIntegrityRunRecord
 } from "./domain.ts";
+import type { SiteEvaluationEvidenceVersionRecord } from "./site-evaluation-evidence-v1.ts";
+import type { PostSiteElementalObservationRecord } from "./post-site-observations-v1.ts";
+import type { EnergyBarEvidenceVersionRecord } from "./energy-bar-evidence-v1.ts";
+import type { EnergyBarStateSetVersionRecord } from "./energy-bar-state-v1.ts";
+import type { ElementalEvaluationSnapshotV1 } from "./elemental-evaluation-integration-v1.ts";
 import { LEGACY_COMMERCIAL_POLICY_DEFAULTS } from "./commercial-policy.ts";
 
 export interface AppState {
@@ -85,6 +104,7 @@ export interface AppState {
   commercialPolicy: import("./domain.ts").CommercialPolicy;
   commercialPolicyHistory: import("./domain.ts").CommercialPolicy[];
   clientIntakeProfiles: ClientIntakeProfile[];
+  casePropertyContexts: CasePropertyContextRecord[];
   leadQualifications: LeadQualificationRecord[];
   commercialProposals: CommercialProposalRecord[];
   reviewCallBookings: ReviewCallBookingRecord[];
@@ -97,11 +117,19 @@ export interface AppState {
   siteAnalysisApprovals: SiteAnalysisApprovalRecord[];
   postSiteFindings: PostSiteFindingsRecord[];
   postSiteFindingsApprovals: PostSiteFindingsApprovalRecord[];
+  v1FullBalanceClearances: V1FullBalanceClearanceRecord[];
   planVersions: PlanVersionRecord[];
   spatialEvidenceVersions: SpatialEvidenceVersionRecord[];
   orientationVersions: OrientationVersionRecord[];
+  d8OrientationSnapshots: D8OrientationSnapshotV1[];
+  directionalInputVersions: DirectionalInputVersionV1[];
+  directionalEvaluationSnapshots: DirectionalEvaluationSnapshotV1[];
+  directionalReportCardSnapshots: DirectionalReportCardSnapshotV1[];
+  directionalStageAPresentations: DirectionalStageAPresentationV1[];
   openingMappings: OpeningMappingRecord[];
+  entranceZoneVersions: EntranceZoneVersionRecord[];
   spaceMappings: SpaceMappingRecord[];
+  d16UtilityMappingVersions: D16UtilityMappingVersionRecord[];
   dependencyInvalidations: DependencyInvalidationRecord[];
   regenerationResolutions: RegenerationResolutionRecord[];
   stageAFloorReviews: StageAFloorReviewSnapshotRecord[];
@@ -111,6 +139,11 @@ export interface AppState {
   revisedLayoutCandidates: RevisedLayoutCandidateRecord[];
   remediationBaseLayoutVersions: RemediationBaseLayoutVersionRecord[];
   remedyRepositoryRecords: RemedyRepositoryRecord[];
+  caseUsedRemedyRecords: CaseUsedRemedyRecord[];
+  contextualRepositoryRecords: ContextualRepositoryRecord[];
+  repositoryAuditEvents: RepositoryAuditEventRecord[];
+  repositoryImportBatches: RepositoryImportBatchRecord[];
+  repositoryImportRows: RepositoryImportRowRecord[];
   remedyEligibilityResolutions: RemedyEligibilityResolutionRecord[];
   reportPlacementPages: ReportPlacementPageRecord[];
   physicalPlacements: PhysicalPlacementRecord[];
@@ -124,12 +157,18 @@ export interface AppState {
   colourFrameCompositions: ColourFrameCompositionRecord[];
   sectionAIntegrityRuns: SectionAIntegrityRunRecord[];
   remediationReportIntegrityRuns: RemediationReportIntegrityRunRecord[];
+  sectionCWorkspaces: SectionCWorkspaceRecord[];
+  sectionCExtraPages: SectionCExtraPageRecord[];
+  sectionCAssets: SectionCAssetRecord[];
+  sectionCIntegrityRuns: SectionCIntegrityRunRecord[];
   methodologyVersions: MethodologyVersionRecord[];
   methodologyRules: MethodologyRuleRecord[];
   methodologyGoldenFixtures: MethodologyGoldenFixtureRecord[];
   aouMethodologyVersions: AouMethodologyVersionRecord[];
   aouReferenceRows: AouReferenceRowRecord[];
   reportVersions: ReportVersionRecord[];
+  documentDeliveries: DocumentDeliveryRecord[];
+  documentDeliveryEvents: DocumentDeliveryEventRecord[];
   rectificationRequests: RectificationRequestRecord[];
   assessmentObservations: AssessmentObservation[];
   recommendations: Recommendation[];
@@ -150,6 +189,10 @@ export interface AppState {
   leadProfileVersions: LeadProfileVersionRecord[];
   mediaAssets: MediaAssetRecord[];
   mediaAssetVersions: MediaAssetVersionRecord[];
+  imageProcessingTasks: ImageProcessingTaskRecord[];
+  imageDerivatives: ImageDerivativeRecord[];
+  imageProcessingBatches: ImageProcessingBatchRecord[];
+  imageUtilityAuditEvents: ImageUtilityAuditEventRecord[];
   secureAccessGrants: SecureAccessGrantRecord[];
   communicationPreparations: CommunicationPreparationRecord[];
   qualificationFormDefinitions: QualificationFormDefinitionRecord[];
@@ -176,6 +219,19 @@ export interface AppState {
   founderBillingProfileVersions: FounderBillingProfileVersionRecord[];
   founderStatutorySequenceReservations: FounderStatutorySequenceReservationRecord[];
   founderStatutoryDocuments: FounderStatutoryDocumentRecord[];
+  organisationBrandProfiles: OrganisationBrandProfileRecord[];
+  documentTemplates: DocumentTemplateRecord[];
+  brandingAuditEvents: BrandingAuditEventRecord[];
+  legacyBrandingSources: LegacyBrandingSourceRecord[];
+  siteEvaluationEvidenceVersions: SiteEvaluationEvidenceVersionRecord[];
+  postSiteElementalObservations: PostSiteElementalObservationRecord[];
+  energyBarEvidenceVersions: EnergyBarEvidenceVersionRecord[];
+  energyBarStateSetVersions: EnergyBarStateSetVersionRecord[];
+  elementalEvaluationSnapshots: ElementalEvaluationSnapshotV1[];
+  elementalReportSnapshots: ElementalReportSnapshotV1[];
+  evaluationRemedyHandoffs: EvaluationRemedyHandoffRecordV1[];
+  stageBInputsV1: StageBInputV1Record[];
+  combinedEvaluationReportSnapshots: CombinedEvaluationReportSnapshotV1[];
 }
 
 export const createEmptyAppState = (): AppState => ({
@@ -184,6 +240,7 @@ export const createEmptyAppState = (): AppState => ({
   commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
   commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
   clientIntakeProfiles: [],
+  casePropertyContexts: [],
   leadQualifications: [],
   commercialProposals: [],
   reviewCallBookings: [],
@@ -196,26 +253,38 @@ export const createEmptyAppState = (): AppState => ({
   siteAnalysisApprovals: [],
   postSiteFindings: [],
   postSiteFindingsApprovals: [],
+  v1FullBalanceClearances: [],
   planVersions: [],
   spatialEvidenceVersions: [],
   orientationVersions: [],
+  d8OrientationSnapshots: [],
+  directionalInputVersions: [],
+  directionalEvaluationSnapshots: [],
+  directionalReportCardSnapshots: [],
+  directionalStageAPresentations: [],
   openingMappings: [],
+  entranceZoneVersions: [],
   spaceMappings: [],
+  d16UtilityMappingVersions: [],
   dependencyInvalidations: [],
   regenerationResolutions: [],
   stageAFloorReviews: [],
   stageAFloorApprovalCheckpoints: [],
   remedialWorkflowReservations: [],
-  stageBRemediations: [], revisedLayoutCandidates: [], remediationBaseLayoutVersions: [], remedyRepositoryRecords: [],
+  stageBRemediations: [], revisedLayoutCandidates: [], remediationBaseLayoutVersions: [], remedyRepositoryRecords: [], caseUsedRemedyRecords: [],
+  contextualRepositoryRecords: [], repositoryAuditEvents: [], repositoryImportBatches: [], repositoryImportRows: [],
   remedyEligibilityResolutions: [], reportPlacementPages: [], physicalPlacements: [], placementImplementationRows: [],
   masterAppendixRows: [], stageBIntegrityRuns: [], sectionAWorkspaces: [], sectionAVisualPages: [], sectionAAssets: [],
   existingLayoutAnnotations: [], colourFrameCompositions: [], sectionAIntegrityRuns: [], remediationReportIntegrityRuns: [],
+  sectionCWorkspaces: [], sectionCExtraPages: [], sectionCAssets: [], sectionCIntegrityRuns: [],
   methodologyVersions: [],
   methodologyRules: [],
   methodologyGoldenFixtures: [],
   aouMethodologyVersions: [],
   aouReferenceRows: [],
   reportVersions: [],
+  documentDeliveries: [],
+  documentDeliveryEvents: [],
   rectificationRequests: [],
   assessmentObservations: [],
   recommendations: [],
@@ -232,13 +301,15 @@ export const createEmptyAppState = (): AppState => ({
   timelineEvents: [],
   optInLeads: [],
   whatsappTemplates: [],
-  whatsappLogs: [], leadProfileVersions: [], mediaAssets: [], mediaAssetVersions: [], secureAccessGrants: [], communicationPreparations: [],
+  whatsappLogs: [], leadProfileVersions: [], mediaAssets: [], mediaAssetVersions: [], imageProcessingTasks: [], imageDerivatives: [],
+  imageProcessingBatches: [], imageUtilityAuditEvents: [], secureAccessGrants: [], communicationPreparations: [],
   qualificationFormDefinitions: [], qualificationInvitations: [], qualificationResponseVersions: [], prospectiveProjects: [],
   founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
   founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
   founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
   founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialPolicyEvents: [], founderCommercialAuditEvents: [],
-  founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
+  founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: [],
+   organisationBrandProfiles: [], documentTemplates: [], brandingAuditEvents: [], legacyBrandingSources: [], siteEvaluationEvidenceVersions: [], postSiteElementalObservations: [], energyBarEvidenceVersions: [], energyBarStateSetVersions: [], elementalEvaluationSnapshots: [], elementalReportSnapshots: [], evaluationRemedyHandoffs: [], stageBInputsV1: [], combinedEvaluationReportSnapshots: []
 });
 
 const createDemoAppState = (): AppState => ({
@@ -247,6 +318,7 @@ const createDemoAppState = (): AppState => ({
   commercialPolicy: structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS),
   commercialPolicyHistory: [structuredClone(LEGACY_COMMERCIAL_POLICY_DEFAULTS)],
   clientIntakeProfiles: [],
+  casePropertyContexts: [],
   leadQualifications: structuredClone(seedLeadQualifications),
   commercialProposals: structuredClone(seedCommercialProposals),
   reviewCallBookings: [],
@@ -259,26 +331,38 @@ const createDemoAppState = (): AppState => ({
   siteAnalysisApprovals: [],
   postSiteFindings: [],
   postSiteFindingsApprovals: [],
+  v1FullBalanceClearances: [],
   planVersions: [],
   spatialEvidenceVersions: [],
   orientationVersions: [],
+  d8OrientationSnapshots: [],
+  directionalInputVersions: [],
+  directionalEvaluationSnapshots: [],
+  directionalReportCardSnapshots: [],
+  directionalStageAPresentations: [],
   openingMappings: [],
+  entranceZoneVersions: [],
   spaceMappings: [],
+  d16UtilityMappingVersions: [],
   dependencyInvalidations: [],
   regenerationResolutions: [],
   stageAFloorReviews: [],
   stageAFloorApprovalCheckpoints: [],
   remedialWorkflowReservations: [],
-  stageBRemediations: [], revisedLayoutCandidates: [], remediationBaseLayoutVersions: [], remedyRepositoryRecords: [],
+  stageBRemediations: [], revisedLayoutCandidates: [], remediationBaseLayoutVersions: [], remedyRepositoryRecords: [], caseUsedRemedyRecords: [],
+  contextualRepositoryRecords: [], repositoryAuditEvents: [], repositoryImportBatches: [], repositoryImportRows: [],
   remedyEligibilityResolutions: [], reportPlacementPages: [], physicalPlacements: [], placementImplementationRows: [],
   masterAppendixRows: [], stageBIntegrityRuns: [], sectionAWorkspaces: [], sectionAVisualPages: [], sectionAAssets: [],
   existingLayoutAnnotations: [], colourFrameCompositions: [], sectionAIntegrityRuns: [], remediationReportIntegrityRuns: [],
+  sectionCWorkspaces: [], sectionCExtraPages: [], sectionCAssets: [], sectionCIntegrityRuns: [],
   methodologyVersions: [],
   methodologyRules: [],
   methodologyGoldenFixtures: [],
   aouMethodologyVersions: [],
   aouReferenceRows: [],
   reportVersions: structuredClone(seedReportVersions),
+  documentDeliveries: [],
+  documentDeliveryEvents: [],
   rectificationRequests: [],
   assessmentObservations: [],
   recommendations: [],
@@ -295,13 +379,15 @@ const createDemoAppState = (): AppState => ({
   timelineEvents: structuredClone(seedTimelineEvents),
   optInLeads: [],
   whatsappTemplates: structuredClone(seedWhatsappTemplates),
-  whatsappLogs: structuredClone(seedWhatsappLogs), leadProfileVersions: [], mediaAssets: [], mediaAssetVersions: [], secureAccessGrants: [], communicationPreparations: [],
+  whatsappLogs: structuredClone(seedWhatsappLogs), leadProfileVersions: [], mediaAssets: [], mediaAssetVersions: [], imageProcessingTasks: [], imageDerivatives: [],
+  imageProcessingBatches: [], imageUtilityAuditEvents: [], secureAccessGrants: [], communicationPreparations: [],
   qualificationFormDefinitions: [], qualificationInvitations: [], qualificationResponseVersions: [], prospectiveProjects: [],
   founderReviewBookings: [], zoomMeetingBindings: [], founderReminderTasks: [],
   founderCommercialPolicies: [], founderCommercialLegalPolicies: [], founderProposalTemplates: [], founderProposalVersions: [],
   founderProposalApprovals: [], founderProposalArtifacts: [], founderProposalGrants: [], founderProposalResponses: [],
   founderCommercialPaymentConfirmations: [], founderBalanceDeadlines: [], founderCommercialInvoices: [], founderCommercialPolicyEvents: [], founderCommercialAuditEvents: [],
-  founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: []
+  founderStatutoryPolicies: [], founderBillingProfileVersions: [], founderStatutorySequenceReservations: [], founderStatutoryDocuments: [],
+   organisationBrandProfiles: [], documentTemplates: [], brandingAuditEvents: [], legacyBrandingSources: [], siteEvaluationEvidenceVersions: [], postSiteElementalObservations: [], energyBarEvidenceVersions: [], energyBarStateSetVersions: [], elementalEvaluationSnapshots: [], elementalReportSnapshots: [], evaluationRemedyHandoffs: [], stageBInputsV1: [], combinedEvaluationReportSnapshots: []
 });
 
 const createInitialState = () => process.env.NODE_ENV === "production" ? createEmptyAppState() : createDemoAppState();

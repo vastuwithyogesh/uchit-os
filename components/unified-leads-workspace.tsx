@@ -106,6 +106,10 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const [communication, setCommunication] = useState<{ key: FounderTemplateKey; serviceType?: "EXISTING_SPACE" | "NEW_CONSTRUCTION" }>();
   const [editing, setEditing] = useState(false);
   const [openCase, setOpenCase] = useState(false);
+  const [complimentaryProject, setComplimentaryProject] = useState<NonNullable<Bootstrap["prospectiveProjects"]>[number]>();
+  const [classificationBusy, setClassificationBusy] = useState<string>();
+  const [complimentaryReason, setComplimentaryReason] = useState("");
+  const [complimentaryBusy, setComplimentaryBusy] = useState(false);
   const [profileDraft, setProfileDraft] = useState({ fullName: "", email: "", phone: "", city: "", country: "", timeZone: "", serviceInterest: "" });
   const [editReason, setEditReason] = useState("");
   const [moveGroupId, setMoveGroupId] = useState("");
@@ -228,6 +232,53 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     finally { setBusy(false); }
   }
 
+  async function createComplimentaryProposal() {
+    if (!complimentaryProject || !selectedClient || !state || !complimentaryReason.trim()) { setMessage("Enter the private Founder reason before creating the complimentary proposal."); return; }
+    setComplimentaryBusy(true); setErrorKind("none");
+    try {
+      const latestBootstrap = await fetch("/api/bootstrap", { cache: "no-store" }).then(async (response) => {
+        if (!response.ok) throw new Error("The latest case and state versions could not be loaded. Refresh and try again.");
+        return response.json() as Promise<{ persistenceRevision?: number; prospectiveProjects?: Array<{ id: string; recordVersion?: number }> }>;
+      });
+      const latestProject = latestBootstrap.prospectiveProjects?.find((project) => project.id === complimentaryProject.id);
+      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
+        action: "founder-proposal-draft-create", clientId: selectedClient.id, prospectiveProjectId: complimentaryProject.id,
+        classification: "INTERNAL_COMPLIMENTARY", professionalFeePaise: 0, appliedGstBasisPoints: 0, agreedAdvancePaise: 0,
+        classificationReason: complimentaryReason.trim(), idempotencyKey: `founder:complimentary-proposal:${complimentaryProject.id}:${crypto.randomUUID()}`,
+        expectedProjectVersion: latestProject?.recordVersion ?? complimentaryProject.recordVersion ?? 0,
+        expectedRecordVersion: latestProject?.recordVersion ?? complimentaryProject.recordVersion ?? 0,
+        expectedRevision: latestBootstrap.persistenceRevision ?? state.persistenceRevision ?? null,
+      }) });
+      const result = await response.json();
+      if (!response.ok || result.ok === false) throw new Error(result.error?.message ?? result.error ?? "The complimentary proposal could not be created.");
+      const proposalId = result.proposal?.id;
+      if (!proposalId) throw new Error("The server did not return the new proposal version. Reload and retry.");
+      window.location.assign(`/commercial-proposals/${encodeURIComponent(proposalId)}/1`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "The complimentary proposal could not be created."); }
+    finally { setComplimentaryBusy(false); }
+  }
+
+  async function classifyExistingSpace(project: NonNullable<Bootstrap["prospectiveProjects"]>[number]) {
+    if (!selectedClient || !selected || !state || project.serviceType) return;
+    setClassificationBusy(project.id); setErrorKind("none");
+    try {
+      const latestBootstrap = await fetchJson<Bootstrap>("/api/bootstrap");
+      const latestProject = latestBootstrap.prospectiveProjects?.find((candidate) => candidate.id === project.id);
+      if (!latestProject) throw new Error("The prospective project is no longer available. Reload and try again.");
+      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
+        action: "founder-prospective-project-service-classify", prospectiveProjectId: latestProject.id, serviceType: "EXISTING_SPACE",
+        clientId: latestProject.clientId, leadId: latestProject.leadId, responseVersionId: latestProject.responseVersionId,
+        idempotencyKey: `founder:prospective-service:${latestProject.id}:existing-space`, expectedRecordVersion: latestProject.recordVersion,
+        expectedRevision: latestBootstrap.persistenceRevision ?? state.persistenceRevision ?? null,
+      }) });
+      const result = await response.json();
+      if (!response.ok || result.ok === false) throw new Error(result.error?.message ?? result.error ?? "The service classification could not be saved.");
+      setMessage("Existing Space classification saved on the existing prospective project.");
+      await refresh(selected.id);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "The service classification could not be saved."); }
+    finally { setClassificationBusy(undefined); }
+  }
+
   async function latestRevision() { return (await fetchJson<Bootstrap>("/api/bootstrap")).persistenceRevision ?? null; }
   async function prepareCommunicationContext(idempotencyKey: string, qualificationKind?: "RESIDENTIAL" | "COMMERCIAL" | "HYBRID") {
     if (!selected?.leadId) throw new Error("This row has no linked inbound lead. Open the original lead record before preparing communication.");
@@ -290,7 +341,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
         {selectedClient ? <div className="lead-drawer-section"><button type="button" className="button" onClick={() => setOpenCase(true)}>Open new case</button><p className="meta">Create an independent prospective project. A Case ID follows only canonical commercial clearance.</p></div> : null}
         <details className="lead-drawer-section" open><summary>Profile</summary>{editing ? <div className="lead-profile-edit-form"><label>Full name<input value={profileDraft.fullName} onChange={(event) => setProfileDraft({ ...profileDraft, fullName: event.target.value })} /></label><label>Email<input type="email" value={profileDraft.email} onChange={(event) => setProfileDraft({ ...profileDraft, email: event.target.value })} /></label><label>Phone / WhatsApp<input value={profileDraft.phone} onChange={(event) => setProfileDraft({ ...profileDraft, phone: event.target.value })} /></label><label>City<input value={profileDraft.city} onChange={(event) => setProfileDraft({ ...profileDraft, city: event.target.value })} /></label><label>Country<input value={profileDraft.country} onChange={(event) => setProfileDraft({ ...profileDraft, country: event.target.value })} /></label><label>IANA time zone<input value={profileDraft.timeZone} onChange={(event) => setProfileDraft({ ...profileDraft, timeZone: event.target.value })} placeholder="Asia/Kolkata" /></label><label>Primary service interest<select value={profileDraft.serviceInterest} onChange={(event) => setProfileDraft({ ...profileDraft, serviceInterest: event.target.value })}><option value="">Choose service</option><option value="EXISTING_SPACE">Existing Space</option><option value="NEW_CONSTRUCTION">New Construction</option></select></label><label>Private change reason<textarea value={editReason} onChange={(event) => setEditReason(event.target.value)} required /></label><div><button className="button" type="button" disabled={busy || !editReason.trim()} onClick={() => void saveProfile()}>{busy ? "Saving…" : "Save changes"}</button><button className="button-secondary" type="button" onClick={() => setEditing(false)}>Cancel</button></div></div> : <dl><div><dt>Contact</dt><dd>{maskEmail(selected.email)} · {maskPhone(selected.phone)}</dd></div><div><dt>City</dt><dd>{selected.city || "Not recorded"}</dd></div><div><dt>Country / time zone</dt><dd>{[selected.country, selected.timeZone].filter(Boolean).join(" · ") || "Not recorded"}</dd></div><div><dt>Service</dt><dd>{selected.serviceInterest ? stageLabel(selected.serviceInterest) : "Not recorded"}</dd></div></dl>}</details>
         <details className="lead-drawer-section"><summary>Requirement / Intake</summary><p>{selected.serviceInterest ? `${stageLabel(selected.serviceInterest)} interest recorded.` : "Complete the Founder intake to capture property and service requirements."}</p><a href="/founder/03" className="text-link">Open intake step</a></details>
-        <details className="lead-drawer-section"><summary>Cases &amp; projects</summary>{clientCases.length || clientProjects.length ? <ul className="lead-timeline">{clientCases.map((item) => <li key={item.id}><strong>{item.caseNumber}</strong><span>{item.serviceType} · {item.status} · <a href={`/founder/continue?caseId=${item.id}`}>Continue</a></span></li>)}{clientProjects.map((item) => <li key={item.id}><strong>{item.variation ?? item.displayName ?? "Prospective project"}</strong><span>{item.propertyLocation ?? "Location pending"} · commercial clearance pending</span></li>)}</ul> : <p>No cases or projects yet.</p>}{selectedClient ? <button type="button" className="button-secondary" onClick={() => setOpenCase(true)}>Open another case</button> : null}</details>
+        <details className="lead-drawer-section"><summary>Cases &amp; projects</summary>{clientCases.length || clientProjects.length ? <ul className="lead-timeline">{clientCases.map((item) => <li key={item.id}><strong>{item.caseNumber}</strong><span>{item.serviceType} · {item.status} · <a href={`/founder/continue?caseId=${item.id}`}>Continue</a></span></li>)}{clientProjects.map((item) => <li key={item.id}><strong>{item.variation ?? item.displayName ?? "Prospective project"}</strong><span>{item.propertyLocation ?? "Location pending"} · {item.serviceType ? `service: ${item.serviceType}` : "service not classified"} · commercial clearance pending</span>{!item.serviceType ? <button type="button" className="button-secondary" disabled={Boolean(classificationBusy)} onClick={() => void classifyExistingSpace(item)}>{classificationBusy === item.id ? "Saving service…" : "Confirm Existing Space"}</button> : null}<button type="button" className="button-secondary" onClick={() => { setComplimentaryProject(item); setComplimentaryReason(""); }}>Create INTERNAL_COMPLIMENTARY proposal</button></li>)}</ul> : <p>No cases or projects yet.</p>}{selectedClient ? <button type="button" className="button-secondary" onClick={() => setOpenCase(true)}>Open another case</button> : null}</details>
         <details className="lead-drawer-section" open><summary>Guided next action</summary><div className="lead-guided-actions"><button type="button" onClick={() => setCommunication({ key: "VSL" })}>Send VSL</button><div role="group" aria-label="Send deliverable brochure"><span>Send deliverable brochure</span><button type="button" onClick={() => setCommunication({ key: "BROCHURE", serviceType: "EXISTING_SPACE" })}>Existing Space</button><button type="button" onClick={() => setCommunication({ key: "BROCHURE", serviceType: "NEW_CONSTRUCTION" })}>New Construction</button></div><button type="button" onClick={() => setCommunication({ key: "QUALIFICATION" })}>Send qualification form</button></div><p className="meta">Pipeline transitions remain on Lead Pipeline. Opening a message never advances the lead automatically.</p></details>
         <details className="lead-drawer-section"><summary>Timeline</summary>{events.length ? <ol className="lead-timeline">{events.map((event) => <li key={event.id}><strong>{event.headline}</strong><span>{readableDate(event.happenedAt)} · {event.actorName ?? "Uchit"}</span></li>)}</ol> : <p>No Uchit activity yet.</p>}<p className="meta">Source history is labelled separately and never becomes authoritative audit.</p></details>
         <details className="lead-drawer-section"><summary>Follow-ups</summary><p>{selected.nextAction?.summary ?? "No follow-up scheduled."}</p><p className="meta">{readableDate(selected.nextAction?.dueAt)}</p></details>
@@ -300,6 +351,8 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
       </div>
       <footer className="lead-drawer-footer"><div className="lead-contact-actions"><a className={!selected.phone ? "is-disabled" : ""} href={selected.phone ? `tel:${selected.phone}` : undefined} aria-disabled={!selected.phone}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M6 3h4l2 5-3 2a14 14 0 0 0 5 5l2-3 5 2v4c0 2-2 3-4 3C9 20 4 15 3 7c0-2 1-4 3-4Z" /></svg>Call</a><button type="button" disabled={!selected.phone} title={!selected.phone ? "Add a phone number first" : undefined} onClick={() => setCommunication({ key: "VSL" })}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M4 20l1-4a8 8 0 1 1 3 3l-4 1Z" /></svg>WhatsApp</button><button type="button" disabled={!selected.email} title={!selected.email ? "Add an email address first" : undefined} onClick={() => setCommunication({ key: "VSL" })}><svg aria-hidden="true" viewBox="0 0 24 24"><path d="M3 5h18v14H3V5Zm0 1 9 7 9-7" /></svg>Email</button></div><span className="meta">Manual compose only</span></footer>
     </aside></div> : null}
+
+    {complimentaryProject ? <div className="lead-drawer-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setComplimentaryProject(undefined)} aria-label="Close complimentary proposal" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="complimentary-proposal-title"><span className="eyebrow">Founder-authorised exception</span><h2 id="complimentary-proposal-title">Create INTERNAL_COMPLIMENTARY proposal</h2><p>This uses the existing protected commercial workflow. It records zero fee, zero GST, zero advance and zero payable; it does not create payment or invoice records.</p><dl className="focused-summary"><div><dt>Project</dt><dd>{complimentaryProject.displayName}</dd></div><div><dt>Professional fee</dt><dd>₹0</dd></div><div><dt>GST</dt><dd>₹0</dd></div><div><dt>Total payable</dt><dd>₹0</dd></div><div><dt>Advance</dt><dd>₹0</dd></div></dl><label>Private Founder reason<textarea value={complimentaryReason} onChange={(event) => setComplimentaryReason(event.target.value)} required maxLength={1200} /></label><div className="lead-move-actions"><button type="button" className="button" disabled={complimentaryBusy || !complimentaryReason.trim()} onClick={() => void createComplimentaryProposal()}>{complimentaryBusy ? "Creating proposal…" : "Create complimentary proposal"}</button><button type="button" className="button-secondary" disabled={complimentaryBusy} onClick={() => setComplimentaryProject(undefined)}>Cancel</button></div></section></div> : null}
 
     {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
 

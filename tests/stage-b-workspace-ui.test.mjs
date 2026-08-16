@@ -22,9 +22,17 @@ test("workspace uses only frozen Stage B actions and exact concurrency", () => {
   assert.doesNotMatch(workspace, /fetch\([^)]*(?:external|repository admin)/i);
 });
 
+test("consultant choice is required before a Stage-B remedy can be placed", () => {
+  assert.doesNotMatch(workspace, /eligible\[0\]/);
+  assert.match(workspace, /const selected = eligible\.find\(\(item\) => item\.resolution\.id === selectedResolutionId\) \?\? eligible\.find\(\(item\) => item\.resolution\.id === activePlacement\?\.eligibilityResolutionId\)/);
+  assert.match(workspace, /setSelectedResolutionId\(first\?\.eligibilityResolutionId \?\? ""\)/);
+  assert.match(workspace, /Click the exact placement point/);
+});
+
 test("active page binds eligibility, verdict and placements without cross-page leakage", () => {
   assert.match(workspace, /eligibleRemediesForPage\(state\.remedyEligibilityResolutions, state\.remedyRepositoryRecords, remediation\.id, activeConfiguration\.pageType\)/);
   assert.match(workspace, /item\.solutionFraming === activeConfiguration\.sourceFraming/); assert.match(workspace, /remedialType: activeConfiguration\.pageType/);
+  assert.match(workspace, /const eligibilitySource = verdict \?\? v1StageBInput/); assert.match(workspace, /disabled=\{!eligibilitySource/);
   assert.match(workspace, /livePagePlacements\(state\.physicalPlacements, remediation\.id, page\.id\)/);
   assert.match(viewModel, /resolution\.remedialType === pageType/); assert.match(viewModel, /item\.remedialType === pageType/);
   assert.match(viewModel, /TATTAV_BALANCER[\s\S]*Tattva Balancer/); assert.match(viewModel, /TATTAV_ACTIVATION[\s\S]*Tattva Activation/);
@@ -48,10 +56,19 @@ test("page switching preserves server state and only autosaves an active canvas 
 });
 
 test("all pages retain the approved placement editor behavior and recovery states", () => {
-  for (const label of ["Clean View", "Report Preview", "Implementation Sheet", "Load eligible remedies", "Swap remedy", "Move Placement Point", "Delete draft", "Zoom +", "Zoom −", "Fit", "Grid", "Save & lock"]) assert.match(workspace, new RegExp(label));
+  for (const label of ["Clean View", "Report Preview", "Implementation Sheet", "Load eligible remedies", "Refresh eligible remedies", "Swap remedy", "Move Placement Point", "Delete draft", "Zoom +", "Zoom −", "Fit", "Grid", "Save & lock"]) assert.match(workspace, new RegExp(label));
   for (const state of ["Loading remedy workspace", "could not be loaded", "Retry loading", "access is restricted", "Stage B is not ready", "No revised-layout candidate", "No standard remedies available for this section", "Workspace changed", "Reload latest"]) assert.match(workspace, new RegExp(state, "i"));
   assert.match(workspace, /automaticCallout/); assert.match(placementPrimitives, /collisionSafeBox/); assert.match(placementPrimitives, /pointFromRect/); assert.match(workspace, /URL\.createObjectURL/); assert.match(workspace, /mimeType === "application\/pdf"/);
   assert.match(workspace, /tabIndex=\{0\}/); assert.match(placementPrimitives, /event\.key === "ArrowLeft"/); assert.match(workspace, /role="status"/); assert.match(css, /print-sheet\.is-awaiting-placement/);
+});
+
+test("real base-layout rendering is required before placement", () => {
+  assert.match(workspace, /const \[layoutStatus, setLayoutStatus\]/);
+  assert.match(workspace, /layoutStatus !== "ready"/);
+  assert.match(workspace, /Final Revised Layout could not be loaded\. Placement is unavailable\./);
+  assert.match(workspace, /visualFixture \? <div className="stage-b-layout-fallback"/);
+  assert.match(workspace, /URL\.createObjectURL/);
+  assert.match(workspace, /Final Revised Layout loaded\. Physical placement is bound to the real layout bounds\./);
 });
 
 test("Focus mode fades completed work and restores controls after save", () => {

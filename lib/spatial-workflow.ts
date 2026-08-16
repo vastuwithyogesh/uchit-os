@@ -95,7 +95,7 @@ export async function createPlanVersion(input: { caseId: unknown; floorId: unkno
   return plan;
 }
 
-export async function createSpatialEvidenceVersion(input: { caseId: unknown; floorId?: unknown; planVersionId?: unknown; kind: unknown; classification?: unknown; manualEvidencePurpose?: unknown; has32SectorChakra?: unknown; has16DirectionMapping?: unknown; evidenceRef: unknown; fullColourConfirmed: unknown; idempotencyKey: unknown; expectedRecordVersion: unknown; actor: AppUser }) {
+export async function createSpatialEvidenceVersion(input: { caseId: unknown; floorId?: unknown; planVersionId?: unknown; kind: unknown; classification?: unknown; manualEvidencePurpose?: unknown; has32SectorChakra?: unknown; has16DirectionMapping?: unknown; dualPurposeMarkedLayersConfirmed?: unknown; evidenceRef: unknown; fullColourConfirmed: unknown; idempotencyKey: unknown; expectedRecordVersion: unknown; actor: AppUser }) {
   const { state, caseRecord, project, floor, service } = spatialContext(input.caseId, input.floorId);
   assertExpectedVersion(caseRecord.recordVersion, input.expectedRecordVersion);
   const key = idempotencyKey(input.idempotencyKey);
@@ -110,6 +110,7 @@ export async function createSpatialEvidenceVersion(input: { caseId: unknown; flo
   if (manualEvidencePurpose && (kind !== "OTHER" || classification !== "STANDARD" || !floor)) throw new SpatialWorkflowError("Manual gridding evidence must be a standard OTHER record bound to one exact floor and plan.");
   if (input.has32SectorChakra !== undefined && typeof input.has32SectorChakra !== "boolean") throw new SpatialWorkflowError("32-sector Founder confirmation must be true or false.");
   if (input.has16DirectionMapping !== undefined && typeof input.has16DirectionMapping !== "boolean") throw new SpatialWorkflowError("16-direction Founder confirmation must be true or false.");
+  if (input.dualPurposeMarkedLayersConfirmed !== undefined && typeof input.dualPurposeMarkedLayersConfirmed !== "boolean") throw new SpatialWorkflowError("Dual-layer Founder confirmation must be true or false.");
   if (classification === "MARKED_32D_CHAKRA_V1") {
     if (!founderCanConfirmEvidence(input.actor)) throw new SpatialWorkflowError("Only the Founder organisation owner can confirm 32-sector marked evidence.", 403);
     if (kind !== "HAND_MARKED_PLAN" || input.has32SectorChakra !== true) throw new SpatialWorkflowError("32-sector evidence requires a Founder confirmation that the chakra overlay is visibly present.");
@@ -124,17 +125,21 @@ export async function createSpatialEvidenceVersion(input: { caseId: unknown; flo
   const plan = input.planVersionId === undefined ? undefined : state.planVersions.find((item) => item.id === input.planVersionId && item.caseId === caseRecord.id && item.projectId === project.id && (!floor || item.floorId === floor.id));
   if (kind === "HAND_MARKED_PLAN" && (!plan || plan.status !== "CURRENT")) throw new SpatialWorkflowError("Hand-marked evidence must reference the current plan version for this floor.", 409);
   if (manualEvidencePurpose && (!plan || plan.status !== "CURRENT")) throw new SpatialWorkflowError("Manual gridding evidence must reference the current plan version for this floor.", 409);
+  const protectedFileRef = requiredString(input.evidenceRef, "Protected evidence", 200);
+  const oppositeClassification = classification === "MARKED_32D_CHAKRA_V1" ? "MARKED_16D_MAPPING_V1" : classification === "MARKED_16D_MAPPING_V1" ? "MARKED_32D_CHAKRA_V1" : undefined;
+  const sameFileOppositeEvidence = oppositeClassification && state.spatialEvidenceVersions.some((item) => item.caseId === caseRecord.id && item.floorId === floor?.id && item.planVersionId === plan?.id && item.classification === oppositeClassification && item.protectedFileRef === protectedFileRef && item.status === "CURRENT");
+  if (sameFileOppositeEvidence && input.dualPurposeMarkedLayersConfirmed !== true) throw new SpatialWorkflowError("Confirm that this one protected file visibly contains both distinct 32-sector and 16-direction marked layers.");
   const retry = state.spatialEvidenceVersions.find((item) => item.caseId === caseRecord.id && item.floorId === floor?.id && item.planVersionId === plan?.id && item.idempotencyKey === key);
   if (retry) {
     const sameConfirmation = Boolean(retry.has32SectorChakra) === (input.has32SectorChakra === true)
       && Boolean(retry.has16DirectionMapping) === (input.has16DirectionMapping === true)
+      && Boolean(retry.dualPurposeMarkedLayersConfirmed) === (input.dualPurposeMarkedLayersConfirmed === true)
       && (retry.classification ?? "STANDARD") === classification
       && retry.manualEvidencePurpose === manualEvidencePurpose
       && retry.kind === kind;
     if (!sameConfirmation) throw new SpatialWorkflowError("That idempotency key is already used for a different evidence version.", 409);
     return retry;
   }
-  const protectedFileRef = requiredString(input.evidenceRef, "Protected evidence", 200);
   await assertCaseFileEvidenceScope(protectedFileRef, { organisationId: organisationId(input.actor, caseRecord.organisationId), caseId: caseRecord.id,
     caseRevisionNumber: caseRecord.revisionNumber ?? 1, serviceType: service.serviceType, floorLabel: floor?.floorLabel });
   const createdAt = now();
@@ -147,12 +152,13 @@ export async function createSpatialEvidenceVersion(input: { caseId: unknown; flo
   const evidence: SpatialEvidenceVersionRecord = { id: id("spatial-evidence"), projectId: project.id, caseId: caseRecord.id,
     floorId: floor?.id, planVersionId: plan?.id, kind, classification, has32SectorChakra: classification === "MARKED_32D_CHAKRA_V1" ? true : undefined,
     has16DirectionMapping: classification === "MARKED_16D_MAPPING_V1" ? true : undefined, manualEvidencePurpose,
+    dualPurposeMarkedLayersConfirmed: input.dualPurposeMarkedLayersConfirmed === true ? true : undefined,
     protectedFileRef, fullColour: true, status: "CURRENT", idempotencyKey: key, createdAt };
   state.spatialEvidenceVersions.unshift(evidence);
   if (replacedEvidence.length) appendFloorInvalidations({ projectId: project.id, caseId: caseRecord.id, floorId: floor?.id,
     causeType: "EVIDENCE", sourceVersionId: evidence.id, reason: `${kind.replaceAll("_", " ")} changed; exact dependent floor outputs require regeneration.`, actor: input.actor });
   caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
-  appendTimeline(caseRecord.clientId, input.actor, "Spatial evidence recorded", `${kind.replaceAll("_", " ")} (${classification}) was stored as immutable full-colour evidence.`);
+  appendTimeline(caseRecord.clientId, input.actor, "Spatial evidence recorded", `${kind.replaceAll("_", " ")} (${classification}) was stored as immutable full-colour evidence.${input.dualPurposeMarkedLayersConfirmed === true ? " Founder explicitly confirmed that the protected file contains both distinct marked layers." : ""}`);
   return evidence;
 }
 
@@ -287,8 +293,9 @@ export function getSpatialEvaluationBlockers(caseId: string) {
     const marked16DEvidence = state.spatialEvidenceVersions.find((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id
       && item.kind === "HAND_MARKED_PLAN" && item.classification === "MARKED_16D_MAPPING_V1" && item.has16DirectionMapping === true && item.status === "CURRENT" && item.fullColour);
     if (!marked16DEvidence) blockers.push(`Add Founder-confirmed 16-direction marked mapping for ${floor.floorLabel}.`);
-    if (orientation && !state.openingMappings.some((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id && item.kind === "MAIN_ENTRANCE" && item.verified)) blockers.push(`Verify the main entrance on ${floor.floorLabel}.`);
-    if (orientation && state.openingMappings.some((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id && !item.verified)) blockers.push(`Verify every opening on ${floor.floorLabel}.`);
+    const propertyMainGate = state.entranceZoneVersions.find((item) => item.caseId === caseId && item.projectId === caseRecord.projectId && item.scope === "PROPERTY_MAIN_GATE" && item.status === "CURRENT");
+    const floorGate = state.entranceZoneVersions.find((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.scope === "FLOOR_PRIMARY_ENTRANCE" && item.status === "CURRENT");
+    if (!propertyMainGate && !floorGate) blockers.push(`Confirm an applicable property or floor entrance zone for ${floor.floorLabel}.`);
   }
   if (state.dependencyInvalidations.some((item) => item.caseId === caseId && openRegenerationStatuses.includes(item.status as typeof openRegenerationStatuses[number]))) blockers.push("Regenerate stale spatial mappings and evaluations after the upstream change.");
   return blockers;

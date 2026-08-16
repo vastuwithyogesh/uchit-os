@@ -22,7 +22,10 @@ test("document writes match concurrency, idempotency, and immutable evidence con
   assert.match(ui, /error\.status === 409/);
   assert.match(ui, /error\.status === 428/);
   assert.match(ui, /Nothing was saved/);
-  assert.match(ui, /disabled=\{Boolean\(currentDocument && versionLabel === currentDocument\.versionLabel\)\}/);
+  const unchangedBlock = ui.slice(ui.indexOf("const documentUnchanged"), ui.indexOf("const issueFieldsValid"));
+  for (const field of ["versionLabel", "documentDate", "evidenceRef", "revisionStatus", "blocker", "discrepancy", "reviewObservation", "requiredChange", "preferredAlternative", "acceptableAlternative", "ownerRole", "ownerName"]) assert.match(unchangedBlock, new RegExp(field));
+  assert.match(ui, /const canSave = Boolean\([\s\S]*!documentUnchanged/);
+  assert.match(ui, /disabled=\{busy \|\| !canSave\}/);
 });
 
 test("verification is deliberate, safe, and staff-only", () => {
@@ -30,8 +33,9 @@ test("verification is deliberate, safe, and staff-only", () => {
   const page = source("app/files/page.tsx");
   assert.match(page, /requirePageAccess\("CONSULTANT"\)/);
   assert.ok((ui.match(/window\.confirm/g) ?? []).length >= 1);
-  assert.match(ui, /revisionStatus === "VERIFIED" && \(blocker \|\| Boolean\(discrepancy\.trim\(\)\)\)/);
-  assert.match(ui, /Resolve the blocker and discrepancy before verifying/);
+  assert.match(ui, /revisionStatus === "VERIFIED" && \(blocker \|\| Boolean\(discrepancy\.trim\(\)\) \|\| Boolean\(openIssue\)\)/);
+  assert.match(ui, /Use Resolve issue before verification/);
+  assert.match(ui, /Verification is unavailable until the saved review issue is resolved/);
   assert.match(ui, /Storage details stay hidden/);
   assert.match(ui, /<details><summary>(?:File details|Alternatives and technical details|Show)/);
   assert.match(ui, /aria-live="polite"/);
@@ -66,7 +70,7 @@ test("verified manual utility sheet exposes separate Founder approval", () => {
   assert.match(ui, /action: "manual-sheet-approve"/);
   assert.match(ui, /Founder approve sheet/);
   assert.match(ui, /approvalReason\.trim\(\)\.length < 20/);
-  assert.match(ui, /documentId: currentDocument\.id/);
+  assert.match(ui, /documentId: approvalCandidate\.id/);
   assert.match(ui, /floorId: requestedFloorId/);
   assert.match(ui, /expectedRecordVersion: activeCase\.recordVersion/);
   assert.match(ui, /approvalKey\.current/);

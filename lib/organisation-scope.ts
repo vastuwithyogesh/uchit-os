@@ -2,17 +2,21 @@ import type { AppState } from "@/lib/store";
 
 const ownedCollections = [
   "clients", "pipelineTransitions", "clientIntakeProfiles", "leadQualifications", "commercialProposals",
-  "reviewCallBookings", "payments", "advanceVerifications", "vastuCases", "floorWorkspaces", "reportVersions",
+  "reviewCallBookings", "payments", "advanceVerifications", "vastuCases", "floorWorkspaces", "reportVersions", "documentDeliveries", "documentDeliveryEvents",
   "rectificationRequests", "assessmentObservations", "recommendations", "implementationTasks", "caseDocuments",
   "deliveryMilestones", "evaluationSnapshots", "shaktiSnapshots", "timelineEvents", "optInLeads"
-  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "stageBRemediations", "revisedLayoutCandidates", "remediationBaseLayoutVersions", "remedyRepositoryRecords", "remedyEligibilityResolutions", "reportPlacementPages", "physicalPlacements", "placementImplementationRows", "masterAppendixRows", "stageBIntegrityRuns", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures",
+  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "entranceZoneVersions", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "stageBRemediations", "revisedLayoutCandidates", "remediationBaseLayoutVersions", "remedyRepositoryRecords", "caseUsedRemedyRecords", "contextualRepositoryRecords", "repositoryAuditEvents", "repositoryImportBatches", "repositoryImportRows", "remedyEligibilityResolutions", "reportPlacementPages", "physicalPlacements", "placementImplementationRows", "masterAppendixRows", "stageBIntegrityRuns", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures",
+  "sectionAWorkspaces", "sectionAVisualPages", "sectionAAssets", "existingLayoutAnnotations", "colourFrameCompositions", "sectionAIntegrityRuns", "remediationReportIntegrityRuns",
+  "sectionCWorkspaces", "sectionCExtraPages", "sectionCAssets", "sectionCIntegrityRuns",
   "aouMethodologyVersions", "aouReferenceRows", "leadProfileVersions", "mediaAssets", "mediaAssetVersions",
+  "imageProcessingTasks", "imageDerivatives", "imageProcessingBatches", "imageUtilityAuditEvents",
   "secureAccessGrants", "communicationPreparations", "qualificationFormDefinitions", "qualificationInvitations",
   "qualificationResponseVersions", "prospectiveProjects", "founderReviewBookings", "zoomMeetingBindings", "founderReminderTasks"
   ,"founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
   "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
   "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialPolicyEvents", "founderCommercialAuditEvents",
-  "founderStatutoryPolicies", "founderBillingProfileVersions", "founderStatutorySequenceReservations", "founderStatutoryDocuments"
+  "founderStatutoryPolicies", "founderBillingProfileVersions", "founderStatutorySequenceReservations", "founderStatutoryDocuments",
+  "organisationBrandProfiles", "documentTemplates", "brandingAuditEvents", "legacyBrandingSources", "stageBInputsV1", "combinedEvaluationReportSnapshots"
 ] as const satisfies readonly (keyof AppState)[];
 
 type Owned = { id?: string; organisationId?: string; createdByActorUserId?: string; updatedByActorUserId?: string; recordVersion?: number };
@@ -69,7 +73,7 @@ export function assertOrganisationRequestScope(state: AppState, body: Record<str
     error.statusCode = 400;
     throw error;
   }
-  for (const key of ["clientId", "proposalId", "proposalVersionId", "caseId", "projectId", "prospectiveProjectId", "floorId", "reportId", "remediationId", "candidateId", "pageId", "placementId", "eligibilityResolutionId", "baseLayoutVersionId", "invalidationId", "reconcileInvalidationId", "recordId", "requestId", "bookingId", "leadId", "assetId", "assetVersionId", "formDefinitionId", "invitationId", "responseVersionId", "preparationId", "grantId", "templateVersionId", "policyId", "paymentConfirmationId", "invoiceId", "deadlineId"]) {
+  for (const key of ["clientId", "proposalId", "proposalVersionId", "caseId", "projectId", "prospectiveProjectId", "floorId", "reportId", "deliveryId", "remediationId", "candidateId", "pageId", "placementId", "eligibilityResolutionId", "baseLayoutVersionId", "invalidationId", "reconcileInvalidationId", "recordId", "caseUsedRemedyId", "batchId", "replacementRecordId", "requestId", "bookingId", "leadId", "assetId", "assetVersionId", "sourceVersionId", "derivativeId", "taskId", "formDefinitionId", "invitationId", "responseVersionId", "preparationId", "grantId", "templateVersionId", "templateId", "profileId", "sourceProfileId", "sourceTemplateId", "policyId", "paymentConfirmationId", "invoiceId", "deadlineId"]) {
     const id = body[key];
     if (typeof id !== "string" || !id) continue;
     const owner = ownerForId(state, id);

@@ -49,9 +49,11 @@ test("readiness and UI select one floor without merging evaluations", () => {
   assert.match(blockers, /item\.id === floorId && item\.caseId === caseId/);
   assert.match(blockers, /!floorId \|\| floor\.id === floorId/);
   assert.match(evaluationUi, /initialFloorId/);
-  assert.match(evaluationUi, /floors\.find\(\(item\) => item\.id === initialFloorId\)/);
+  assert.match(evaluationUi, /state\?\.floorWorkspaces\.find\(\(item\) => item\.id === initialFloorId && item\.caseId === currentCase\?\.id && \(!currentCase\?\.projectId \|\| item\.projectId === currentCase\.projectId\)\)/);
   assert.match(evaluationUi, /item\.floorId === selectedFloor\?\.id/);
   assert.match(evaluationUi, /floorId: selectedFloor\.id/);
-  assert.match(evaluationUi, /expectedRecordVersion: currentCase\.recordVersion \?\? 0/);
+  assert.match(evaluationUi, /const expectedRecordVersion = typeof action\.expectedRecordVersion === "number"/);
+  assert.match(evaluationUi, /typeof regenerationVersion === "number" \? regenerationVersion : \(currentCase\.recordVersion \?\? 0\)/);
+  assert.match(evaluationUi, /floorId: selectedFloor\.id, expectedRecordVersion, expectedRevision: state\.persistenceRevision/);
   assert.match(evaluationUi, /expectedRevision: state\.persistenceRevision/);
 });

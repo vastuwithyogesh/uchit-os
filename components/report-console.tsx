@@ -273,6 +273,7 @@ export function ReportConsole() {
             <button type="button" className={canReleaseCurrentVerdict ? "button" : "button-secondary"}
               disabled={busy || !canReleaseCurrentVerdict}
               onClick={() => runPdf("release", "Release this verified immutable PDF? The released bytes and report version cannot be replaced in place.")}>Release protected PDF</button>
+            {pdfArtifact?.status === "RELEASED" ? <a className="button" href="/report-deliveries">Open delivery panel</a> : null}
           </div>
           {finalReport ? (
             <div style={{ marginTop: 14 }}>

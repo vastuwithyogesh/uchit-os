@@ -1,5 +1,5 @@
-export function buildActionHeaders(role?: string) {
-  const headers: Record<string, string> = {
+export function buildActionHeaders(role?: string, options?: { multipart?: boolean }) {
+  const headers: Record<string, string> = options?.multipart ? {} : {
     "Content-Type": "application/json"
   };
 

@@ -3,7 +3,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import type { PaymentProofRecord, PaymentProofKey } from "@/lib/payment-proof-types";
-import { prepareImageUpload } from "@/lib/image-upload";
 import type { AppState } from "@/lib/store";
 import { FounderStepCard } from "@/components/founder-step-card";
 import { buildActionHeaders } from "@/lib/request-helpers";
@@ -130,13 +129,10 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
 
     setBusy(true);
     try {
-      const prepared = await prepareImageUpload(file);
-      const result = await uploadProof(key, prepared.file, context);
+      const result = await uploadProof(key, file, context);
       setSelectedFiles((current) => ({ ...current, [key]: null }));
       setMessage(
-        prepared.compressed
-          ? `${result.proof.label} uploaded after trimming the image for a safer upload.`
-          : `${result.proof.label} uploaded.`
+        `${result.proof.label} uploaded.`
       );
       await refresh();
       router.refresh();
@@ -232,6 +228,17 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
             const file = selectedFiles[key];
             const confirmedPayment = key === "balance-proof" ? balancePayment : advancePayment;
             const isVerified = Boolean(confirmedPayment?.status === "APPROVED" || (asset?.id && boundProofIds.has(asset.id)));
+            const uploadDisabledReason = isVerified
+              ? "This confirmed receipt is immutable; use a successor correction workflow if required."
+              : !context
+                ? "Select an authorised Case and Client before uploading payment evidence."
+                : key === "advance-proof" && !context.proposalId
+                  ? "An approved proposal is required before uploading the advance receipt."
+                  : key === "balance-proof" && !context.caseId
+                    ? "An authorised Case is required before uploading the balance receipt."
+                    : !file
+                      ? `Choose a file for ${uploadLabels[key].toLowerCase()} to enable upload.`
+                      : "";
             return (
               <div key={key} className="panel">
                 <div className="panel-head">
@@ -283,12 +290,26 @@ export function PaymentProofConsole({ focus = "all", clientId: initialClientId, 
                   </button>
                   {file ? <span className="pill">Selected: {file.name}</span> : null}
                 </div>
+                {uploadDisabledReason && <p className="meta" role="status">{uploadDisabledReason}</p>}
                 {asset ? <details style={{ marginTop: 10 }}><summary>File details</summary><span className="meta">{asset.fileName}{asset.sizeBytes ? ` · ${Math.ceil(asset.sizeBytes / 1024)} KB` : ""}</span></details> : null}
               </div>
             );
           })}
         </div>
-        {focus === "balance" ? <div className="focused-payment-verification"><label className="field"><span>Reconciled balance amount</span><input type="number" min={1} value={balanceAmount} onChange={(event) => setBalanceAmount(Number(event.target.value))} disabled={busy || balanceConfirmed} /></label><button type="button" className="button" disabled={busy || balanceConfirmed || !assetsByKey["balance-proof"] || activeCase?.stageAVerdictStatus !== "PRESENTED"} onClick={() => void verifyBalance()}>{busy ? "Confirming…" : balanceConfirmed ? "Balance confirmed" : "Confirm full balance"}</button><div className="footer-note" role={!balanceConfirmed && /failed|could not|upload|before/i.test(message) ? "alert" : "status"} aria-live="polite">{balanceConfirmed ? "Full balance confirmation is immutable and already bound to this exact Case." : message}</div></div> : null}
+        {focus === "balance" ? <div className="focused-payment-verification"><label className="field"><span>Reconciled balance amount</span><input type="number" min={1} value={balanceAmount} onChange={(event) => setBalanceAmount(Number(event.target.value))} disabled={busy || balanceConfirmed} /></label>{(() => {
+          const balanceVerifyDisabledReason = balanceConfirmed
+            ? "This balance confirmation is immutable and already bound to the exact Case."
+            : !activeCase
+              ? "Select an authorised Case before confirming the balance."
+              : !assetsByKey["balance-proof"]
+                ? "Upload the exact balance receipt before confirming the balance."
+                : activeCase.stageAVerdictStatus !== "PRESENTED"
+                  ? "The exact Stage A verdict must be presented before balance confirmation."
+                  : balanceAmount < 1
+                    ? "Enter the reconciled balance amount to continue."
+                    : "";
+          return <><button type="button" className="button" disabled={busy || Boolean(balanceVerifyDisabledReason)} onClick={() => void verifyBalance()}>{busy ? "Confirming…" : balanceConfirmed ? "Balance confirmed" : "Confirm full balance"}</button>{balanceVerifyDisabledReason && <p className="meta" role="status">{balanceVerifyDisabledReason}</p>}</>;
+        })()}<div className="footer-note" role={!balanceConfirmed && /failed|could not|upload|before/i.test(message) ? "alert" : "status"} aria-live="polite">{balanceConfirmed ? "Full balance confirmation is immutable and already bound to this exact Case." : message}</div></div> : null}
         </FounderStepCard>
       </div>
 

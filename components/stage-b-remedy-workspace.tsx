@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { StageBRemedyType, StageBRenderManifest } from "@/lib/domain";
 import type { AppState } from "@/lib/store";
 import { automaticCallout, pointFromRect } from "@/lib/stage-b-workspace-geometry";
-import { eligibleRemediesForPage, implementationRowsForPage, livePagePlacements, liveRemediationPlacements, STAGE_B_WORKSPACE_PAGES } from "@/lib/stage-b-workspace-view";
+import { eligibleCaseUsedRemediesForPage, eligibleRemediesForPage, implementationRowsForPage, livePagePlacements, liveRemediationPlacements, STAGE_B_WORKSPACE_PAGES } from "@/lib/stage-b-workspace-view";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { canEvaluateCases } from "@/lib/permissions";
 import { useSession } from "@/components/session-provider";
@@ -18,7 +18,9 @@ type WorkspaceView = "canvas" | "implementation";
 
 class WorkspaceActionError extends Error { constructor(message: string, readonly status: number) { super(message); } }
 
-function UploadRemedyDialog({ scope, onScope, onClose }: { scope: UploadScope; onScope: (scope: UploadScope) => void; onClose: () => void }) {
+function UploadRemedyDialog({ scope, onScope, onClose, media, permanentAllowed, busy, onSave }: { scope: UploadScope; onScope: (scope: UploadScope) => void; onClose: () => void;
+  media: AppState["mediaAssetVersions"]; permanentAllowed: boolean; busy: boolean; onSave: (input: { scope: Exclude<UploadScope, null>; name: string; purpose: string; assetVersionId: string }) => void }) {
+  const [name, setName] = useState(""); const [purpose, setPurpose] = useState(""); const [assetVersionId, setAssetVersionId] = useState(media[0]?.id ?? "");
   return <div className="stage-b-preview-backdrop" role="dialog" aria-modal="true" aria-labelledby="stage-b-upload-title">
     <article className="stage-b-upload-dialog">
       <header><div><div className="eyebrow">Custom remedy entry</div><h2 id="stage-b-upload-title">+ Upload Remedy</h2></div><button aria-label="Close remedy upload" onClick={onClose}>×</button></header>
@@ -29,10 +31,11 @@ function UploadRemedyDialog({ scope, onScope, onClose }: { scope: UploadScope; o
         <button className="text-link" onClick={() => onScope(null)}>← Change scope</button>
         <h3>{scope === "CASE_ONLY" ? "One-Time Use — This Case" : "Permanent Scope"}</h3>
         <p>{scope === "CASE_ONLY" ? "Supply the remedy image, name and attribute or purpose for this case." : "Supply the complete remedy metadata and evidence for the existing approval workflow."}</p>
-        <label>Remedy image<input type="file" accept="image/*" /></label>
-        <label>Remedy name<input type="text" autoComplete="off" /></label>
-        <label>Attribute / purpose<textarea rows={3} /></label>
-        <p className="stage-b-upload-boundary" role="note">This shared workspace collects the entry choice and details only. Publishing remains behind the existing approved remedy workflow.</p>
+        <label>Approved immutable media version<select value={assetVersionId} onChange={(event) => setAssetVersionId(event.target.value)}><option value="">Choose existing approved media</option>{media.map((item) => <option key={item.id} value={item.id}>{item.filename ?? item.assetId} · v{item.version ?? 1}</option>)}</select></label>
+        <label>Remedy name<input type="text" autoComplete="off" value={name} onChange={(event) => setName(event.target.value)} /></label>
+        <label>Attribute / purpose<textarea rows={3} value={purpose} onChange={(event) => setPurpose(event.target.value)} /></label>
+        <button className="button" disabled={busy || !name.trim() || !purpose.trim() || !assetVersionId || (scope === "PERMANENT" && !permanentAllowed)} onClick={() => onSave({ scope, name, purpose, assetVersionId })}>{scope === "CASE_ONLY" ? "Create case-used remedy" : "Create Main Library Draft"}</button>
+        <p className="stage-b-upload-boundary" role="note">{scope === "CASE_ONLY" ? "Immediate exact case, floor and remedy-page use. It never enters permanent eligibility pools automatically." : permanentAllowed ? "Creates a governed Draft only. Explicit approval in the separate owner-governed workflow is still required." : "Permanent Draft creation requires an existing Admin or Super-Admin role."} New binary upload remains outside this milestone; choose an existing approved media version.</p>
       </div>}
     </article>
   </div>;
@@ -137,7 +140,7 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
   const [zoom, setZoom] = useState(1); const [pan, setPan] = useState({ x: 0, y: 0 }); const [grid, setGrid] = useState(false); const [awaitingPlacement, setAwaitingPlacement] = useState(false);
   const [cleanView, setCleanView] = useState(false); const [view, setView] = useState<WorkspaceView>("canvas"); const [search, setSearch] = useState("");
   const [uploadOpen, setUploadOpen] = useState(false); const [uploadScope, setUploadScope] = useState<UploadScope>(null); const [manifestPreview, setManifestPreview] = useState<StageBRenderManifest | null>(null); const [previewOpen, setPreviewOpen] = useState(false);
-  const [layoutObjectUrl, setLayoutObjectUrl] = useState(""); const panStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null); const actionKeys = useRef<Record<string, string>>({});
+  const [layoutObjectUrl, setLayoutObjectUrl] = useState(""); const [layoutStatus, setLayoutStatus] = useState<"loading" | "ready" | "error">("loading"); const panStart = useRef<{ x: number; y: number; panX: number; panY: number } | null>(null); const actionKeys = useRef<Record<string, string>>({});
 
   const refresh = useCallback(async () => {
     if (visualFixture) return;
@@ -164,14 +167,21 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
 
   const caseRecord = state?.vastuCases.find((item) => item.id === caseId); const client = state?.clients.find((item) => item.id === caseRecord?.clientId); const floor = state?.floorWorkspaces.find((item) => item.id === floorId && item.caseId === caseRecord?.id);
   const reservation = state?.remedialWorkflowReservations.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id); const remediation = state?.stageBRemediations.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id);
-  const report = state?.reportVersions.find((item) => item.id === (remediation?.reportId ?? reservation?.stageAReportId)); const activeConfiguration = STAGE_B_WORKSPACE_PAGES.find((item) => item.pageType === activePageType) ?? STAGE_B_WORKSPACE_PAGES[0];
+  const report = state?.reportVersions.find((item) => item.id === (remediation?.reportId ?? reservation?.stageAReportId)); const v1Source = caseRecord?.evaluationArchitectureVersion === "V1" && floor?.evaluationArchitectureVersion === "V1"
+    ? state?.combinedEvaluationReportSnapshots.find((item) => item.caseId === caseRecord.id && item.projectId === caseRecord.projectId && item.floorId === floor.id && item.architectureVersion === "V1" && item.status === "FINALIZED")
+    : undefined; const activeConfiguration = STAGE_B_WORKSPACE_PAGES.find((item) => item.pageType === activePageType) ?? STAGE_B_WORKSPACE_PAGES[0];
+  const v1StageBInput = v1Source ? state?.stageBInputsV1.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && item.status === "FINALIZED") : undefined;
   const page = state?.reportPlacementPages.find((item) => item.remediationId === remediation?.id && item.pageType === activeConfiguration.pageType); const baseLayout = state?.remediationBaseLayoutVersions.find((item) => item.id === remediation?.baseLayoutVersionId && ["SELECTED", "LOCKED"].includes(item.state));
   const candidate = state?.revisedLayoutCandidates.find((item) => item.id === baseLayout?.candidateId); const candidates = state?.revisedLayoutCandidates.filter((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && item.status === "AVAILABLE") ?? [];
   const placements = state && remediation && page ? livePagePlacements(state.physicalPlacements, remediation.id, page.id) : []; const activePlacement = placements.find((item) => item.id === activePlacementId) ?? placements[0];
   const editingPlacement = placements.find((item) => item.id === editingPlacementId); const occupiedCallouts = placements.filter((item) => item.id !== editingPlacementId).map((item) => ({ x: item.calloutX, y: item.calloutY, width: item.calloutWidth, height: item.calloutHeight }));
-  const eligible = useMemo(() => state && remediation ? eligibleRemediesForPage(state.remedyEligibilityResolutions, state.remedyRepositoryRecords, remediation.id, activeConfiguration.pageType) : [], [state, remediation?.id, activeConfiguration.pageType]);
-  const filteredEligible = eligible.filter(({ remedy }) => `${remedy.name} ${remedy.attributePurpose}`.toLowerCase().includes(search.trim().toLowerCase())); const selected = eligible.find((item) => item.resolution.id === selectedResolutionId) ?? eligible.find((item) => item.resolution.id === activePlacement?.eligibilityResolutionId) ?? eligible[0];
-  const verdict = state?.utilityVerdicts.find((item) => report?.artifact?.utilityVerdictIds?.includes(item.id) && item.solutionFraming === activeConfiguration.sourceFraming);
+  const eligible = useMemo(() => state && remediation ? [
+    ...eligibleRemediesForPage(state.remedyEligibilityResolutions, state.remedyRepositoryRecords, remediation.id, activeConfiguration.pageType),
+    ...(page ? eligibleCaseUsedRemediesForPage(state.remedyEligibilityResolutions, state.caseUsedRemedyRecords, remediation.id, page.id, activeConfiguration.pageType) : [])
+  ] : [], [state, remediation?.id, page?.id, activeConfiguration.pageType]);
+  const filteredEligible = eligible.filter(({ remedy }) => `${remedy.name} ${remedy.attributePurpose}`.toLowerCase().includes(search.trim().toLowerCase())); const selected = eligible.find((item) => item.resolution.id === selectedResolutionId) ?? eligible.find((item) => item.resolution.id === activePlacement?.eligibilityResolutionId);
+  const verdict = v1StageBInput ? undefined : state?.utilityVerdicts.find((item) => report?.artifact?.utilityVerdictIds?.includes(item.id) && item.solutionFraming === activeConfiguration.sourceFraming);
+  const eligibilitySource = verdict ?? v1StageBInput;
   const implementationRows = state && remediation && page ? implementationRowsForPage(state.placementImplementationRows, state.physicalPlacements, remediation.id, page.id) : [];
   const finalReport = state?.reportVersions.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && !item.isPreview && item.artifact?.templateVersion === "uchit-verdict/v5");
   const exactAsset = assets.find((item) => item.evidenceRef === candidate?.evidenceRef); const assetUrl = exactAsset && caseRecord && floor ? `/api/case-files/${encodeURIComponent(exactAsset.id)}?caseId=${encodeURIComponent(caseRecord.id)}&floorLabel=${encodeURIComponent(floor.floorLabel)}` : undefined;
@@ -179,14 +189,14 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
 
   useEffect(() => {
     const first = placements[0]; setActivePlacementId(first?.id ?? ""); setEditingPlacementId(""); setSwapMode(false); setDraft(null); setDirty(false); setAwaitingPlacement(false); setTool("select"); setSearch("");
-    setSelectedResolutionId(first?.eligibilityResolutionId ?? eligible[0]?.resolution.id ?? "");
+    setSelectedResolutionId(first?.eligibilityResolutionId ?? "");
   }, [page?.id]);
   useEffect(() => { if (activePlacementId && !placements.some((item) => item.id === activePlacementId)) setActivePlacementId(placements[0]?.id ?? ""); }, [placements, activePlacementId]);
   useEffect(() => { if (finalReport?.artifact?.stageBRenderManifest) setManifestPreview(finalReport.artifact.stageBRenderManifest); }, [finalReport]);
   useEffect(() => {
-    let disposed = false; let objectUrl = ""; setLayoutObjectUrl(""); if (!assetUrl || !exactAsset) return;
-    void fetch(assetUrl, { cache: "no-store" }).then(async (response) => { if (!response.ok) throw new Error("The selected layout asset could not be displayed."); objectUrl = URL.createObjectURL(await response.blob()); if (disposed) URL.revokeObjectURL(objectUrl); else setLayoutObjectUrl(objectUrl); })
-      .catch(() => { if (!disposed) setMessage("The selected layout asset could not be displayed; using its checksum-bound fallback."); });
+    let disposed = false; let objectUrl = ""; setLayoutObjectUrl(""); setLayoutStatus("loading"); if (!assetUrl || !exactAsset) { setLayoutStatus("error"); setMessage("Final Revised Layout could not be loaded. Placement is unavailable."); return; }
+    void fetch(assetUrl, { cache: "no-store" }).then(async (response) => { if (!response.ok) throw new Error("The selected layout asset could not be displayed."); if (!exactAsset.mimeType.startsWith("image/") && exactAsset.mimeType !== "application/pdf") throw new Error("The selected layout asset type cannot be displayed."); objectUrl = URL.createObjectURL(await response.blob()); if (disposed) URL.revokeObjectURL(objectUrl); else { setLayoutObjectUrl(objectUrl); setLayoutStatus("ready"); setMessage("Final Revised Layout loaded. Physical placement is bound to the real layout bounds."); } })
+      .catch(() => { if (!disposed) { setLayoutStatus("error"); setMessage("Final Revised Layout could not be loaded. Placement is unavailable."); } });
     return () => { disposed = true; if (objectUrl) URL.revokeObjectURL(objectUrl); };
   }, [assetUrl, exactAsset]);
 
@@ -200,7 +210,7 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
   }
 
   async function initialise() {
-    if (!caseRecord || !floor || !report) return; try { await action("stage-b-remediation-initialise", { caseId: caseRecord.id, floorId: floor.id, reportId: report.id }, caseRecord.recordVersion ?? 0); await refresh(); setMessage("Stage B workspace opened from authoritative Existing Layout evidence."); }
+    if (!caseRecord || !floor || (!report && !v1Source)) return; try { await action("stage-b-remediation-initialise", { caseId: caseRecord.id, floorId: floor.id, ...(v1Source ? { reportSourceId: v1Source.id } : { reportId: report!.id }) }, caseRecord.recordVersion ?? 0); await refresh(); setMessage("Stage B workspace opened from authoritative Existing Layout evidence."); }
     catch (cause) { setMessage(cause instanceof Error ? cause.message : "Stage B could not be opened."); }
   }
   async function selectLayout(candidateId: string) {
@@ -208,9 +218,18 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
     catch (cause) { setMessage(cause instanceof Error ? cause.message : "The layout could not be selected."); }
   }
   async function loadEligible() {
-    if (!remediation || !verdict) return; setResolving(true);
-    try { const result = await action("stage-b-remedy-resolve", { remediationId: remediation.id, verdictId: verdict.id, remedialType: activeConfiguration.pageType }, remediation.recordVersion ?? 0); setAttemptedTypes((current) => new Set(current).add(activeConfiguration.pageType)); await refresh(); setMessage(result.eligible.length ? `${result.eligible.length} eligible ${activeConfiguration.label} remed${result.eligible.length === 1 ? "y" : "ies"} loaded.` : `No approved ${activeConfiguration.label} remedy is eligible for this verdict.`); }
+    if (!remediation || !eligibilitySource) return; setResolving(true);
+    try { const result = await action("stage-b-remedy-resolve", { remediationId: remediation.id, ...(v1StageBInput ? { stageBInputId: v1StageBInput.id } : { verdictId: verdict!.id }), remedialType: activeConfiguration.pageType, refresh: eligible.length > 0 }, remediation.recordVersion ?? 0); setAttemptedTypes((current) => new Set(current).add(activeConfiguration.pageType)); await refresh(); setMessage(result.eligible.length ? `${result.eligible.length} eligible ${activeConfiguration.label} remed${result.eligible.length === 1 ? "y" : "ies"} ${eligible.length > 0 ? "refreshed" : "loaded"}.` : `No approved ${activeConfiguration.label} remedy is eligible for this source.`); }
     catch (cause) { setMessage(cause instanceof Error ? cause.message : "Eligibility could not be resolved."); } finally { setResolving(false); }
+  }
+  async function saveUploadedRemedy(input: { scope: Exclude<UploadScope, null>; name: string; purpose: string; assetVersionId: string }) {
+    if (!remediation || !page || !state) return; const media = state.mediaAssetVersions.find((item) => item.id === input.assetVersionId); if (!media) return;
+    try {
+      if (input.scope === "CASE_ONLY") await action("repository-case-used-create", { remediationId: remediation.id, pageId: page.id, name: input.name, attributePurpose: input.purpose, assetId: media.assetId, assetVersionId: media.id }, remediation.recordVersion ?? 0);
+      else await action("repository-record-create", { category: activeConfiguration.pageType, name: input.name, attributePurpose: input.purpose, assetId: media.assetId, assetVersionId: media.id, elements: [], directions: [], tags: ["workspace-entry"], duplicatePolicy: "USE_EXISTING", reason: "Permanent remedy entry submitted from the Stage B workspace into governed Draft review." }, 0);
+      setUploadOpen(false); setUploadScope(null); await refresh(); setAttemptedTypes((current) => { const next = new Set(current); next.delete(activeConfiguration.pageType); return next; });
+      setMessage(input.scope === "CASE_ONLY" ? "Case-used remedy created in this exact page scope. Load eligible remedies to use it immediately." : "Main Library Draft created. It remains ineligible until the separate owner-governed approval is complete.");
+    } catch (cause) { setMessage(cause instanceof Error ? cause.message : "Remedy entry could not be created."); }
   }
   async function savePlacement(completePlacement = true) {
     if (!remediation || !page || !baseLayout || !selected || !draft) return false;
@@ -236,6 +255,7 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
     catch (cause) { setMessage(cause instanceof Error ? cause.message : "Saved placement could not be deleted."); }
   }
   function placeAt(event: React.PointerEvent<HTMLDivElement>) {
+    if (layoutStatus !== "ready") { setMessage("Final Revised Layout could not be loaded. Placement is unavailable."); return; }
     if (!selected || cleanView || !["place", "move-anchor"].includes(tool) || page?.state === "FINALISED") return; const anchor = pointFromRect(event.clientX, event.clientY, event.currentTarget.getBoundingClientRect()); const callout = automaticCallout(anchor, occupiedCallouts);
     setDraft({ anchor, callout }); setAwaitingPlacement(false); setDirty(true); setTool("move-callout"); setMessage("Anchor set. Drag the callout if needed, then save the locked placement.");
   }
@@ -269,8 +289,8 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
     {view === "implementation" ? <ImplementationSheet pageLabel={activeConfiguration.label} pageState={page?.state ?? "DRAFT"} rows={implementationRows} /> : <>
       <div className="stage-b-main"><div className="stage-b-canvas-column"><div className="stage-b-canvas-toolbar" aria-label="Canvas controls"><button aria-pressed={tool === "select"} onClick={() => setTool("select")}>Select</button><button aria-pressed={tool === "pan"} onClick={() => setTool("pan")}>Pan</button><button onClick={() => setZoom((value) => Math.min(2.5, value + .2))}>Zoom +</button><button onClick={() => setZoom((value) => Math.max(.5, value - .2))}>Zoom −</button><button onClick={() => { setZoom(1); setPan({ x: 0, y: 0 }); }}>Fit</button><button aria-pressed={grid} onClick={() => setGrid((value) => !value)}>Grid</button><span>{Math.round(zoom * 100)}%</span></div>
         <div className="stage-b-canvas-viewport" onPointerDown={(event) => { if (tool === "pan") panStart.current = { x: event.clientX, y: event.clientY, panX: pan.x, panY: pan.y }; }} onPointerMove={(event) => { if (panStart.current && tool === "pan") setPan({ x: panStart.current.panX + event.clientX - panStart.current.x, y: panStart.current.panY + event.clientY - panStart.current.y }); }} onPointerUp={() => { panStart.current = null; }} onPointerLeave={() => { panStart.current = null; }}>
-          <div className={`stage-b-print-sheet${grid ? " has-grid" : ""}${awaitingPlacement ? " is-awaiting-placement" : ""}`} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onPointerDown={placeAt} onKeyDown={(event) => { if ((event.key === "Enter" || event.key === " ") && selected && ["place", "move-anchor"].includes(tool) && page?.state !== "FINALISED") { event.preventDefault(); const anchor = { x: .5, y: .5 }; setDraft({ anchor, callout: automaticCallout(anchor, occupiedCallouts) }); setAwaitingPlacement(false); setDirty(true); setTool("move-callout"); setMessage("Keyboard placement set at the printable centre. Move the callout with arrow keys if needed."); } }} tabIndex={0} role="application" aria-label={`${activeConfiguration.label} Final Revised Layout placement canvas. Press Enter to place at the centre when placement mode is active.`}>
-            {layoutObjectUrl && exactAsset?.mimeType.startsWith("image/") ? <img className="stage-b-layout-media" src={layoutObjectUrl} alt={`Final Revised Layout: ${candidate?.label}`} /> : layoutObjectUrl && exactAsset?.mimeType === "application/pdf" ? <iframe className="stage-b-layout-media" src={`${layoutObjectUrl}#toolbar=0&navpanes=0&scrollbar=0`} title={`Final Revised Layout: ${candidate?.label}`} /> : <div className="stage-b-layout-fallback" aria-label={`Final Revised Layout ${candidate?.label}`}><span>FINAL REVISED LAYOUT</span><strong>{candidate?.label}</strong><div className="stage-b-plan-lines"><i /><i /><i /><i /><i /></div><small>Immutable candidate · {candidate?.checksumSha256.slice(0, 16)}</small></div>}
+          <div className={`stage-b-print-sheet${grid ? " has-grid" : ""}${awaitingPlacement ? " is-awaiting-placement" : ""}${layoutStatus !== "ready" && !visualFixture ? " is-layout-unavailable" : ""}`} style={{ transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})` }} onPointerDown={placeAt} onKeyDown={(event) => { if (layoutStatus !== "ready") { setMessage("Final Revised Layout could not be loaded. Placement is unavailable."); return; } if ((event.key === "Enter" || event.key === " ") && selected && ["place", "move-anchor"].includes(tool) && page?.state !== "FINALISED") { event.preventDefault(); const anchor = { x: .5, y: .5 }; setDraft({ anchor, callout: automaticCallout(anchor, occupiedCallouts) }); setAwaitingPlacement(false); setDirty(true); setTool("move-callout"); setMessage("Keyboard placement set at the printable centre. Move the callout with arrow keys if needed."); } }} tabIndex={0} role="application" aria-label={`${activeConfiguration.label} Final Revised Layout placement canvas. Press Enter to place at the centre when placement mode is active.`}>
+            {layoutObjectUrl && exactAsset?.mimeType.startsWith("image/") ? <img className="stage-b-layout-media" src={layoutObjectUrl} alt={`Final Revised Layout: ${candidate?.label}`} /> : layoutObjectUrl && exactAsset?.mimeType === "application/pdf" ? <iframe className="stage-b-layout-media" src={`${layoutObjectUrl}#toolbar=0&navpanes=0&scrollbar=0`} title={`Final Revised Layout: ${candidate?.label}`} /> : visualFixture ? <div className="stage-b-layout-fallback" aria-label={`Final Revised Layout ${candidate?.label}`}><span>FINAL REVISED LAYOUT</span><strong>{candidate?.label}</strong><div className="stage-b-plan-lines"><i /><i /><i /><i /><i /></div><small>Immutable candidate · {candidate?.checksumSha256.slice(0, 16)}</small></div> : <div className="stage-b-layout-error" role="status">Final Revised Layout could not be loaded. Placement is unavailable.</div>}
             {!cleanView && <>{placements.filter((placement) => !(placement.id === editingPlacementId && draft)).map((placement) => renderPlacement(placementDraft(placement), placement.nameSnapshot, placement.attributePurposeSnapshot, placement.id, { prior: focusMode, selected: !focusMode && placement.id === activePlacement?.id, masterNumber: placement.masterNumber, onSelect: () => { setActivePlacementId(placement.id); setSelectedResolutionId(placement.eligibilityResolutionId ?? ""); } }))}
               {draft && (editingPlacementId || dirty) && renderPlacement(draft, selected?.remedy.name ?? editingPlacement?.nameSnapshot ?? activeConfiguration.label, selected?.remedy.attributePurpose ?? editingPlacement?.attributePurposeSnapshot, `draft-${editingPlacementId || "new"}`, { interactive: true, masterNumber: editingPlacement?.masterNumber })}
               {awaitingPlacement && selected && <div className="stage-b-placement-prompt"><span className="stage-b-remedy-thumb">{activeConfiguration.shortLabel}</span><div><strong>{selected.remedy.name} selected</strong><small>Click the exact placement point on the printable layout.</small></div></div>}</>}
@@ -280,16 +300,18 @@ export function StageBRemedyWorkspace({ caseId, floorId, visualFixture = false, 
           <button disabled={!activePlacement || eligible.length < 2 || page?.state === "FINALISED" || busy} onClick={() => { if (!activePlacement) return; setEditingPlacementId(activePlacement.id); setSelectedResolutionId(activePlacement.eligibilityResolutionId ?? ""); setDraft(placementDraft(activePlacement)); setSwapMode(true); setTool("move-callout"); setSearch(""); setMessage("Choose another eligible remedy below. Its saved anchor remains fixed."); }}>Swap remedy</button>
           <button disabled={!activePlacement || page?.state === "FINALISED" || busy} onClick={() => { if (!activePlacement) return; setEditingPlacementId(activePlacement.id); setSelectedResolutionId(activePlacement.eligibilityResolutionId ?? ""); setDraft(null); setSwapMode(false); setAwaitingPlacement(true); setTool("move-anchor"); setMessage("Click the new exact placement point. The callout will stay print-safe."); }}>Move Placement Point</button>
           {dirty && !editingPlacementId ? <button onClick={() => { setDraft(null); setAwaitingPlacement(false); setDirty(false); setTool("select"); setMessage("Unsaved placement draft deleted."); }}>Delete draft</button> : <button disabled={!activePlacement || page?.state === "FINALISED" || busy} onClick={() => void deleteSavedPlacement()}>Delete</button>}
-          <hr /><label className="check-row"><input type="checkbox" checked={grid} onChange={(event) => setGrid(event.target.checked)} /> Alignment grid</label><button className="button" disabled={!dirty || page?.state === "FINALISED" || busy} onClick={() => void savePlacement(true)}>Save & lock</button>
+          <hr /><label className="check-row"><input type="checkbox" checked={grid} onChange={(event) => setGrid(event.target.checked)} /> Alignment grid</label><button className="button" disabled={!dirty || layoutStatus !== "ready" || page?.state === "FINALISED" || busy} onClick={() => void savePlacement(true)}>Save & lock</button>
           {activePlacement && <div className="stage-b-lock-summary"><strong>Master No. {activePlacement.masterNumber ?? "Pending"}</strong><span>Anchor {activePlacement.anchorX.toFixed(3)}, {activePlacement.anchorY.toFixed(3)}</span><small>Server-owned number · callout movable while page is draft.</small></div>}
         </aside></div>
       <footer className="stage-b-remedy-bar" aria-label={`Eligible ${activeConfiguration.label} remedies`}><div className="stage-b-remedy-bar-heading"><div><strong>Remedy Bar · {activeConfiguration.label}</strong><span>{resolving ? "Resolving approved methodology…" : `${eligible.length} eligible`}</span></div><label><span>Search</span><input type="search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search eligible remedies" disabled={!eligible.length} /></label></div>
-        {!eligible.length && !eligibilityAttempted && <button className="button stage-b-load-remedies" disabled={!verdict || resolving || busy || page?.state === "FINALISED"} onClick={() => void loadEligible()}>{resolving ? "Loading…" : "Load eligible remedies"}</button>}
+        {eligibilitySource && !eligible.length && !eligibilityAttempted && <button className="button stage-b-load-remedies" disabled={!eligibilitySource || resolving || busy || page?.state === "FINALISED"} onClick={() => void loadEligible()}>{resolving ? "Loading…" : "Load eligible remedies"}</button>}
+        {eligibilitySource && eligible.length > 0 && <button className="button stage-b-refresh-remedies" disabled={resolving || busy || page?.state === "FINALISED"} onClick={() => void loadEligible()}>{resolving ? "Refreshing…" : "Refresh eligible remedies"}</button>}
         <div className="stage-b-remedy-items">{filteredEligible.map(({ resolution, remedy }) => <button key={resolution.id} disabled={page?.state === "FINALISED"} className={`${selected?.resolution.id === resolution.id ? "is-selected" : ""}${awaitingPlacement && selected?.resolution.id === resolution.id ? " is-awaiting-placement" : ""}`} aria-pressed={selected?.resolution.id === resolution.id} onClick={() => void chooseRemedy(resolution.id)}><span className="stage-b-remedy-thumb">{activeConfiguration.shortLabel}</span><strong>{remedy.name}</strong><small>{remedy.attributePurpose}</small></button>)}<button className="stage-b-upload-button" onClick={() => { setUploadScope(null); setUploadOpen(true); }}>+ Upload Remedy</button></div>
-        {eligibilityAttempted && !eligible.length && verdict && <p className="stage-b-remedy-empty" role="status">No standard remedies available for this section</p>}{eligible.length > 0 && !filteredEligible.length && <p className="stage-b-remedy-empty" role="status">No eligible remedies match this search.</p>}{!verdict && <p className="stage-b-remedy-empty" role="alert">No immutable {activeConfiguration.label} verdict is bound to this Stage A report.</p>}
+        {eligibilityAttempted && !eligible.length && eligibilitySource && <p className="stage-b-remedy-empty" role="status">No standard remedies available for this section</p>}{eligible.length > 0 && !filteredEligible.length && <p className="stage-b-remedy-empty" role="status">No eligible remedies match this search.</p>}{!eligibilitySource && <p className="stage-b-remedy-empty" role="alert">No immutable {activeConfiguration.label} verdict is bound to this Stage A report.</p>}
       </footer>
     </>}
     {previewOpen && manifestPreview && <StageBManifestPreview manifest={manifestPreview} onClose={() => setPreviewOpen(false)} />}
-    {uploadOpen && <UploadRemedyDialog scope={uploadScope} onScope={setUploadScope} onClose={() => { setUploadOpen(false); setUploadScope(null); }} />}
+    {uploadOpen && <UploadRemedyDialog scope={uploadScope} onScope={setUploadScope} onClose={() => { setUploadOpen(false); setUploadScope(null); }}
+      media={(state?.mediaAssetVersions ?? []).filter((item) => ["FOUNDER_APPROVED", "ACTIVE"].includes(item.status))} permanentAllowed={["ADMIN", "SUPER_ADMIN"].includes(activeUser.role)} busy={busy} onSave={(input) => void saveUploadedRemedy(input)} />}
   </section>;
 }

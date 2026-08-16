@@ -51,7 +51,8 @@ test("Stage A readiness is one-floor v3 and fails closed on every approved block
   assert.match(blockers, /HAND_MARKED_PLAN/);
   assert.match(blockers, /fullColour/);
   assert.match(blockers, /status === "LOCKED"/);
-  assert.match(blockers, /MAIN_ENTRANCE/);
+  assert.match(blockers, /PROPERTY_MAIN_GATE/);
+  assert.match(blockers, /FLOOR_PRIMARY_ENTRANCE/);
   assert.match(blockers, /REVIEW_REQUIRED/);
   assert.match(blockers, /BLOCKED_METHOD_INPUT/);
   assert.match(blockers, /NEEDS_REGENERATION/);

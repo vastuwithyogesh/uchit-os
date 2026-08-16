@@ -1,6 +1,6 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import type { AppUser, FounderLegalPolicyKind } from "../lib/domain.ts";
+import type { AppUser, FounderLegalPolicyKind, MediaAssetVersionRecord } from "../lib/domain.ts";
 import { createEmptyAppState } from "../lib/store.ts";
 import {
   activateFounderLegalPolicy,
@@ -9,8 +9,12 @@ import {
   approveFounderProposal,
   autosaveFounderProposalStep,
   calculateGstPaise,
+  classifyFounderProspectiveProjectService,
   confirmFounderCommercialPayment,
+  approveFounderLegalPolicy,
   createFounderLegalPolicy,
+  createFounderCanonicalLegalPolicyVersion,
+  FOUNDER_CANCELLATION_REFUND_DELAY_V2_COPY,
   createFounderProposalDraft,
   createFounderProposalTemplate,
   FounderCommercialError,
@@ -28,6 +32,7 @@ import {
   sendFounderProposal
 } from "../lib/founder-commercial.ts";
 import { projectStatutoryReadiness } from "../lib/founder-statutory-documents.ts";
+import { activateDocumentTemplate, bootstrapLegacyBranding, createDocumentTemplateVersion } from "../lib/document-branding.ts";
 
 const organisationId = "org-synthetic-commercial";
 const founder: AppUser = { id: "owner-yogesh", fullName: "Yogesh Hora", email: "owner@example.test", role: "SUPER_ADMIN", color: "#111111", organisationId, organisationCapability: "organisation_owner" };
@@ -104,6 +109,34 @@ test("P5 P13 and P14 remain fail-closed and advisory draft text is never auto-se
   assert.equal(JSON.stringify(state).includes("force-majeure"), false);
 });
 
+test("canonical P5 P13 and P14 materialise once, remain unapproved, and require owner CAS approval", () => {
+  const state = base();
+  const p5 = createFounderCanonicalLegalPolicyVersion({ ...ownerArgs(state), kind: "PROFESSIONAL_BOUNDARIES", reason: "Materialise canonical P5 for owner review.", idempotencyKey: "canonical-p5-0001" });
+  const p13 = createFounderCanonicalLegalPolicyVersion({ ...ownerArgs(state), kind: "ACCEPTANCE_DECLARATION", reason: "Materialise canonical P13 for owner review.", idempotencyKey: "canonical-p13-0001" });
+  const p14 = createFounderCanonicalLegalPolicyVersion({ ...ownerArgs(state), kind: "CANCELLATION_REFUND_DELAY", reason: "Materialise canonical P14 for owner review.", idempotencyKey: "canonical-p14-0001" });
+  assert.deepEqual([p5.status, p13.status, p14.status], ["DRAFT", "DRAFT", "DRAFT"]);
+  assert.equal(createFounderCanonicalLegalPolicyVersion({ ...ownerArgs(state), kind: "PROFESSIONAL_BOUNDARIES", reason: "Replay canonical P5.", idempotencyKey: "canonical-p5-0002" }).id, p5.id);
+  assert.equal(state.founderCommercialLegalPolicies.length, 3);
+  assert.throws(() => approveFounderLegalPolicy({ ...ownerArgs(state), actor: nonOwner, policyId: p5.id, reason: "Denied.", idempotencyKey: "canonical-p5-deny", expectedRecordVersion: 1 }), /configured Founder SUPER_ADMIN owner/i);
+  const approved = approveFounderLegalPolicy({ ...ownerArgs(state), policyId: p5.id, reason: "Owner reviewed exact canonical P5.", idempotencyKey: "canonical-p5-approve", expectedRecordVersion: 1 });
+  assert.equal(approved.status, "FOUNDER_APPROVED");
+  assert.throws(() => approveFounderLegalPolicy({ ...ownerArgs(state), policyId: p5.id, reason: "Stale replay.", idempotencyKey: "canonical-p5-stale", expectedRecordVersion: 1 }), /legal policy changed/i);
+});
+
+test("owner-approved P14 successor preserves v1 and activates only the exact v2 source", () => {
+  const state = base();
+  const v1 = createFounderLegalPolicy({ ...ownerArgs(state), kind: "CANCELLATION_REFUND_DELAY", title: "Historical P14", exactText: "Historical P14 wording.", configuration: { refundPolicy: "NO_REFUNDS" }, reason: "Historical test policy.", idempotencyKey: "p14-v1-history" });
+  const v2 = createFounderCanonicalLegalPolicyVersion({ ...ownerArgs(state), kind: "CANCELLATION_REFUND_DELAY", reason: "Owner-approved P14 successor.", idempotencyKey: "p14-v2-successor" });
+  assert.equal(v1.version, 1); assert.equal(v1.status, "DRAFT"); assert.equal(v2.version, 2); assert.equal(v2.status, "DRAFT"); assert.equal(v2.exactText, FOUNDER_CANCELLATION_REFUND_DELAY_V2_COPY);
+  assert.throws(() => createFounderCanonicalLegalPolicyVersion({ ...ownerArgs(state), kind: "CANCELLATION_REFUND_DELAY", reason: "Changed replay body.", idempotencyKey: "p14-v2-successor" }), /different canonical legal policy content/i);
+  assert.throws(() => approveFounderLegalPolicy({ ...ownerArgs(state), actor: nonOwner, policyId: v2.id, reason: "Denied.", idempotencyKey: "p14-v2-non-owner-approve", expectedRecordVersion: 1 }), /configured Founder SUPER_ADMIN owner/i);
+  assert.throws(() => activateFounderLegalPolicy({ ...ownerArgs(state), actor: nonOwner, policyId: v2.id, reason: "Denied.", idempotencyKey: "p14-v2-non-owner-activate", expectedRecordVersion: 1 }), /configured Founder SUPER_ADMIN owner/i);
+  assert.throws(() => activateFounderLegalPolicy({ ...ownerArgs(state), organisationId: "foreign-org", policyId: v2.id, reason: "Cross-org.", idempotencyKey: "p14-v2-cross-org", expectedRecordVersion: 1 }), /configured Founder SUPER_ADMIN owner/i);
+  const approved = approveFounderLegalPolicy({ ...ownerArgs(state), policyId: v2.id, reason: "Owner approved exact P14 v2.", idempotencyKey: "p14-v2-approve", expectedRecordVersion: 1 });
+  const active = activateFounderLegalPolicy({ ...ownerArgs(state), policyId: approved.id, reason: "Owner activated exact P14 v2.", idempotencyKey: "p14-v2-activate", expectedRecordVersion: 2 });
+  assert.equal(active.status, "ACTIVE"); assert.equal(state.founderCommercialLegalPolicies.filter((item) => item.kind === "CANCELLATION_REFUND_DELAY" && item.status === "ACTIVE").length, 1);
+});
+
 test("review approval artifact send acceptance payment invoice and deadlines remain exact and immutable", async () => {
   const state = base(); activateTemplate(state);
   activateLegal(state, "PROFESSIONAL_BOUNDARIES", 1); activateLegal(state, "ACCEPTANCE_DECLARATION", 2); activateLegal(state, "CANCELLATION_REFUND_DELAY", 3); activateLegal(state, "INVOICE_STATUTORY_CONFIG", 4);
@@ -162,4 +195,61 @@ test("tenant isolation, stale CAS and changed-body idempotency replay fail close
   assert.throws(() => autosaveFounderProposalStep({ ...ownerArgs(state), proposalVersionId: proposal.id, step: 2, patch: { refinedSummary: "Changed" }, idempotencyKey: "proposal-same-key", expectedRecordVersion: 2 }), /different proposal changes/i);
   const projectionAttempt = () => projectFounderProposalForClient(state, proposal);
   assert.throws(projectionAttempt, /legal-policy snapshot/i);
+});
+
+test("new Founder proposal artifacts physically compose frozen prefix body suffix while replay preserves historical bytes", async () => {
+  const state = base(); activateTemplate(state);
+  activateLegal(state, "PROFESSIONAL_BOUNDARIES", 1); activateLegal(state, "ACCEPTANCE_DECLARATION", 2); activateLegal(state, "CANCELLATION_REFUND_DELAY", 3);
+  const proposal = completeDraft(state, createDraft(state));
+  reviewFounderProposal({ ...ownerArgs(state), proposalVersionId: proposal.id, reason: "Synthetic distinct Founder review.", idempotencyKey: "template-review-0001", expectedRecordVersion: 5, now: at("2026-08-13T00:00:00Z") });
+  approveFounderProposal({ ...ownerArgs(state), proposalVersionId: proposal.id, reason: "Synthetic distinct Founder approval.", idempotencyKey: "template-approve-0001", expectedRecordVersion: 6, now: at("2026-08-13T00:05:00Z") });
+  const prefix = Uint8Array.from(Buffer.from("iVBORw0KGgoAAAANSUhEUgAAAAIAAAACCAIAAAD91JpzAAAAEklEQVR4nGPcEqXBwMDAxAAGAA8+ATocNFacAAAAAElFTkSuQmCC", "base64"));
+  const suffix = Uint8Array.from(Buffer.from("/9j/4AAQSkZJRgABAQAAAQABAAD/2wBDAP//////////////////////////////////////////////////////////////////////////////////////2wBDAf//////////////////////////////////////////////////////////////////////////////////////wAARCAABAAEDASIAAhEBAxEB/8QAFQABAQAAAAAAAAAAAAAAAAAAAAX/xAAUEAEAAAAAAAAAAAAAAAAAAAAA/9oADAMBAAIQAxAAAAEf/8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABBQJ//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPwF//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPwF//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQAGPwJ//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPyF//9oADAMBAAIAAwAAABAf/8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAwEBPxB//8QAFBEBAAAAAAAAAAAAAAAAAAAAAP/aAAgBAgEBPxB//8QAFBABAAAAAAAAAAAAAAAAAAAAAP/aAAgBAQABPxB//9k=", "base64"));
+  const checksum = async (bytes: Uint8Array) => [...new Uint8Array(await crypto.subtle.digest("SHA-256", bytes.slice().buffer))].map((byte) => byte.toString(16).padStart(2, "0")).join("");
+  const media = async (id: string, bytes: Uint8Array, mimeType: "image/png" | "image/jpeg"): Promise<MediaAssetVersionRecord> => ({ id, assetId: `asset-${id}`, version: 1, filename: id,
+    privateObjectKey: `media/${id}`, mimeType, sizeBytes: bytes.length, checksumSha256: await checksum(bytes), pageCount: 1, status: "FOUNDER_APPROVED", clientSendable: false,
+    uploadedByActorUserId: founder.id, uploadedAt: "2026-08-13T00:00:00.000Z", approvedByActorUserId: founder.id, approvedAt: "2026-08-13T00:00:00.000Z",
+    reason: "Synthetic frozen Founder template page.", registrationHash: `registration-${id}`, organisationId, recordVersion: 1 });
+  const prefixVersion = await media("founder-prefix-v1", prefix, "image/png"); const suffixVersion = await media("founder-suffix-v1", suffix, "image/jpeg");
+  state.mediaAssetVersions.push(prefixVersion, suffixVersion);
+  bootstrapLegacyBranding({ state, actor: founder, idempotencyKey: "template-branding-bootstrap-0001", expectedRecordVersion: 0, reason: "Synthetic exact-equivalent central bootstrap.", now: at("2026-08-13T00:05:30Z") });
+  const active = state.documentTemplates.find((item) => item.family === "FOUNDER_COMMERCIAL_PROPOSAL" && item.status === "ACTIVE")!;
+  const draft = createDocumentTemplateVersion({ state, actor: founder, family: "FOUNDER_COMMERCIAL_PROPOSAL", sourceTemplateId: active.id,
+    template: { prefixPages: [{ internalTitle: "Founder opening", media: { assetId: prefixVersion.assetId, assetVersionId: prefixVersion.id } }], suffixPages: [{ internalTitle: "Founder closing", media: { assetId: suffixVersion.assetId, assetVersionId: suffixVersion.id } }] },
+    reason: "Synthetic physical Founder template page fixture.", idempotencyKey: "template-pages-draft-0001", expectedRecordVersion: active.recordVersion, now: at("2026-08-13T00:05:40Z") });
+  activateDocumentTemplate({ state, actor: founder, templateId: draft.id, reason: "Synthetic physical Founder template activation.", idempotencyKey: "template-pages-active-0001", expectedRecordVersion: draft.recordVersion, now: at("2026-08-13T00:05:50Z") });
+  const store = new InMemoryCommercialArtifactStore(); store.objects.set(prefixVersion.privateObjectKey, prefix); store.objects.set(suffixVersion.privateObjectKey, suffix);
+  const artifact = await generateFounderProposalArtifact({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "template-artifact-0001", expectedRecordVersion: 7, now: at("2026-08-13T00:06:00Z") });
+  const bytes = store.objects.get(artifact.privateObjectKey)!; const text = new TextDecoder("latin1").decode(bytes);
+  assert.equal(artifact.pageCount, 3); assert.match(artifact.rendererVersion, /template-pages\/v1$/); assert.match(text, /PREFIX \/ founder-prefix-v1/); assert.match(text, /SUFFIX \/ founder-suffix-v1/);
+  store.objects.delete(prefixVersion.privateObjectKey); store.objects.delete(suffixVersion.privateObjectKey);
+  const replay = await generateFounderProposalArtifact({ ...ownerArgs(state), proposalVersionId: proposal.id, store, idempotencyKey: "template-artifact-replay-0001", expectedRecordVersion: 7 });
+  assert.equal(replay.artifactHashSha256, artifact.artifactHashSha256); assert.deepEqual(store.objects.get(artifact.privateObjectKey), bytes);
+});
+test("existing prospective service classification updates in place with CAS and exact replay", async () => {
+  const state = base();
+  state.prospectiveProjects[0].serviceType = undefined;
+  state.prospectiveProjects[0].status = "QUALIFICATION_SUBMITTED";
+  const args = { ...ownerArgs(state), prospectiveProjectId: "prospect-project-1", serviceType: "EXISTING_SPACE" as const, clientId: "UC-SYNTH-1", leadId: "lead-synth-1", responseVersionId: "qual-response-1", expectedRecordVersion: 1, idempotencyKey: "service-classify-0001", now: at("2026-08-12T02:00:00Z") };
+  const result = classifyFounderProspectiveProjectService(args);
+  assert.equal(result.project.id, "prospect-project-1");
+  assert.equal(result.project.serviceType, "EXISTING_SPACE");
+  assert.equal(result.project.recordVersion, 2);
+  assert.equal(state.prospectiveProjects.length, 1);
+  const replay = classifyFounderProspectiveProjectService(args);
+  assert.equal(replay.replayed, true);
+  assert.equal(replay.project.recordVersion, 2);
+  await expectStatus(409, () => classifyFounderProspectiveProjectService({ ...args, serviceType: "NEW_CONSTRUCTION", idempotencyKey: "service-classify-0001" }));
+  await expectStatus(409, () => classifyFounderProspectiveProjectService({ ...args, idempotencyKey: "service-classify-0002", expectedRecordVersion: 1 }));
+  await expectStatus(409, () => classifyFounderProspectiveProjectService({ ...args, idempotencyKey: "service-classify-0003", expectedRecordVersion: 2, serviceType: "NEW_CONSTRUCTION" }));
+});
+
+test("existing prospective classification fails closed for tenant, context and qualification mismatches", async () => {
+  const state = base(); state.prospectiveProjects[0].serviceType = undefined; state.prospectiveProjects[0].status = "QUALIFICATION_SUBMITTED";
+  const args = { ...ownerArgs(state), prospectiveProjectId: "prospect-project-1", serviceType: "EXISTING_SPACE" as const, expectedRecordVersion: 1, idempotencyKey: "service-classify-tenant-1" };
+  await expectStatus(403, () => classifyFounderProspectiveProjectService({ ...args, organisationId: "foreign-org" }));
+  await expectStatus(409, () => classifyFounderProspectiveProjectService({ ...args, clientId: "wrong-client", idempotencyKey: "service-classify-context-1" }));
+  await expectStatus(409, () => classifyFounderProspectiveProjectService({ ...args, leadId: "wrong-lead", idempotencyKey: "service-classify-context-2" }));
+  state.qualificationResponseVersions[0].status = "DRAFT" as never;
+  await expectStatus(409, () => classifyFounderProspectiveProjectService({ ...args, idempotencyKey: "service-classify-qualification-1" }));
 });

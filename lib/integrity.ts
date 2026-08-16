@@ -28,7 +28,10 @@ export function inspectIntegrity(
   const issues: IntegrityIssue[] = [];
 
   const clientIds = new Set(state.clients.map((client) => client.id));
-  const proposalIds = new Set(state.commercialProposals.map((proposal) => proposal.id));
+  const proposalIds = new Set([
+    ...state.commercialProposals.map((proposal) => proposal.id),
+    ...state.founderProposalVersions.map((proposal) => proposal.id)
+  ]);
   const caseIds = new Set(state.vastuCases.map((item) => item.id));
   const reportIds = new Set(state.reportVersions.map((item) => item.id));
   const templateIds = new Set(state.whatsappTemplates.map((template) => template.id));

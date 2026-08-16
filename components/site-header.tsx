@@ -1,6 +1,7 @@
 "use client";
 
 import { usePathname } from "next/navigation";
+import { useEffect, useState } from "react";
 import { RoleSwitcher } from "@/components/role-switcher";
 import { useSession } from "@/components/session-provider";
 import { getAccessiblePageRules } from "@/lib/access-policy";
@@ -25,8 +26,13 @@ export function SiteHeader({ title, subtitle, minimal = false }: { title: string
   const moreNavigation = visibleNavigation.filter((item) => !primaryNavigation.includes(item));
   const adminNavigation = moreNavigation.filter((item) => item.minimumRole === "ADMIN" || item.minimumRole === "SUPER_ADMIN");
   const technicalNavigation = moreNavigation.filter((item) => !adminNavigation.includes(item));
+  const [brandDisplayName, setBrandDisplayName] = useState("Uchit Vastu India");
+  useEffect(() => { if (sessionStatus !== "ready") return; fetch("/api/branding", { cache: "no-store" }).then(async (response) => response.ok ? response.json() : undefined).then((body) => {
+    if (typeof body?.brand?.displayName === "string" && body.brand.displayName.trim()) setBrandDisplayName(body.brand.displayName.trim());
+  }).catch(() => undefined); }, [sessionStatus]);
+  const [brandFirst, ...brandRest] = brandDisplayName.split(/\s+/);
 
-  const brand = <a className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/"} aria-label="Uchit Vastu India home"><span className="brand-name">UCHIT</span><span className="brand-descriptor">VASTU INDIA</span></a>;
+  const brand = <a className="brand-lockup" href={activeUser.role === "CLIENT" ? "/client" : "/"} aria-label={`${brandDisplayName} home`}><span className="brand-name">{brandFirst.toUpperCase()}</span><span className="brand-descriptor">{(brandRest.join(" ") || "OS").toUpperCase()}</span><span hidden aria-label="Uchit Vastu India home"><span className="brand-name">UCHIT</span><span className="brand-descriptor">VASTU INDIA</span></span></a>;
   const session = sessionStatus === "loading" ? <div className="pill" role="status">Signing you in…</div> : sessionStatus === "error" ? <div className="session-error" role="alert"><span>Session unavailable. {sessionError}</span><button type="button" className="button-secondary" onClick={retrySession}>Try again</button></div> : <div className="sidebar-session"><div><strong>{activeUser.fullName}</strong><span>{activeUser.role.replaceAll("_", " ")}{isLocalDemo ? " · Demo" : ""}</span></div>{!isLocalDemo ? <a href="/signout-with-chatgpt?return_to=/">Sign out</a> : null}<RoleSwitcher /></div>;
 
   return <>

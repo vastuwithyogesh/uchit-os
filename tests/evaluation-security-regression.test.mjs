@@ -40,7 +40,7 @@ test("artifacted reports block both engines with conflict semantics", () => {
   assert.match(blockers, /report\.caseId === caseId && report\.artifact/);
   assert.match(blockers, /formal rectification workflow/);
   assert.match(functionBody(framework, "assertCaseReadyForEvaluation"), /getCaseEvaluationBlockers/);
-  assert.match(actions, /\[400, 401, 403, 404, 409, 428, 503\]\.includes\(Number\(error\.statusCode\)\)/);
+  assert.match(actions, /\[400, 401, 403, 404, 409, 413, 428, 503\]\.includes\(Number\(error\.statusCode\)\)/);
 });
 
 test("drawing dates reject future values and invalid chronology", () => {
@@ -58,8 +58,9 @@ test("a differing evaluation retry requires formal rectification", () => {
 });
 
 test("client controls use the same complete server prerequisite helper", () => {
-  assert.equal((evaluationUi.match(/disabled=\{busy[^}]*!evaluationReady/g) ?? []).length, 2);
   assert.match(evaluationUi, /getCaseEvaluationBlockers/);
-  assert.match(evaluationUi, /evaluationBlockers\.slice\(0, 3\)\.map/);
-  assert.match(evaluationUi, /href="\/clients-cases">Complete case setup/);
+  assert.match(evaluationUi, /evaluationBlockers\.map/);
+  assert.match(evaluationUi, /!evaluationReady/);
+  assert.match(evaluationUi, /Run and save Utility evaluation/);
+  assert.match(evaluationUi, /Run and save Shakti evaluation/);
 });

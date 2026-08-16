@@ -16,15 +16,17 @@ test("portal projection returns no payment proof bytes or internal evaluation de
   const projection = functionBody(helper, "buildClientPortalView");
   assert.doesNotMatch(projection, /referenceScreenshot|generatedMatrix|inputValues|approvalEvidence/);
   assert.match(projection, /item\.clientId === client\.id/);
-  assert.match(projection, /item\.status === "RELEASED"/);
+  assert.match(projection, /item\.status === "DELIVERED"/);
+  assert.match(projection, /item\.recipientClientId === client\.id/);
   assert.match(projection, /deliveryMilestones: currentCase \? getClientSafeDeliveryMilestones/);
 });
 
-test("client report route checks ownership, release state and immutable integrity", () => {
+test("client report route checks exact delivery ownership and immutable protected artifact", () => {
   const route = source("app/api/client/reports/[reportId]/route.ts");
-  assert.match(route, /caseRecord\.clientId !== client\.id/);
-  assert.match(route, /report\.status !== "RELEASED"/);
-  assert.match(route, /artifactStillMatches/);
+  assert.match(route, /recipientClientId === client\.id/);
+  assert.match(route, /item\.status === "DELIVERED"/);
+  assert.match(route, /readDeliveredProtectedPdf/);
+  assert.doesNotMatch(route, /renderPrintableReport|artifactStillMatches/);
 });
 
 test("client navigation is isolated from staff navigation", () => {
@@ -33,6 +35,6 @@ test("client navigation is isolated from staff navigation", () => {
   assert.match(accessible, /role === "CLIENT"/);
   assert.match(accessible, /return \[\]/);
   assert.match(accessible, /item\.href !== "\/client"/);
-  assert.match(source("app/client/page.tsx"), /Delivery intentionally disabled/);
-  assert.match(source("app/api/client/portal/route.ts"), /CLIENT_DELIVERY_ENABLED = false/);
+  assert.match(source("app/client/page.tsx"), /ClientPortal/);
+  assert.doesNotMatch(source("app/api/client/portal/route.ts"), /CLIENT_DELIVERY_ENABLED|CLIENT_DELIVERY_DEFERRED/);
 });

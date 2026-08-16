@@ -26,6 +26,7 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/assets", label: "Report Charts", minimumRole: "CONSULTANT" },
   { href: "/payment-proofs", label: "Payments", minimumRole: "SETTER" },
   { href: "/reports", label: "Reports", minimumRole: "CONSULTANT" },
+  { href: "/report-deliveries", label: "Report Delivery", minimumRole: "ADMIN" },
   { href: "/commercial-proposals", label: "Commercial Proposals", minimumRole: "SUPER_ADMIN" },
   { href: "/models", label: "Data Model", minimumRole: "ADMIN" },
   { href: "/diagnostics", label: "System Check", minimumRole: "ADMIN" },
@@ -35,6 +36,7 @@ export const pageAccessRules: PageAccessRule[] = [
   { href: "/methodology", label: "Methodology", minimumRole: "SUPER_ADMIN" },
   { href: "/state", label: "System Data", minimumRole: "SUPER_ADMIN" },
   { href: "/admin", label: "Team", minimumRole: "ADMIN" },
+  { href: "/brand-templates", label: "Brand & Templates", minimumRole: "ADMIN" },
   { href: "/bootstrap", label: "Data Readiness", minimumRole: "ADMIN" },
   { href: "/settings", label: "Settings", minimumRole: "ADMIN" }
 ];

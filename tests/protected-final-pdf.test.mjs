@@ -85,7 +85,7 @@ test("server workflow enforces exact Founder scope, release gates, hash verifica
   assert.match(read, /status !== "RELEASED"/); assert.match(read, /verifyBytes/); assert.match(read, /EXPORTED|PRINTED/);
 });
 
-test("protected route exposes no object key, denies preview HTML export, and keeps client delivery disabled", () => {
+test("protected route exposes no object key, denies preview HTML export, and preserves the controlled delivery separation", () => {
   const route = source("app/api/reports/[reportId]/pdf/route.ts");
   const legacyPrint = source("app/api/reports/[reportId]/print/route.ts");
   const publicShape = functionBody(source("lib/final-pdf.server.ts"), "rowPublic");
@@ -96,7 +96,8 @@ test("protected route exposes no object key, denies preview HTML export, and kee
   assert.match(legacyPrint, /uchit-verdict\/v3/); assert.match(legacyPrint, /protected PDF/);
   assert.match(ui, /Generate protected PDF/); assert.match(ui, /Verify PDF/); assert.match(ui, /Release protected PDF/);
   assert.match(ui, /mode=export/); assert.match(ui, /mode=print/); assert.doesNotMatch(ui, /action: "verdict-release"/);
-  assert.match(source("lib/foundation.ts"), /clientDeliveryEnabled: false/);
+  assert.doesNotMatch(functionBody(source("lib/final-pdf.server.ts"), "assertFounder"), /clientDeliveryEnabled/);
+  assert.match(source("lib/document-delivery.ts"), /VASTU_REMEDY_REPORT/);
 });
 
 test("v3 cannot bypass PDF verification through the legacy release action", () => {

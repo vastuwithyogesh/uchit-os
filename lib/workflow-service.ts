@@ -45,6 +45,8 @@ import { getUtilityMasterMethodologyBinding, resolveUtilityMasterRows, utilityMa
 import { calculateUtilityGraphVerdict, UtilityVerdictValidationError } from "@/lib/utility-verdict";
 import { getStageAFloorReviewBlockers, recordStageAFloorCheckpoint } from "@/lib/founder-regeneration";
 import { validateClientIntake } from "@/lib/client-intake";
+import { saveCasePropertyContext } from "@/lib/case-property-context";
+import { resolveEvaluationArchitecture } from "@/lib/evaluation-architecture";
 
 export class WorkflowConflictError extends Error {
   readonly statusCode = 409;
@@ -342,21 +344,57 @@ export async function upsertCaseDocument(input: Record<string, unknown> & { acto
   if (/^(?:data:|blob:)/i.test(evidenceRef) || /^[a-z][a-z0-9+.-]*:/i.test(evidenceRef) || evidenceRef.includes("..") || evidenceRef.includes("\\") || evidenceRef.startsWith("/")) throw new Error("Evidence reference must be an opaque protected-file reference, not embedded file data or a public path.");
   if (existing && existing.evidenceRef !== evidenceRef) throw new WorkflowConflictError("Evidence reference is immutable. Add a new document version for a different file.");
   if (typeof input.isCurrent !== "boolean" || typeof input.blocker !== "boolean") throw new Error("Current and blocker must be true or false.");
-  if (!input.isCurrent && (!existing || existing.isCurrent)) throw new WorkflowConflictError("Every document requirement must retain one current version. Make a replacement current to supersede this version.");
   const revisionStatus = enumValue(input.revisionStatus, documentRevisionStatuses, "document revision status") as DocumentRevisionStatus;
   if (revisionStatus === "VERIFIED" && !evidenceRef) throw new Error("A document cannot be verified without evidence.");
   if (revisionStatus === "SUPERSEDED" && input.isCurrent) throw new Error("A superseded document cannot be current.");
   const discrepancy = input.discrepancy === undefined || input.discrepancy === "" ? undefined : boundedRequiredString(input.discrepancy, "Discrepancy", 1000);
   if (revisionStatus === "VERIFIED" && (input.blocker || discrepancy)) throw new WorkflowConflictError("Resolve blockers and discrepancies before verification.");
+  const successorOfDocumentId = input.successorOfDocumentId === undefined || input.successorOfDocumentId === "" ? undefined : boundedRequiredString(input.successorOfDocumentId, "Predecessor document ID", 160);
+  const currentForRequirement = state.caseDocuments.find((item) => item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.assetType === assetType && (item.floorLabel ?? "") === (floorLabel ?? "") && item.isCurrent);
+  const isManualSuccessor = assetType === "MANUAL_UTILITY_SHEET" && !input.isCurrent && Boolean(successorOfDocumentId)
+    && Boolean(currentForRequirement && currentForRequirement.id === successorOfDocumentId && currentForRequirement.revisionStatus === "VERIFIED" && currentForRequirement.founderApprovalStatus === "APPROVED");
+  if (!input.isCurrent && !(isManualSuccessor || (existing && !existing.isCurrent && existing.successorOfDocumentId === successorOfDocumentId))) throw new WorkflowConflictError("A non-current manual sheet must be an explicit successor of the exact approved current version.");
+  if (assetType === "MANUAL_UTILITY_SHEET" && currentForRequirement?.founderApprovalStatus === "APPROVED" && currentForRequirement.id !== existing?.id && input.isCurrent) throw new WorkflowConflictError("Create a successor draft; only Founder approval may replace the approved current version.");
+  const requiredChange = input.requiredChange === undefined || input.requiredChange === "" ? undefined : boundedRequiredString(input.requiredChange, "Required change", 2000);
+  const issueOpen = Boolean(input.blocker) || revisionStatus === "CHANGES_REQUIRED";
+  if (issueOpen && (!discrepancy || !requiredChange)) throw new WorkflowConflictError("A review issue requires both the discrepancy and required correction.");
+  const issueHistory = [...(existing?.issueHistory ?? [])];
+  if (revisionStatus === "VERIFIED" && issueHistory.some((item) => item.status === "OPEN")) throw new WorkflowConflictError("Resolve the recorded review issue before verification.");
+  if (issueOpen) {
+    const latestOpen = issueHistory.find((item) => item.status === "OPEN");
+    if (!latestOpen || latestOpen.discrepancy !== discrepancy || latestOpen.requiredChange !== requiredChange || latestOpen.ownerRole !== input.ownerRole || latestOpen.ownerName !== input.ownerName) {
+      issueHistory.unshift({ id: nextId("document-issue"), status: "OPEN", discrepancy: discrepancy!, requiredChange: requiredChange!, ownerRole: input.ownerRole as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), openedAt: audit(input.actor).at, openedByActorUserId: input.actor.id });
+    }
+  }
   const organisationId = caseRecord.organisationId ?? input.actor.organisationId ?? "local-demo-organisation";
   await assertCaseFileEvidenceScope(evidenceRef, { organisationId, caseId, caseRevisionNumber: revisionNumber, serviceType, floorLabel });
   const stamp = audit(input.actor);
-  const next = { id: existing?.id ?? nextId("document"), caseId, caseRevisionNumber: revisionNumber, serviceType, assetType, floorLabel, versionLabel, documentDate: optionalDate(input.documentDate, "Document date"), isCurrent: input.isCurrent as boolean, evidenceRef, discrepancy, blocker: input.blocker as boolean, reviewObservation: input.reviewObservation === undefined || input.reviewObservation === "" ? undefined : boundedRequiredString(input.reviewObservation, "Review observation", 2000), requiredChange: input.requiredChange === undefined || input.requiredChange === "" ? undefined : boundedRequiredString(input.requiredChange, "Required change", 2000), preferredAlternative: input.preferredAlternative === undefined || input.preferredAlternative === "" ? undefined : boundedRequiredString(input.preferredAlternative, "Preferred alternative", 1000), acceptableAlternative: input.acceptableAlternative === undefined || input.acceptableAlternative === "" ? undefined : boundedRequiredString(input.acceptableAlternative, "Acceptable alternative", 1000), ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), revisionStatus, ...(assetType === "MANUAL_UTILITY_SHEET" ? { founderApprovalStatus: "PENDING" as const, founderApprovedAt: undefined, founderApprovedByActorUserId: undefined } : {}), idempotencyKey, version: (existing?.version ?? 0) + 1, received: existing?.received ?? stamp, verified: revisionStatus === "VERIFIED" ? (existing?.verified ?? stamp) : undefined, updated: stamp };
+  const next = { id: existing?.id ?? nextId("document"), caseId, caseRevisionNumber: revisionNumber, serviceType, assetType, floorLabel, versionLabel, documentDate: optionalDate(input.documentDate, "Document date"), isCurrent: input.isCurrent as boolean, successorOfDocumentId, evidenceRef, discrepancy, blocker: input.blocker as boolean, reviewObservation: input.reviewObservation === undefined || input.reviewObservation === "" ? undefined : boundedRequiredString(input.reviewObservation, "Review observation", 2000), requiredChange, preferredAlternative: input.preferredAlternative === undefined || input.preferredAlternative === "" ? undefined : boundedRequiredString(input.preferredAlternative, "Preferred alternative", 1000), acceptableAlternative: input.acceptableAlternative === undefined || input.acceptableAlternative === "" ? undefined : boundedRequiredString(input.acceptableAlternative, "Acceptable alternative", 1000), ownerRole: enumValue(input.ownerRole, responsibilityRoles, "responsibility owner role") as ResponsibilityRole, ownerName: boundedRequiredString(input.ownerName, "Responsibility owner name", 120), revisionStatus, issueHistory, ...(assetType === "MANUAL_UTILITY_SHEET" ? { founderApprovalStatus: existing?.founderApprovalStatus ?? "PENDING" as const, founderApprovedAt: existing?.founderApprovedAt, founderApprovedByActorUserId: existing?.founderApprovedByActorUserId } : {}), idempotencyKey, version: (existing?.version ?? 0) + 1, received: existing?.received ?? stamp, verified: revisionStatus === "VERIFIED" ? (existing?.verified ?? stamp) : undefined, updated: stamp };
   if (next.isCurrent) for (const item of state.caseDocuments) if (item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType && item.id !== next.id && item.assetType === assetType && (item.floorLabel ?? "") === (floorLabel ?? "") && item.isCurrent) { item.isCurrent = false; item.revisionStatus = "SUPERSEDED"; item.version += 1; item.updated = stamp; }
   if (existing) Object.assign(existing, next); else state.caseDocuments.unshift(next);
   caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, existing ? "Case document review updated" : "Case document received", `${input.actor.fullName} recorded ${assetType} ${versionLabel} as ${revisionStatus}.`, "Documents", input.actor);
   return next;
+}
+
+export function resolveCaseDocumentIssue(input: Record<string, unknown> & { actor: AppUser }) {
+  const { state, caseRecord, caseId, serviceType, revisionNumber } = assessmentContext(input.caseId);
+  assertExpectedRecordVersion(caseRecord, input.expectedRecordVersion);
+  const recordId = boundedRequiredString(input.recordId, "Document ID", 160);
+  const document = state.caseDocuments.find((item) => item.id === recordId && item.caseId === caseId && item.caseRevisionNumber === revisionNumber && item.serviceType === serviceType);
+  if (!document) throw new Error("Document version not found on this case revision.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const replay = document.issueHistory?.find((item) => item.resolutionIdempotencyKey === idempotencyKey);
+  if (replay) return { document, issue: replay };
+  const issue = document.issueHistory?.find((item) => item.status === "OPEN");
+  if (!issue) throw new WorkflowConflictError("This document version has no open review issue to resolve.");
+  const resolutionNote = boundedRequiredString(input.resolutionNote, "Resolution note", 1000);
+  const stamp = audit(input.actor);
+  issue.status = "RESOLVED"; issue.resolvedAt = stamp.at; issue.resolvedByActorUserId = input.actor.id; issue.resolutionNote = resolutionNote; issue.resolutionIdempotencyKey = idempotencyKey;
+  document.blocker = false; document.discrepancy = undefined; document.requiredChange = undefined; document.revisionStatus = "UNDER_REVIEW";
+  document.version += 1; document.updated = stamp; caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
+  appendTimeline(caseRecord.clientId, "Case document issue resolved", `${input.actor.fullName} resolved the recorded review issue for ${document.assetType} ${document.versionLabel}.`, "Documents", input.actor);
+  return { document, issue };
 }
 
 const milestoneKindsByService: Record<VastuServiceType, readonly DeliveryMilestoneKind[]> = {
@@ -1144,7 +1182,7 @@ export async function verifyAdvanceProofAndOpenCase(input: {
   return { payment, verification, caseRecord };
 }
 
-export function createVastuCase(clientId: string, proposalId: string, actor: AppUser, expectedRecordVersion?: number) {
+export function createVastuCase(clientId: string, proposalId: string, actor: AppUser, expectedRecordVersion?: number, architectureVersion?: "V1") {
   const state = getAppState();
   const proposal = state.commercialProposals.find((item) => item.id === proposalId);
   if (!proposal) {
@@ -1182,7 +1220,8 @@ export function createVastuCase(clientId: string, proposalId: string, actor: App
     reportStatus: "DRAFT",
     orientationLocked: false,
     balanceApproved: false,
-    fullPaymentApproved: false
+    fullPaymentApproved: false,
+    ...(architectureVersion ? { evaluationArchitectureVersion: architectureVersion } : {})
   } satisfies (typeof state.vastuCases)[number];
 
   state.vastuCases.unshift(nextCase);
@@ -1201,12 +1240,101 @@ export function createVastuCase(clientId: string, proposalId: string, actor: App
     floorLabel: "Ground floor",
     status: "DRAFT",
     locked: false,
-    evidenceUploads: []
+    evidenceUploads: [],
+    ...(architectureVersion ? { evaluationArchitectureVersion: architectureVersion } : {})
   };
 
   state.floorWorkspaces.unshift(primaryFloor);
   appendTimeline(clientId, "Case created", `Case ${caseNumber} opened after scoped advance proof approval.`, "Case", actor);
   return nextCase;
+}
+
+export function createVastuCaseV1(clientId: string, proposalId: string, actor: AppUser, expectedRecordVersion?: number) {
+  return createVastuCase(clientId, proposalId, actor, expectedRecordVersion, "V1");
+}
+
+export function upsertCasePropertyContextV1(input: {
+  clientId: string; caseId: string; projectId?: string; propertyContext: import("@/lib/domain").PropertyContext;
+  actor: AppUser; idempotencyKey: string; expectedRecordVersion?: number; organisationId?: string;
+}) {
+  const state = getAppState();
+  const architecture = resolveEvaluationArchitecture({ state, caseId: input.caseId });
+  if (architecture.caseVersion !== "V1") throw new WorkflowConflictError("V1 property context is only available for an explicitly versioned V1 case.");
+  const caseRecord = state.vastuCases.find((item) => item.id === input.caseId);
+  if (!caseRecord || caseRecord.clientId !== input.clientId) throw new WorkflowConflictError("Case and client ownership could not be verified.");
+  if (input.projectId && caseRecord.projectId !== input.projectId) throw new WorkflowConflictError("Project does not belong to the selected case.");
+  const propertyErrors = validateClientIntake({ service: input.propertyContext.serviceInterest, propertyType: input.propertyContext.propertyType, propertyStatus: input.propertyContext.propertyStatus, cityCountry: input.propertyContext.cityCountry, floorCount: input.propertyContext.floorCount?.toString(), locationLink: input.propertyContext.locationLink, latitude: input.propertyContext.latitude?.toString(), longitude: input.propertyContext.longitude?.toString() });
+  const firstPropertyError = Object.values(propertyErrors)[0];
+  if (firstPropertyError) throw new Error(firstPropertyError);
+  const current = state.casePropertyContexts
+    .filter((item) => item.caseId === input.caseId && item.clientId === input.clientId && item.status === "CURRENT")
+    .sort((a, b) => b.version - a.version)[0];
+  if (current && current.recordVersion !== (input.expectedRecordVersion ?? 0)) throw new WorkflowConflictError("Case property context changed. Refresh before saving.");
+  if (current && deterministicContentHash(current.propertyContext) === deterministicContentHash(input.propertyContext)) return current;
+  return saveCasePropertyContext({ state, clientId: input.clientId, caseId: input.caseId, projectId: input.projectId, propertyContext: input.propertyContext, actorId: input.actor.id, organisationId: input.organisationId, idempotencyKey: input.idempotencyKey, expectedVersion: input.expectedRecordVersion });
+}
+
+/** V1 client-owned intake fields; deliberately leaves propertyContext untouched. */
+export function upsertClientIntakeProfileV1(input: Record<string, unknown> & { actor: AppUser }) {
+  const state = getAppState();
+  const clientId = boundedRequiredString(input.clientId, "Client ID");
+  const client = state.clients.find((item) => item.id === clientId);
+  if (!client) throw new Error("Client not found.");
+  const caseId = boundedRequiredString(input.caseId, "Case ID");
+  const caseRecord = state.vastuCases.find((item) => item.id === caseId && item.clientId === clientId);
+  if (!caseRecord || (input.projectId && caseRecord.projectId !== input.projectId)) throw new WorkflowConflictError("Intake context does not match the selected case, project and client.");
+  if (resolveEvaluationArchitecture({ state, caseId }).caseVersion !== "V1") throw new WorkflowConflictError("V1 client intake is only available for an explicitly versioned V1 case.");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const existing = state.clientIntakeProfiles.find((item) => item.clientId === clientId);
+  if (existing?.idempotencyKey === idempotencyKey) return existing;
+  assertExpectedRecordVersion(client, input.expectedRecordVersion);
+  const contact = intakeObject(input.contactPreference, "Contact preference", ["whatsapp", "preferredLanguage", "preferredContactWindow"]);
+  const whatsapp = contact?.whatsapp ? String(contact.whatsapp).replace(/[\s()-]/g, "") : undefined;
+  if (whatsapp && !/^\+[1-9]\d{7,14}$/.test(whatsapp)) throw new Error("WhatsApp number must use valid international E.164 format.");
+  const business = intakeObject(input.businessContext, "Business context", ["company", "industry", "designation", "vision"]);
+  const needsInput = intakeObject(input.needs, "Needs", ["mainChallenge", "desiredOutcome", "urgency"]);
+  const needs = needsInput ? { mainChallenge: optionalIntakeString(needsInput.mainChallenge, "Main challenge", 1000), desiredOutcome: optionalIntakeString(needsInput.desiredOutcome, "Desired outcome", 1000), urgency: optionalIntakeString(needsInput.urgency, "Urgency", 120) } : undefined;
+  const needsErrors = validateClientIntake({ challenge: needs?.mainChallenge, outcome: needs?.desiredOutcome });
+  if (needsErrors.challenge || needsErrors.outcome) throw new Error(needsErrors.challenge ?? needsErrors.outcome);
+  const consent = intakeObject(input.consent, "Consent", ["version", "contact", "accuracy", "confidentiality"]);
+  if (!consent || consent.version !== "uchit-intake/v1") throw new Error("Consent version must be uchit-intake/v1.");
+  const stamp = audit(input.actor);
+  const profile = { clientId, version: (existing?.version ?? 0) + 1, idempotencyKey, contactPreference: contact ? { whatsapp, preferredLanguage: optionalIntakeString(contact.preferredLanguage, "Preferred language", 80), preferredContactWindow: optionalIntakeString(contact.preferredContactWindow, "Preferred contact window", 120) } : existing?.contactPreference, businessContext: business ? { company: optionalIntakeString(business.company, "Company", 160), industry: optionalIntakeString(business.industry, "Industry", 120), designation: optionalIntakeString(business.designation, "Designation", 120), vision: optionalIntakeString(business.vision, "Business vision", 1000) } : existing?.businessContext, decisionMakerStatus: input.decisionMakerStatus ? enumValue(input.decisionMakerStatus, decisionMakerStatuses, "decision-maker status") as DecisionMakerStatus : existing?.decisionMakerStatus, otherDecisionMakers: optionalIntakeString(input.otherDecisionMakers, "Other decision makers", 500) ?? existing?.otherDecisionMakers, propertyContext: existing?.propertyContext, needs, consent: { version: "uchit-intake/v1" as const, contact: consent.contact as boolean | undefined, accuracy: consent.accuracy as boolean | undefined, confidentiality: consent.confidentiality as boolean | undefined, confirmedAt: existing?.consent.confirmedAt ?? stamp.at }, created: existing?.created ?? stamp, updated: stamp };
+  if (existing) Object.assign(existing, profile); else state.clientIntakeProfiles.unshift(profile);
+  client.recordVersion = (client.recordVersion ?? 0) + 1;
+  return profile;
+}
+
+/** Composite V1 save: property truth and client-intake needs commit through one action snapshot. */
+export function saveClientIntakeV1(input: Record<string, unknown> & { actor: AppUser; propertyContext: import("@/lib/domain").PropertyContext }) {
+  const state = getAppState();
+  const clientId = boundedRequiredString(input.clientId, "Client ID");
+  const caseId = boundedRequiredString(input.caseId, "Case ID");
+  const idempotencyKey = boundedRequiredString(input.idempotencyKey, "Idempotency key", 120);
+  const currentContext = state.casePropertyContexts
+    .filter((item) => item.caseId === caseId && item.clientId === clientId && item.status === "CURRENT")
+    .sort((a, b) => b.version - a.version)[0];
+  const existingProfile = state.clientIntakeProfiles.find((item) => item.clientId === clientId);
+  const comparableProfile = (item: typeof existingProfile) => item ? {
+    contactPreference: item.contactPreference, businessContext: item.businessContext,
+    decisionMakerStatus: item.decisionMakerStatus, otherDecisionMakers: item.otherDecisionMakers,
+    needs: item.needs, consent: { version: item.consent.version, contact: item.consent.contact, accuracy: item.consent.accuracy, confidentiality: item.consent.confidentiality }
+  } : undefined;
+  const incomingProfile = {
+    contactPreference: input.contactPreference, businessContext: input.businessContext,
+    decisionMakerStatus: input.decisionMakerStatus, otherDecisionMakers: input.otherDecisionMakers,
+    needs: input.needs, consent: input.consent
+  };
+  if (currentContext?.idempotencyKey === idempotencyKey && deterministicContentHash(currentContext.propertyContext) !== deterministicContentHash(input.propertyContext)) throw new WorkflowConflictError("The V1 intake idempotency key was reused with a different property context.");
+  if (existingProfile?.idempotencyKey === idempotencyKey && deterministicContentHash(comparableProfile(existingProfile)) !== deterministicContentHash(incomingProfile)) throw new WorkflowConflictError("The V1 intake idempotency key was reused with a different client-intake body.");
+  const propertyContext = upsertCasePropertyContextV1({
+    clientId, caseId, projectId: typeof input.projectId === "string" ? input.projectId : undefined,
+    propertyContext: input.propertyContext, actor: input.actor, idempotencyKey,
+    expectedRecordVersion: input.propertyContextExpectedRecordVersion as number | undefined,
+    organisationId: input.organisationId as string | undefined
+  });
+  const profile = upsertClientIntakeProfileV1({ ...input, actor: input.actor, expectedRecordVersion: input.clientExpectedRecordVersion });
+  return { propertyContext, profile };
 }
 
 export function addFloorWorkspace(caseId: string, floorLabel: string, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: string) {
@@ -1215,6 +1343,7 @@ export function addFloorWorkspace(caseId: string, floorLabel: string, actor: App
   if (!caseRecord) {
     throw new Error("Case not found.");
   }
+
   assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
   const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
   const retry = state.floorWorkspaces.find((workspace) => workspace.caseId === caseId && workspace.idempotencyKey === stableKey);
@@ -1255,7 +1384,8 @@ export function addFloorWorkspace(caseId: string, floorLabel: string, actor: App
     status: "DRAFT",
     locked: false,
     evidenceUploads: [],
-    idempotencyKey: stableKey
+    idempotencyKey: stableKey,
+    ...(caseRecord.evaluationArchitectureVersion ? { evaluationArchitectureVersion: caseRecord.evaluationArchitectureVersion } : {})
   };
 
   state.floorWorkspaces.unshift(workspace);
@@ -1265,7 +1395,7 @@ export function addFloorWorkspace(caseId: string, floorLabel: string, actor: App
   return workspace;
 }
 
-export function addFloorEvidence(floorId: string, fileName: string, actor: AppUser) {
+export function addFloorEvidence(floorId: string, fileName: string, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: string, requestHash?: string) {
   const state = getAppState();
   const workspace = state.floorWorkspaces.find((item) => item.id === floorId);
   if (!workspace) {
@@ -1277,6 +1407,13 @@ export function addFloorEvidence(floorId: string, fileName: string, actor: AppUs
     throw new Error("Case not found.");
   }
 
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
+  const hash = boundedRequiredString(requestHash, "Request hash", 256);
+  if (workspace.evidenceIdempotencyKey === stableKey) {
+    if (workspace.evidenceRequestHash !== hash) throw new WorkflowConflictError("This floor-evidence key was already used with different content.");
+    return workspace;
+  }
+  assertExpectedRecordVersion(caseRecord, expectedRecordVersion);
   const normalizedFileName = String(fileName ?? "").trim();
   if (!normalizedFileName) {
     throw new Error("Evidence file name is required.");
@@ -1286,11 +1423,14 @@ export function addFloorEvidence(floorId: string, fileName: string, actor: AppUs
     workspace.evidenceUploads.push(normalizedFileName);
   }
 
+  workspace.evidenceIdempotencyKey = stableKey;
+  workspace.evidenceRequestHash = hash;
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   appendTimeline(caseRecord.clientId, "Evidence added", `${normalizedFileName} attached to ${workspace.floorLabel}.`, "Workspace", actor.role);
   return workspace;
 }
 
-export function markFloorWorkspaceReady(floorId: string, actor: AppUser) {
+export function markFloorWorkspaceReady(floorId: string, actor: AppUser, expectedRecordVersion?: number, idempotencyKey?: string, requestHash?: string) {
   const state = getAppState();
   const workspace = state.floorWorkspaces.find((item) => item.id === floorId);
   if (!workspace) {
@@ -1302,11 +1442,23 @@ export function markFloorWorkspaceReady(floorId: string, actor: AppUser) {
     throw new Error("Case not found.");
   }
 
+  const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
+  const hash = boundedRequiredString(requestHash, "Request hash", 256);
+  if (workspace.readyIdempotencyKey === stableKey) {
+    if (workspace.readyRequestHash !== hash) throw new WorkflowConflictError("This floor-ready key was already used with different content.");
+    return workspace;
+  }
+  if (workspace.readyIdempotencyKey) throw new WorkflowConflictError("Floor readiness has already been recorded for this floor revision.");
+  if (!Number.isInteger(expectedRecordVersion) || (caseRecord.recordVersion ?? 0) !== expectedRecordVersion) throw new PreconditionRequiredError("The latest case record version is required. Refresh and try again.");
+
   // `locked` is the authoritative Floor Setup completion marker consumed by the
   // Founder scorecard. Previously this action only wrote READY_FOR_REVIEW,
   // leaving the UI to report success while Steps 03–04 stayed blocked.
   workspace.locked = true;
   workspace.status = "LOCKED";
+  workspace.readyIdempotencyKey = stableKey;
+  workspace.readyRequestHash = hash;
+  caseRecord.recordVersion = (caseRecord.recordVersion ?? 0) + 1;
   if (!caseRecord.orientationLocked) {
     caseRecord.status = "FLOOR_WORKSPACE_ACTIVE";
   }
@@ -1463,6 +1615,7 @@ export async function generatePreviewReport(caseId: string, floorIdValue: unknow
 
   const report: ReportVersionRecord = {
       id: nextId("report"),
+      organisationId: caseRecord.organisationId,
       caseId,
       floorId: floor.id,
       versionLabel: `${floor.floorLabel} · Stage-A Preview`,
@@ -1539,7 +1692,8 @@ export async function prepareFinalReport(caseId: string, floorIdValue: unknown, 
   const floorId = boundedRequiredString(floorIdValue, "Floor ID", 160);
   const stableKey = boundedRequiredString(idempotencyKey, "Idempotency key", 160);
   const floor = state.floorWorkspaces.find((item) => item.id === floorId && item.caseId === caseId && item.projectId === caseRecord.projectId);
-  if (!floor || floor.stageAVerdictStatus !== "PRESENTED") throw new WorkflowConflictError("Prepare the official report only after this floor's immutable Stage A preview has been presented.");
+  const nativeV1StageB = state.stageBRemediations.find((item) => item.caseId === caseId && item.floorId === floor?.id && item.architectureVersion === "V1" && item.state === "PAGE_FINALISED");
+  if (!floor || (floor.stageAVerdictStatus !== "PRESENTED" && !nativeV1StageB)) throw new WorkflowConflictError("Prepare the official report only after this floor's immutable Stage A preview has been presented or its certified native V1 Stage-B sequence has been finalized.");
   const balancePayment = state.payments.find((item) => item.caseId === caseId && item.type === "BALANCE" && item.status === "APPROVED");
   if (!balancePayment?.proofAssetId) throw new WorkflowConflictError("Final report preparation requires exact scoped and confirmed balance proof.");
 
@@ -1548,6 +1702,7 @@ export async function prepareFinalReport(caseId: string, floorIdValue: unknown, 
   if (existing?.artifact?.immutable) throw new Error("This floor report version is immutable. Create a new revision through formal rectification instead of changing it.");
   const report: ReportVersionRecord = {
       id: nextId("report"),
+      organisationId: caseRecord.organisationId,
       caseId,
       floorId: floor.id,
       versionLabel: `${floor.floorLabel} · Official Verdict Report`,
@@ -1644,7 +1799,8 @@ export function createEvaluationSnapshot(caseId: string, floorIdValue: unknown, 
   const existingSnapshot = state.evaluationSnapshots.find((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id);
   if (existingSnapshot) {
     if (existingSnapshot.provenance?.inputHash === inputHash) return existingSnapshot;
-    throw new WorkflowConflictError("A different Utility evaluation already exists for this case. Start formal rectification before creating another snapshot.");
+    const replacementRequired = state.dependencyInvalidations.some((item) => item.caseId === caseId && item.floorId === floor.id && item.targetType === "UTILITY_EVALUATION" && item.targetId === existingSnapshot.id && item.status === "REPLACEMENT_REQUIRED");
+    if (!replacementRequired) throw new WorkflowConflictError("A different Utility evaluation already exists for this case. Start formal rectification before creating another snapshot.");
   }
   const historicalSnapshots = state.evaluationSnapshots.filter((item) => item.caseId === caseId && item.floorId === floor.id);
   if (historicalSnapshots.length && !historicalSnapshots.some((snapshot) => state.dependencyInvalidations.some((item) => item.caseId === caseId && item.floorId === floor.id && item.targetType === "UTILITY_EVALUATION" && item.targetId === snapshot.id && item.status === "REPLACEMENT_REQUIRED"))) {
@@ -1754,7 +1910,8 @@ export function recordShaktiSnapshot(caseId: string, floorIdValue: unknown, valu
   const existingSnapshot = state.shaktiSnapshots.find((item) => item.caseId === caseId && item.floorId === floor.id && item.planVersionId === plan.id && item.orientationVersionId === orientation.id);
   if (existingSnapshot) {
     if (existingSnapshot.provenance?.inputHash === inputHash) return existingSnapshot;
-    throw new WorkflowConflictError("A different Shakti evaluation already exists for this case. Start formal rectification before creating another snapshot.");
+    const replacementRequired = state.dependencyInvalidations.some((item) => item.caseId === caseId && item.floorId === floor.id && item.targetType === "SHAKTI_EVALUATION" && item.targetId === existingSnapshot.id && item.status === "REPLACEMENT_REQUIRED");
+    if (!replacementRequired) throw new WorkflowConflictError("A different Shakti evaluation already exists for this case. Start formal rectification before creating another snapshot.");
   }
   const historicalSnapshots = state.shaktiSnapshots.filter((item) => item.caseId === caseId && item.floorId === floor.id);
   if (historicalSnapshots.length && !historicalSnapshots.some((snapshot) => state.dependencyInvalidations.some((item) => item.caseId === caseId && item.floorId === floor.id && item.targetType === "SHAKTI_EVALUATION" && item.targetId === snapshot.id && item.status === "REPLACEMENT_REQUIRED"))) {
@@ -1871,8 +2028,8 @@ export function releaseVerdict(reportId: string, actor: AppUser, policy = TEAM_R
   if (!caseRecord) {
     throw new Error("Case not found.");
   }
-  if ((report.artifact?.templateVersion === "uchit-verdict/v3" || report.artifact?.templateVersion === "uchit-verdict/v4") && !pdfReleaseAuthorized) {
-    throw new WorkflowConflictError("Founder Edition v3 release must use the protected PDF verification and atomic release workflow.");
+  if ((report.artifact?.templateVersion === "uchit-verdict/v3" || report.artifact?.templateVersion === "uchit-verdict/v4" || report.artifact?.templateVersion === "uchit-verdict/v5") && !pdfReleaseAuthorized) {
+    throw new WorkflowConflictError("Founder Edition v3/v4/v5 release must use the protected PDF verification and atomic release workflow.");
   }
   if (expectedRecordVersion !== undefined && expectedRecordVersion !== (report.recordVersion ?? 0)) {
     throw new WorkflowConflictError("The report changed before release. Refresh and review the exact approved version.");

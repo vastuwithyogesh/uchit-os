@@ -56,9 +56,11 @@ test("releaseable pilot creates deterministic Utility, graph, Site and immutable
   await createArtifactManifest(state, report, actor);
   assert.equal(report.artifact.templateVersion, "uchit-verdict/v4");
   assert.deepEqual(report.artifact.griddingEvidenceVersionIds, [pilotIds.brahmasthanId, pilotIds.marmaaId, pilotIds.graphEvidenceId].sort());
+  assert.deepEqual(report.artifact.entranceZoneVersionIds, ["pilot-entrance-zone-floor-v1"]);
   assert.deepEqual(getStageAFloorReviewBlockers(state, report), []);
 
   const reviewed = recordStageAFloorCheckpoint(state, report, "FOUNDER_REVIEWED", actor, "Founder reviewed the exact synthetic floor lineage.", "pilot-checkpoint-reviewed");
+  assert.ok(reviewed.review.methodologyVersionIds.includes("pilot-direction-32-v1"));
   const replay = recordStageAFloorCheckpoint(state, report, "FOUNDER_REVIEWED", actor, "Founder reviewed the exact synthetic floor lineage.", "pilot-checkpoint-reviewed");
   assert.equal(replay.checkpoint.id, reviewed.checkpoint.id);
   recordStageAFloorCheckpoint(state, report, "FOUNDER_APPROVED", actor, "Founder approved the exact synthetic floor report.", "pilot-checkpoint-approved");

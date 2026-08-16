@@ -81,7 +81,7 @@ export async function GET(request: Request) {
         "Content-Disposition": `attachment; filename="${minimal ? "uchit-minimal-lead-import-template.csv" : "vastu-with-yogesh-apply-leads-template.csv"}` } });
     }
     const localDemo = isExplicitLocalDemo(request.headers);
-    const context = localDemo ? null : await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
+    const context = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email) || localDemo);
     const snapshot = await loadStateSnapshotFromPersistence();
     const leads = context ? snapshot.state.optInLeads.filter((lead) => lead.organisationId === context.organisation.id) : snapshot.state.optInLeads;
     const projectedLeads = access.actor.role === "SUPER_ADMIN" ? leads : leads.map((lead) => {
@@ -106,7 +106,7 @@ export async function POST(request: Request) {
   let rollback = structuredClone(getAppState());
   try {
     const localDemo = isExplicitLocalDemo(request.headers);
-    const context = localDemo ? null : await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email));
+    const context = await resolveActiveOrganisationContext(access.actor, isInitialOrganisationOwnerEmail(access.actor.email) || localDemo);
     if (context && (context.membership.role !== "SUPER_ADMIN" || context.membership.capability !== "organisation_owner"
       || context.organisation.founderUserId !== access.actor.id)) {
       return NextResponse.json({ ok: false, error: "Only the active organisation owner can import leads in Founder Edition." }, { status: 403, headers: privateHeaders() });

@@ -72,8 +72,18 @@ function isLocalRequest(headers: Headers) {
   return /^(localhost|127\.0\.0\.1)(:\d+)?$/.test(host) || /^\[::1\](:\d+)?$/.test(host) || host === "::1";
 }
 
+type LocalAuthRuntimeKey = "NODE_ENV" | "UCHIT_VASTU_DEMO_MODE" | "UCHIT_VASTU_LOCAL_FOUNDER_OWNER_FIXTURE";
+
+function localAuthRuntimeValue(key: LocalAuthRuntimeKey) {
+  const processValue = typeof process !== "undefined" ? process.env?.[key] : undefined;
+  if (processValue !== undefined) return processValue;
+  return getRuntimeEnv()[key];
+}
+
 export function isExplicitLocalDemo(headers: Headers) {
-  return process.env.NODE_ENV !== "production" && process.env.UCHIT_VASTU_DEMO_MODE === "true" && isLocalRequest(headers);
+  return localAuthRuntimeValue("NODE_ENV") !== "production"
+    && localAuthRuntimeValue("UCHIT_VASTU_DEMO_MODE") === "true"
+    && isLocalRequest(headers);
 }
 
 function readAuthenticatedIdentity(headers: Headers) {
@@ -169,6 +179,20 @@ export function resolveActor(role?: string | null) {
 
 export async function resolveRequestActor(headers: Headers, demoRole?: string | null) {
   if (isExplicitLocalDemo(headers)) {
+    // The owner fixture is opt-in for local authenticated acceptance only. It
+    // never runs in production or for hosted identity resolution, and the
+    // protected actions still evaluate their normal owner predicates.
+    if (localAuthRuntimeValue("UCHIT_VASTU_LOCAL_FOUNDER_OWNER_FIXTURE") === "true") {
+      return {
+        id: "local-founder-owner",
+        fullName: "Yogesh Hora (Local Founder)",
+        email: "iyogesh2020@gmail.com",
+        role: "SUPER_ADMIN" as const,
+        color: "#b08d57",
+        organisationId: "org_local_founder",
+        organisationCapability: "organisation_owner" as const
+      } satisfies AppUser;
+    }
     const cookieRole = headers.get("cookie")?.match(/(?:^|;\s*)uchit-vastu-demo-role=([^;]+)/)?.[1];
     let decodedCookieRole: string | null = null;
     try { decodedCookieRole = cookieRole ? decodeURIComponent(cookieRole) : null; } catch { decodedCookieRole = null; }

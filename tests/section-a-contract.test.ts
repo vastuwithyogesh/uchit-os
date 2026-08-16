@@ -42,7 +42,8 @@ function fixture() {
   state.postSiteFindings.push({ id: "findings-1", projectId: "project-1", caseId: "case-1", floorId: "floor-1", version: 1, status: "FOUNDER_APPROVED", needsRegeneration: false, ...owned } as any);
   state.methodologyVersions.push({ id: "method-stage-b-1", module: "STAGE_B_REMEDIAL", lifecycleStatus: "ACTIVE", executionAdapterVersion: STAGE_B_RESOLVER_VERSION,
     sourceAssetHash: STAGE_B_AUTHORITY_HASH, contentHash: "method-hash-1", ...owned } as any);
-  for (const configuration of STAGE_B_REMEDY_PAGES) state.methodologyRules.push({ id: `rule-${configuration.pageType}`, methodologyVersionId: "method-stage-b-1", decisionStatus: "APPROVED", outcomeJson: { remedialType: configuration.pageType }, ...owned } as any);
+  const stageBActionByType: Record<string, string> = { TATTAV_BALANCER: "SUPPRESS", DISHA_BALANCER: "GROUND", TATTAV_ACTIVATION: "UPLIFT", DISHA_ACTIVATION: "PROMOTE", EQUALISER: "BALANCE" };
+  for (const configuration of STAGE_B_REMEDY_PAGES) state.methodologyRules.push({ id: `rule-${configuration.pageType}`, methodologyVersionId: "method-stage-b-1", decisionStatus: "APPROVED", conditionJson: { action: stageBActionByType[configuration.pageType] }, outcomeJson: { remedialType: configuration.pageType }, ...owned } as any);
   for (let index = 1; index <= 6; index++) state.methodologyGoldenFixtures.push({ id: `fixture-${index}`, methodologyVersionId: "method-stage-b-1", decisionStatus: "APPROVED", ...owned } as any);
   for (const configuration of STAGE_B_REMEDY_PAGES) {
     const suffix = configuration.pageType;

@@ -24,7 +24,7 @@ Do not infer these values from technical convenience.
    pnpm build
    ```
 
-4. Record migration versions currently present in `schema_migrations`. Expected application versions are 1, 2, 3, and 4.
+4. Record migration versions currently present in `schema_migrations`. Expected application versions are the complete ordered set 1 through 16.
 5. Confirm storage capacity, access roles, maintenance window, communications owner, and rollback decision time.
 
 ## Backup before migration
@@ -60,7 +60,7 @@ Separately create an R2 inventory using approved provider tooling: object key, s
 
 1. Restore a disposable staging clone from the D1 export and the independently protected R2 copy/inventory.
 2. Start the candidate application against only that clone. Application startup applies ordered migrations through `migrateD1`.
-3. Verify `schema_migrations` contains one row each for versions 1, 2, 3, and 4.
+3. Verify `schema_migrations` contains one row each for every ordered migration version from 1 through 16.
 4. Verify `app_state_snapshot.revision` equals its pre-migration value. Migration 2 may initialize revision to zero only for a true v1 database that never had the column.
 5. Verify `case_file_assets` exists with unique `evidence_ref` and `object_key`, the immutable-status constraint, and indexes `idx_case_file_assets_scope` and `idx_case_file_assets_floor`.
 6. Restart the candidate against the same clone and verify migration repeatability: no duplicate markers, schema drift, or revision change.

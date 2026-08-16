@@ -45,6 +45,8 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
   const [uploading, setUploading] = useState(false);
   const [uploadState, setUploadState] = useState<UploadState>("NOT_SELECTED");
   const [uploadError, setUploadError] = useState("");
+  const [draftMode, setDraftMode] = useState(false);
+  const [resolutionNote, setResolutionNote] = useState("");
   const [approvalReason, setApprovalReason] = useState("Founder reviewed the original full-colour manual utility sheet for this exact Case and floor.");
   const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
   const versionRef = useRef<HTMLInputElement>(null);
@@ -52,6 +54,7 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
   const ownerNameRef = useRef<HTMLInputElement>(null);
   const idempotencyKey = useRef(crypto.randomUUID());
   const approvalKey = useRef(crypto.randomUUID());
+  const resolutionKey = useRef(crypto.randomUUID());
 
   const refresh = useCallback(async () => {
     setBusy(true);
@@ -74,6 +77,10 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
   const requirement = requirements[selectedRequirement];
   const currentDocument = requirement?.document;
   const caseDocuments = state?.caseDocuments.filter((item) => item.caseId === activeCase?.id && item.caseRevisionNumber === (activeCase?.revisionNumber ?? 1)) ?? [];
+  const approvedDocument = focus === "manual-sheet" ? caseDocuments.find((item) => item.assetType === "MANUAL_UTILITY_SHEET" && item.floorLabel === requestedFloorLabel && item.isCurrent && item.revisionStatus === "VERIFIED" && item.founderApprovalStatus === "APPROVED" && !item.blocker && !item.discrepancy) : undefined;
+  const successorDraft = approvedDocument ? caseDocuments.find((item) => item.assetType === "MANUAL_UTILITY_SHEET" && item.floorLabel === requestedFloorLabel && !item.isCurrent && item.revisionStatus !== "SUPERSEDED" && item.successorOfDocumentId === approvedDocument.id) : undefined;
+  const editorDocument = successorDraft ?? (!approvedDocument ? currentDocument : undefined);
+  const approvalCandidate = editorDocument?.revisionStatus === "VERIFIED" && editorDocument.founderApprovalStatus !== "APPROVED" ? editorDocument : (!approvedDocument && currentDocument?.revisionStatus === "VERIFIED" ? currentDocument : undefined);
   const selectedAsset = useMemo(() => assets.find((asset) => asset.evidenceRef === evidenceRef), [assets, evidenceRef]);
   const readyCount = requirements.filter((item) => item.ready).length;
 
@@ -91,11 +98,13 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
     void refreshAssets(activeCase.id, requirement.floorLabel).catch((error) => setMessage(error instanceof Error ? error.message : "Protected files could not be loaded."));
   }, [activeCase?.id, requirement?.assetType, requirement?.floorLabel, refreshAssets]);
   useEffect(() => {
-    setVersionLabel(currentDocument?.versionLabel ?? ""); setDocumentDate(currentDocument?.documentDate?.slice(0, 10) ?? ""); setEvidenceRef(currentDocument?.evidenceRef ?? "");
-    setRevisionStatus(currentDocument?.revisionStatus ?? "RECEIVED"); setBlocker(currentDocument?.blocker ?? false); setDiscrepancy(currentDocument?.discrepancy ?? "");
-    setReviewObservation(currentDocument?.reviewObservation ?? ""); setRequiredChange(currentDocument?.requiredChange ?? ""); setPreferredAlternative(currentDocument?.preferredAlternative ?? ""); setAcceptableAlternative(currentDocument?.acceptableAlternative ?? "");
-    setOwnerRole(currentDocument?.ownerRole ?? "CONSULTANT"); setOwnerName(currentDocument?.ownerName ?? ""); idempotencyKey.current = crypto.randomUUID();
-  }, [activeCase?.id, selectedRequirement, currentDocument?.id, currentDocument?.version]);
+    const document = editorDocument;
+    setVersionLabel(document?.versionLabel ?? ""); setDocumentDate(document?.documentDate?.slice(0, 10) ?? ""); setEvidenceRef(document?.evidenceRef ?? "");
+    setRevisionStatus(document?.revisionStatus ?? "RECEIVED"); setBlocker(document?.blocker ?? false); setDiscrepancy(document?.discrepancy ?? "");
+    setReviewObservation(document?.reviewObservation ?? ""); setRequiredChange(document?.requiredChange ?? ""); setPreferredAlternative(document?.preferredAlternative ?? ""); setAcceptableAlternative(document?.acceptableAlternative ?? "");
+    setOwnerRole(document?.ownerRole ?? "CONSULTANT"); setOwnerName(document?.ownerName ?? activeUser.fullName); setResolutionNote("");
+    setUploadState(document ? "RECORDED" : "NOT_SELECTED"); idempotencyKey.current = crypto.randomUUID(); resolutionKey.current = crypto.randomUUID();
+  }, [activeCase?.id, selectedRequirement, editorDocument?.id, editorDocument?.version, activeUser.fullName, draftMode]);
   useEffect(() => {
     if (uploading) return;
     if (selectedFile && uploadState === "NOT_SELECTED") setUploadState("SELECTED");
@@ -108,8 +117,12 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
     if (!versionLabel.trim()) errors.versionLabel = "Enter a version name for this document.";
     if (!evidenceRef) errors.evidenceRef = "Select the exact protected upload for this version.";
     if (!ownerName.trim()) errors.ownerName = "Enter the person or team responsible for the next action.";
-    if (revisionStatus === "VERIFIED" && blocker) errors.blocker = "Clear the blocking issue before verification.";
-    if (revisionStatus === "VERIFIED" && discrepancy.trim()) errors.discrepancy = "Resolve the discrepancy before verification.";
+    const savingIssue = blocker || revisionStatus === "CHANGES_REQUIRED";
+    if (savingIssue && !discrepancy.trim()) errors.discrepancy = "Describe what does not match.";
+    if (savingIssue && !requiredChange.trim()) errors.requiredChange = "Describe the required correction.";
+    if (revisionStatus === "VERIFIED" && blocker) errors.blocker = "Use Resolve issue before verification.";
+    if (revisionStatus === "VERIFIED" && discrepancy.trim()) errors.discrepancy = "Use Resolve issue to preserve this discrepancy in history before verification.";
+    if (revisionStatus === "VERIFIED" && editorDocument?.issueHistory?.some((item) => item.status === "OPEN")) errors.issueHistory = "Resolve the recorded review issue before verification.";
     setFieldErrors(errors);
     if (Object.keys(errors).length) {
       setMessage(`${Object.keys(errors).length} required correction${Object.keys(errors).length === 1 ? "" : "s"} needed before recording this document.`);
@@ -117,19 +130,35 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
       return;
     }
     const isVerify = revisionStatus === "VERIFIED";
-    const isReplacement = Boolean(currentDocument && versionLabel.trim() !== currentDocument.versionLabel);
-    if (!window.confirm(isVerify ? "Verify this version? Confirm that the file is correct and has no unresolved issue." : isReplacement ? "Save this as the current version? The previous current version will be superseded." : "Save this document review?")) return;
+    const isSuccessor = Boolean(approvedDocument);
+    if (!window.confirm(savingIssue ? "Save this review issue without replacing the approved current version?" : isVerify ? "Verify this exact version? Founder approval is still required before a successor replaces the approved version." : isSuccessor ? "Save this successor draft? It will not replace the approved version." : "Save this document review?")) return;
     setBusy(true);
     try {
-      const payload = { action: "case-document-upsert", caseId: activeCase.id, recordId: isReplacement ? undefined : currentDocument?.id, assetType: requirement.assetType, floorLabel: requirement.floorLabel, versionLabel, documentDate: documentDate || undefined, isCurrent: true, evidenceRef, discrepancy: discrepancy || undefined, blocker, reviewObservation: reviewObservation || undefined, requiredChange: requiredChange || undefined, preferredAlternative: preferredAlternative || undefined, acceptableAlternative: acceptableAlternative || undefined, ownerRole, ownerName, revisionStatus, idempotencyKey: idempotencyKey.current, expectedRecordVersion: activeCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null };
+      const payload = { action: "case-document-upsert", caseId: activeCase.id, recordId: editorDocument?.id, assetType: requirement.assetType, floorLabel: requirement.floorLabel, versionLabel, documentDate: documentDate || undefined, isCurrent: !approvedDocument, successorOfDocumentId: approvedDocument?.id, evidenceRef, discrepancy: discrepancy || undefined, blocker, reviewObservation: reviewObservation || undefined, requiredChange: requiredChange || undefined, preferredAlternative: preferredAlternative || undefined, acceptableAlternative: acceptableAlternative || undefined, ownerRole, ownerName, revisionStatus, idempotencyKey: idempotencyKey.current, expectedRecordVersion: activeCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null };
       const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify(payload) });
       const result = await response.json();
       if (!response.ok || result.ok === false) throw new ActionError(typeof result.error === "string" ? result.error : result.error?.message ?? "The document could not be saved.", response.status);
-      idempotencyKey.current = crypto.randomUUID(); await refresh(); router.refresh(); setUploadState("RECORDED"); setMessage(isVerify ? "Document verified." : "Document review saved.");
+      idempotencyKey.current = crypto.randomUUID(); setDraftMode(true); await refresh(); router.refresh(); setUploadState("RECORDED"); setMessage(savingIssue ? "Review issue saved. The approved current version remains unchanged." : isVerify ? "Version verified. Founder approval is required before it becomes current." : isSuccessor ? "Successor draft saved. The approved current version remains unchanged." : "Document review saved.");
     } catch (error) {
       if (error instanceof ActionError && error.status === 409) setMessage("This case changed while you were working. Reload, review the latest version, then enter your change again. Nothing was saved.");
       else if (error instanceof ActionError && error.status === 428) setMessage("The case version is missing. Reload before saving.");
       else setMessage(error instanceof Error ? error.message : "The document could not be saved.");
+    } finally { setBusy(false); }
+  }
+
+  async function resolveIssue() {
+    if (!state || !activeCase || !editorDocument) return;
+    if (resolutionNote.trim().length < 10) { setMessage("Enter a resolution note of at least 10 characters."); return; }
+    setBusy(true);
+    try {
+      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action: "case-document-issue-resolve", caseId: activeCase.id, recordId: editorDocument.id, resolutionNote, idempotencyKey: resolutionKey.current, expectedRecordVersion: activeCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null }) });
+      const result = await response.json();
+      if (!response.ok || result.ok === false) throw new ActionError(typeof result.error === "string" ? result.error : result.error?.message ?? "The review issue could not be resolved.", response.status);
+      resolutionKey.current = crypto.randomUUID(); await refresh(); router.refresh(); setMessage("Review issue resolved and preserved in history. Choose Verified when this exact version is ready.");
+    } catch (error) {
+      if (error instanceof ActionError && error.status === 409) setMessage("This case changed. Reload the latest version, review the issue history, and retry.");
+      else if (error instanceof ActionError && error.status === 428) setMessage("Reload the latest case version before resolving this issue.");
+      else setMessage(error instanceof Error ? error.message : "The review issue could not be resolved.");
     } finally { setBusy(false); }
   }
 
@@ -152,13 +181,13 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
   }
 
   async function approveManualSheet() {
-    if (!state || !activeCase || !requestedFloorId || !currentDocument) return;
+    if (!state || !activeCase || !requestedFloorId || !approvalCandidate) return;
     if (approvalReason.trim().length < 20) { setMessage("Explain the Founder approval using at least 20 characters."); return; }
     if (!window.confirm("Founder approve this exact verified manual utility sheet for report inclusion?")) return;
     setBusy(true);
     try {
       const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
-        action: "manual-sheet-approve", caseId: activeCase.id, floorId: requestedFloorId, documentId: currentDocument.id, reason: approvalReason,
+        action: "manual-sheet-approve", caseId: activeCase.id, floorId: requestedFloorId, documentId: approvalCandidate.id, reason: approvalReason,
         idempotencyKey: approvalKey.current, expectedRecordVersion: activeCase.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null
       }) });
       const result = await response.json();
@@ -171,38 +200,60 @@ export function FilesDrawingsConsole({ focus = "all", clientId: initialClientId,
     } finally { setBusy(false); }
   }
 
-  const verificationBlocked = revisionStatus === "VERIFIED" && (blocker || Boolean(discrepancy.trim()));
-  const documentUnchanged = Boolean(currentDocument
-    && versionLabel.trim() === currentDocument.versionLabel
-    && (documentDate || undefined) === currentDocument.documentDate?.slice(0, 10)
-    && evidenceRef === currentDocument.evidenceRef
-    && revisionStatus === currentDocument.revisionStatus
-    && blocker === currentDocument.blocker
-    && discrepancy.trim() === (currentDocument.discrepancy ?? "")
-    && reviewObservation.trim() === (currentDocument.reviewObservation ?? "")
-    && requiredChange.trim() === (currentDocument.requiredChange ?? "")
-    && preferredAlternative.trim() === (currentDocument.preferredAlternative ?? "")
-    && acceptableAlternative.trim() === (currentDocument.acceptableAlternative ?? "")
-    && ownerRole === currentDocument.ownerRole
-    && ownerName.trim() === currentDocument.ownerName);
-  const canSave = Boolean(requirement && versionLabel.trim() && evidenceRef && ownerName.trim() && revisionStatus !== "SUPERSEDED" && !verificationBlocked && !documentUnchanged);
+  const openIssue = editorDocument?.issueHistory?.find((item) => item.status === "OPEN");
+  const savingIssue = blocker || revisionStatus === "CHANGES_REQUIRED";
+  const verificationBlocked = revisionStatus === "VERIFIED" && (blocker || Boolean(discrepancy.trim()) || Boolean(openIssue));
+  const documentUnchanged = Boolean(editorDocument
+    && versionLabel.trim() === editorDocument.versionLabel
+    && (documentDate || undefined) === editorDocument.documentDate?.slice(0, 10)
+    && evidenceRef === editorDocument.evidenceRef
+    && revisionStatus === editorDocument.revisionStatus
+    && blocker === editorDocument.blocker
+    && discrepancy.trim() === (editorDocument.discrepancy ?? "")
+    && reviewObservation.trim() === (editorDocument.reviewObservation ?? "")
+    && requiredChange.trim() === (editorDocument.requiredChange ?? "")
+    && preferredAlternative.trim() === (editorDocument.preferredAlternative ?? "")
+    && acceptableAlternative.trim() === (editorDocument.acceptableAlternative ?? "")
+    && ownerRole === editorDocument.ownerRole
+    && ownerName.trim() === editorDocument.ownerName);
+  const issueFieldsValid = !savingIssue || Boolean(discrepancy.trim() && requiredChange.trim() && ownerName.trim());
+  const canSave = Boolean(requirement && versionLabel.trim() && evidenceRef && ownerName.trim() && revisionStatus !== "SUPERSEDED" && issueFieldsValid && !verificationBlocked && !documentUnchanged && editorDocument?.founderApprovalStatus !== "APPROVED");
   const recordBlockedReason = !versionLabel.trim() ? "Enter a version name."
     : !evidenceRef ? "Select the exact protected upload."
       : !ownerName.trim() ? "Enter the next responsible person or team."
         : verificationBlocked ? "Clear the blocker and discrepancy before verification."
-          : documentUnchanged ? "This exact document version is already recorded. Change a review field or add a replacement version."
+          : savingIssue && !issueFieldsValid ? "Describe the discrepancy, required correction and responsible person, then save the review issue."
+          : editorDocument?.founderApprovalStatus === "APPROVED" ? "This exact version is Founder approved and immutable."
+          : documentUnchanged ? "This exact document version is already recorded. Change the review or start a successor version."
             : "Ready to record this document version.";
   const primaryIndex = requirements.findIndex((item) => !item.ready);
+  const showEditor = Boolean(requirement && (!approvedDocument || draftMode || successorDraft));
+  const issueMode = savingIssue || Boolean(openIssue);
+  const primaryLabel = editorDocument?.founderApprovalStatus === "APPROVED"
+    ? "Founder approved"
+    : editorDocument?.revisionStatus === "VERIFIED" && revisionStatus === "VERIFIED"
+      ? "Version verified"
+      : savingIssue
+        ? "Save review issue"
+        : revisionStatus === "VERIFIED"
+          ? "Verify this version"
+          : editorDocument
+            ? "Save review"
+            : approvedDocument
+              ? "Save successor draft"
+              : "Record document";
 
   const checklist = <><div className="eyebrow">Required checklist</div><h2>What is ready?</h2>{!activeCase ? <p className="subtle">Open a case first.</p> : <div className="list">{requirements.map((item, index) => { const itemStatus = !item.document ? "Missing" : item.ready ? "Verified" : item.document.revisionStatus === "CHANGES_REQUIRED" || item.document.blocker || item.document.discrepancy ? "Needs correction" : "Received"; return <button type="button" className={index === primaryIndex ? "button" : "button-secondary"} key={`${item.assetType}-${item.floorLabel ?? "case"}`} onClick={() => setSelectedRequirement(index)} aria-pressed={index === selectedRequirement}><strong>{label(item.assetType)}{item.floorLabel ? ` · ${item.floorLabel}` : ""}</strong><span>{itemStatus}{item.document ? ` · Next: ${item.document.ownerName}` : " · Next: consultant"}</span></button>; })}</div>}</>;
 
   return <section className={`section-grid files-workspace files-focus-${focus}`} aria-labelledby="files-title">
-    {focus === "manual-sheet" && currentDocument?.revisionStatus === "VERIFIED" && <div className="card span-12"><div className="eyebrow">Founder approval</div><h2>{currentDocument.founderApprovalStatus === "APPROVED" ? "Manual utility sheet approved" : "Approve the verified sheet"}</h2><p className="subtle">Verification confirms the file review. Founder approval separately authorises this exact immutable version for report inclusion.</p><label className="field" htmlFor="manual-sheet-approval-reason"><span>Approval reason</span><textarea id="manual-sheet-approval-reason" value={approvalReason} onChange={(event) => setApprovalReason(event.target.value)} minLength={20} maxLength={500} disabled={currentDocument.founderApprovalStatus === "APPROVED" || busy} /></label><button type="button" className="button" disabled={busy || currentDocument.founderApprovalStatus === "APPROVED" || approvalReason.trim().length < 20} onClick={() => void approveManualSheet()}>{currentDocument.founderApprovalStatus === "APPROVED" ? "Founder approved" : "Founder approve sheet"}</button>{currentDocument.founderApprovalStatus !== "APPROVED" && approvalReason.trim().length < 20 && <p className="meta">Approval is disabled until the reason contains at least 20 characters.</p>}</div>}
+    {focus === "manual-sheet" && approvedDocument && <div className="card span-12 status-approved"><div className="eyebrow">Approved current version</div><h2>{approvedDocument.versionLabel}</h2><p className="subtle">Founder approved · Verified · Exact floor/report binding retained. This immutable version remains authoritative until a verified successor receives Founder approval.</p><div className="pill-row"><span className="pill">Version {approvedDocument.version}</span><span className="pill">{approvedDocument.documentDate ?? "Date not recorded"}</span><span className="pill">Founder approved</span></div>{!successorDraft && !draftMode && <button type="button" className="button-secondary" onClick={() => setDraftMode(true)}>Start successor version</button>}</div>}
+    {focus === "manual-sheet" && (successorDraft || (approvedDocument && draftMode)) && <div className="card span-12 status-attention" role="status"><div className="eyebrow">Successor draft</div><h2>Does not replace approved {approvedDocument?.versionLabel} until verified and Founder approved</h2><p className="subtle">Draft blockers and corrections apply only to this successor. The approved current version and its report lineage remain valid unless the successor is promoted.</p></div>}
+    {focus === "manual-sheet" && approvalCandidate && <div className="card span-12"><div className="eyebrow">Founder approval</div><h2>Approve the verified version</h2><p className="subtle">Verification confirms the file review. Founder approval promotes this exact immutable successor for report inclusion and preserves the prior version as superseded history.</p><label className="field" htmlFor="manual-sheet-approval-reason"><span>Approval reason</span><textarea id="manual-sheet-approval-reason" value={approvalReason} onChange={(event) => setApprovalReason(event.target.value)} minLength={20} maxLength={500} disabled={busy} /></label><button type="button" className="button" disabled={busy || approvalReason.trim().length < 20} onClick={() => void approveManualSheet()}>{busy ? "Approving..." : "Founder approve sheet"}</button>{approvalReason.trim().length < 20 && <p className="meta">Approval is disabled until the reason contains at least 20 characters.</p>}</div>}
     <div className="card span-12"><div className="eyebrow">Files and drawings</div><h1 id="files-title">{readiness?.ready ? "All required files are verified" : "Check the next required file"}</h1><p className="subtle">See what is missing, what needs correction, and who acts next.</p><div className="founder-context-bar" aria-label="Locked file context"><span>Case</span><strong>{activeCase?.caseNumber ?? "Unavailable"}</strong><span aria-hidden="true">→</span><span>{client?.displayName ?? "Client unavailable"}</span><span aria-hidden="true">→</span><span>{requestedFloorLabel ?? "Floor unavailable"}</span><button className="button-secondary" type="button" onClick={() => void refresh()} disabled={busy}>Reload</button></div><div className="pill-row"><span className="pill">Revision {activeCase?.revisionNumber ?? 1}</span><span className="pill">{readyCount} of {requirements.length} verified</span></div>{!activeCase && <p role="alert">This route does not contain an authorised Case and Client context. Select the case again.</p>}{activeCase && !requestedFloorLabel && <p role="alert">This route does not contain an authorised floor for the selected case. Select the floor again.</p>}</div>
     {focus === "manual-sheet" ? <details className="card span-12 founder-technical-details"><summary>View other required files</summary><div className="details-body">{checklist}</div></details> : <div className="card span-12">{checklist}</div>}
-    {requirement && <div className="card span-12" aria-live="polite"><div className="eyebrow">Protected upload status</div><div className={`upload-status upload-status-${uploadState.toLowerCase()}`} role={uploadState === "FAILED" ? "alert" : "status"}><strong>{label(uploadState)}</strong>{selectedFile && <span> · {selectedFile.name.replace(/[\r\n]/g, " ")} · {selectedFile.type || "unknown type"} · {Math.ceil(selectedFile.size / 1024)} KB</span>}{uploadError && <span> · {uploadError}</span>}</div>{uploadState === "NOT_SELECTED" && <p className="meta">Upload is disabled until a PDF or supported image is selected.</p>}{uploadState === "FAILED" && selectedFile && <button type="button" className="button-secondary" disabled={uploading} onClick={() => void uploadFile()}>Retry upload</button>}{uploadState === "UPLOADED_NOT_RECORDED" && <p className="meta">The protected upload succeeded. Record the exact version below; it is not verified yet.</p>}</div>}
-    {requirement && <div className="card span-12"><div className="eyebrow">Current selection</div><h2>{label(requirement.assetType)}{requirement.floorLabel ? ` · ${requirement.floorLabel}` : ""}</h2><div className="two-col"><div className="field"><label htmlFor="file-version">Version name</label><input id="file-version" value={versionLabel} onChange={(event) => setVersionLabel(event.target.value)} maxLength={120} /></div><div className="field"><label htmlFor="file-date">Document date</label><input id="file-date" type="date" value={documentDate} onChange={(event) => setDocumentDate(event.target.value)} /></div><div className="field"><label htmlFor="case-file">Upload a protected file</label><input id="case-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} disabled={uploading} /><span className="meta">PDF, PNG, JPG, or WebP · up to 20 MB</span><button type="button" className="button-secondary" disabled={!selectedFile || uploading} onClick={() => void uploadFile()}>{uploading ? "Uploading..." : "Upload file"}</button></div><div className="field"><label htmlFor="file-evidence">Protected file for this version</label><select id="file-evidence" value={evidenceRef} onChange={(event) => setEvidenceRef(event.target.value)} disabled={Boolean(currentDocument && versionLabel === currentDocument.versionLabel)}><option value="">Choose a matching protected upload</option>{assets.map((asset) => <option value={asset.evidenceRef} key={asset.id}>{asset.fileName}</option>)}</select><span className="meta">Only uploads for this case and exact floor are shown. Storage details stay hidden.</span>{selectedAsset && <details><summary>File details</summary><span className="meta">{selectedAsset.fileName} · {selectedAsset.mimeType} · {Math.ceil(selectedAsset.sizeBytes / 1024)} KB · {new Date(selectedAsset.createdAt).toLocaleDateString()}</span></details>}</div><div className="field"><label htmlFor="file-status">Review status</label><select id="file-status" value={revisionStatus} onChange={(event) => setRevisionStatus(event.target.value as DocumentRevisionStatus)}>{documentRevisionStatuses.filter((status) => status !== "SUPERSEDED").map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></div><label className="list-item"><span><input type="checkbox" checked={blocker} onChange={(event) => setBlocker(event.target.checked)} /> This issue blocks the next step</span></label><div className="field"><label htmlFor="file-discrepancy">What does not match?</label><textarea id="file-discrepancy" value={discrepancy} onChange={(event) => setDiscrepancy(event.target.value)} maxLength={1000} /></div><div className="field"><label htmlFor="file-owner-role">Next owner</label><select id="file-owner-role" value={ownerRole} onChange={(event) => setOwnerRole(event.target.value as ResponsibilityRole)}>{responsibilityRoles.map((role) => <option key={role} value={role}>{label(role)}</option>)}</select></div><div className="field"><label htmlFor="file-owner-name">Person or team</label><input id="file-owner-name" value={ownerName} onChange={(event) => setOwnerName(event.target.value)} maxLength={120} /></div></div><div className="field"><label htmlFor="review-observation">Review observation</label><textarea id="review-observation" value={reviewObservation} onChange={(event) => setReviewObservation(event.target.value)} maxLength={2000} /></div><div className="field"><label htmlFor="required-change">Required correction</label><textarea id="required-change" value={requiredChange} onChange={(event) => setRequiredChange(event.target.value)} maxLength={2000} /></div><details><summary>Alternatives and technical details</summary><div className="field"><label htmlFor="preferred-alternative">Preferred alternative</label><textarea id="preferred-alternative" value={preferredAlternative} onChange={(event) => setPreferredAlternative(event.target.value)} maxLength={1000} /></div><div className="field"><label htmlFor="acceptable-alternative">Acceptable alternative</label><textarea id="acceptable-alternative" value={acceptableAlternative} onChange={(event) => setAcceptableAlternative(event.target.value)} maxLength={1000} /></div>{currentDocument && <p className="meta">Record version {currentDocument.version} · Received {currentDocument.received.at} · Updated {currentDocument.updated.at}</p>}</details>{verificationBlocked && <p role="alert">Resolve the blocker and discrepancy before verifying.</p>}<button type="button" className="button" disabled={busy || !canSave} onClick={() => void save()}>{revisionStatus === "VERIFIED" ? "Verify document" : currentDocument ? "Save review" : "Record document"}</button></div>}
+    {showEditor && <div className="card span-12" aria-live="polite"><div className="eyebrow">Protected upload status</div><div className={`upload-status upload-status-${uploadState.toLowerCase()}`} role={uploadState === "FAILED" ? "alert" : "status"}><strong>{label(uploadState)}</strong>{selectedFile && <span> · {selectedFile.name.replace(/[\r\n]/g, " ")} · {selectedFile.type || "unknown type"} · {Math.ceil(selectedFile.size / 1024)} KB</span>}{uploadError && <span> · {uploadError}</span>}</div>{uploadState === "NOT_SELECTED" && <p className="meta">Upload is disabled until a PDF or supported image is selected.</p>}{uploadState === "FAILED" && selectedFile && <button type="button" className="button-secondary" disabled={uploading} onClick={() => void uploadFile()}>Retry upload</button>}{uploadState === "UPLOADED_NOT_RECORDED" && <p className="meta">The protected upload succeeded. Record this exact version next; it is not verified or current yet.</p>}</div>}
+    {showEditor && requirement && <div className="card span-12"><div className="eyebrow">{approvedDocument ? "Successor draft" : "Manual utility sheet"}</div><h2>{label(requirement.assetType)}{requirement.floorLabel ? ` · ${requirement.floorLabel}` : ""}</h2><p className="subtle">Upload or select the original full-colour manually marked utility sheet for this exact floor, name and date it, review it, then verify the immutable version.</p><div className="two-col"><div className="field"><label htmlFor="file-version">Version name</label><input id="file-version" value={versionLabel} onChange={(event) => setVersionLabel(event.target.value)} maxLength={120} /></div><div className="field"><label htmlFor="file-date">Document date</label><input id="file-date" type="date" value={documentDate} onChange={(event) => setDocumentDate(event.target.value)} /></div><div className="field"><label htmlFor="case-file">Upload the protected original sheet</label><input id="case-file" type="file" accept=".pdf,.png,.jpg,.jpeg,.webp,application/pdf,image/png,image/jpeg,image/webp" onChange={(event) => setSelectedFile(event.target.files?.[0] ?? null)} disabled={uploading || Boolean(editorDocument)} /><span className="meta">PDF, PNG, JPG, or WebP · up to 20 MB</span><button type="button" className="button-secondary" disabled={!selectedFile || uploading || Boolean(editorDocument)} onClick={() => void uploadFile()}>{uploading ? "Uploading..." : "Upload securely"}</button></div><div className="field"><label htmlFor="file-evidence">Protected file for this version</label><select id="file-evidence" ref={evidenceRefControl} value={evidenceRef} onChange={(event) => setEvidenceRef(event.target.value)} disabled={Boolean(editorDocument)} aria-invalid={Boolean(fieldErrors.evidenceRef)} aria-describedby={fieldErrors.evidenceRef ? "file-evidence-error" : undefined}><option value="">Choose a matching protected upload</option>{assets.map((asset) => <option value={asset.evidenceRef} key={asset.id}>{asset.fileName}</option>)}</select>{fieldErrors.evidenceRef && <span id="file-evidence-error" className="field-error">{fieldErrors.evidenceRef}</span>}<span className="meta">Only uploads for this case and exact floor are shown. Storage details stay hidden.</span>{selectedAsset && <details><summary>File details</summary><span className="meta">{selectedAsset.fileName} · {selectedAsset.mimeType} · {Math.ceil(selectedAsset.sizeBytes / 1024)} KB · {new Date(selectedAsset.createdAt).toLocaleDateString()}</span></details>}</div><div className="field"><label htmlFor="file-status">Review status</label><select id="file-status" value={revisionStatus} onChange={(event) => { setRevisionStatus(event.target.value as DocumentRevisionStatus); if (event.target.value === "CHANGES_REQUIRED") setBlocker(true); }} disabled={editorDocument?.founderApprovalStatus === "APPROVED"}>{documentRevisionStatuses.filter((status) => status !== "SUPERSEDED").map((status) => <option key={status} value={status}>{label(status)}</option>)}</select></div><label className="list-item"><span><input type="checkbox" checked={blocker} onChange={(event) => setBlocker(event.target.checked)} disabled={editorDocument?.founderApprovalStatus === "APPROVED"} /> This issue blocks this successor version</span></label></div>{issueMode && <div className="panel-grid" aria-label="Review issue details"><div className="field"><label htmlFor="file-discrepancy">What does not match?</label><textarea id="file-discrepancy" value={discrepancy} onChange={(event) => setDiscrepancy(event.target.value)} maxLength={1000} /></div><div className="field"><label htmlFor="required-change">Required correction</label><textarea id="required-change" value={requiredChange} onChange={(event) => setRequiredChange(event.target.value)} maxLength={2000} /></div><div className="two-col"><div className="field"><label htmlFor="file-owner-role">Next owner</label><select id="file-owner-role" value={ownerRole} onChange={(event) => setOwnerRole(event.target.value as ResponsibilityRole)}>{responsibilityRoles.map((role) => <option key={role} value={role}>{label(role)}</option>)}</select></div><div className="field"><label htmlFor="file-owner-name">Person or team</label><input id="file-owner-name" ref={ownerNameRef} value={ownerName} onChange={(event) => setOwnerName(event.target.value)} maxLength={120} /></div></div><div className="field"><label htmlFor="review-observation">Review observation</label><textarea id="review-observation" value={reviewObservation} onChange={(event) => setReviewObservation(event.target.value)} maxLength={2000} /></div></div>}{openIssue && <div className="panel status-attention"><h3>Resolve the recorded issue</h3><p className="subtle">The original issue remains in append-only history. Explain how it was resolved; the editor will clear the active blocker and return this version to Under review.</p><label className="field" htmlFor="issue-resolution-note"><span>Resolution note</span><textarea id="issue-resolution-note" value={resolutionNote} onChange={(event) => setResolutionNote(event.target.value)} minLength={10} maxLength={1000} /></label><button type="button" className="button-secondary" disabled={busy || resolutionNote.trim().length < 10} onClick={() => void resolveIssue()}>{busy ? "Resolving..." : "Resolve issue"}</button>{resolutionNote.trim().length < 10 && <p className="meta">Enter at least 10 characters to enable Resolve issue.</p>}</div>}<details><summary>Advanced review and version history</summary><div className="field"><label htmlFor="preferred-alternative">Preferred alternative</label><textarea id="preferred-alternative" value={preferredAlternative} onChange={(event) => setPreferredAlternative(event.target.value)} maxLength={1000} /></div><div className="field"><label htmlFor="acceptable-alternative">Acceptable alternative</label><textarea id="acceptable-alternative" value={acceptableAlternative} onChange={(event) => setAcceptableAlternative(event.target.value)} maxLength={1000} /></div>{editorDocument && <p className="meta">Record version {editorDocument.version} · Received {editorDocument.received.at} · Updated {editorDocument.updated.at}</p>}{editorDocument?.issueHistory?.length ? <div className="list">{editorDocument.issueHistory.map((issue) => <div className="list-item" key={issue.id}><strong>{issue.status} review issue</strong><span>{issue.discrepancy}</span><span className="meta">Opened {issue.openedAt}{issue.resolvedAt ? ` · Resolved ${issue.resolvedAt}: ${issue.resolutionNote}` : ""}</span></div>)}</div> : null}</details>{verificationBlocked && <p role="alert">Verification is unavailable until the saved review issue is resolved. Use Resolve issue above; the history will be preserved.</p>}<button type="button" className="button" disabled={busy || !canSave} onClick={() => void save()}>{busy ? "Saving..." : primaryLabel}</button>{!canSave && <p className="meta">{recordBlockedReason}</p>}</div>}
     <details className="card span-12 founder-technical-details"><summary>Version history and recovery</summary><div className="details-body">{caseDocuments.length ? <div><p className="meta">{caseDocuments.length} recorded version{caseDocuments.length === 1 ? "" : "s"} for this case.</p><div className="list">{caseDocuments.map((document) => <div className="list-item" key={document.id}><strong>{label(document.assetType)} · {document.versionLabel}</strong><span>{label(document.revisionStatus)} · {document.isCurrent ? "Current" : "Superseded"}</span><span className="meta">Owner: {document.ownerName} · record version {document.version}</span></div>)}</div></div> : <p className="subtle">No document versions recorded yet.</p>}<div className="footer-note" role={message.includes("could not") || message.includes("changed") || message.includes("missing") ? "alert" : "status"} aria-live="polite">{message}</div></div></details>
-    {requirement && <div className={`footer-note ${canSave ? "" : "status-blocked"}`} role={Object.keys(fieldErrors).length ? "alert" : "status"} aria-live="polite">{Object.keys(fieldErrors).length ? Object.values(fieldErrors)[0] : recordBlockedReason}</div>}
+    {showEditor && <div className={`footer-note ${canSave ? "" : "status-blocked"}`} role={Object.keys(fieldErrors).length ? "alert" : "status"} aria-live="polite">{Object.keys(fieldErrors).length ? Object.values(fieldErrors)[0] : recordBlockedReason}</div>}
   </section>;
 }

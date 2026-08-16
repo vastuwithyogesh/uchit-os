@@ -99,15 +99,34 @@ function methodologyRecords() {
       reason: "Synthetic golden-pilot binding for approved Founder workflow.", idempotencyKey: "pilot-method-" + module,
       createdAt: PILOT_TIME, approvedAt: PILOT_TIME, approvedByActorUserId: pilotIds.founderId
     });
+    if (module === "DIRECTION_32") Object.assign(version, { catalogScope: "ENTRANCE", catalogRecordCount: 32, ownerSourceAuthority: "TEST_ONLY" });
     versions.push(version);
-    rules.push(owned({
-      id: id + "-rule", methodologyVersionId: id, ruleKey: module + "_PILOT_RULE",
-      sourceReference: module === "UTILITY" ? "UtilityMaster exact source rows" : "Approved manual evidence contract",
-      decisionStatus: "APPROVED", conditionJson: { fixture: "releaseable", computedGeometry: false },
-      outcomeJson: { status: "APPROVED", methodologyInvented: false },
-      contentHash: deterministicContentHash({ module, rule: "pilot" }), idempotencyKey: "pilot-rule-" + module,
-      createdAt: PILOT_TIME
-    }));
+    if (module === "DIRECTION_32") {
+      // TEST_ONLY canonical catalog. It proves the exact 32-record contract
+      // without supplying or implying live methodology labels.
+      const codes = ["N1", "N2", "N3", "N4", "N5", "N6", "N7", "N8", "E1", "E2", "E3", "E4", "E5", "E6", "E7", "E8", "S1", "S2", "S3", "S4", "S5", "S6", "S7", "S8", "W1", "W2", "W3", "W4", "W5", "W6", "W7", "W8"];
+      for (let index = 1; index <= 32; index += 1) {
+        const code = codes[index - 1];
+        rules.push(owned({
+          id: `${id}-entrance-${index}`, methodologyVersionId: id, ruleKey: `ENTRANCE_ZONE:${code}`,
+          sourceReference: "TEST_ONLY Founder pilot entrance-zone catalog",
+          decisionStatus: "APPROVED", conditionJson: { entranceZoneCode: code },
+          outcomeJson: { entranceZoneClassification: index % 3 === 0 ? "GOOD" : index % 5 === 0 ? "OK-OK" : "BAD", entranceZoneOrder: index, presentationText: null, presentationTextStatus: "REVIEW_REQUIRED_COPY" },
+          ownerSourceText: `TEST_ONLY internal interpretation for ${code}.`, presentationTextStatus: "REVIEW_REQUIRED_COPY",
+          contentHash: deterministicContentHash({ module, code, index }), idempotencyKey: `pilot-rule-${module}-${index}`,
+          createdAt: PILOT_TIME
+        }));
+      }
+    } else {
+      rules.push(owned({
+        id: id + "-rule", methodologyVersionId: id, ruleKey: module + "_PILOT_RULE",
+        sourceReference: module === "UTILITY" ? "UtilityMaster exact source rows" : "Approved manual evidence contract",
+        decisionStatus: "APPROVED", conditionJson: { fixture: "releaseable", computedGeometry: false },
+        outcomeJson: { status: "APPROVED", methodologyInvented: false },
+        contentHash: deterministicContentHash({ module, rule: "pilot" }), idempotencyKey: "pilot-rule-" + module,
+        createdAt: PILOT_TIME
+      }));
+    }
     fixtures.push(owned({
       id: id + "-fixture", methodologyVersionId: id, fixtureKey: "FOUNDER_GOLDEN_PILOT",
       inputJson: { synthetic: true, oneFloor: true }, expectedOutputJson: { status: "APPROVED" },
@@ -241,6 +260,7 @@ export function buildReleaseableFounderPilotFixture() {
     spatialEvidenceVersions: evidence,
     orientationVersions: [owned({ id: pilotIds.orientationId, projectId: pilotIds.projectId, caseId: pilotIds.caseId, exactDegree: 325, googleEarthEvidenceVersionId: pilotIds.googleEvidenceId, status: "LOCKED", lockedAt: PILOT_TIME, lockedByActorUserId: pilotIds.founderId, lockReason: "Founder deliberately locked the measured synthetic pilot orientation against protected evidence.", idempotencyKey: "pilot-orientation", createdAt: PILOT_TIME })],
     openingMappings: [owned({ id: "pilot-opening-main", projectId: pilotIds.projectId, caseId: pilotIds.caseId, floorId: pilotIds.floorId, planVersionId: pilotIds.planId, orientationVersionId: pilotIds.orientationId, kind: "MAIN_ENTRANCE", markerX: 0.51, markerY: 0.08, verified: true, methodologyStatus: "APPROVED", methodologyVersionId: "pilot-direction-32-v1", directionCode: "N3", evidenceVersionId: pilotIds.marked32Id, idempotencyKey: "pilot-opening", createdAt: PILOT_TIME })],
+    entranceZoneVersions: [owned({ id: "pilot-entrance-zone-floor-v1", projectId: pilotIds.projectId, caseId: pilotIds.caseId, scope: "FLOOR_PRIMARY_ENTRANCE", floorId: pilotIds.floorId, sourceFloorId: pilotIds.floorId, planVersionId: pilotIds.planId, marked32DEvidenceVersionId: pilotIds.marked32Id, methodologyVersionId: "pilot-direction-32-v1", methodologyContentHash: methodology.versions.find((item) => item.id === "pilot-direction-32-v1").contentHash, catalogVersionId: "pilot-direction-32-v1", catalogContentHash: methodology.versions.find((item) => item.id === "pilot-direction-32-v1").contentHash, zoneCode: "N1", zoneNameSnapshot: "BAD", classificationSnapshot: "BAD", ownerInterpretationHash: deterministicContentHash("TEST_ONLY internal interpretation for N1."), status: "CURRENT", reason: "TEST_ONLY Founder pilot entrance-zone confirmation.", actorUserId: pilotIds.founderId, confirmedAt: PILOT_TIME, idempotencyKey: "pilot-entrance-zone-floor", requestHash: deterministicContentHash({ scope: "FLOOR_PRIMARY_ENTRANCE", code: "N1" }), createdAt: PILOT_TIME })],
     spaceMappings: selectedRows.map((row, index) => owned({ id: "pilot-space-" + (index + 1), projectId: pilotIds.projectId, caseId: pilotIds.caseId, floorId: pilotIds.floorId, planVersionId: pilotIds.planId, orientationVersionId: pilotIds.orientationId, spaceLabel: row.utilityName, polygon: [{ x: 0.1 + index * 0.02, y: 0.2 }, { x: 0.2 + index * 0.02, y: 0.2 }, { x: 0.15 + index * 0.02, y: 0.3 }], verified: true, methodologyStatus: "APPROVED", methodologyVersionId: "pilot-direction-16-v1", directionCode: row.directionCode, evidenceVersionId: pilotIds.marked16Id, idempotencyKey: "pilot-space-key-" + (index + 1), createdAt: PILOT_TIME })),
     evaluationSnapshots: [owned({ id: pilotIds.evaluationId, caseId: pilotIds.caseId, floorId: pilotIds.floorId, planVersionId: pilotIds.planId, orientationVersionId: pilotIds.orientationId, snapshotName: "Founder golden pilot Utility evaluation", sourceVersion: utilitySource.sourceVersion, generatedMatrix, provenance: { inputHash: evaluationInputHash, outputHash: evaluationOutputHash, algorithmVersion: "utility-master-adapter/v1", methodologyVersionId: "pilot-utility-v1" }, idempotencyKey: "pilot-utility-evaluation", createdAt: PILOT_TIME })],
     shaktiSnapshots: [owned({ id: pilotIds.shaktiId, caseId: pilotIds.caseId, floorId: pilotIds.floorId, planVersionId: pilotIds.planId, orientationVersionId: pilotIds.orientationId, inputValues: [90, 95], elementAverages: { Earth: 92.5 }, rankedVerdicts: [{ element: "Earth", score: 92.5 }], tieBreakUsed: false, provenance: { inputHash: graph.inputHash, outputHash: graph.outputHash, algorithmVersion: graph.algorithmVersion, methodologyVersionId: "pilot-shakti-v1" }, idempotencyKey: "pilot-shakti", createdAt: PILOT_TIME })],

@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { execFileSync } from "node:child_process";
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { resolve } from "node:path";
 import { source } from "./helpers/source-contracts.mjs";
 
@@ -31,6 +31,7 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/actions/route.ts": /resolveRequestActor/,
     "app/api/audit/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/bootstrap/route.ts": /requireRouteActor/,
+    "app/api/branding/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/case-files/route.ts": /requireRouteActor\(request, "CONSULTANT"\)/,
     "app/api/case-files/[assetId]/route.ts": /requireRouteActor\(request, "CONSULTANT"\)/,
     "app/api/chart-assets/route.ts": /requireRouteActor/,
@@ -39,6 +40,9 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/diagnostics/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
     "app/api/foundation/access/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
     "app/api/foundation/policy/route.ts": /resolveRequestActor.*resolveActiveOrganisationContext/s,
+    "app/api/founder/cases/route.ts": /requireRouteActor/,
+    "app/api/image-utility/assets/[versionId]/route.ts": /requireRouteActor\(request, "ADMIN"\).*organisation\.id/s,
+    "app/api/image-utility/route.ts": /requireRouteActor\(request, "ADMIN"\).*resolveActiveOrganisationContext/s,
     "app/api/integrity/route.ts": /requireRouteActor\(request, "ADMIN"\)/,
     "app/api/media-library/route.ts": /requireRouteActor\(request, "SUPER_ADMIN"\).*organisation_owner/s,
     "app/api/migrations/status/route.ts": /requireRouteActor\(request, "SUPER_ADMIN"\).*organisation_owner/s,
@@ -49,6 +53,7 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/payment-proofs/route.ts": /requireRouteActor/,
     "app/api/payment-proofs/files/[fileName]/route.ts": /requireRouteActor/,
     "app/api/public/qualification/[token]/route.ts": /resolveQualificationInvitation.*private, no-store/s,
+    "app/api/report-deliveries/route.ts": /resolveRequestActor.*hasOrganisationCapability.*"DELIVERY"/s,
     "app/api/public/booking/[token]/route.ts": /resolveSecureGrant.*private, no-store/s,
     "app/api/public/media/[token]/route.ts": /resolveSecureGrant.*privateHeaders/s,
     "app/api/public/proposals/[token]/route.ts": /resolveFounderProposalGrant.*private, no-store/s,
@@ -64,11 +69,21 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/timeline/route.ts": /requireRouteActor/,
     "app/api/utility/master/route.ts": /requireRouteActor/
   };
-  const routes = tracked.filter((file) => /^app\/api\/.+\/route\.ts$/.test(file));
-  for (const file of Object.keys(policies)) if (existsSync(resolve(process.cwd(), file)) && !routes.includes(file)) routes.push(file);
+  const routes = readdirSync(resolve(process.cwd(), "app/api"), { recursive: true })
+    .map((file) => `app/api/${String(file).replaceAll("\\", "/")}`)
+    .filter((file) => /\/route\.ts$/.test(file));
   routes.sort();
   assert.deepEqual(routes, Object.keys(policies).sort());
   for (const [file, pattern] of Object.entries(policies)) assert.match(source(file), pattern, `${file} lacks its declared access gate`);
+});
+
+test("synthetic walkthrough and visual-review fixtures cannot render outside development", () => {
+  for (const file of ["app/walkthrough/page.tsx", "app/visual-review/repository/page.tsx", "app/visual-review/remediation/page.tsx", "app/visual-review/image-utility/page.tsx"]) {
+    assert.match(source(file), /process\.env\.NODE_ENV !== "development".*notFound\(\)/s, `${file} lacks its development-only boundary`);
+  }
+  for (const file of ["app/visual-review/branding/page.tsx", "app/visual-review/delivery/page.tsx"]) {
+    assert.match(source(file), /process\.env\.NODE_ENV === "production".*notFound\(\)/s, `${file} lacks its production boundary`);
+  }
 });
 
 test("critical journey gates remain connected without commercial or report bypasses", () => {

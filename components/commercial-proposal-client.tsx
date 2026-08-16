@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import type { FounderProposalClientProjection } from "@/lib/commercial-document-renderer";
 
-type Loaded = { proposal: FounderProposalClientProjection; acceptanceDeclaration: { exactText: string; checkboxLabel?: string; typedConfirmationPhrase?: string; typedConfirmationMode?: "FULL_NAME" } };
+type Loaded = { proposal: FounderProposalClientProjection; brandPresentation?: { displayName: string; colours: { primary: string; secondary: string; accent: string; paper: string; text: string }; headerEnabled: boolean; footerEnabled: boolean }; acceptanceDeclaration: { exactText: string; checkboxLabel?: string; typedConfirmationPhrase?: string; typedConfirmationMode?: "FULL_NAME" } };
 const money = (paise: number) => new Intl.NumberFormat("en-IN", { style: "currency", currency: "INR", minimumFractionDigits: paise % 100 === 0 ? 0 : 2 }).format(paise / 100);
 
 export function CommercialProposalClient({ token }: { token: string }) {
@@ -15,9 +15,9 @@ export function CommercialProposalClient({ token }: { token: string }) {
   if (busy && !loaded) return <section className="public-proposal-state" role="status"><h1>Opening your proposal…</h1><p>The secure version is being verified.</p></section>;
   if (error && !loaded) return <section className="public-proposal-state" role="alert"><h1>Proposal unavailable</h1><p>{error}</p><button type="button" onClick={load}>Try again</button></section>;
   if (!loaded) return null;
-  const { proposal, acceptanceDeclaration } = loaded;
-  return <article className="public-proposal-surface">
-    <header><span>UCHIT VASTU INDIA</span><h1>Commercial proposal</h1><p>Version {proposal.proposalVersion} · {proposal.client.name}</p></header>
+  const { proposal, acceptanceDeclaration, brandPresentation } = loaded;
+  return <article className="public-proposal-surface" style={brandPresentation ? { background: brandPresentation.colours.paper, color: brandPresentation.colours.text, borderColor: brandPresentation.colours.accent } : undefined}>
+    <header><span>{brandPresentation?.displayName.toUpperCase() ?? "UCHIT VASTU INDIA"}</span><h1>Commercial proposal</h1><p>Version {proposal.proposalVersion} · {proposal.client.name}</p></header>
     <section><h2>Client and project</h2><p>{proposal.client.permanentClientId} · {proposal.project.kind.replaceAll("_", " ")} · {proposal.project.serviceType.replaceAll("_", " ")}</p></section>
     <section><h2>Scope</h2><ol>{proposal.scopeItems.map((item) => <li key={`${item.order}-${item.title}`}><strong>{item.title}</strong> <span>{item.status.replaceAll("_", " ")}</span></li>)}</ol></section>
     <section><h2>Commercials</h2><dl><div><dt>Professional fee</dt><dd>{money(proposal.commercial.professionalFeePaise)}</dd></div><div><dt>GST</dt><dd>{(proposal.commercial.gstAppliedBasisPoints / 100).toFixed(2)}% · {money(proposal.commercial.gstAmountPaise)}</dd></div><div><dt>Total payable</dt><dd>{money(proposal.commercial.totalPayablePaise)}</dd></div><div><dt>Agreed advance</dt><dd>{money(proposal.commercial.agreedAdvancePaise)}</dd></div></dl></section>

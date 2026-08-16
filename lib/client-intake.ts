@@ -1,4 +1,5 @@
 import type { ClientIntakeProfile } from "./domain.ts";
+import type { PropertyContext } from "./domain.ts";
 import type { AppState } from "./store.ts";
 
 export type IntakeFieldKey = "challenge" | "outcome" | "service" | "propertyType" | "propertyStatus" | "cityCountry" | "floorCount" | "locationLink" | "latitude" | "longitude";
@@ -15,16 +16,16 @@ export type ClientIntakePrefill = {
 const propertyTypes = new Set(["Residential", "Commercial", "Factory", "Shop", "Hospital", "Hotel", "Temple"]);
 const serviceTypes = new Set(["EXISTING_SPACE", "NEW_CONSTRUCTION"]);
 
-/** Single required-field and location contract shared by the screen, scorecard and server mutation. */
+/** Validates only values supplied by the user. Empty values remain valid draft state. */
 export function validateClientIntake(input: Record<string, unknown>): IntakeFieldErrors {
   const errors: IntakeFieldErrors = {};
   const text = (key: string) => typeof input[key] === "string" ? input[key].trim() : "";
-  if (!text("challenge")) errors.challenge = "Enter the client’s main challenge.";
-  if (!text("outcome")) errors.outcome = "Enter the desired outcome.";
-  if (!serviceTypes.has(text("service"))) errors.service = "Choose Existing Space or New Construction.";
-  if (!propertyTypes.has(text("propertyType"))) errors.propertyType = "Choose an approved property type.";
-  if (!text("propertyStatus")) errors.propertyStatus = "Enter the current property status.";
-  if (!text("cityCountry")) errors.cityCountry = "Enter the city and country.";
+  if (text("challenge") && text("challenge").length > 1000) errors.challenge = "Main challenge must be 1000 characters or fewer.";
+  if (text("outcome") && text("outcome").length > 1000) errors.outcome = "Desired outcome must be 1000 characters or fewer.";
+  if (text("service") && !serviceTypes.has(text("service"))) errors.service = "Choose Existing Space or New Construction.";
+  if (text("propertyType") && !propertyTypes.has(text("propertyType"))) errors.propertyType = "Choose an approved property type.";
+  if (text("propertyStatus") && text("propertyStatus").length > 240) errors.propertyStatus = "Property status must be 240 characters or fewer.";
+  if (text("cityCountry") && text("cityCountry").length > 240) errors.cityCountry = "City and country must be 240 characters or fewer.";
   const floors = text("floorCount");
   if (floors && (!/^\d+$/.test(floors) || Number(floors) < 1 || Number(floors) > 200)) errors.floorCount = "Enter a whole number from 1 to 200, or leave this blank.";
   const locationLink = text("locationLink");
@@ -39,10 +40,24 @@ export function validateClientIntake(input: Record<string, unknown>): IntakeFiel
   return errors;
 }
 
-export function getClientIntakeCompleteness(profile: ClientIntakeProfile | undefined) {
+/** Fields needed to cross the existing intake/evaluation readiness gate. */
+export function validateClientIntakeForEvaluation(input: Record<string, unknown>): IntakeFieldErrors {
+  const errors = validateClientIntake(input);
+  const text = (key: string) => typeof input[key] === "string" ? input[key].trim() : "";
+  if (!text("challenge")) errors.challenge = "Main challenge is required before running the evaluation.";
+  if (!text("outcome")) errors.outcome = "Desired outcome is required before running the evaluation.";
+  if (!text("service")) errors.service = "Service path is required before running the evaluation.";
+  if (!text("propertyType")) errors.propertyType = "Property type is required before running the evaluation.";
+  if (!text("propertyStatus")) errors.propertyStatus = "Property status is required before running the evaluation.";
+  if (!text("cityCountry")) errors.cityCountry = "City and country are required before running the evaluation.";
+  return errors;
+}
+
+export function getClientIntakeCompleteness(profile: ClientIntakeProfile | undefined, propertyContextOverride?: PropertyContext) {
   // Consent is retained only as source evidence; removed Founder consent
   // self-attestation never contributes to this completion result.
-  const errors = validateClientIntake({ challenge: profile?.needs?.mainChallenge, outcome: profile?.needs?.desiredOutcome, service: profile?.propertyContext?.serviceInterest, propertyType: profile?.propertyContext?.propertyType, propertyStatus: profile?.propertyContext?.propertyStatus, cityCountry: profile?.propertyContext?.cityCountry, floorCount: profile?.propertyContext?.floorCount?.toString(), locationLink: profile?.propertyContext?.locationLink, latitude: profile?.propertyContext?.latitude?.toString(), longitude: profile?.propertyContext?.longitude?.toString() });
+  const propertyContext = propertyContextOverride ?? profile?.propertyContext;
+  const errors = validateClientIntakeForEvaluation({ challenge: profile?.needs?.mainChallenge, outcome: profile?.needs?.desiredOutcome, service: propertyContext?.serviceInterest, propertyType: propertyContext?.propertyType, propertyStatus: propertyContext?.propertyStatus, cityCountry: propertyContext?.cityCountry, floorCount: propertyContext?.floorCount?.toString(), locationLink: propertyContext?.locationLink, latitude: propertyContext?.latitude?.toString(), longitude: propertyContext?.longitude?.toString() });
   const checks = [
     { key: "context", complete: !errors.challenge && !errors.outcome },
     { key: "propertyProject", complete: !errors.service && !errors.propertyType && !errors.propertyStatus && !errors.cityCountry && !errors.floorCount && !errors.locationLink && !errors.latitude && !errors.longitude }

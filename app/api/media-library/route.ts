@@ -41,7 +41,13 @@ export async function POST(request: Request) {
   if (!manifest) return NextResponse.json({ ok: false, error: "Approved asset manifest entry not found." }, { status: 404, headers: noStore });
   if (file.size > 5 * 1024 * 1024) return NextResponse.json({ ok: false, error: "Media Library files are limited to 5 MB." }, { status: 413, headers: noStore });
   const bytes = new Uint8Array(await file.arrayBuffer());
-  const magicOk = manifest.mimeType === "application/pdf" ? new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-" : bytes.slice(0, 8).every((value, index) => value === [137,80,78,71,13,10,26,10][index]);
+  const magicOk = manifest.mimeType === "application/pdf"
+    ? new TextDecoder().decode(bytes.slice(0, 5)) === "%PDF-"
+    : manifest.mimeType === "image/png"
+      ? bytes.slice(0, 8).every((value, index) => value === [137,80,78,71,13,10,26,10][index])
+      : manifest.mimeType === "image/jpeg"
+        ? bytes.length >= 3 && bytes[0] === 0xff && bytes[1] === 0xd8 && bytes[2] === 0xff
+        : bytes.length >= 12 && new TextDecoder().decode(bytes.slice(0, 4)) === "RIFF" && new TextDecoder().decode(bytes.slice(8, 12)) === "WEBP";
   if (!magicOk || file.type !== manifest.mimeType) return NextResponse.json({ ok: false, error: "File signature or MIME type does not match the approved asset." }, { status: 400, headers: noStore });
   const checksumSha256 = hex(new Uint8Array(await crypto.subtle.digest("SHA-256", bytes)));
   const organisationId = context.foundation.organisation.id;

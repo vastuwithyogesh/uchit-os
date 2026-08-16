@@ -150,17 +150,21 @@ export const DEFAULT_FOUNDER_APPROVAL_POLICY = {
 const organisationCollections = [
   "clients", "pipelineTransitions", "clientIntakeProfiles", "leadQualifications",
   "commercialProposals", "reviewCallBookings", "payments", "advanceVerifications",
-  "vastuCases", "floorWorkspaces", "reportVersions", "rectificationRequests",
+  "vastuCases", "floorWorkspaces", "reportVersions", "documentDeliveries", "documentDeliveryEvents", "rectificationRequests",
   "assessmentObservations", "recommendations", "implementationTasks", "caseDocuments",
   "deliveryMilestones", "evaluationSnapshots", "utilityVerdicts", "shaktiSnapshots", "timelineEvents", "optInLeads"
-  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "stageBRemediations", "revisedLayoutCandidates", "remediationBaseLayoutVersions", "remedyRepositoryRecords", "remedyEligibilityResolutions", "reportPlacementPages", "physicalPlacements", "placementImplementationRows", "masterAppendixRows", "stageBIntegrityRuns", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures", "aouMethodologyVersions", "aouReferenceRows",
-  "leadProfileVersions", "mediaAssets", "mediaAssetVersions", "secureAccessGrants", "communicationPreparations",
+  ,"projects", "planVersions", "spatialEvidenceVersions", "orientationVersions", "openingMappings", "entranceZoneVersions", "spaceMappings", "dependencyInvalidations", "regenerationResolutions", "stageAFloorReviews", "stageAFloorApprovalCheckpoints", "remedialWorkflowReservations", "stageBRemediations", "revisedLayoutCandidates", "remediationBaseLayoutVersions", "remedyRepositoryRecords", "caseUsedRemedyRecords", "contextualRepositoryRecords", "repositoryAuditEvents", "repositoryImportBatches", "repositoryImportRows", "remedyEligibilityResolutions", "reportPlacementPages", "physicalPlacements", "placementImplementationRows", "masterAppendixRows", "stageBIntegrityRuns", "methodologyVersions", "methodologyRules", "methodologyGoldenFixtures", "aouMethodologyVersions", "aouReferenceRows",
+  "sectionAWorkspaces", "sectionAVisualPages", "sectionAAssets", "existingLayoutAnnotations", "colourFrameCompositions", "sectionAIntegrityRuns", "remediationReportIntegrityRuns",
+  "sectionCWorkspaces", "sectionCExtraPages", "sectionCAssets", "sectionCIntegrityRuns",
+  "leadProfileVersions", "mediaAssets", "mediaAssetVersions", "imageProcessingTasks", "imageDerivatives", "imageProcessingBatches", "imageUtilityAuditEvents",
+  "secureAccessGrants", "communicationPreparations",
   "qualificationFormDefinitions", "qualificationInvitations", "qualificationResponseVersions", "prospectiveProjects",
   "founderReviewBookings", "zoomMeetingBindings", "founderReminderTasks",
   "founderCommercialPolicies", "founderCommercialLegalPolicies", "founderProposalTemplates", "founderProposalVersions",
   "founderProposalApprovals", "founderProposalArtifacts", "founderProposalGrants", "founderProposalResponses",
   "founderCommercialPaymentConfirmations", "founderBalanceDeadlines", "founderCommercialInvoices", "founderCommercialPolicyEvents", "founderCommercialAuditEvents",
-  "founderStatutoryPolicies", "founderBillingProfileVersions", "founderStatutorySequenceReservations", "founderStatutoryDocuments"
+  "founderStatutoryPolicies", "founderBillingProfileVersions", "founderStatutorySequenceReservations", "founderStatutoryDocuments",
+  "organisationBrandProfiles", "documentTemplates", "brandingAuditEvents", "legacyBrandingSources", "stageBInputsV1"
 ] as const satisfies readonly (keyof AppState)[];
 
 /**

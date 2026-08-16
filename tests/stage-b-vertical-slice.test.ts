@@ -10,6 +10,7 @@ import {
 } from "../lib/stage-b-remediation.ts";
 import { canonicalReportPayload, V5_REPORT_TEMPLATE_VERSION } from "../lib/report-artifacts.ts";
 import { renderPrintableReport } from "../lib/report-html.ts";
+import { resolveRemedySource } from "../lib/remedy-source.ts";
 import type { StageBRemedyType } from "../lib/domain.ts";
 
 const sourceFraming: Record<StageBRemedyType, string> = {
@@ -40,7 +41,8 @@ function fixture() {
   state.reportVersions.push(report);
   state.postSiteFindings.push({ id: "findings-1", projectId: "project-1", caseId: "case-1", floorId: "floor-1", version: 1, status: "FOUNDER_APPROVED", needsRegeneration: false, ...owned } as any);
   state.methodologyVersions.push({ id: "method-stage-b-1", module: "STAGE_B_REMEDIAL", lifecycleStatus: "ACTIVE", executionAdapterVersion: STAGE_B_RESOLVER_VERSION, sourceAssetHash: STAGE_B_AUTHORITY_HASH, contentHash: "method-hash-1", ...owned } as any);
-  for (const configuration of STAGE_B_REMEDY_PAGES) state.methodologyRules.push({ id: `rule-${configuration.pageType}`, methodologyVersionId: "method-stage-b-1", decisionStatus: "APPROVED", outcomeJson: { remedialType: configuration.pageType }, ...owned } as any);
+  const stageBActionByType: Record<string, string> = { TATTAV_BALANCER: "SUPPRESS", DISHA_BALANCER: "GROUND", TATTAV_ACTIVATION: "UPLIFT", DISHA_ACTIVATION: "PROMOTE", EQUALISER: "BALANCE" };
+  for (const configuration of STAGE_B_REMEDY_PAGES) state.methodologyRules.push({ id: `rule-${configuration.pageType}`, methodologyVersionId: "method-stage-b-1", decisionStatus: "APPROVED", conditionJson: { action: stageBActionByType[configuration.pageType] }, outcomeJson: { remedialType: configuration.pageType }, ...owned } as any);
   for (let index = 1; index <= 6; index++) state.methodologyGoldenFixtures.push({ id: `fixture-${index}`, methodologyVersionId: "method-stage-b-1", decisionStatus: "APPROVED", ...owned } as any);
   for (const configuration of STAGE_B_REMEDY_PAGES) {
     for (let index = 1; index <= 2; index++) {
@@ -123,6 +125,66 @@ test("five Stage B remedy pages resolve independently with dynamic 0...N eligibi
   }
   assert.equal(adaptStageBSourceFraming("Tattva Balancer"), "TATTAV_BALANCER");
   assert.equal(adaptStageBSourceFraming("Tattva Activation"), "TATTAV_ACTIVATION");
+});
+
+test("governed eligibility refresh supersedes stale authority without selection or placement", () => {
+  const setup = fixture(); const state = getAppState();
+  const second = state.remedyRepositoryRecords.find((item) => item.id === "remedy-DISHA_BALANCER-2")!;
+  second.directions = ["NE"];
+  const initial = resolveEligibleRemedies({ remediationId: setup.opened.remediation.id, verdictId: setup.verdicts.DISHA_BALANCER.id, remedialType: "DISHA_BALANCER",
+    expectedRecordVersion: setup.opened.remediation.recordVersion, idempotencyKey: "refresh-initial", actor: setup.actor });
+  assert.deepEqual(initial.eligible.map((item) => item.remedyId), ["remedy-DISHA_BALANCER-1"]);
+  second.directions = ["SW"];
+  const refreshed = resolveEligibleRemedies({ remediationId: setup.opened.remediation.id, verdictId: setup.verdicts.DISHA_BALANCER.id, remedialType: "DISHA_BALANCER", refresh: true,
+    expectedRecordVersion: setup.opened.remediation.recordVersion, idempotencyKey: "refresh-updated", actor: setup.actor });
+  assert.deepEqual(new Set(refreshed.eligible.map((item) => item.remedyId)), new Set(["remedy-DISHA_BALANCER-1", "remedy-DISHA_BALANCER-2"]));
+  assert.equal(state.remedyEligibilityResolutions.filter((item) => item.status === "ELIGIBLE").length, 2);
+  assert.equal(state.remedyEligibilityResolutions.filter((item) => item.status === "INVALIDATED").length, 1);
+  const replay = resolveEligibleRemedies({ remediationId: setup.opened.remediation.id, verdictId: setup.verdicts.DISHA_BALANCER.id, remedialType: "DISHA_BALANCER", refresh: true,
+    expectedRecordVersion: setup.opened.remediation.recordVersion, idempotencyKey: "refresh-unchanged", actor: setup.actor });
+  assert.deepEqual(new Set(replay.eligible.map((item) => item.id)), new Set(refreshed.eligible.map((item) => item.id)));
+  assert.equal(state.remedyEligibilityResolutions.length, 3);
+  assert.equal(state.physicalPlacements.length, 0);
+});
+
+test("case-used remedies are exact-page scoped, preserve permanent semantics, and snapshot through finalisation", () => {
+  const setup = fixture(); const state = getAppState(); const page = setup.opened.pages.find((item) => item.pageType === "DISHA_BALANCER")!;
+  const owned = { organisationId: "org-1", createdByActorUserId: setup.actor.id, updatedByActorUserId: setup.actor.id, recordVersion: 1 };
+  state.mediaAssetVersions.push({ id: "asset-version-case-used", assetId: "asset-case-used", status: "ACTIVE", checksumSha256: "case-used-asset-hash", ...owned } as any);
+  const exact = { id: "case-used-remedy-1", caseId: "case-1", floorId: "floor-1", remediationId: setup.opened.remediation.id, pageId: page.id,
+    remedialType: "DISHA_BALANCER" as const, name: "Case-only brass helix", attributePurpose: "Case-specific Disha balance",
+    preferredAssetId: "asset-case-used", preferredAssetVersionId: "asset-version-case-used", sourceMediaChecksumSha256: "case-used-asset-hash",
+    source: "ONE_TIME_USE_THIS_CASE" as const, status: "ACTIVE" as const, createdAt: "2026-01-02T00:00:00.000Z", idempotencyKey: "case-used-create-1", requestHash: "case-used-request-1", ...owned };
+  state.caseUsedRemedyRecords.push(exact,
+    { ...exact, id: "case-used-wrong-org", organisationId: "org-2" },
+    { ...exact, id: "case-used-wrong-case", caseId: "case-other" },
+    { ...exact, id: "case-used-wrong-floor", floorId: "floor-other" },
+    { ...exact, id: "case-used-wrong-remediation", remediationId: "remediation-other" },
+    { ...exact, id: "case-used-wrong-page", pageId: setup.opened.pages.find((item) => item.pageType === "DISHA_ACTIVATION")!.id });
+  state.remedyRepositoryRecords.push({ id: "remedy-merged-draft", name: exact.name, attributePurpose: exact.attributePurpose, remedialType: exact.remedialType,
+    elements: ["Earth"], directions: ["SW"], preferredAssetId: exact.preferredAssetId, preferredAssetVersionId: exact.preferredAssetVersionId, status: "DRAFT", ...owned } as any);
+
+  const scope = { organisationId: "org-1", caseId: "case-1", floorId: "floor-1", remediationId: setup.opened.remediation.id, pageId: page.id, remedialType: "DISHA_BALANCER" as const };
+  assert.equal(resolveRemedySource(state, exact.id, scope)?.sourceKind, "CASE_USED");
+  assert.equal(resolveRemedySource(state, exact.id, { ...scope, floorId: "floor-other" }), undefined);
+  assert.equal(resolveRemedySource(state, exact.id, { ...scope, pageId: "page-other" }), undefined);
+  assert.equal(resolveRemedySource(state, "remedy-DISHA_BALANCER-1", scope)?.sourceKind, "PERMANENT");
+
+  const resolved = resolveEligibleRemedies({ remediationId: setup.opened.remediation.id, verdictId: setup.verdicts.DISHA_BALANCER.id, remedialType: "DISHA_BALANCER",
+    expectedRecordVersion: setup.opened.remediation.recordVersion, idempotencyKey: "resolve-with-case-used", actor: setup.actor });
+  assert.deepEqual(resolved.eligible.map((item) => item.remedyId), ["remedy-DISHA_BALANCER-1", "remedy-DISHA_BALANCER-2", exact.id]);
+  assert.ok(!resolved.eligible.some((item) => item.remedyId === "remedy-merged-draft" || item.remedyId.startsWith("case-used-wrong-")));
+  const caseResolution = resolved.eligible.find((item) => item.remedyId === exact.id)!;
+  assert.deepEqual(Object.keys(caseResolution).sort(), ["caseId", "createdByActorUserId", "eligibilityRuleIds", "explanationCodes", "floorId", "id", "idempotencyKey", "methodologyContentHash", "methodologyVersionId", "organisationId", "recordVersion", "remedialType", "remediationId", "remedyAssetVersionId", "remedyId", "remedyRecordVersion", "requestHash", "resolutionHash", "resolvedAt", "resolverVersion", "status", "updatedByActorUserId", "verdictContentHash", "verdictId"].sort());
+
+  const selected = selectFinalRevisedLayout({ remediationId: setup.opened.remediation.id, candidateId: "candidate-a", expectedRecordVersion: setup.opened.remediation.recordVersion, idempotencyKey: "select-case-used", actor: setup.actor });
+  const placement = place(setup, "DISHA_BALANCER", caseResolution.id, selected.baseLayout.id, "place-case-used");
+  assert.equal(placement.remedyId, exact.id); assert.equal(placement.nameSnapshot, exact.name); assert.equal(placement.attributePurposeSnapshot, exact.attributePurpose);
+  let final: ReturnType<typeof finaliseStageBPage> | undefined;
+  for (const remedyPage of setup.opened.pages) final = finaliseStageBPage({ remediationId: setup.opened.remediation.id, pageId: remedyPage.id,
+    expectedRecordVersion: setup.opened.remediation.recordVersion, idempotencyKey: `finalise-case-used-${remedyPage.pageType}`, actor: setup.actor });
+  assert.equal(final?.integrityRun?.status, "PASS"); assert.equal(final?.manifest?.schemaVersion, "stage-b-render-manifest/v1");
+  assert.equal(final?.manifest?.pages[0].placements[0].remedyId, exact.id); assert.equal(final?.manifest?.pages[0].placements[0].nameSnapshot, exact.name);
 });
 
 test("page-scoped placement, delete resequencing, first-page lock and five-page immutable v5 manifest", () => {

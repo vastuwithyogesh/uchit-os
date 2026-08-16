@@ -68,7 +68,7 @@ Passed:
 - The approved graph conditions overlap. Current deterministic precedence is SUPPRESS, UPLIFT, PROMOTE, GROUND, BALANCE. Founder approval is still required before client-facing activation.
 - Stage B remedy methodology remains unavailable and correctly blocked.
 - No degree-to-direction boundary was inferred from the 325-degree input.
-- The manual N3 entrance marker is evidence-bound, but no automatic 32D interpretation is asserted.
+- The TEST_ONLY floor entrance-zone version is evidence-bound to the exact 32D source and synthetic catalog; no live methodology labels are asserted.
 
 ## Multi-floor decision
 

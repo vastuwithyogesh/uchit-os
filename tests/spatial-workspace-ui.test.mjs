@@ -26,7 +26,8 @@ test("UI uses only protected uploads and canonical spatial actions", () => {
 test("mapping UI does not invent directions or methodology", () => {
   const ui = source("components/spatial-workspace.tsx");
   assert.match(ui, /methodology version is approved/);
-  assert.doesNotMatch(ui, /directionCode|NNE|SSW|north-east|south-west/i);
+  assert.match(ui, /d16UtilityZones/);
+  assert.doesNotMatch(ui, /nearest[- ]direction|derive[d]? zone from|bearing resolver/i);
 });
 
 test("legacy operations screen sends users to protected spatial setup", () => {

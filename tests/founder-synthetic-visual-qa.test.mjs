@@ -35,11 +35,12 @@ test("owner review package records safe hosted DOM evidence without claiming scr
 
 test("evaluation surface keeps technical context behind disclosure and one dominant save action", () => {
   const ui = read("components/evaluation-console.tsx");
-  assert.match(ui, /<summary>Evaluation status details<\/summary>/);
-  assert.match(ui, /<summary>Rule summary<\/summary>/);
+  assert.match(ui, /Utility and Shakti evaluation/);
+  assert.match(ui, /Run and save Utility evaluation/);
+  assert.match(ui, /Create new Shakti snapshot/);
   assert.match(ui, /className="button founder-action-primary"/);
   assert.match(ui, /className="button-secondary"/);
-  assert.match(ui, /<summary>Release and payment context<\/summary>/);
+  assert.doesNotMatch(ui, /Release and payment context|Case amount|Balance gate|formatMoney/);
 });
 
 test("manual-sheet visual QA keeps the selected evidence task primary", () => {
@@ -58,6 +59,9 @@ test("balance visual QA keeps payment confirmation primary and details progressi
   assert.match(ui, /<summary>Receipt history and gate context<\/summary>/);
   assert.match(ui, /balance-proof-verify/);
   assert.match(ui, /Confirm full balance/);
+  assert.match(ui, /Upload the exact balance receipt before confirming the balance/);
+  assert.match(ui, /The exact Stage A verdict must be presented before balance confirmation/);
+  assert.match(ui, /Choose a file for \$\{uploadLabels\[key\]\.toLowerCase\(\)\} to enable upload/);
   assert.match(manifest, /"\/founder\/12"/);
 });
 
@@ -75,6 +79,7 @@ test("report visual QA keeps protected artifact actions progressive", () => {
   assert.match(ui, /mode=export/);
   assert.match(ui, /mode=print/);
   assert.match(ui, /report-approve/);
+  assert.match(ui, /Complete Utility and Shakti evaluation first/);
   assert.match(manifest, /"\/founder\/15"/);
   assert.match(manifest, /"\/founder\/16"/);
 });

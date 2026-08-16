@@ -1,40 +1,38 @@
 import { AuthenticationError, authErrorResponse, resolveRequestActor } from "@/lib/auth";
 import { ClientAccountUnlinkedError, ClientPortalAccessError, findOwnedClient } from "@/lib/client-portal";
-import { loadStateFromPersistence } from "@/lib/persistence";
-import { artifactStillMatches } from "@/lib/report-artifacts";
-import { renderPrintableReport } from "@/lib/report-html";
-const CLIENT_DELIVERY_ENABLED = false as const;
+import { appendDocumentDeliveryAccess } from "@/lib/document-delivery";
+import { FinalPdfError, readDeliveredProtectedPdf } from "@/lib/final-pdf.server";
+import { loadStateSnapshotFromPersistence, persistStateToDatabase, PersistenceConflictError } from "@/lib/persistence";
 
 export async function GET(request: Request, context: { params: Promise<{ reportId: string }> }) {
-  if (!CLIENT_DELIVERY_ENABLED) {
-    return new Response("Client report delivery is disabled during Founder Edition.", { status: 403, headers: { "cache-control": "private, no-store" } });
-  }
   try {
     const actor = await resolveRequestActor(request.headers);
-    const state = await loadStateFromPersistence();
+    const { state, revision } = await loadStateSnapshotFromPersistence();
     const client = findOwnedClient(actor, state.clients);
     const { reportId } = await context.params;
-    const report = state.reportVersions.find((item) => item.id === reportId);
-    const caseRecord = report ? state.vastuCases.find((item) => item.id === report.caseId) : null;
+    const url = new URL(request.url); const deliveryId = url.searchParams.get("deliveryId") ?? "";
+    const mode = url.searchParams.get("mode") === "view" ? "view" : "download";
+    const delivery = state.documentDeliveries.find((item) => item.id === deliveryId && item.reportId === reportId
+      && item.recipientClientId === client.id && item.organisationId === client.organisationId
+      && (item.status === "DELIVERED" || item.status === "ACKNOWLEDGED"));
+    if (!delivery) return new Response("Delivered report not found", { status: 404, headers: { "cache-control": "private, no-store" } });
 
-    if (!report || !caseRecord || caseRecord.clientId !== client.id) return new Response("Report not found", { status: 404 });
-    if (!report.isPreview && report.status !== "RELEASED") return new Response("This final report has not been released yet", { status: 403 });
-    if (!report.artifact) return new Response("This report is not ready to open", { status: 409 });
-    if (!await artifactStillMatches(state, report)) return new Response("This report could not be verified. Please contact the Uchit Vastu team.", { status: 409 });
+    const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
+    const exact = await readDeliveredProtectedPdf({ state, delivery, actor, mode, requestId });
+    appendDocumentDeliveryAccess({ state, delivery, actor, eventType: mode === "view" ? "VIEWED" : "DOWNLOADED", requestId });
+    await persistStateToDatabase(state, revision ?? undefined);
 
-    return new Response(renderPrintableReport(state, report), {
-      headers: {
-        "content-type": "text/html; charset=utf-8",
-        "cache-control": "private, no-store",
-        "content-security-policy": "default-src 'none'; style-src 'unsafe-inline'; script-src 'unsafe-inline'; img-src data:; base-uri 'none'; frame-ancestors 'none'",
-        "x-content-type-options": "nosniff",
-        "content-disposition": `inline; filename="${report.isPreview ? "preview" : "verdict"}-${report.id}.html"`
-      }
-    });
+    return new Response(exact.bytes, { headers: {
+      "content-type": "application/pdf", "cache-control": "private, no-store", "x-content-type-options": "nosniff",
+      "content-disposition": `${mode === "view" ? "inline" : "attachment"}; filename="${exact.fileName}"`,
+      "x-uchit-delivery-id": delivery.id, "x-uchit-artifact-sha256": delivery.protectedPdfChecksumSha256
+    } });
   } catch (error) {
     if (error instanceof AuthenticationError) return authErrorResponse(error);
     if (error instanceof ClientPortalAccessError) return new Response(error.message, { status: 403, headers: { "cache-control": "private, no-store" } });
     if (error instanceof ClientAccountUnlinkedError) return new Response(error.message, { status: 404, headers: { "cache-control": "private, no-store" } });
+    if (error instanceof PersistenceConflictError) return new Response("Access history changed. Retry the secure download.", { status: 409, headers: { "cache-control": "private, no-store" } });
+    if (error instanceof FinalPdfError) return new Response(error.message, { status: error.statusCode, headers: { "cache-control": "private, no-store" } });
     throw error;
   }
 }

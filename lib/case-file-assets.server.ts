@@ -91,6 +91,24 @@ export async function assertCaseFileEvidenceScope(evidenceRef: string, scope: Ca
   if (!row) throw new Error("Evidence reference does not resolve to an immutable file in this case revision and floor.");
 }
 
+export async function resolveCaseFileEvidenceAuthority(evidenceRef: string, scope: CaseFileScope) {
+  const { DB, R2 } = getRuntimeEnv();
+  if (!DB || !R2) throw new Error("Protected case-file storage is not configured.");
+  await migrateD1(DB);
+  const row = await DB.prepare(`SELECT id, evidence_ref, object_key, original_file_name, mime_type, size_bytes, checksum_sha256
+    FROM case_file_assets WHERE evidence_ref=? AND organisation_id=? AND case_id=? AND case_revision_number=?
+    AND service_type=? AND COALESCE(floor_label,'')=? AND status='IMMUTABLE'`)
+    .bind(evidenceRef, scope.organisationId, scope.caseId, scope.caseRevisionNumber, scope.serviceType, scope.floorLabel ?? "")
+    .first<{ id: string; evidence_ref: string; object_key: string; original_file_name: string; mime_type: string; size_bytes: number; checksum_sha256: string }>();
+  if (!row) throw new Error("Evidence reference does not resolve to an immutable file in this exact scope.");
+  const object = await R2.get(row.object_key);
+  if (!object) throw new Error("Protected evidence bytes are unavailable from private storage.");
+  const bytes = await streamBytes(object.body);
+  const checksum = await sha256Hex(bytes);
+  if (bytes.length !== Number(row.size_bytes) || checksum !== row.checksum_sha256) throw new Error("Protected evidence failed its immutable checksum verification.");
+  return { artifactId: row.id, evidenceRef: row.evidence_ref, fileName: safeDisplayName(row.original_file_name), mimeType: row.mime_type, sizeBytes: bytes.length, checksumSha256: checksum };
+}
+
 export async function assertCaseFileEvidenceRefs(evidenceRefs: readonly string[], scope: Omit<CaseFileScope, "floorLabel">) {
   const { DB, R2 } = getRuntimeEnv();
   if (!DB || !R2) throw new Error("Protected case-file storage is not configured.");

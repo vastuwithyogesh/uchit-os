@@ -313,8 +313,8 @@ export function approveManualUtilitySheet(input: {
   if (!Number.isInteger(input.expectedRecordVersion) || Number(input.expectedRecordVersion) < 0) throw new SiteWorkflowError("The latest floor record version is required.", 428);
   if ((caseRecord.recordVersion ?? 0) !== Number(input.expectedRecordVersion)) throw new SiteWorkflowError("The case changed. Refresh before approving the manual utility sheet.", 409);
   const documentId = safeText(input.documentId, "Manual utility sheet document ID", 160);
-  const document = state.caseDocuments.find((item) => item.id === documentId && item.caseId === caseRecord.id && item.caseRevisionNumber === (caseRecord.revisionNumber ?? 1) && item.assetType === "MANUAL_UTILITY_SHEET" && item.floorLabel === floor.floorLabel && item.isCurrent);
-  if (!document) throw new SiteWorkflowError("The manual utility sheet must belong to this current floor and case revision.", 404);
+  const document = state.caseDocuments.find((item) => item.id === documentId && item.caseId === caseRecord.id && item.caseRevisionNumber === (caseRecord.revisionNumber ?? 1) && item.assetType === "MANUAL_UTILITY_SHEET" && item.floorLabel === floor.floorLabel);
+  if (!document) throw new SiteWorkflowError("The manual utility sheet must belong to this floor and active case revision.", 404);
   if (document.revisionStatus !== "VERIFIED" || document.blocker || document.discrepancy) throw new SiteWorkflowError("The manual utility sheet must be verified with no blocker or discrepancy.", 409);
   const key = stableKey(input.idempotencyKey);
   const replay = state.manualSheetApprovals.find((item) => item.documentId === document.id && item.idempotencyKey === key);
@@ -322,6 +322,12 @@ export function approveManualUtilitySheet(input: {
   const reason = safeText(input.reason, "Founder approval reason", 500, 20);
   const priorStatus = document.founderApprovalStatus ?? "PENDING";
   if (priorStatus === "APPROVED") throw new SiteWorkflowError("This manual utility sheet is already Founder-approved.", 409);
+  const predecessor = document.successorOfDocumentId ? state.caseDocuments.find((item) => item.id === document.successorOfDocumentId && item.caseId === caseRecord.id && item.assetType === "MANUAL_UTILITY_SHEET" && item.floorLabel === floor.floorLabel && item.isCurrent && item.revisionStatus === "VERIFIED" && item.founderApprovalStatus === "APPROVED") : undefined;
+  if (!document.isCurrent && !predecessor) throw new SiteWorkflowError("A successor must reference the exact approved current manual sheet before Founder approval.", 409);
+  if (predecessor) {
+    predecessor.isCurrent = false; predecessor.revisionStatus = "SUPERSEDED"; predecessor.version += 1; predecessor.updated = { actorId: input.actor.id, actorName: input.actor.fullName, actorRole: input.actor.role, at: now() };
+    document.isCurrent = true;
+  }
   document.founderApprovalStatus = "APPROVED";
   document.founderApprovedAt = now();
   document.founderApprovedByActorUserId = input.actor.id;
@@ -337,5 +343,8 @@ export function approveManualUtilitySheet(input: {
   };
   state.manualSheetApprovals.unshift(approval);
   appendTimeline(state, caseRecord.clientId, input.actor, "Manual utility sheet Founder-approved", `${floor.floorLabel} document ${document.versionLabel} is approved for report inclusion.`);
+  if (predecessor) appendFloorInvalidations({ projectId: project.id, caseId: caseRecord.id, floorId: floor.id, causeType: "EVIDENCE", sourceVersionId: document.id,
+    reason: "The Founder approved a successor manual utility sheet; dependent floor evaluation and draft report lineage require regeneration.", actor: input.actor,
+    targetTypes: ["UTILITY_EVALUATION", "UTILITY_VERDICT", "SHAKTI_EVALUATION", "FINDING", "DRAFT_REPORT"] });
   return { document, approval };
 }

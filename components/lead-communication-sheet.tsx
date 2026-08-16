@@ -42,7 +42,16 @@ export function LeadCommunicationSheet(props: Props) {
     return digits.length >= 8 ? digits : "";
   }
   const emailRecipient = normaliseManualEmail(props.email);
-  const blocked = props.templateKey === "BROCHURE" ? !context && !props.secureBrochureLink : props.templateKey === "QUALIFICATION" ? !qualificationKind || (!context && (!props.secureOnlineFormLink || !props.securePdfLink || !props.qualificationTitle)) : false;
+  // The context callback is the authoritative server action that resolves the
+  // active asset and creates the scoped grants. Requiring its returned values
+  // before invoking the callback made the qualification action unreachable.
+  // Keep the sheet fail-closed on purpose selection; the callback still has to
+  // succeed before either communication preparation can proceed.
+  const blocked = props.templateKey === "BROCHURE"
+    ? !context && !props.secureBrochureLink && !props.onPrepareContext
+    : props.templateKey === "QUALIFICATION"
+      ? !qualificationKind || (!context && !props.onPrepareContext)
+      : false;
 
   async function prepareBoth() {
     setBusy(true);

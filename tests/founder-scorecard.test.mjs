@@ -30,19 +30,22 @@ test("floor-ready writes the exact state consumed by the Founder scorecard", () 
   assert.match(service, /workspace\.status\s*=\s*"LOCKED"/);
 });
 
-test("scorecard preserves regeneration, methodology, floor and delivery gates", () => {
+test("scorecard preserves regeneration, methodology, floor and controlled delivery gates", () => {
   const helper = read("lib/founder-scorecard.ts");
   assert.match(helper, /NEEDS_REGENERATION/);
-  assert.match(helper, /hasOpenRegeneration/);
+  assert.match(helper, /openRegenerations/);
+  assert.match(helper, /evaluationRegeneration/);
   assert.match(helper, /BLOCKED — METHOD INPUT REQUIRED/);
-  assert.match(helper, /Client delivery is intentionally disabled/);
+  assert.match(helper, /Prepare and record controlled client access/);
+  assert.match(helper, /documentDeliveries/);
+  assert.doesNotMatch(helper, /Client delivery is intentionally disabled/);
   assert.match(helper, /one immutable report for this floor/i);
   assert.match(helper, /contextPath/);
 });
 
-test("Step 06 includes the existing verified-main-entrance gate and Step 08 shares engine readiness", () => {
+test("Step 06 includes the confirmed entrance-zone gate and Step 08 shares engine readiness", () => {
   const scorecard = read("lib/founder-scorecard.ts");
-  assert.match(scorecard, /facts\.mainEntrance/);
+  assert.match(scorecard, /facts\.propertyMainGateZone \|\| facts\.floorGateZone/);
   assert.match(scorecard, /getCaseEvaluationBlockers/);
   assert.match(scorecard, /evaluationBlockers\.length/);
   assert.match(scorecard, /Complete evaluation readiness/);

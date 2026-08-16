@@ -11,6 +11,8 @@ const pipeline = source("lib/crm-pipeline.ts");
 const actions = source("app/api/actions/route.ts");
 const policy = source("lib/commercial-policy.ts");
 const evaluationConsole = source("components/evaluation-console.tsx");
+const crmWorkbench = source("components/crm-workbench.tsx");
+const commercialConsole = source("components/commercial-console.tsx");
 const leadInboxConsole = source("components/lead-inbox-console.tsx");
 
 test("canonical CRM pipeline is additive and legacy stages remain intact", () => {
@@ -92,6 +94,7 @@ test("server commercial behavior reads policy while explicit proposal amounts re
   assert.doesNotMatch(workflow, /51000|11000|2-minute/);
   assert.match(workflows, /LEGACY_COMMERCIAL_POLICY_DEFAULTS/);
   assert.doesNotMatch(evaluationConsole, /formatMoney\(51000\)/);
-  assert.match(evaluationConsole, /commercialPolicy\.defaultProposalAmountInr/);
+  assert.match(crmWorkbench, /commercialPolicy\.defaultProposalAmountInr/);
+  assert.match(commercialConsole, /commercialPolicy\.defaultProposalAmountInr/);
   assert.doesNotMatch(leadInboxConsole, /proposal-create[\s\S]{0,100}amountInr:\s*51000/);
 });

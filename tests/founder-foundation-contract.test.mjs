@@ -81,11 +81,12 @@ test("membership capabilities decode deterministically and ignore unknown values
   assert.deepEqual(decodeMembershipCapabilities("organisation_owner"), ["organisation_owner"]);
 });
 
-test("client delivery and internal preview export remain server-blocked", () => {
-  assert.match(source("app/api/client/portal/route.ts"), /CLIENT_DELIVERY_ENABLED = false/);
-  assert.match(source("app/api/client/reports/[reportId]/route.ts"), /CLIENT_DELIVERY_ENABLED = false/);
+test("client delivery is controlled by exact delivered records and internal preview export remains blocked", () => {
+  assert.match(source("app/api/client/portal/route.ts"), /buildClientPortalView/);
+  assert.match(source("app/api/client/reports/[reportId]/route.ts"), /item\.status === "DELIVERED"/);
+  assert.match(source("app/api/client/reports/[reportId]/route.ts"), /readDeliveredProtectedPdf/);
   assert.match(source("app/api/reports/[reportId]/print/route.ts"), /report\.isPreview[\s\S]*status: 403/);
-  assert.match(source("app/client/page.tsx"), /client portal is reserved for a later edition/i);
+  assert.match(source("app/client/page.tsx"), /ClientPortal/);
 });
 
 test("protected case files are organisation, case, revision and floor scoped", () => {

@@ -4,6 +4,7 @@ import { deterministicContentHash } from "./evaluation-provenance.ts";
 import { APPROVED_QUALIFICATION_DEFINITIONS } from "./qualification-form-definitions.ts";
 import { renderFounderTemplate, type FounderTemplateKey, type TemplateValues } from "./founder-communication-templates.ts";
 import { APPROVED_FOUNDER_ASSETS, validateApprovedAssetMetadata } from "./founder-media-manifest.ts";
+import { activeBrandProjection } from "./document-branding.ts";
 
 export class FounderEngagementError extends Error { statusCode: number; constructor(statusCode: number, message: string) { super(message); this.statusCode = statusCode; } }
 function fail(status: number, message: string): never { throw new FounderEngagementError(status, message); }
@@ -82,11 +83,11 @@ export function updateCanonicalLeadProfile(input: { state: AppState; actor: AppU
   return { replayed: false, version, lead };
 }
 
-export async function createSecureGrant(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; purpose: "BROCHURE" | "QUALIFICATION_PDF" | "QUALIFICATION_FORM" | "BOOKING_RESPONSE"; leadId: string; clientId?: string; assetVersionId?: string; formDefinitionId?: string; bookingId?: string; days: 14 | 30; rotateGrantId?: string; now?: Date }) {
+export async function createSecureGrant(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; purpose: "BROCHURE" | "QUALIFICATION_PDF" | "QUALIFICATION_FORM" | "BOOKING_RESPONSE"; leadId: string; clientId?: string; assetVersionId?: string; formDefinitionId?: string; bookingId?: string; days: 14 | 30; rotateGrantId?: string; requireUsableToken?: boolean; now?: Date }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId);
   const now = input.now ?? new Date();
   const reusable = input.state.secureAccessGrants.find((grant) => grant.organisationId === input.organisationId && grant.leadId === input.leadId && grant.purpose === input.purpose && !grant.revokedAt && new Date(grant.expiresAt) > now && grant.assetVersionId === input.assetVersionId && grant.formDefinitionId === input.formDefinitionId && grant.bookingId === input.bookingId);
-  if (reusable && !input.rotateGrantId) return { grant: reusable, token: undefined, reused: true };
+  if (reusable && !input.rotateGrantId && !input.requireUsableToken) return { grant: reusable, token: undefined, reused: true };
   const token = `${uuid().replaceAll("-", "")}${uuid().replaceAll("-", "")}`;
   const grant = { id: uuid(), organisationId: input.organisationId, purpose: input.purpose, leadId: input.leadId, clientId: input.clientId, assetVersionId: input.assetVersionId, formDefinitionId: input.formDefinitionId, bookingId: input.bookingId, tokenHash: await hashText(token), expiresAt: new Date(now.getTime() + input.days * 86400000).toISOString(), createdAt: now.toISOString(), createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
   if (input.rotateGrantId) { const old = input.state.secureAccessGrants.find((item) => item.id === input.rotateGrantId && item.organisationId === input.organisationId); if (!old) fail(404, "Secure link not found."); old.revokedAt = now.toISOString(); old.replacedByGrantId = grant.id; old.recordVersion = (old.recordVersion ?? 0) + 1; }
@@ -103,7 +104,9 @@ export async function resolveSecureGrant(state: AppState, token: string, purpose
 
 export async function prepareManualCommunication(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId?: string; prospectiveProjectIds?: string[]; templateKey: FounderTemplateKey; values: TemplateValues; channel: CommunicationChannel; recipient: string; assetVersionIds?: string[]; formDefinitionId?: string; bookingId?: string; grantIds?: string[]; renderedTimeZoneSnapshot?: string; manualNote?: string; idempotencyKey: string; expectedRecordVersion?: number }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId); safeIdempotency(input.idempotencyKey);
-  const rendered = renderFounderTemplate(input.templateKey, input.values);
+  const legacyRendered = renderFounderTemplate(input.templateKey, input.values); const brand = activeBrandProjection(input.state, input.organisationId);
+  const brandText = (value: string) => value.replaceAll("Uchit Vastu India", brand.displayName).replaceAll("UCHIT VASTU INDIA", brand.displayName.toUpperCase());
+  const rendered = { ...legacyRendered, whatsapp: brandText(legacyRendered.whatsapp), emailSubject: brandText(legacyRendered.emailSubject), email: brandText(legacyRendered.email) };
   const content = input.channel === "WHATSAPP" ? rendered.whatsapp : `${rendered.emailSubject}\n\n${rendered.email}`;
   const recipientHash = await hashText(input.recipient.trim().toLowerCase());
   const renderedContentHash = await hashText(content);
@@ -157,15 +160,14 @@ export async function createFounderCommunicationContext(input: {
     if (!input.qualificationKind) fail(400, "Choose Residential, Commercial or Hybrid; the qualification type cannot be guessed.");
     if (!input.clientId) fail(409, "A permanent Client ID is required before sending a qualification form.");
     const selectedServices = input.qualificationKind === "HYBRID" ? ["RESIDENTIAL", "COMMERCIAL"] as const : [input.qualificationKind] as const;
-    const invitation = await createQualificationInvitation({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, kind: input.qualificationKind, selectedServices: [...selectedServices], idempotencyKey: `invite-${input.idempotencyKey}`, expectedRecordVersion: input.expectedRecordVersion, now });
+    const invitation = await createQualificationInvitation({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, kind: input.qualificationKind, selectedServices: [...selectedServices], idempotencyKey: `invite-${input.idempotencyKey}`, expectedRecordVersion: input.expectedRecordVersion, requireUsableToken: true, now });
     if (!invitation.token) fail(409, "The qualification link could not be recovered. Retry with a new review action.");
     const definition = APPROVED_QUALIFICATION_DEFINITIONS[input.qualificationKind];
     const manifest = APPROVED_FOUNDER_ASSETS.find((item) => item.key === definition.sourceAssetVersionId)!;
     const asset = input.state.mediaAssets.find((item) => item.id === `media:${manifest.key.toLowerCase()}` && item.organisationId === input.organisationId);
     const version = input.state.mediaAssetVersions.find((item) => item.id === asset?.activeVersionId && item.organisationId === input.organisationId && item.status === "ACTIVE" && item.clientSendable && item.checksumSha256 === manifest.checksumSha256);
     if (!version) fail(409, "Activate the exact approved qualification PDF before preparing this message.");
-    const activeGrant = input.state.secureAccessGrants.find((item) => item.organisationId === input.organisationId && item.leadId === input.leadId && item.purpose === "QUALIFICATION_PDF" && item.assetVersionId === version.id && !item.revokedAt && new Date(item.expiresAt) > now);
-    const pdfGrant = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "QUALIFICATION_PDF", leadId: input.leadId, clientId: input.clientId, assetVersionId: version.id, days: 14, rotateGrantId: activeGrant?.id, now });
+    const pdfGrant = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "QUALIFICATION_PDF", leadId: input.leadId, clientId: input.clientId, assetVersionId: version.id, days: 14, requireUsableToken: true, now });
     if (!pdfGrant.token) fail(409, "The qualification PDF link could not be recovered. Retry to rotate a secure link.");
     valuesPatch["Qualification Form Title"] = definition.title;
     valuesPatch["Secure Online Form Link"] = `/api/public/qualification/${invitation.token}`;
@@ -186,7 +188,7 @@ export function markCommunicationOpened(input: { state: AppState; actor: AppUser
   record.state = "OPENED"; record.openedAt = nowIso(); record.recordVersion = (record.recordVersion ?? 0) + 1; return record;
 }
 
-export async function createQualificationInvitation(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId: string; kind: QualificationKind; selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+export async function createQualificationInvitation(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId: string; kind: QualificationKind; selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; idempotencyKey: string; expectedRecordVersion?: number; requireUsableToken?: boolean; now?: Date }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId); safeIdempotency(input.idempotencyKey);
   const requestHash = deterministicContentHash({ leadId: input.leadId, clientId: input.clientId, kind: input.kind, selectedServices: input.selectedServices });
   const replay = input.state.qualificationInvitations.find((item) => item.organisationId === input.organisationId && item.id === `qualification-invite:${input.idempotencyKey}`);
@@ -208,7 +210,7 @@ export async function createQualificationInvitation(input: { state: AppState; ac
   if (!definition) { definition = { ...structuredClone(definitionSeed), organisationId: input.organisationId, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 }; input.state.qualificationFormDefinitions.push(definition); }
   if (definition.status !== "ACTIVE") fail(409, "Only the active Founder-approved qualification definition can be sent.");
   const now = input.now ?? new Date();
-  const grantResult = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "QUALIFICATION_FORM", leadId: input.leadId, clientId: input.clientId, formDefinitionId: definition.id, days: 14, now });
+  const grantResult = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "QUALIFICATION_FORM", leadId: input.leadId, clientId: input.clientId, formDefinitionId: definition.id, days: 14, requireUsableToken: input.requireUsableToken, now });
   const invitation = { id: `qualification-invite:${input.idempotencyKey}`, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, formDefinitionId: definition.id, grantId: grantResult.grant.id, status: "OPEN" as const, selectedServices: [...input.selectedServices], createdAt: now.toISOString(), expiresAt: grantResult.grant.expiresAt, requestHash, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
   input.state.qualificationInvitations.push(invitation);
   return { invitation, token: grantResult.token, replayed: false };

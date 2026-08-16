@@ -1,0 +1,44 @@
+import { deterministicContentHash } from "./evaluation-provenance.ts";
+import type { EnergyBarEvidenceVersionRecord } from "./energy-bar-evidence-v1.ts";
+import type { SiteEvaluationEvidenceVersionRecord } from "./site-evaluation-evidence-v1.ts";
+import type { ElementalEvaluationSnapshotV1 } from "./elemental-evaluation-integration-v1.ts";
+import type { ElementalStatementSelection } from "./elemental-statement-repo-v1.ts";
+
+export const ELEMENTAL_REPORT_SECTION_ORDER = ["SITE_EVALUATION_EVIDENCE", "ENERGY_BAR_GRAPH", "FIVE_ELEMENT_VERDICT", "NATURAL_LIGHT", "VENTILATION", "STRENGTHS", "OPTIMIZATION_AREAS", "OVERALL_ELEMENTAL_SUMMARY"] as const;
+export type ElementalReportStatus = "READY" | "REVIEW_REQUIRED";
+export interface ElementalLightVentSelection { state: string; statementId: string; approvedText: string; sourceSheet: "Light Vent Rules"; sourceRow: number; contentHash: string; }
+export interface ElementalReportV1 {
+  version: "elemental-report/v1"; status: ElementalReportStatus; lineage: { organisationId: string; caseId: string; projectId: string; floorId: string };
+  sections: Array<{ key: typeof ELEMENTAL_REPORT_SECTION_ORDER[number]; order: number }>;
+  siteEvaluationEvidence: { evidenceVersionId: string; evidenceRef: string; artifactHash: string; mode: string; floorId: string; caseId: string; projectId: string };
+  energyBarEvidence: { evidenceVersionId: string; evidenceRef: string; artifactHash: string; floorId: string; caseId: string; projectId: string };
+  fiveElementVerdict: ElementalEvaluationSnapshotV1["elements"];
+  naturalLight: { state?: string; selection?: ElementalLightVentSelection; reviewReason?: string };
+  ventilation: { state?: string; selection?: ElementalLightVentSelection; reviewReason?: string };
+  strengths: { status: "READY"; elements: ElementalStatementSelection[] };
+  optimizationAreas: { status: "READY"; elements: ElementalStatementSelection[] };
+  overallElementalSummary: { verdicts: Array<{ element: string; verdict: string; remedyType: string }>; evidenceComplete: boolean; statementSelections: ElementalStatementSelection[] };
+  statementSelections: ElementalStatementSelection[]; reviewReasons: string[]; methodologyProvenance: { methodologyVersionId: string; methodologyContentHash: string; sourceEngine: string };
+  deterministicContentHash: string;
+}
+export class ElementalReportError extends Error {}
+const LIGHT: Record<string, { id: string; text: string; row: number }> = {
+  BALANCED: { id: "EL-LIGHT-BALANCED", text: "Natural light is broadly balanced. Preserve clear openings and even daylight distribution.", row: 5 },
+  LOW_SUPPRESSED: { id: "EL-LIGHT-LOW-SUPPRESSED", text: "Optimization required: improve usable daylight without creating excessive heat/glare.", row: 6 },
+  EXCESS_HARSH: { id: "EL-LIGHT-EXCESS-HARSH", text: "Moderation required while retaining useful daylight.", row: 7 },
+  UNEVEN_FRAGMENTED: { id: "EL-LIGHT-UNEVEN-FRAGMENTED", text: "Redistribution/balancing required rather than simply increasing or decreasing light everywhere.", row: 8 }
+};
+const VENTILATION: Record<string, { id: string; text: string; row: number }> = {
+  BALANCED: { id: "EL-VENT-BALANCED", text: "Maintain clear openings and circulation paths.", row: 9 },
+  LOW_STAGNANT: { id: "EL-VENT-LOW-STAGNANT", text: "Improvement required.", row: 10 },
+  BLOCKED_RESTRICTED: { id: "EL-VENT-BLOCKED-RESTRICTED", text: "Circulation correction required; number of windows alone is not sufficient.", row: 11 },
+  OVERACTIVE_DRAFT_HEAVY: { id: "EL-VENT-OVERACTIVE-DRAFT-HEAVY", text: "Moderation / grounding required.", row: 12 },
+  FRAGMENTED_UNEVEN: { id: "EL-VENT-FRAGMENTED-UNEVEN", text: "Rebalancing required.", row: 13 }
+};
+function selection(state: string | undefined, table: Record<string, { id: string; text: string; row: number }>, prefix: "LIGHT" | "VENTILATION", methodologyContentHash: string): ElementalLightVentSelection | undefined { if (!state) return undefined; const item = table[state]; if (!item) return undefined; return { state, statementId: item.id, approvedText: item.text, sourceSheet: "Light Vent Rules", sourceRow: item.row, contentHash: deterministicContentHash({ sourceSheet: "Light Vent Rules", sourceRow: item.row, statementId: item.id, approvedText: item.text, methodologyContentHash, prefix }) }; }
+export function assembleElementalReport(input: { snapshot: ElementalEvaluationSnapshotV1; siteEvidence: SiteEvaluationEvidenceVersionRecord; energyBarEvidence: EnergyBarEvidenceVersionRecord; }): ElementalReportV1 {
+  const { snapshot, siteEvidence, energyBarEvidence } = input; const same = (x: { organisationId: string; caseId: string; projectId: string; floorId: string }) => x.organisationId === snapshot.organisationId && x.caseId === snapshot.caseId && x.projectId === snapshot.projectId && x.floorId === snapshot.floorId; if (!same(siteEvidence) || !same(energyBarEvidence) || siteEvidence.id !== snapshot.siteEvidenceVersionId || energyBarEvidence.id !== snapshot.energyBarEvidenceVersionId || siteEvidence.status !== "FINALIZED" || energyBarEvidence.status !== "FINALIZED") throw new ElementalReportError("Finalized same-floor Site and Energy Bar evidence bound to the Elemental snapshot is required.");
+  const light = selection(snapshot.naturalLight, LIGHT, "LIGHT", snapshot.methodologyContentHash); const ventilation = selection(snapshot.ventilation, VENTILATION, "VENTILATION", snapshot.methodologyContentHash); const reasons = [...snapshot.reviewReasons]; if (!light) reasons.push("APPROVED_LIGHT_STATEMENT_MISSING"); if (!ventilation) reasons.push("APPROVED_VENTILATION_STATEMENT_MISSING"); const statementSelections = snapshot.elements.map(x => x.statement).filter(Boolean); if (snapshot.elements.length !== 5 || statementSelections.length !== 5) reasons.push("APPROVED_ELEMENTAL_STATEMENT_SELECTION_MISSING"); const strengths = snapshot.elements.filter(x => x.verdict === "BALANCE" && x.statement).map(x => x.statement); const optimizationAreas = snapshot.elements.filter(x => x.verdict !== "BALANCE" && x.statement).map(x => x.statement); const status: ElementalReportStatus = snapshot.status === "COMPLETE" && snapshot.elements.length === 5 && statementSelections.length === 5 && strengths.length + optimizationAreas.length === 5 && Boolean(light && ventilation) && reasons.length === 0 ? "READY" : "REVIEW_REQUIRED";
+  const report: Omit<ElementalReportV1, "deterministicContentHash"> = { version: "elemental-report/v1", status, lineage: { organisationId: snapshot.organisationId, caseId: snapshot.caseId, projectId: snapshot.projectId, floorId: snapshot.floorId }, sections: ELEMENTAL_REPORT_SECTION_ORDER.map((key, i) => ({ key, order: i + 1 })), siteEvaluationEvidence: { evidenceVersionId: siteEvidence.id, evidenceRef: siteEvidence.evidenceRef, artifactHash: siteEvidence.artifactHash, mode: siteEvidence.mode, floorId: siteEvidence.floorId, caseId: siteEvidence.caseId, projectId: siteEvidence.projectId }, energyBarEvidence: { evidenceVersionId: energyBarEvidence.id, evidenceRef: energyBarEvidence.evidenceRef, artifactHash: energyBarEvidence.artifactHash, floorId: energyBarEvidence.floorId, caseId: energyBarEvidence.caseId, projectId: energyBarEvidence.projectId }, fiveElementVerdict: snapshot.elements, naturalLight: { state: snapshot.naturalLight, selection: light, reviewReason: light ? undefined : "APPROVED_LIGHT_STATEMENT_MISSING" }, ventilation: { state: snapshot.ventilation, selection: ventilation, reviewReason: ventilation ? undefined : "APPROVED_VENTILATION_STATEMENT_MISSING" }, strengths: { status: "READY", elements: strengths }, optimizationAreas: { status: "READY", elements: optimizationAreas }, overallElementalSummary: { verdicts: snapshot.elements.map(x => ({ element: x.element, verdict: x.verdict, remedyType: x.remedyType })), evidenceComplete: status === "READY", statementSelections }, statementSelections, reviewReasons: reasons, methodologyProvenance: { methodologyVersionId: snapshot.methodologyVersionId, methodologyContentHash: snapshot.methodologyContentHash, sourceEngine: snapshot.provenance.sourceEngine } };
+  const canonical = { ...report, sections: report.sections, fiveElementVerdict: report.fiveElementVerdict.map(x => ({ element: x.element, verdict: x.verdict, correctionScope: x.correctionScope, targetDirection: x.targetDirection ?? null, remedyType: x.remedyType, reasonCode: x.reasonCode, statementId: x.statement?.statementId ?? null, statementHash: x.statement?.contentHash ?? null })), naturalLight: { state: report.naturalLight.state ?? null, selectionId: report.naturalLight.selection?.statementId ?? null, selectionHash: report.naturalLight.selection?.contentHash ?? null }, ventilation: { state: report.ventilation.state ?? null, selectionId: report.ventilation.selection?.statementId ?? null, selectionHash: report.ventilation.selection?.contentHash ?? null } }; return { ...report, deterministicContentHash: deterministicContentHash(canonical) };
+}

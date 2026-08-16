@@ -10,6 +10,7 @@ function fixture() {
   return {
     clients: [{ id: "client-1", displayName: "Client One", city: "Pune" }], leadQualifications: [], clientIntakeProfiles: [],
     vastuCases: [{ id: "case-1", clientId: "client-1", projectId: "project-1", caseNumber: "UV-1", serviceType: "EXISTING_SPACE" }],
+    projects: [{ id: "project-1", clientId: "client-1", activeCaseId: "case-1", propertyName: "Client One Residence" }],
     floorWorkspaces: [
       { id: "floor-a", caseId: "case-1", projectId: "project-1", floorLabel: "Ground floor", status: "LOCKED", locked: true, evidenceUploads: [] },
       { id: "floor-b", caseId: "case-1", projectId: "project-1", floorLabel: "First floor", status: "LOCKED", locked: true, evidenceUploads: [] }
@@ -20,9 +21,10 @@ function fixture() {
     ],
     orientationVersions: [{ id: "orientation-1", projectId: "project-1", caseId: "case-1", exactDegree: 42.5, googleEarthEvidenceVersionId: "earth-1", status: "LOCKED" }],
     spatialEvidenceVersions: [
-      { id: "marked-a", projectId: "project-1", caseId: "case-1", floorId: "floor-a", planVersionId: "plan-a", kind: "HAND_MARKED_PLAN", protectedFileRef: "private-a", fullColour: true, status: "CURRENT" },
-      { id: "marked-b", projectId: "project-1", caseId: "case-1", floorId: "floor-b", planVersionId: "plan-b", kind: "HAND_MARKED_PLAN", protectedFileRef: "private-b", fullColour: true, status: "CURRENT" }
+      { id: "marked-a", projectId: "project-1", caseId: "case-1", floorId: "floor-a", planVersionId: "plan-a", kind: "HAND_MARKED_PLAN", classification: "MARKED_32D_CHAKRA_V1", has32SectorChakra: true, protectedFileRef: "private-a", fullColour: true, status: "CURRENT" },
+      { id: "marked-b", projectId: "project-1", caseId: "case-1", floorId: "floor-b", planVersionId: "plan-b", kind: "HAND_MARKED_PLAN", classification: "MARKED_32D_CHAKRA_V1", has32SectorChakra: true, protectedFileRef: "private-b", fullColour: true, status: "CURRENT" }
     ],
+    entranceZoneVersions: [{ id: "entrance-property-v1", projectId: "project-1", caseId: "case-1", scope: "PROPERTY_MAIN_GATE", sourceFloorId: "floor-a", planVersionId: "plan-a", marked32DEvidenceVersionId: "marked-a", methodologyVersionId: "method-32", methodologyContentHash: "method-32-hash", zoneCode: "TEST_ZONE", zoneNameSnapshot: "Test zone", status: "CURRENT" }],
     openingMappings: [{ id: "opening-a", projectId: "project-1", caseId: "case-1", floorId: "floor-a", planVersionId: "plan-a", orientationVersionId: "orientation-1", kind: "MAIN_ENTRANCE", markerX: 10, markerY: 20, verified: true, methodologyStatus: "APPROVED", directionCode: "D-A", evidenceVersionId: "marked-a" }],
     spaceMappings: [{ id: "space-a", projectId: "project-1", caseId: "case-1", floorId: "floor-a", planVersionId: "plan-a", orientationVersionId: "orientation-1", spaceLabel: "Kitchen", polygon: [{ x: 1, y: 1 }, { x: 2, y: 2 }, { x: 3, y: 1 }], verified: true, methodologyStatus: "APPROVED", directionCode: "S-A", evidenceVersionId: "marked-a" }],
     evaluationSnapshots: [

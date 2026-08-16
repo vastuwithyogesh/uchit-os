@@ -39,9 +39,9 @@ test("mobile, keyboard, focus and 44px source contracts cover all new surfaces",
 
 test("action routes remain server-authoritative and expose conflict semantics", async () => {
   const [route, leads, commercial] = await Promise.all([read("app/api/actions/route.ts"), read("components/unified-leads-workspace.tsx"), read("components/founder-commercial-proposal-editor.tsx")]);
-  for (const action of ["founder-lead-profile-update", "founder-media-dry-run", "founder-communication-prepare", "founder-communication-opened", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send"]) assert.match(route, new RegExp(`case \\"${action}\\"`));
-  assert.match(route, /\[400, 401, 403, 404, 409, 428, 503\]/);
-  assert.match(leads, /buildActionHeaders\(activeUser\.role\)/); assert.match(leads, /expectedRevision/); assert.match(leads, /idempotencyKey/);
+  for (const action of ["founder-lead-profile-update", "founder-media-dry-run", "founder-communication-prepare", "founder-communication-opened", "founder-prospective-project-service-classify", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send"]) assert.match(route, new RegExp(`case \\"${action}\\"`));
+  assert.match(route, /\[400, 401, 403, 404, 409, 413, 428, 503\]/);
+  assert.match(leads, /Confirm Existing Space/); assert.match(leads, /founder-prospective-project-service-classify/); assert.match(leads, /buildActionHeaders\(activeUser\.role\)/); assert.match(leads, /expectedRevision/); assert.match(leads, /idempotencyKey/);
   assert.match(commercial, /expectedRevision/); assert.match(commercial, /expectedRecordVersion/); assert.match(commercial, /idempotencyKey/);
   assert.doesNotMatch(leads, /ownerUserId\s*:/); assert.doesNotMatch(commercial, /ownerUserId\s*:/);
 });
@@ -61,4 +61,34 @@ test("commercial index reflects the approved brochure-as-scope contract", async 
   assert.match(page, /brochure is pinned as the scope reference/i);
   assert.match(page, /Active brochure scope references/);
   assert.doesNotMatch(page, /configure an active service scope template/i);
+});
+
+test("canonical legal policy governance stays server-owned and reviewable", async () => {
+  const [route, page, consoleSource] = await Promise.all([
+    read("app/api/actions/route.ts"),
+    read("app/commercial-proposals/page.tsx"),
+    read("components/founder-legal-policy-console.tsx")
+  ]);
+  for (const action of ["founder-legal-policy-version-create-from-canonical", "founder-legal-policy-approve", "founder-legal-policy-activate"]) assert.match(route, new RegExp(`case \\\"${action}\\\"`));
+  assert.match(route, /createFounderCanonicalLegalPolicyVersion/);
+  assert.doesNotMatch(route, /"founder-legal-policy-version-create-from-canonical":\s*\[[^\]]*exactText/);
+  assert.match(page, /FounderLegalPolicyConsole/);
+  assert.match(consoleSource, /View exact policy wording/);
+  assert.match(consoleSource, /Approve exact version/);
+  assert.match(consoleSource, /Activate exact version/);
+});
+
+test("Founder commercial pages share binding-backed organisation resolution", async () => {
+  const [access, list, detail] = await Promise.all([
+    read("lib/page-access.tsx"),
+    read("app/commercial-proposals/page.tsx"),
+    read("app/commercial-proposals/[proposalId]/[step]/page.tsx")
+  ]);
+  assert.match(access, /requireFounderCommercialPageAccess/);
+  assert.match(access, /resolveActiveOrganisationContext/);
+  assert.match(access, /isExplicitLocalDemo/);
+  assert.match(list, /requireFounderCommercialPageAccess/);
+  assert.match(detail, /requireFounderCommercialPageAccess/);
+  assert.doesNotMatch(list, /requirePageAccess/);
+  assert.doesNotMatch(detail, /requirePageAccess/);
 });

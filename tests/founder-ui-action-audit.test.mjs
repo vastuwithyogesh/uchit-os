@@ -73,9 +73,10 @@ test("native navigation, private delivery routes and accessibility tokens remain
     assert.doesNotMatch(text, /<Link\b|prefetch=/);
   }
   const clientPortal = read("app/api/client/portal/route.ts");
-  assert.match(clientPortal, /CLIENT_DELIVERY_DEFERRED/);
+  assert.match(clientPortal, /buildClientPortalView/);
   const clientReport = read("app/api/client/reports/[reportId]/route.ts");
-  assert.match(clientReport, /disabled during Founder Edition/);
+  assert.match(clientReport, /readDeliveredProtectedPdf/);
+  assert.match(clientReport, /recipientClientId === client\.id/);
   const css = read("app/globals.css");
   assert.match(css, /:where\(a, button, input, textarea, select, summary\):focus-visible/);
   assert.match(css, /min-height:\s*44px/);

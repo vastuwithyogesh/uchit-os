@@ -1,5 +1,6 @@
 import type {
   AppUser,
+  CasePropertyContextRecord,
   FloorWorkspaceRecord,
   FounderCommercialLegalPolicyRecord,
   FounderCommercialPolicyVersionRecord,
@@ -14,11 +15,14 @@ import type {
   VastuProjectRecord,
   VastuServiceType
 } from "./domain.ts";
+import { serviceTypes } from "./domain.ts";
 import type { AppState } from "./store.ts";
 import { deterministicContentHash } from "./evaluation-provenance.ts";
-import { COMMERCIAL_PROPOSAL_RENDERER_VERSION, renderCommercialProposalPdf, type FounderProposalClientProjection } from "./commercial-document-renderer.ts";
+import { COMMERCIAL_PROPOSAL_RENDERER_VERSION, founderTemplatePageCount, founderTemplateRendererVersion, renderCommercialProposalPdf, type FounderProposalClientProjection } from "./commercial-document-renderer.ts";
 import { registerFinalTaxInvoiceReviewTask, registerStatutoryPaymentTrigger } from "./founder-statutory-documents.ts";
 import { APPROVED_FOUNDER_ASSETS } from "./founder-media-manifest.ts";
+import { resolveDocumentTemplateSnapshot } from "./document-branding.ts";
+import { loadFounderTemplateMedia } from "./founder-template-media.ts";
 
 export class FounderCommercialError extends Error {
   statusCode: number;
@@ -47,6 +51,18 @@ export const FOUNDER_NO_REFUND_POLICY_CONFIGURATION = {
   creditPolicy: "NO_CREDITS_VOUCHERS_OR_FEE_OFFSETS",
   correctionPolicyApproval: "REVIEW_REQUIRED_ACCOUNTANT"
 } as const;
+export const FOUNDER_CANCELLATION_REFUND_DELAY_V2_TITLE = "P14 — Cancellation, Refund and Delay Policy";
+export const FOUNDER_CANCELLATION_REFUND_DELAY_V2_COPY = [
+  "P14.1 Client cancellation or withdrawal. If the Client cancels, pauses indefinitely or chooses not to proceed after work has commenced, amounts attributable to services already performed, work already completed and non-cancellable third-party costs are ordinarily non-refundable, subject always to applicable law. Any amount relating to services not yet performed will be assessed having regard to the approved Proposal, work completed, committed resources and any rights that apply under law.",
+  "P14.2 Client-caused delay. Estimated timelines depend on timely receipt of information, drawings, documents, access, confirmations, decisions and site availability from the Client and relevant project participants. Delay in providing these inputs may move the estimated schedule without constituting a failure by Uchit to perform the services.",
+  "P14.3 Uchit rescheduling. If Uchit needs to reschedule a consultation, review or other scheduled service, a reasonable replacement date or slot will be offered.",
+  "P14.4 Applicable law preserved. Nothing in this policy excludes, restricts or waives any right, remedy, refund or other entitlement that cannot lawfully be excluded, restricted or waived. Any amount determined to be refundable or otherwise payable under applicable law will be processed through Uchit’s normal accounting process; internal administrative approval does not limit a statutory or legally enforceable entitlement."
+].join("\n\n");
+export const FOUNDER_CANCELLATION_REFUND_DELAY_V2_CONFIGURATION = {
+  refundPolicy: "LAW_PRESERVING_REFUND_ASSESSMENT",
+  creditPolicy: "NO_AUTOMATIC_CREDITS_OR_VOUCHERS",
+  correctionPolicyApproval: "NORMAL_ACCOUNTING_PROCESS"
+} as const;
 export const FOUNDER_PROFESSIONAL_BOUNDARIES_TITLE = "P5 — Core Professional Boundaries";
 export const FOUNDER_PROFESSIONAL_BOUNDARIES_COPY = [
   "P5.1. Nature of the service. Uchit Vastu India provides Vastu consultancy and advisory services within the scope expressly stated in the Proposal. The consultancy is based on the information, plans, photographs, recordings, site observations and other evidence made available for the engagement, together with the approved Uchit methodology applicable to the relevant version of the work.",
@@ -68,12 +84,39 @@ export const FOUNDER_ACCEPTANCE_DECLARATION_COPY = [
   "P13.6. No waiver of legal rights. Nothing in this declaration removes any right or remedy that cannot lawfully be excluded, restricted or waived."
 ].join("\n\n");
 
+type CanonicalFounderLegalPolicyKind = "PROFESSIONAL_BOUNDARIES" | "ACCEPTANCE_DECLARATION" | "CANCELLATION_REFUND_DELAY";
+
+function canonicalFounderLegalPolicy(kind: CanonicalFounderLegalPolicyKind) {
+  if (kind === "PROFESSIONAL_BOUNDARIES") return { title: FOUNDER_PROFESSIONAL_BOUNDARIES_TITLE, exactText: FOUNDER_PROFESSIONAL_BOUNDARIES_COPY, configuration: undefined };
+  if (kind === "ACCEPTANCE_DECLARATION") return { title: FOUNDER_ACCEPTANCE_DECLARATION_TITLE, exactText: FOUNDER_ACCEPTANCE_DECLARATION_COPY, configuration: { acceptanceCheckboxLabel: FOUNDER_ACCEPTANCE_CHECKBOX_COPY, typedConfirmationMode: "FULL_NAME" as const } };
+  return { title: FOUNDER_CANCELLATION_REFUND_DELAY_V2_TITLE, exactText: FOUNDER_CANCELLATION_REFUND_DELAY_V2_COPY, configuration: FOUNDER_CANCELLATION_REFUND_DELAY_V2_CONFIGURATION };
+}
+
+export function createFounderCanonicalLegalPolicyVersion(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; kind: CanonicalFounderLegalPolicyKind; reason: string; idempotencyKey: string; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const canonical = canonicalFounderLegalPolicy(input.kind);
+  const contentHash = deterministicContentHash({ exactText: canonical.exactText, configuration: canonical.configuration });
+  const requestHash = deterministicContentHash({ kind: input.kind, contentHash, reason: trimmed(input.reason, "Reason") });
+  const replay = input.state.founderCommercialLegalPolicies.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === input.idempotencyKey);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different canonical legal policy content."); return replay; }
+  const existing = input.state.founderCommercialLegalPolicies.find((item) => item.organisationId === input.organisationId && item.kind === input.kind && item.contentHash === contentHash);
+  if (existing) return existing;
+  const version = Math.max(0, ...input.state.founderCommercialLegalPolicies.filter((item) => item.organisationId === input.organisationId && item.kind === input.kind).map((item) => item.version)) + 1;
+  const now = nowIso(input.now);
+  const policy: FounderCommercialLegalPolicyRecord = { id: uuid(), organisationId: input.organisationId, kind: input.kind, version, status: "DRAFT", title: canonical.title, exactText: canonical.exactText, contentHash, configuration: structuredClone(canonical.configuration), reason: input.reason.trim(), createdByActorUserId: input.actor.id, createdAt: now, idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
+  input.state.founderCommercialLegalPolicies.push(policy);
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_DRAFTED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: "Canonical Founder legal policy source materialised for owner review.", afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  return policy;
+}
+
 export interface CommercialArtifactStore {
+  readImmutable(key: string): Promise<Uint8Array | undefined>;
   putImmutable(key: string, bytes: Uint8Array, contentType: "application/pdf", metadata: Record<string, string>): Promise<void>;
 }
 
 export class InMemoryCommercialArtifactStore implements CommercialArtifactStore {
   readonly objects = new Map<string, Uint8Array>();
+  async readImmutable(key: string) { const bytes = this.objects.get(key); return bytes?.slice(); }
   async putImmutable(key: string, bytes: Uint8Array) { if (this.objects.has(key)) fail(409, "The immutable commercial artifact already exists."); this.objects.set(key, bytes.slice()); }
 }
 
@@ -86,7 +129,7 @@ function assertExpected(actual: number | undefined, expected: number | undefined
   if ((actual ?? 0) !== expected) fail(409, `The ${label} changed. Reload before retrying.`);
 }
 
-function appendAudit(state: AppState, input: { organisationId: string; eventType: string; entityType: string; entityId: string; actorUserId: string; reason: string; proposalVersionId?: string; prospectiveProjectId?: string; beforeHash?: string; afterHash?: string; idempotencyKey: string }) {
+function appendAudit(state: AppState, input: { organisationId: string; eventType: string; entityType: string; entityId: string; actorUserId: string; reason: string; proposalVersionId?: string; prospectiveProjectId?: string; beforeHash?: string; afterHash?: string; idempotencyKey: string; requestHash?: string }) {
   const existing = state.founderCommercialAuditEvents.find((event) => event.organisationId === input.organisationId && event.idempotencyKey === input.idempotencyKey);
   if (existing) return existing;
   const event = { id: uuid(), ...input, happenedAt: nowIso(), recordVersion: 1 };
@@ -149,16 +192,32 @@ export function createFounderLegalPolicy(input: { state: AppState; actor: AppUse
 
 export function activateFounderLegalPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; policyId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
   owner(input); safeIdempotency(input.idempotencyKey);
+  const requestHash = deterministicContentHash({ action: "ACTIVATE", policyId: input.policyId, reason: trimmed(input.reason, "Activation reason") });
   const policy = input.state.founderCommercialLegalPolicies.find((item) => item.id === input.policyId && item.organisationId === input.organisationId);
   if (!policy) fail(404, "Commercial legal policy not found.");
   const replay = input.state.founderCommercialAuditEvents.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === `audit:${input.idempotencyKey}`);
-  if (replay) return policy;
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different legal policy activation content."); return policy; }
   assertExpected(policy.recordVersion, input.expectedRecordVersion, "legal policy");
   if (policy.status !== "DRAFT" && policy.status !== "FOUNDER_APPROVED") fail(409, "Only a draft or Founder-approved policy can be activated.");
-  if (policy.kind === "CANCELLATION_REFUND_DELAY" && policy.configuration?.refundPolicy !== "NO_REFUNDS") fail(409, "P14 cannot activate without the owner-approved NO_REFUNDS policy binding.");
+  const historicalP14Hash = deterministicContentHash({ exactText: FOUNDER_NO_REFUND_POLICY_COPY, configuration: FOUNDER_NO_REFUND_POLICY_CONFIGURATION });
+  if (policy.kind === "CANCELLATION_REFUND_DELAY" && policy.contentHash === historicalP14Hash) fail(409, "Historical P14 v1 cannot be activated; use the governed successor version.");
   for (const prior of input.state.founderCommercialLegalPolicies.filter((item) => item.organisationId === input.organisationId && item.kind === policy.kind && item.status === "ACTIVE")) { prior.status = "SUPERSEDED"; prior.supersedesPolicyId = policy.id; prior.recordVersion = (prior.recordVersion ?? 1) + 1; }
   policy.status = "ACTIVE"; policy.approvedByActorUserId = input.actor.id; policy.approvedAt ??= nowIso(input.now); policy.activatedAt = nowIso(input.now); policy.recordVersion = (policy.recordVersion ?? 1) + 1;
-  appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_ACTIVATED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Activation reason"), afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}` });
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_ACTIVATED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Activation reason"), afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}`, requestHash });
+  return policy;
+}
+
+export function approveFounderLegalPolicy(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; policyId: string; reason: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const requestHash = deterministicContentHash({ action: "APPROVE", policyId: input.policyId, reason: trimmed(input.reason, "Approval reason") });
+  const policy = input.state.founderCommercialLegalPolicies.find((item) => item.id === input.policyId && item.organisationId === input.organisationId);
+  if (!policy) fail(404, "Commercial legal policy not found.");
+  const replay = input.state.founderCommercialAuditEvents.find((item) => item.organisationId === input.organisationId && item.idempotencyKey === `audit:${input.idempotencyKey}`);
+  if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different legal policy approval content."); return policy; }
+  assertExpected(policy.recordVersion, input.expectedRecordVersion, "legal policy");
+  if (policy.status !== "DRAFT") fail(409, "Only a draft legal policy can be owner-approved.");
+  policy.status = "FOUNDER_APPROVED"; policy.approvedByActorUserId = input.actor.id; policy.approvedAt = nowIso(input.now); policy.recordVersion = (policy.recordVersion ?? 1) + 1;
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "LEGAL_POLICY_APPROVED", entityType: "LEGAL_POLICY", entityId: policy.id, actorUserId: input.actor.id, reason: trimmed(input.reason, "Approval reason"), afterHash: policy.contentHash, idempotencyKey: `audit:${input.idempotencyKey}`, requestHash });
   return policy;
 }
 
@@ -398,9 +457,19 @@ export async function generateFounderProposalArtifact(input: { state: AppState; 
   if (existing) return existing;
   assertExpected(proposal.recordVersion, input.expectedRecordVersion, "proposal");
   if (proposal.status !== "SUPER_ADMIN_APPROVED") fail(409, "Super Admin approval is required before immutable artifact generation.");
-  const projection = projectFounderProposalForClient(input.state, proposal); const projectionHash = deterministicContentHash(projection); const bytes = renderCommercialProposalPdf(projection); const artifactHash = await hashBytes(bytes); const privateObjectKey = `commercial/proposals/${input.organisationId}/${proposal.id}/${artifactHash}.pdf`;
-  await input.store.putImmutable(privateObjectKey, bytes, "application/pdf", { immutable: "true", proposalVersionId: proposal.id, checksumSha256: artifactHash });
-  const artifact = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, proposalContentHash: proposal.contentHash, clientProjectionHash: projectionHash, artifactHashSha256: artifactHash, privateObjectKey, mimeType: "application/pdf" as const, sizeBytes: bytes.byteLength, pageCount: 1, rendererVersion: COMMERCIAL_PROPOSAL_RENDERER_VERSION, generatedAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, recordVersion: 1 };
+  const projection = projectFounderProposalForClient(input.state, proposal);
+  const resolvedDocumentTemplate = resolveDocumentTemplateSnapshot(input.state, { organisationId: input.organisationId, family: "FOUNDER_COMMERCIAL_PROPOSAL", documentFields: {
+    "Client Name": projection.client.name, "Project Name": projection.project.propertyLocation ?? projection.project.primaryRequirement ?? proposal.prospectiveProjectId,
+    "Report Date": nowIso(input.now).slice(0, 10), "Version ID": String(projection.proposalVersion), "Consultant": input.actor.fullName } });
+  const documentTemplateSnapshot = resolvedDocumentTemplate.source === "CENTRAL" ? resolvedDocumentTemplate : undefined;
+  const templateMedia = await loadFounderTemplateMedia({ state: input.state, organisationId: input.organisationId,
+    expectedFamily: "FOUNDER_COMMERCIAL_PROPOSAL", snapshot: documentTemplateSnapshot, reader: input.store });
+  const projectionHash = deterministicContentHash(documentTemplateSnapshot ? { projection, documentTemplateSnapshot } : projection);
+  const bytes = await renderCommercialProposalPdf(projection, documentTemplateSnapshot, templateMedia); const artifactHash = await hashBytes(bytes);
+  const privateObjectKey = `commercial/proposals/${input.organisationId}/${proposal.id}/${artifactHash}.pdf`;
+  const rendererVersion = founderTemplateRendererVersion(COMMERCIAL_PROPOSAL_RENDERER_VERSION, templateMedia);
+  await input.store.putImmutable(privateObjectKey, bytes, "application/pdf", { immutable: "true", proposalVersionId: proposal.id, checksumSha256: artifactHash, rendererVersion });
+  const artifact = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, proposalContentHash: proposal.contentHash, clientProjectionHash: projectionHash, artifactHashSha256: artifactHash, privateObjectKey, mimeType: "application/pdf" as const, sizeBytes: bytes.byteLength, pageCount: founderTemplatePageCount(templateMedia), rendererVersion, generatedAt: nowIso(input.now), idempotencyKey: input.idempotencyKey, recordVersion: 1, ...(documentTemplateSnapshot ? { documentTemplateSnapshot } : {}) };
   input.state.founderProposalArtifacts.push(artifact); return artifact;
 }
 
@@ -425,7 +494,10 @@ export async function resolveFounderProposalGrant(state: AppState, token: string
   if (!grant.openedAt) { grant.openedAt = now.toISOString(); grant.recordVersion = (grant.recordVersion ?? 1) + 1; }
   const acceptance = state.founderCommercialLegalPolicies.find((item) => item.id === proposal.content.policyBindings.acceptanceDeclarationPolicyId && item.organisationId === proposal.organisationId);
   if (!acceptance) fail(409, "The accepted legal declaration snapshot is unavailable.");
-  return { grant, proposal, projection: projectFounderProposalForClient(state, proposal), acceptanceDeclaration: { exactText: acceptance.exactText, checkboxLabel: acceptance.configuration?.acceptanceCheckboxLabel, typedConfirmationPhrase: acceptance.configuration?.typedConfirmationPhrase, typedConfirmationMode: acceptance.configuration?.typedConfirmationMode } };
+  const artifact = state.founderProposalArtifacts.find((item) => item.proposalVersionId === proposal.id && item.organisationId === proposal.organisationId);
+  const template = artifact?.documentTemplateSnapshot;
+  const brandPresentation = template ? { displayName: template.brandDisplayName, colours: template.colours, headerEnabled: template.header.enabled, footerEnabled: template.footer.enabled } : undefined;
+  return { grant, proposal, projection: projectFounderProposalForClient(state, proposal), brandPresentation, acceptanceDeclaration: { exactText: acceptance.exactText, checkboxLabel: acceptance.configuration?.acceptanceCheckboxLabel, typedConfirmationPhrase: acceptance.configuration?.typedConfirmationPhrase, typedConfirmationMode: acceptance.configuration?.typedConfirmationMode } };
 }
 
 export async function respondToFounderProposal(input: { state: AppState; token: string; response: "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED"; fullName: string; acceptanceChecked?: boolean; typedConfirmation?: string; organisationName?: string; designation?: string; requestedChanges?: string; idempotencyKey: string; now?: Date }) {
@@ -519,11 +591,25 @@ export function createFounderComplimentaryCaseHandoff(input: {
   const nextCase: VastuCaseRecord = {
     id: caseId, organisationId: input.organisationId, caseNumber, clientId: proposal.clientId, proposalId: proposal.id, projectId,
     status: "CASE_CREATED", reportStatus: "DRAFT", orientationLocked: false, balanceApproved: false, fullPaymentApproved: false,
-    serviceType: proposal.serviceType, canonicalStage: "UNDERSTAND", revisionNumber: 1, recordVersion: 1
+    serviceType: proposal.serviceType, canonicalStage: "UNDERSTAND", revisionNumber: 1, recordVersion: 1, evaluationArchitectureVersion: "V1"
   };
   const nextProject: VastuProjectRecord = { id: projectId, organisationId: input.organisationId, clientId: proposal.clientId, activeCaseId: caseId, propertyName: project.displayName ?? proposal.content.clientProject.propertyType ?? "Property project", status: "IN_PROGRESS", createdAt: now };
-  const nextFloor: FloorWorkspaceRecord = { id: floorId, organisationId: input.organisationId, caseId, projectId, floorLabel: "Ground floor", status: "DRAFT", locked: false, evidenceUploads: [], idempotencyKey: `handoff-floor:${input.idempotencyKey}` };
+  const nextFloor: FloorWorkspaceRecord = { id: floorId, organisationId: input.organisationId, caseId, projectId, floorLabel: "Ground floor", status: "DRAFT", locked: false, evidenceUploads: [], idempotencyKey: `handoff-floor:${input.idempotencyKey}`, evaluationArchitectureVersion: "V1" };
   input.state.vastuCases.unshift(nextCase); input.state.projects.unshift(nextProject); input.state.floorWorkspaces.unshift(nextFloor);
+  const propertyContext: CasePropertyContextRecord = {
+    id: uuid(), organisationId: input.organisationId, clientId: proposal.clientId, caseId, projectId,
+    propertyContext: {
+      serviceInterest: proposal.serviceType,
+      propertyType: project.propertyType ?? "Residential",
+      propertyStatus: "Known",
+      cityCountry: project.propertyLocation,
+      constraints: project.importantNotes,
+      floorCount: project.floorCount ?? 1
+    },
+    version: 1, idempotencyKey: `handoff-property-context:${input.idempotencyKey}`, createdAt: now, updatedAt: now,
+    status: "CURRENT", createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1
+  };
+  input.state.casePropertyContexts.unshift(propertyContext);
   project.caseId = caseId; project.status = "CONVERTED"; project.recordVersion = (project.recordVersion ?? 0) + 1;
   proposal.recordVersion = (proposal.recordVersion ?? 0) + 1;
   const timeline: TimelineEvent = { id: uuid(), organisationId: input.organisationId, clientId: proposal.clientId, category: "Commercial", headline: "Complimentary case setup", details: `Case ${caseNumber} opened from the accepted INTERNAL_COMPLIMENTARY proposal. No payment or invoice was created.`, happenedAt: now, actorRole: input.actor.role, actorId: input.actor.id, actorName: input.actor.fullName };
@@ -532,10 +618,11 @@ export function createFounderComplimentaryCaseHandoff(input: {
   return nextCase;
 }
 
-export function createFounderProspectiveCase(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; serviceType: "EXISTING_SPACE" | "NEW_CONSTRUCTION"; propertyType: "Residential" | "Commercial" | "Factory" | "Shop" | "Hospital" | "Hotel" | "Temple"; displayName: string; propertyLocation: string; floorCount?: number; importantNotes?: string; confirmPossibleDuplicate?: boolean; idempotencyKey: string; expectedClientRecordVersion: number }) {
+export function createFounderProspectiveCase(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; serviceType: "EXISTING_SPACE" | "NEW_CONSTRUCTION"; propertyType: "Residential" | "Commercial" | "Factory" | "Shop" | "Hospital" | "Hotel" | "Temple"; displayName: string; propertyLocation: string; floorCount?: number; importantNotes?: string; confirmPossibleDuplicate?: boolean; idempotencyKey: string; expectedClientRecordVersion: number; allowLegacyUnownedLocalFixture?: boolean }) {
   owner(input); safeIdempotency(input.idempotencyKey);
-  const client = input.state.clients.find((item) => item.id === input.clientId && item.organisationId === input.organisationId);
+  const client = input.state.clients.find((item) => item.id === input.clientId && (item.organisationId === input.organisationId || (input.allowLegacyUnownedLocalFixture === true && !item.organisationId)));
   if (!client) throw new Error("Client is unavailable in this organisation.");
+  if (!client.organisationId && input.allowLegacyUnownedLocalFixture) client.organisationId = input.organisationId;
   assertExpected(client.recordVersion, input.expectedClientRecordVersion, "client");
   const clean = (value: string, label: string, max: number) => {
     const next = value.trim(); if (!next || next.length > max || /[\u0000-\u001f<>]/.test(next)) throw new Error(`${label} is required and must be safe text.`); return next;
@@ -555,6 +642,36 @@ export function createFounderProspectiveCase(input: { state: AppState; actor: Ap
   input.state.timelineEvents.unshift({ id: uuid(), organisationId: input.organisationId, clientId: client.id, category: "Case", headline: "Prospective case opened", details: `Founder opened ${project.variation}. Commercial clearance is required before a Case ID is created.`, happenedAt: nowIso(), actorRole: input.actor.role, actorId: input.actor.id, actorName: input.actor.fullName });
   appendAudit(input.state, { organisationId: input.organisationId, eventType: "PROSPECTIVE_CASE_OPENED", entityType: "PROSPECTIVE_PROJECT", entityId: project.id, actorUserId: input.actor.id, reason: notes || "Founder opened a prospective case.", prospectiveProjectId: project.id, afterHash: deterministicContentHash(project), idempotencyKey: `audit:${input.idempotencyKey}` });
   return { project, duplicateWarning: duplicate };
+}
+
+export function classifyFounderProspectiveProjectService(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; prospectiveProjectId: string; serviceType: VastuServiceType; expectedRecordVersion?: number; idempotencyKey: string; clientId?: string; leadId?: string; responseVersionId?: string; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  if (!serviceTypes.includes(input.serviceType)) fail(400, "Choose a valid service type.");
+  const requestHash = deterministicContentHash({ prospectiveProjectId: input.prospectiveProjectId, serviceType: input.serviceType, clientId: input.clientId, leadId: input.leadId, responseVersionId: input.responseVersionId });
+  const auditKey = `prospective-service-classify:${input.idempotencyKey}`;
+  const replay = input.state.founderCommercialAuditEvents.find((event) => event.organisationId === input.organisationId && event.idempotencyKey === auditKey);
+  if (replay) {
+    if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different service classification content.");
+    const project = input.state.prospectiveProjects.find((item) => item.id === replay.entityId && item.organisationId === input.organisationId);
+    if (!project) fail(404, "Prospective project not found.");
+    return { project, changed: false, replayed: true, updatedActorUserId: replay.actorUserId, updatedAt: replay.happenedAt };
+  }
+  const project = input.state.prospectiveProjects.find((item) => item.id === input.prospectiveProjectId && item.organisationId === input.organisationId);
+  if (!project) fail(404, "Prospective project not found.");
+  if (input.clientId !== undefined && input.clientId !== project.clientId) fail(409, "The prospective project client context does not match.");
+  if (input.leadId !== undefined && input.leadId !== project.leadId) fail(409, "The prospective project lead context does not match.");
+  if (input.responseVersionId !== undefined && input.responseVersionId !== project.responseVersionId) fail(409, "The prospective project qualification context does not match.");
+  const response = input.state.qualificationResponseVersions.find((item) => item.id === project.responseVersionId && item.organisationId === input.organisationId && item.clientId === project.clientId && item.status === "SUBMITTED");
+  if (!response) fail(409, "An exact submitted qualification response is required before service classification.");
+  if (project.serviceType && project.serviceType !== input.serviceType) fail(409, "Service classification is locked; create an explicit future scope revision instead.");
+  const proposals = input.state.founderProposalVersions.filter((item) => item.organisationId === input.organisationId && item.prospectiveProjectId === project.id);
+  if (proposals.some((item) => item.serviceType !== input.serviceType)) fail(409, "Service classification is locked by an existing proposal.");
+  assertExpected(project.recordVersion, input.expectedRecordVersion, "prospective project");
+  const beforeHash = deterministicContentHash({ id: project.id, serviceType: project.serviceType, status: project.status, recordVersion: project.recordVersion });
+  const changed = project.serviceType !== input.serviceType;
+  if (changed) { project.serviceType = input.serviceType; project.recordVersion = (project.recordVersion ?? 0) + 1; }
+  const event = appendAudit(input.state, { organisationId: input.organisationId, eventType: "PROSPECTIVE_PROJECT_SERVICE_CLASSIFIED", entityType: "PROSPECTIVE_PROJECT", entityId: project.id, actorUserId: input.actor.id, reason: `Founder classified the existing prospective project as ${input.serviceType}.`, prospectiveProjectId: project.id, beforeHash, afterHash: deterministicContentHash({ id: project.id, serviceType: project.serviceType, status: project.status, recordVersion: project.recordVersion }), idempotencyKey: auditKey, requestHash });
+  return { project, changed, replayed: false, updatedActorUserId: event.actorUserId, updatedAt: event.happenedAt };
 }
 
 export function confirmFounderCommercialPayment(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; paymentId: string; type: "ADVANCE" | "BALANCE"; amountPaise: number; idempotencyKey: string; expectedProposalRecordVersion?: number; now?: Date }) {

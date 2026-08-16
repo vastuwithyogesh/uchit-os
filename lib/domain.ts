@@ -242,6 +242,27 @@ export interface ClientIntakeProfile extends OrganisationOwnedRecord {
   created: AssessmentAudit; updated: AssessmentAudit;
 }
 
+/** The validated property-context payload is intentionally shared by the
+ * legacy client profile and the additive case-scoped successor. */
+export type PropertyContext = NonNullable<ClientIntakeProfile["propertyContext"]>;
+
+export const propertyContextProvenances = ["CASE_SCOPED", "LEGACY_CLIENT_FALLBACK", "AMBIGUOUS_LEGACY_CONTEXT", "NO_PROPERTY_CONTEXT"] as const;
+export type PropertyContextProvenance = (typeof propertyContextProvenances)[number];
+
+export interface CasePropertyContextRecord extends OrganisationOwnedRecord {
+  id: string;
+  clientId: string;
+  caseId: string;
+  projectId?: string;
+  propertyContext: PropertyContext;
+  version: number;
+  idempotencyKey: string;
+  createdAt: string;
+  updatedAt: string;
+  supersededAt?: string;
+  status: "CURRENT" | "SUPERSEDED";
+}
+
 export interface LeadQualificationRecord extends OrganisationOwnedRecord {
   id: string;
   clientId: string;
@@ -335,13 +356,146 @@ export interface MediaAssetRecord extends OrganisationOwnedRecord {
 }
 
 export interface MediaAssetVersionRecord extends OrganisationOwnedRecord {
-  id: string; assetId: string; version: number; filename: string; privateObjectKey: string; mimeType: "application/pdf" | "image/png" | "image/jpeg";
+  id: string; assetId: string; version: number; filename: string; privateObjectKey: string; mimeType: "application/pdf" | "image/png" | "image/jpeg" | "image/webp";
   sizeBytes: number; checksumSha256: string; pageCount: number; status: MediaAssetStatus; clientSendable: boolean; statutoryPurpose?: "LOGO" | "SIGNATURE";
   widthPixels?: number; heightPixels?: number; hasAlphaChannel?: boolean;
   brandRole?: "PRIMARY_DARK_PREMIUM" | "LIGHT_MONOCHROME_PRINT" | "FOUNDER_SIGNATURE";
   uploadedByActorUserId: string; uploadedAt: string; approvedByActorUserId?: string; approvedAt?: string;
   activatedByActorUserId?: string; activatedAt?: string;
   supersedesVersionId?: string; supersededByVersionId?: string; reason: string; registrationHash: string;
+}
+
+export const documentFamilies = ["FOUNDER_COMMERCIAL_PROPOSAL", "FOUNDER_STATUTORY_DOCUMENT", "FOUNDER_FLOOR_REPORT", "VASTU_REMEDY_REPORT"] as const;
+export type DocumentFamily = (typeof documentFamilies)[number];
+export type BrandingLifecycleStatus = "DRAFT" | "ACTIVE" | "ARCHIVED";
+export type BrandLogoPosition = "TOP_LEFT" | "TOP_CENTER" | "TOP_RIGHT";
+export type BrandAlignment = "LEFT" | "CENTER" | "RIGHT";
+
+export interface BrandingMediaReference {
+  assetId: string; assetVersionId: string; checksumSha256: string;
+  mimeType: "image/png" | "image/jpeg" | "image/webp";
+}
+
+export interface BrandLogoConfig {
+  enabled: boolean; media?: BrandingMediaReference; position: BrandLogoPosition;
+  widthPercent: number; preserveAspectRatio: true;
+}
+
+export interface BrandBackdropConfig {
+  enabled: boolean; media?: BrandingMediaReference; fit: "FIT" | "FILL";
+  opacity: number; alignment: BrandAlignment; pageApplicability: "ALL" | "PREFIX_SUFFIX" | "BODY";
+}
+
+export interface BrandHeaderConfig {
+  enabled: boolean; showLogo: boolean; showBrandName: boolean; showDocumentTitle: boolean;
+  showConsumerReferences: boolean; divider: boolean; alignment: BrandAlignment;
+  size: "COMPACT" | "STANDARD" | "SPACIOUS";
+}
+
+export interface BrandFooterConfig {
+  enabled: boolean; showPageNumber: boolean; showOrganisationText: boolean; showContactLine: boolean;
+  showConfidentialityLine: boolean; divider: boolean; alignment: BrandAlignment;
+}
+
+export interface BrandStandardTextConfig {
+  organisationNote: string; confidentialityStatement: string; disclaimer: string;
+  introductoryText: string; contactInformation: string;
+}
+
+export interface OrganisationBrandProfileRecord extends OrganisationOwnedRecord {
+  id: string; stableProfileId: string; version: number; status: BrandingLifecycleStatus;
+  brandDisplayName: string; primaryLogo: BrandLogoConfig; secondaryLogo?: BrandLogoConfig;
+  defaultBackdrop: BrandBackdropConfig; defaultHeader: BrandHeaderConfig; defaultFooter: BrandFooterConfig;
+  contactText: string; confidentialityLegalText: string;
+  colours: { primary: string; secondary: string; accent: string; paper: string; text: string };
+  sharedApprovedMediaVersionIds: string[]; source: "CENTRAL_ADMIN" | "LEGACY_EQUIVALENT_BOOTSTRAP";
+  legacySourceRefs: string[]; createdAt: string; updatedAt: string; activatedAt?: string; archivedAt?: string;
+  createdByActorUserId: string; updatedByActorUserId: string; activatedByActorUserId?: string; archivedByActorUserId?: string;
+  reason: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface DocumentTemplatePageRecord {
+  id: string; internalTitle: string; active: boolean; order: number; media: BrandingMediaReference;
+}
+
+export interface DocumentTemplateRecord extends OrganisationOwnedRecord {
+  id: string; stableTemplateId: string; family: DocumentFamily; name: string; version: number;
+  status: BrandingLifecycleStatus; isDefault: boolean; brandProfileId: string; brandProfileVersion: number;
+  logoRule: { mode: "INHERIT" | "HIDE" | "OVERRIDE"; override?: BrandLogoConfig };
+  backdropRule: { mode: "INHERIT" | "HIDE" | "OVERRIDE"; override?: BrandBackdropConfig };
+  headerOverride?: Partial<BrandHeaderConfig>; footerOverride?: Partial<BrandFooterConfig>;
+  prefixPages: DocumentTemplatePageRecord[]; suffixPages: DocumentTemplatePageRecord[];
+  standardTextOverride: Partial<BrandStandardTextConfig>; visibleDocumentFields: string[];
+  source: "CENTRAL_ADMIN" | "LEGACY_EQUIVALENT_BOOTSTRAP"; legacySourceRefs: string[];
+  createdAt: string; updatedAt: string; activatedAt?: string; archivedAt?: string; effectiveAt?: string;
+  createdByActorUserId: string; updatedByActorUserId: string; activatedByActorUserId?: string; archivedByActorUserId?: string;
+  reason: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface DocumentTemplateSnapshot {
+  schemaVersion: "document-template-snapshot/v1"; source: "CENTRAL" | "LEGACY_COMPATIBILITY";
+  organisationId: string; family: DocumentFamily;
+  brandProfile: { id: string; stableProfileId: string; version: number };
+  documentTemplate: { id: string; stableTemplateId: string; version: number; name: string };
+  brandDisplayName: string; logo: BrandLogoConfig; secondaryLogo?: BrandLogoConfig;
+  backdrop: BrandBackdropConfig; header: BrandHeaderConfig; footer: BrandFooterConfig;
+  colours: OrganisationBrandProfileRecord["colours"]; prefixPages: DocumentTemplatePageRecord[]; suffixPages: DocumentTemplatePageRecord[];
+  standardText: BrandStandardTextConfig; documentFields: Record<string, string>; snapshotHash: string;
+}
+
+export interface BrandingAuditEventRecord extends OrganisationOwnedRecord {
+  id: string; entityType: "BRAND_PROFILE" | "DOCUMENT_TEMPLATE" | "LEGACY_BRANDING";
+  entityId: string; action: string; family?: DocumentFamily; actorUserId: string; actorRole: UserRole;
+  reason: string; beforeHash?: string; afterHash?: string; happenedAt: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface LegacyBrandingSourceRecord extends OrganisationOwnedRecord {
+  id: string; sourceKey: string; owningModule: string; sourceFiles: string[];
+  disposition: "MIGRATED" | "SUPERSEDED" | "COMPATIBILITY_ADAPTED" | "RETAINED_READ_ONLY" | "RETIRED";
+  writable: false; centralProfileId?: string; centralTemplateId?: string; notes: string;
+  recordedAt: string; recordedByActorUserId: string; recordVersion: number;
+}
+
+export const imageTransformationTypes = ["CROP", "RESIZE", "UPSCALE", "ROTATE", "BRIGHTNESS", "CONTRAST", "WHITESPACE_TRIM", "TYPE_CONVERT", "BACKGROUND_REMOVE"] as const;
+export type ImageTransformationType = (typeof imageTransformationTypes)[number];
+export type ImageProcessingStatus = "QUEUED" | "PROCESSING" | "SUCCEEDED" | "FAILED";
+export type ImageOutputFormat = "PNG" | "JPEG" | "WEBP";
+export type ImageDerivativeStatus = "AVAILABLE" | "RETIRED";
+export type ImageDerivativePurpose = "CANONICAL" | "WEB_EDITOR" | "PRINT_REPORT";
+export type ImageTransformationParameters = Record<string, string | number | boolean | null>;
+
+export interface ImageProcessingTaskRecord extends OrganisationOwnedRecord {
+  id: string; batchId?: string; retryOfTaskId?: string; sourceVersionId: string; sourceAssetId: string;
+  transformationType: ImageTransformationType; normalizedParameters: ImageTransformationParameters;
+  outputFormat: ImageOutputFormat; purpose: ImageDerivativePurpose; implementationVersion: string;
+  status: ImageProcessingStatus; attempt: number; derivativeId?: string; errorReason?: string;
+  requestedAt: string; startedAt?: string; completedAt?: string; requestedByActorUserId: string;
+  idempotencyKey: string; requestHash: string; deduplicationKey: string; recordVersion: number;
+}
+
+export interface ImageDerivativeRecord extends OrganisationOwnedRecord {
+  id: string; sourceVersionId: string; parentVersionId: string; rootVersionId: string;
+  outputAssetId: string; outputVersionId: string; taskId: string;
+  transformationType: ImageTransformationType; normalizedParameters: ImageTransformationParameters;
+  implementationVersion: string; purpose: ImageDerivativePurpose; outputFormat: ImageOutputFormat;
+  outputMimeType: "image/png" | "image/jpeg" | "image/webp"; widthPixels: number; heightPixels: number;
+  hasAlphaChannel: boolean; checksumSha256: string; sizeBytes: number; deduplicationKey: string;
+  status: ImageDerivativeStatus; createdAt: string; createdByActorUserId: string;
+  retiredAt?: string; retiredByActorUserId?: string; retirementReason?: string; recordVersion: number;
+}
+
+export interface ImageProcessingBatchRecord extends OrganisationOwnedRecord {
+  id: string; sourceVersionIds: string[]; transformationType: ImageTransformationType;
+  normalizedParameters: ImageTransformationParameters; outputFormat: ImageOutputFormat;
+  purpose: ImageDerivativePurpose; taskIds: string[]; status: "QUEUED" | "PROCESSING" | "SUCCEEDED" | "PARTIAL" | "FAILED";
+  requestedAt: string; completedAt?: string; requestedByActorUserId: string;
+  idempotencyKey: string; requestHash: string; recordVersion: number;
+}
+
+export interface ImageUtilityAuditEventRecord extends OrganisationOwnedRecord {
+  id: string; action: string; sourceVersionId: string; derivativeId?: string; taskId?: string; batchId?: string;
+  actorUserId: string; actorRole: UserRole; transformationSummary: string; reason: string;
+  occurredAt: string; idempotencyKey?: string; requestHash?: string; beforeHash?: string; afterHash?: string;
 }
 
 export interface SecureAccessGrantRecord extends OrganisationOwnedRecord {
@@ -421,7 +575,7 @@ export interface FounderCommercialPolicyVersionRecord extends OrganisationOwnedR
 export interface FounderCommercialLegalPolicyRecord extends OrganisationOwnedRecord {
   id: string; kind: FounderLegalPolicyKind; version: number; status: FounderLegalPolicyStatus;
   title: string; exactText: string; contentHash: string;
-  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; typedConfirmationMode?: "FULL_NAME"; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[]; refundPolicy?: "NO_REFUNDS"; creditPolicy?: "NO_CREDITS_VOUCHERS_OR_FEE_OFFSETS"; correctionPolicyApproval?: "REVIEW_REQUIRED_ACCOUNTANT" };
+  configuration?: { acceptanceCheckboxLabel?: string; typedConfirmationPhrase?: string; typedConfirmationMode?: "FULL_NAME"; invoicePrefix?: string; startingSequence?: number; jurisdictionLabel?: string; requiredFields?: string[]; refundPolicy?: "NO_REFUNDS" | "LAW_PRESERVING_REFUND_ASSESSMENT"; creditPolicy?: "NO_CREDITS_VOUCHERS_OR_FEE_OFFSETS" | "NO_AUTOMATIC_CREDITS_OR_VOUCHERS"; correctionPolicyApproval?: "REVIEW_REQUIRED_ACCOUNTANT" | "NORMAL_ACCOUNTING_PROCESS" };
   reason: string; createdByActorUserId: string; createdAt: string; approvedByActorUserId?: string; approvedAt?: string; activatedAt?: string; supersedesPolicyId?: string; idempotencyKey: string; requestHash: string;
 }
 
@@ -468,6 +622,7 @@ export interface FounderProposalApprovalRecord extends OrganisationOwnedRecord {
 export interface FounderProposalArtifactRecord extends OrganisationOwnedRecord {
   id: string; proposalVersionId: string; proposalContentHash: string; clientProjectionHash: string; artifactHashSha256: string; privateObjectKey: string;
   mimeType: "application/pdf"; sizeBytes: number; pageCount: number; rendererVersion: string; generatedAt: string; idempotencyKey: string; recordVersion: number;
+  documentTemplateSnapshot?: DocumentTemplateSnapshot;
 }
 
 export interface FounderProposalGrantRecord extends OrganisationOwnedRecord {
@@ -560,12 +715,13 @@ export interface FounderStatutoryDocumentRecord extends OrganisationOwnedRecord 
   balanceDueAt?: string; balanceDeadlineStatus?: FounderBalanceDeadlineStatus;
   logoAssetVersionId?: string; logoChecksumSha256?: string; signatureAssetVersionId?: string; signatureChecksumSha256?: string;
   artifactHashSha256?: string; privateObjectKey?: string; rendererVersion?: string; failureCode?: string; failureAt?: string;
+  documentTemplateSnapshot?: DocumentTemplateSnapshot;
   idempotencyKey: string; requestHash: string; recordVersion: number;
 }
 
 export interface FounderCommercialAuditEventRecord extends OrganisationOwnedRecord {
   id: string; eventType: string; entityType: string; entityId: string; actorUserId: string; happenedAt: string; reason: string;
-  proposalVersionId?: string; prospectiveProjectId?: string; beforeHash?: string; afterHash?: string; idempotencyKey: string;
+  proposalVersionId?: string; prospectiveProjectId?: string; beforeHash?: string; afterHash?: string; idempotencyKey: string; requestHash?: string;
 }
 
 export interface CommercialProposalRecord extends OrganisationOwnedRecord {
@@ -665,6 +821,8 @@ export interface VastuCaseRecord extends OrganisationOwnedRecord {
   /** Rectifications link forward only from the successor, preserving predecessor evidence. */
   parentCaseId?: string;
   revisionNumber?: number;
+  /** Additive closed evaluation architecture discriminator; absent legacy records resolve to LEGACY. */
+  evaluationArchitectureVersion?: "LEGACY" | "V1";
 }
 
 export interface VastuProjectRecord extends OrganisationOwnedRecord {
@@ -693,6 +851,8 @@ export interface SpatialEvidenceVersionRecord extends OrganisationOwnedRecord {
   manualEvidencePurpose?: "BRAHMASTHAN_GRID" | "MARMAA_GRID" | "ENERGY_GRAPH";
   has32SectorChakra?: boolean;
   has16DirectionMapping?: boolean;
+  /** Required when one protected file is deliberately confirmed for both distinct marked layers. */
+  dualPurposeMarkedLayersConfirmed?: boolean;
   protectedFileRef: string; fullColour: boolean; status: "CURRENT" | "SUPERSEDED";
   idempotencyKey: string; createdAt: string; supersededAt?: string;
 }
@@ -704,6 +864,98 @@ export interface OrientationVersionRecord extends OrganisationOwnedRecord {
   idempotencyKey: string; createdAt: string;
 }
 
+export interface D8OrientationSnapshotV1 extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; /** Optional source floor only; never authority scope. */ floorId?: string; sourceFloorId?: string; sourcePlanVersionId?: string; architectureVersion: "V1";
+  status?: "DRAFT" | "FINALIZED" | "SUPERSEDED"; supersedesVersionId?: string; finalizedAt?: string;
+  /** The locked OrientationVersion that supplied the exact degree/evidence. */
+  sourceOrientationVersionId?: string;
+  orientationEvidenceVersionId: string; exactDegree: number; normalizedDegree: number; direction: "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW";
+  resultCode: "D8_RESOLVED"; rulesetVersion: string; catalogHash: string; methodologyVersionId?: string; methodologyContentHash?: string;
+  inputHash: string; outputHash: string; idempotencyKey: string; requestHash: string; createdAt: string; createdByActorUserId: string;
+}
+
+export interface DirectionalInputModifierV1 { modifier: "CUT_OUT" | "EXTENSION" | "MARGA_VEDHA" | "OPEN_SIDE" | "CORNER"; direction?: "N" | "NE" | "E" | "SE" | "S" | "SW" | "W" | "NW"; confirmed?: boolean; openSidePattern?: string; cornerImpact?: boolean; result: unknown; }
+export interface DirectionalInputVersionV1 extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  modifierFindings: DirectionalInputModifierV1[]; noConfirmedD8Modifiers: boolean;
+  circulationState: "CLEAR" | "PARTIALLY_RESTRICTED" | "BLOCKED" | "OVERACTIVE" | "FRAGMENTED";
+  methodologyVersionId?: string; methodologyContentHash?: string; status: "DRAFT" | "FINALIZED" | "SUPERSEDED";
+  predecessorVersionId?: string; idempotencyKey: string; requestHash: string; inputHash: string; createdAt: string; updatedAt: string;
+  finalizedAt?: string; finalizedByActorUserId?: string;
+}
+export interface DirectionalEvaluationSnapshotV1 extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  status: "COMPLETE" | "REVIEW_REQUIRED" | "SUPERSEDED"; result: unknown; sourceD8SnapshotId?: string; sourceD8Hash?: string;
+  sourceD16MappingId: string; sourceD16Hash: string; sourceMainEntranceId?: string; sourceMainEntranceHash?: string;
+  sourceFloorEntranceId?: string; sourceFloorEntranceHash?: string; sourceDirectionalInputId: string; sourceDirectionalInputHash: string;
+  methodologyVersionId?: string; methodologyContentHash?: string; inputHash: string; outputHash: string; idempotencyKey?: string; snapshotVersion: number;
+  supersedesSnapshotId?: string; createdAt: string; createdByActorUserId: string; finalizedAt?: string;
+}
+
+export interface DirectionalReportCardSnapshotV1 extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  status: "DRAFT" | "FINALIZED" | "SUPERSEDED"; cardStatus: "READY" | "REVIEW_REQUIRED";
+  sourceDirectionalEvaluationSnapshotId: string; sourceDirectionalEvaluationHash: string;
+  payload: unknown; statementSelections: unknown[]; reviewReasons: unknown[];
+  methodologyVersionId?: string; methodologyContentHash?: string; contentHash: string;
+  snapshotVersion: number; supersedesSnapshotId?: string; idempotencyKey: string; requestHash: string;
+  createdAt: string; finalizedAt?: string; finalizedByActorUserId?: string;
+}
+
+export interface DirectionalStageAPresentationV1 extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  reportCardSnapshotId: string; reportCardContentHash: string; status: "PRESENTED";
+  presentedAt: string; presentedByActorUserId: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface ElementalReportSnapshotV1 extends OrganisationOwnedRecord {
+  id: string; organisationId: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  elementalEvaluationSnapshotId: string; elementalEvaluationOutputHash: string; report: unknown; status: "DRAFT" | "FINALIZED" | "SUPERSEDED" | "REVIEW_REQUIRED";
+  contentHash: string; methodologyVersionId: string; methodologyContentHash: string; snapshotVersion: number; predecessorId?: string;
+  idempotencyKey: string; requestHash: string; createdAt: string; finalizedAt?: string; finalizedByActorUserId?: string;
+}
+
+export interface EvaluationRemedyHandoffRecordV1 extends OrganisationOwnedRecord {
+  id: string; organisationId: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  elementalEvaluationSnapshotId: string; elementalEvaluationOutputHash: string; elementalReportSnapshotId: string; elementalReportContentHash: string; fullBalanceClearanceId: string; handoff: unknown; contentHash: string; status: "READY" | "SUPERSEDED";
+  idempotencyKey: string; requestHash: string; createdAt: string;
+}
+
+export type StageBInputV1Status = "DRAFT" | "FINALIZED" | "SUPERSEDED";
+export interface StageBInputV1Decision {
+  element: string; verdict: string; correctionScope: "WHOLE_ELEMENT" | "SPECIFIC_DIRECTION";
+  specificDirection?: string; remedyType: string; stageBRemedyType: StageBRemedyType;
+  statementId: string; statementContentHash: string;
+}
+export interface StageBInputV1Record extends OrganisationOwnedRecord {
+  id: string; architectureVersion: "V1"; sourceKind: "V1_ELEMENTAL";
+  clientId?: string; caseId: string; projectId: string; floorId: string;
+  sourceEvaluationRemedyHandoffId: string; sourceEvaluationRemedyHandoffHash: string;
+  sourceElementalEvaluationSnapshotId: string; sourceElementalEvaluationHash: string;
+  sourceCombinedEvaluationReportId: string; sourceCombinedEvaluationReportHash: string;
+  reportSourceId: string; reportSourceHash: string;
+  decisions: StageBInputV1Decision[]; methodologyVersionId: string; methodologyContentHash: string;
+  deterministicInputHash: string; deterministicOutputHash: string; status: StageBInputV1Status;
+  predecessorId?: string; successorId?: string; createdAt: string; finalizedAt?: string; finalizedByActorUserId?: string;
+  idempotencyKey: string; requestHash: string;
+}
+
+export type CombinedEvaluationReportLifecycleV1 = "DRAFT" | "FINALIZED" | "APPROVED" | "SUPERSEDED";
+export interface CombinedEvaluationReportSnapshotV1 extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; floorId: string; architectureVersion: "V1";
+  status: CombinedEvaluationReportLifecycleV1; reportVersion: number;
+  directionalReportCardSnapshotId: string; directionalReportCardContentHash: string;
+  directionalStageAPresentationId: string; directionalStageAPresentationHash: string;
+  siteEvidenceVersionId: string; siteEvidenceArtifactHash: string;
+  energyBarEvidenceVersionId: string; energyBarEvidenceArtifactHash: string;
+  elementalReportSnapshotId: string; elementalReportContentHash: string;
+  remedyHandoffId: string; remedyHandoffContentHash: string;
+  methodologyVersionIds: string[]; methodologyContentHashes: string[];
+  reportTemplateVersion: string; renderModel: unknown; contentHash: string;
+  predecessorId?: string; successorId?: string; idempotencyKey: string; requestHash: string;
+  createdAt: string; finalizedAt?: string; finalizedByActorUserId?: string; approvedAt?: string; approvedByActorUserId?: string;
+}
+
 export interface OpeningMappingRecord extends OrganisationOwnedRecord {
   id: string; projectId: string; caseId: string; floorId: string; planVersionId: string;
   orientationVersionId: string; kind: "MAIN_ENTRANCE" | "ENTRANCE" | "WINDOW";
@@ -711,6 +963,36 @@ export interface OpeningMappingRecord extends OrganisationOwnedRecord {
   methodologyStatus: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT" | "NEEDS_REGENERATION";
   methodologyVersionId?: string; directionCode?: string; evidenceVersionId: string;
   idempotencyKey: string; createdAt: string;
+}
+
+/**
+ * Immutable Founder-confirmed entrance classifications. The zone code/name are
+ * snapshotted from the exact active DIRECTION_32 methodology version; legacy
+ * percentage opening markers remain separate read-only evidence.
+ */
+export interface EntranceZoneVersionRecord extends OrganisationOwnedRecord {
+  id: string; projectId?: string; caseId: string;
+  scope: "PROPERTY_MAIN_GATE" | "FLOOR_PRIMARY_ENTRANCE";
+  /** Present only for floor-level entrance classifications. */
+  floorId?: string;
+  /** The floor whose current 32D evidence supported a property-level choice. */
+  sourceFloorId?: string;
+  planVersionId: string; marked32DEvidenceVersionId: string;
+  methodologyVersionId: string; methodologyContentHash: string;
+  /** Explicit entrance-catalog identity retained alongside generic methodology lineage. */
+  catalogVersionId: string; catalogContentHash: string;
+  zoneCode: string; zoneNameSnapshot: string;
+  classificationSnapshot: "GOOD" | "BAD" | "OK-OK";
+  ownerInterpretationHash: string;
+  /** New writes use DRAFT/FINALIZED/SUPERSEDED; CURRENT remains readable legacy status. */
+  status: "DRAFT" | "FINALIZED" | "CURRENT" | "SUPERSEDED";
+  supersedesVersionId?: string; supersededAt?: string;
+  finalizedAt?: string; finalizedByActorUserId?: string;
+  parentDirection?: "N" | "E" | "S" | "W";
+  degreeStart?: number; degreeEnd?: number;
+  sourceRuleId?: string; sourceWorkbookSheet?: string; sourceWorkbookRow?: string;
+  reason?: string; confirmedAt: string; confirmedByActorUserId: string;
+  idempotencyKey: string; requestHash: string;
 }
 
 export interface DependencyInvalidationRecord extends OrganisationOwnedRecord {
@@ -726,6 +1008,8 @@ export interface DependencyInvalidationRecord extends OrganisationOwnedRecord {
   status: "NEEDS_REGENERATION" | "REPLACEMENT_REQUIRED" | "REGENERATED" | "READY_FOR_REVIEW";
   reason: string; createdAt: string; createdByActorUserId?: string; updatedAt?: string;
   resolutionIdempotencyKey?: string;
+  requestIdempotencyKey?: string;
+  requestHash?: string;
 }
 
 export interface RegenerationResolutionRecord extends OrganisationOwnedRecord {
@@ -744,6 +1028,28 @@ export interface SpaceMappingRecord extends OrganisationOwnedRecord {
   methodologyVersionId?: string; idempotencyKey: string;
   methodologyStatus: "APPROVED" | "REVIEW_REQUIRED" | "BLOCKED_METHOD_INPUT" | "NEEDS_REGENERATION";
   createdAt: string;
+}
+
+export const d16UtilityZones = ["N", "NNE", "NE", "ENE", "E", "ESE", "SE", "SSE", "S", "SSW", "SW", "WSW", "W", "WNW", "NW", "NNW"] as const;
+export type D16UtilityZone = (typeof d16UtilityZones)[number];
+export const d16UtilityMappingStatuses = ["DRAFT", "FINALIZED", "SUPERSEDED"] as const;
+export type D16UtilityMappingStatus = (typeof d16UtilityMappingStatuses)[number];
+
+export interface D16UtilityMappingRowRecord {
+  id: string; serialNumber: number; utilityId: string; utilityName: string;
+  floorPlanLabel: string; zone: D16UtilityZone;
+}
+
+export interface D16UtilityMappingVersionRecord extends OrganisationOwnedRecord {
+  id: string; organisationId: string; caseId: string; projectId: string; floorId: string;
+  version: number; status: D16UtilityMappingStatus; rows: D16UtilityMappingRowRecord[];
+  methodologyVersionId?: string; methodologyVersion?: number; methodologyContentHash?: string;
+  utilityMasterSourceVersion?: string; utilityMasterWorkbookHash?: string; utilityMasterAdapterVersion?: string;
+  provenanceRecoveryMode?: "POST_HOC_SOURCE_CERTIFICATION";
+  provenanceRecoveryOfVersionId?: string; provenanceCertifiedAt?: string; provenanceCertifiedByActorUserId?: string;
+  externalD16EvidenceVersionId?: string; predecessorVersionId?: string; successorVersionId?: string;
+  idempotencyKey: string; requestHash: string; createdAt: string; updatedAt: string;
+  finalizedAt?: string; finalizedByActorUserId?: string;
 }
 
 export interface RectificationRequestRecord extends OrganisationOwnedRecord {
@@ -820,6 +1126,13 @@ export interface CaseDocumentRecord extends OrganisationOwnedRecord {
   reviewObservation?: string; requiredChange?: string; preferredAlternative?: string; acceptableAlternative?: string;
   ownerRole: ResponsibilityRole; ownerName: string; revisionStatus: DocumentRevisionStatus;
   founderApprovalStatus?: "PENDING" | "APPROVED"; founderApprovedAt?: string; founderApprovedByActorUserId?: string;
+  /** A replacement remains non-current until its exact verified version receives Founder approval. */
+  successorOfDocumentId?: string;
+  issueHistory?: Array<{
+    id: string; status: "OPEN" | "RESOLVED"; discrepancy: string; requiredChange: string;
+    ownerRole: ResponsibilityRole; ownerName: string; openedAt: string; openedByActorUserId: string;
+    resolvedAt?: string; resolvedByActorUserId?: string; resolutionNote?: string; resolutionIdempotencyKey?: string;
+  }>;
   idempotencyKey: string; version: number; received: AssessmentAudit; verified?: AssessmentAudit; updated: AssessmentAudit;
 }
 
@@ -862,6 +1175,12 @@ export interface FloorWorkspaceRecord extends OrganisationOwnedRecord {
   verdictPresentationIdempotencyKey?: string;
   reportStatus?: ReportStatus;
   deliveredAt?: string;
+  /** Additive closed evaluation architecture discriminator; absent legacy floors resolve to LEGACY. */
+  evaluationArchitectureVersion?: "LEGACY" | "V1";
+  readyIdempotencyKey?: string;
+  readyRequestHash?: string;
+  evidenceIdempotencyKey?: string;
+  evidenceRequestHash?: string;
 }
 
 export const siteAnalysisEvidenceTypes = ["VIDEO_ANALYSIS", "PHYSICAL_VISIT"] as const;
@@ -912,9 +1231,23 @@ export interface PostSiteFindingsApprovalRecord extends OrganisationOwnedRecord 
   policyVersion?: number; occurredAt: string; idempotencyKey: string;
 }
 
+export interface V1FullBalanceClearanceRecord extends OrganisationOwnedRecord {
+  id: string; caseId: string; projectId: string; floorId: string;
+  scope: "FULL_BALANCE_CLEARANCE_V1"; version: number; status: "APPROVED";
+  elementalEvaluationSnapshotId: string; elementalEvaluationOutputHash: string;
+  elementalReportSnapshotId: string; elementalReportContentHash: string;
+  directionalReportCardSnapshotId?: string;
+  actorUserId: string; actorDisplayName: string; actorRole: UserRole;
+  approvedAt: string; recordVersion: number; idempotencyKey: string; requestHash: string;
+}
+
 export interface RemedialWorkflowReservation extends OrganisationOwnedRecord {
-  id: string; projectId: string; caseId: string; floorId: string; stageAReportId: string;
+  id: string; projectId: string; caseId: string; floorId: string;
+  /** Historical LEGACY records retain stageAReportId: string; V1 records use the native source fields below. */
+  stageAReportId?: string; stageASourceKind?: "LEGACY_STAGE_A_REPORT" | "V1_DIRECTIONAL_STAGE_A"; stageASourceId?: string; stageASourceHash?: string;
+  reportSourceId?: string; reportSourceHash?: string;
   status: "BLOCKED_METHOD_INPUT" | "READY_FOR_CONFIGURATION" | "DRAFT";
+  idempotencyKey?: string;
   methodologyVersionId?: string; createdAt: string;
 }
 
@@ -922,7 +1255,11 @@ export type StageBRemedyType = "DISHA_BALANCER" | "DISHA_ACTIVATION" | "TATTAV_B
 export type StageBWorkflowState = "NOT_STARTED" | "LAYOUT_SELECTED" | "EDITING" | "PAGE_FINALISED" | "REPORT_PROTECTED" | "DELIVERED";
 
 export interface StageBRemediationRecord extends OrganisationOwnedRecord {
-  id: string; projectId: string; caseId: string; floorId: string; reportId: string; state: StageBWorkflowState;
+  /** LEGACY shape remains caseId: string; floorId: string; reportId: string; V1 uses the native source fields below. */
+  id: string; projectId: string; caseId: string; floorId: string; reportId?: string;
+  reportSourceKind?: "LEGACY_REPORT_VERSION" | "V1_COMBINED_EVALUATION_REPORT";
+  reportSourceId?: string; reportSourceHash?: string; reportTemplateVersion?: string; architectureVersion?: "LEGACY" | "V1";
+  state: StageBWorkflowState;
   existingLayoutAssetId: string; existingLayoutAssetVersionId: string; existingLayoutSnapshotId: string;
   finalRevisedLayoutCandidateId?: string; finalRevisedLayoutAssetId?: string; finalRevisedLayoutAssetVersionId?: string;
   baseLayoutVersionId?: string; protectedReportVersionId?: string; deliveredAt?: string;
@@ -930,9 +1267,11 @@ export interface StageBRemediationRecord extends OrganisationOwnedRecord {
 }
 
 export interface RevisedLayoutCandidateRecord extends OrganisationOwnedRecord {
-  id: string; projectId: string; caseId: string; floorId: string; postSiteFindingsId: string;
-  evidenceRef: string; checksumSha256: string; label: string; version: number; status: "AVAILABLE" | "WITHDRAWN";
-  createdAt: string;
+  id: string; projectId: string; caseId: string; floorId: string; postSiteFindingsId?: string;
+  evidenceRef: string; sourceAssetId?: string; sourceFileName?: string; sourceMimeType?: string; sourceSizeBytes?: number;
+  checksumSha256: string; purpose?: "REVISED_FURNITURE_LAYOUT"; label: string; version: number;
+  status: "DRAFT" | "APPROVED" | "AVAILABLE" | "WITHDRAWN";
+  approvedAt?: string; approvedByActorUserId?: string; approvalReason?: string; idempotencyKey: string; requestHash: string; createdAt: string;
 }
 
 export interface RemediationBaseLayoutVersionRecord extends OrganisationOwnedRecord {
@@ -945,10 +1284,54 @@ export interface RemedyRepositoryRecord extends OrganisationOwnedRecord {
   id: string; name: string; remedialType: StageBRemedyType; elements: string[]; directions: string[];
   attributePurpose: string; preferredAssetId: string; preferredAssetVersionId: string;
   status: "DRAFT" | "APPROVED" | "ARCHIVED"; approvalTimestamp?: string; approvedBy?: string;
+  tags?: string[]; createdAt?: string; updatedAt?: string; archivedAt?: string; archivedBy?: string;
+  replacementRecordId?: string; duplicateOfRecordId?: string; sourceCaseUsedRemedyId?: string;
+  sourceCaseId?: string; sourceFloorId?: string; idempotencyKey?: string; requestHash?: string;
+}
+
+export interface CaseUsedRemedyRecord extends OrganisationOwnedRecord {
+  id: string; caseId: string; floorId: string; remediationId: string; pageId: string;
+  remedialType: StageBRemedyType; name: string; attributePurpose: string;
+  preferredAssetId: string; preferredAssetVersionId: string; sourceMediaChecksumSha256: string;
+  source: "ONE_TIME_USE_THIS_CASE"; status: "ACTIVE" | "ARCHIVED"; createdAt: string;
+  idempotencyKey: string; requestHash: string; mergedRepositoryRecordId?: string;
+  mergedAt?: string; mergedBy?: string;
+}
+
+export const contextualRepositoryCategories = ["FURNITURE_ADDON", "APPLIANCE", "COLOUR_FRAME", "EXTRA"] as const;
+export type ContextualRepositoryCategory = (typeof contextualRepositoryCategories)[number];
+export type RepositoryCategory = ContextualRepositoryCategory | StageBRemedyType | "CASE_USED_REMEDY";
+export type RepositoryLifecycleStatus = "DRAFT" | "APPROVED" | "ARCHIVED";
+
+export interface ContextualRepositoryRecord extends OrganisationOwnedRecord {
+  id: string; category: ContextualRepositoryCategory; name: string; attributePurpose: string; tags: string[];
+  preferredAssetId: string; preferredAssetVersionId: string; status: RepositoryLifecycleStatus;
+  createdAt: string; updatedAt: string; approvalTimestamp?: string; approvedBy?: string;
+  archivedAt?: string; archivedBy?: string; replacementRecordId?: string; duplicateOfRecordId?: string;
+  idempotencyKey: string; requestHash: string;
+}
+
+export interface RepositoryAuditEventRecord extends OrganisationOwnedRecord {
+  id: string; recordId: string; category: RepositoryCategory; action: string; actorId: string; actorRole: UserRole;
+  reason: string; beforeHash?: string; afterHash?: string; happenedAt: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface RepositoryImportBatchRecord extends OrganisationOwnedRecord {
+  id: string; format: "CSV"; filename: string; status: "STAGED" | "PARTIALLY_APPROVED" | "APPROVED" | "FAILED";
+  totalRows: number; validRows: number; invalidRows: number; duplicateRows: number; approvedRows: number;
+  createdAt: string; createdBy: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface RepositoryImportRowRecord extends OrganisationOwnedRecord {
+  id: string; batchId: string; rowNumber: number; raw: Record<string, string>;
+  normalized?: { category: Exclude<RepositoryCategory, "CASE_USED_REMEDY">; name: string; attributePurpose: string; assetId: string; assetVersionId: string; elements: string[]; directions: string[]; tags: string[] };
+  status: "VALID" | "INVALID" | "DUPLICATE" | "APPROVED" | "FAILED"; errors: string[];
+  duplicateRecordId?: string; createdRecordId?: string;
 }
 
 export interface RemedyEligibilityResolutionRecord extends OrganisationOwnedRecord {
   id: string; remediationId: string; caseId: string; floorId: string; verdictId: string; verdictContentHash: string;
+  sourceKind?: "LEGACY_UTILITY" | "V1_ELEMENTAL"; sourceInputId?: string; sourceInputHash?: string; specificDirection?: string;
   methodologyVersionId: string; methodologyContentHash: string; resolverVersion: "stage-b-remedy-resolver/v1";
   remedialType: StageBRemedyType; remedyId: string; remedyRecordVersion: number; remedyAssetVersionId: string;
   eligibilityRuleIds: string[]; explanationCodes: string[]; resolvedAt: string; resolutionHash: string;
@@ -957,14 +1340,14 @@ export interface RemedyEligibilityResolutionRecord extends OrganisationOwnedReco
 }
 
 export interface ReportPlacementPageRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; reportId: string; caseId: string; floorId: string;
+  id: string; remediationId: string; reportId?: string; caseId: string; floorId: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage;
   section: "A" | "B" | "C"; pageType: "FURNITURE_ADDON" | "APPLIANCE" | StageBRemedyType | "EXTRA";
   ordinal: number; state: "DRAFT" | "FINALISED"; baseLayoutVersionId?: string;
   finalisedAt?: string; finalisedBy?: string; finalisationHash?: string; finalisationIdempotencyKey?: string; finalisationRequestHash?: string;
 }
 
 export interface PhysicalPlacementRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; caseId: string; floorId: string; reportId: string; pageId: string;
+  id: string; remediationId: string; caseId: string; floorId: string; reportId?: string; pageId: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage;
   baseLayoutVersionId: string; placementType: "FURNITURE_ADDON" | "APPLIANCE" | "REMEDY" | "EXTRA";
   eligibilityResolutionId?: string; remedyId?: string; masterNumber?: number;
   anchorX: number; anchorY: number; anchorLocked: boolean; calloutX: number; calloutY: number;
@@ -976,18 +1359,18 @@ export interface PhysicalPlacementRecord extends OrganisationOwnedRecord {
 }
 
 export interface PlacementImplementationRowRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; reportId: string; pageId: string; placementId: string; masterNumber: number;
+  id: string; remediationId: string; reportId?: string; pageId: string; placementId: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage; masterNumber: number;
   imageAssetSnapshotId: string; itemNameSnapshot: string; attributePurposeSnapshot: string; locationReference?: string;
 }
 
 export interface MasterAppendixRowRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; reportId: string; caseId: string; floorId: string; placementId: string;
+  id: string; remediationId: string; reportId?: string; caseId: string; floorId: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage; placementId: string;
   sourcePageId: string; baseLayoutVersionId: string; masterNumber: number; imageAssetSnapshotId: string;
   itemNameSnapshot: string; attributePurposeSnapshot: string; locationReference?: string;
 }
 
 export interface StageBIntegrityRunRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; reportId: string; scopeHash: string; status: "PASS" | "FAIL";
+  id: string; remediationId: string; reportId?: string; scopeHash: string; status: "PASS" | "FAIL"; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage;
   issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
   checkedAt: string; checkedBy: string;
 }
@@ -998,7 +1381,8 @@ export interface StageBRenderProvenance {
 }
 
 export interface StageBRenderManifest {
-  schemaVersion: "stage-b-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId: string;
+  schemaVersion: "stage-b-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId?: string;
+  reportSourceKind?: "LEGACY_REPORT_VERSION" | "V1_COMBINED_EVALUATION_REPORT"; reportSourceId?: string; reportSourceHash?: string;
   existingLayout: { assetId: string; versionId: string; snapshotId: string; contentHash: string };
   baseLayout: { versionId: string; snapshotId: string; contentHash: string };
   /** Legacy first-placement summary retained for single-page consumers; per-page provenance is authoritative. */
@@ -1013,12 +1397,12 @@ export type SectionAVisualPageType = "EXISTING_LAYOUT" | "FINAL_REVISED_LAYOUT" 
 export type ExistingLayoutAnnotationType = "CIRCLE" | "ARROW" | "HIGHLIGHT" | "PEN" | "TEXT";
 
 export interface SectionAWorkspaceRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; projectId: string; caseId: string; floorId: string; reportId: string;
+  id: string; remediationId: string; projectId: string; caseId: string; floorId: string; reportId?: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage;
   state: "EDITING" | "FINALISED"; idempotencyKey: string; requestHash: string; createdAt: string;
 }
 
 export interface SectionAVisualPageRecord extends OrganisationOwnedRecord {
-  id: string; workspaceId: string; remediationId: string; reportId: string; caseId: string; floorId: string;
+  id: string; workspaceId: string; remediationId: string; reportId?: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage; caseId: string; floorId: string;
   pageType: SectionAVisualPageType; ordinal: 1 | 2 | 7; state: "DRAFT" | "FINALISED";
   baseLayoutVersionId?: string; finalisedAt?: string; finalisedBy?: string; finalisationHash?: string;
   finalisationIdempotencyKey?: string; finalisationRequestHash?: string;
@@ -1027,12 +1411,12 @@ export interface SectionAVisualPageRecord extends OrganisationOwnedRecord {
 export interface SectionAAssetRecord extends OrganisationOwnedRecord {
   id: string; workspaceId: string; remediationId: string; caseId: string; floorId: string;
   assetType: SectionAAssetType; name: string; attributePurpose: string;
-  assetId: string; assetVersionId: string; assetSnapshotId: string; status: "APPROVED" | "ARCHIVED";
+  assetId: string; assetVersionId: string; assetSnapshotId: string; status: "APPROVED" | "ARCHIVED"; repositoryRecordId?: string;
   idempotencyKey: string; requestHash: string;
 }
 
 export interface ExistingLayoutAnnotationRecord extends OrganisationOwnedRecord {
-  id: string; workspaceId: string; remediationId: string; reportId: string; caseId: string; floorId: string; pageId: string;
+  id: string; workspaceId: string; remediationId: string; reportId?: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage; caseId: string; floorId: string; pageId: string;
   existingLayoutSnapshotId: string; annotationType: ExistingLayoutAnnotationType;
   points: Array<{ x: number; y: number }>; textSnapshot?: string;
   colour: string; strokeWidth: number; opacity: number; state: "ACTIVE" | "DELETED";
@@ -1041,7 +1425,7 @@ export interface ExistingLayoutAnnotationRecord extends OrganisationOwnedRecord 
 }
 
 export interface ColourFrameCompositionRecord extends OrganisationOwnedRecord {
-  id: string; workspaceId: string; remediationId: string; reportId: string; caseId: string; floorId: string; pageId: string;
+  id: string; workspaceId: string; remediationId: string; reportId?: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage; caseId: string; floorId: string; pageId: string;
   baseLayoutVersionId: string; sectionAAssetId: string; assetId: string; assetVersionId: string; assetSnapshotId: string;
   x: number; y: number; width: number; height: number; rotationDegrees: number;
   opacityPreset: "LOW" | "MEDIUM" | "FULL"; preserveAspectRatio: boolean; printFit: boolean; locked: boolean;
@@ -1051,23 +1435,61 @@ export interface ColourFrameCompositionRecord extends OrganisationOwnedRecord {
 }
 
 export interface SectionAIntegrityRunRecord extends OrganisationOwnedRecord {
-  id: string; workspaceId: string; remediationId: string; reportId: string; scopeHash: string; status: "PASS" | "FAIL";
+  id: string; workspaceId: string; remediationId: string; reportId?: string; scopeHash: string; status: "PASS" | "FAIL";
   issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
   checkedAt: string; checkedBy: string;
 }
 
 export interface RemediationReportIntegrityRunRecord extends OrganisationOwnedRecord {
-  id: string; remediationId: string; reportId: string; scopeHash: string; status: "PASS" | "FAIL";
+  id: string; remediationId: string; reportId?: string; scopeHash: string; status: "PASS" | "FAIL"; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage;
   issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
   checkedAt: string; checkedBy: string;
 }
 
 export interface SectionARenderManifest {
-  schemaVersion: "section-a-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId: string;
+  schemaVersion: "section-a-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId?: string; reportSourceKind?: "LEGACY_REPORT_VERSION" | "V1_COMBINED_EVALUATION_REPORT"; reportSourceId?: string; reportSourceHash?: string;
   existingLayoutPage: { pageId: string; ordinal: 1; finalisationHash: string; assetId: string; versionId: string; snapshotId: string; annotations: ExistingLayoutAnnotationRecord[] };
   finalRevisedLayoutPage: { pageId: string; ordinal: 2; finalisationHash: string; baseLayoutVersionId: string; snapshotId: string; contentHash: string };
   placementPages: Array<{ pageId: string; pageType: "FURNITURE_ADDON" | "APPLIANCE"; ordinal: 3 | 5; finalisationHash: string; placements: PhysicalPlacementRecord[]; implementationRows: Array<PlacementImplementationRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }> }>;
   colourFramePage: { pageId: string; ordinal: 7; finalisationHash: string; compositions: ColourFrameCompositionRecord[] };
+  appendixRows: Array<MasterAppendixRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }>;
+  integrityRunId: string; integrityScopeHash: string; integrityStatus: "PASS";
+}
+
+export interface SectionCWorkspaceRecord extends OrganisationOwnedRecord {
+  id: string; remediationId: string; projectId: string; caseId: string; floorId: string; reportId?: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage;
+  state: "EDITING" | "FINALISED"; createdAt: string;
+  reorderIdempotencyKey?: string; reorderRequestHash?: string;
+  finalisedAt?: string; finalisedBy?: string; finalisationHash?: string;
+  finalisationIdempotencyKey?: string; finalisationRequestHash?: string;
+}
+
+export interface SectionCExtraPageRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; reportId?: string; stageBLineage?: import("./stage-b-lineage.ts").StageBReportLineage; caseId: string; floorId: string; pageId: string;
+  title: string; orderIndex: number; status: "ACTIVE" | "RETIRED"; createdAt: string;
+  creationIdempotencyKey: string; creationRequestHash: string;
+  renameIdempotencyKey?: string; renameRequestHash?: string;
+  retiredAt?: string; retiredBy?: string; retirementIdempotencyKey?: string; retirementRequestHash?: string;
+}
+
+export interface SectionCAssetRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; caseId: string; floorId: string; pageId: string;
+  name: string; attributePurpose: string; assetId: string; assetVersionId: string; assetSnapshotId: string;
+  status: "APPROVED" | "ARCHIVED"; repositoryRecordId?: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface SectionCIntegrityRunRecord extends OrganisationOwnedRecord {
+  id: string; workspaceId: string; remediationId: string; reportId?: string; scopeHash: string; status: "PASS" | "FAIL";
+  issues: Array<{ code: string; entityType: string; entityId?: string; field?: string }>;
+  checkedAt: string; checkedBy: string;
+}
+
+export interface SectionCRenderManifest {
+  schemaVersion: "section-c-render-manifest/v1"; organisationId: string; caseId: string; floorId: string; reportId?: string; reportSourceKind?: "LEGACY_REPORT_VERSION" | "V1_COMBINED_EVALUATION_REPORT"; reportSourceId?: string; reportSourceHash?: string;
+  baseLayout: { versionId: string; snapshotId: string; contentHash: string };
+  pages: Array<{ extraPageId: string; pageId: string; title: string; orderIndex: number; ordinal: number; finalisationHash: string;
+    placements: PhysicalPlacementRecord[];
+    implementationRows: Array<PlacementImplementationRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }> }>;
   appendixRows: Array<MasterAppendixRowRecord & { implemented: null; implementationDate: null; alternativeNeeded: null }>;
   integrityRunId: string; integrityScopeHash: string; integrityStatus: "PASS";
 }
@@ -1083,12 +1505,19 @@ export interface MethodologyVersionRecord extends OrganisationOwnedRecord {
   executionAdapterVersion?: string;
   sourceLabel: string; sourceAssetVersion?: string; sourceAssetHash?: string; contentHash: string; reason: string; idempotencyKey: string;
   createdAt: string; createdByActorUserId: string; approvedAt?: string; approvedByActorUserId?: string;
+  catalogScope?: "ENTRANCE";
+  catalogRecordCount?: number;
+  ownerSourceAuthority?: string;
 }
 
 export interface MethodologyRuleRecord extends OrganisationOwnedRecord {
   id: string; methodologyVersionId: string; ruleKey: string; sourceReference: string;
   decisionStatus: MethodologyDecisionStatus; conditionJson: unknown; outcomeJson: unknown;
   contentHash: string; idempotencyKey: string; createdAt: string; createdByActorUserId: string;
+  /** Exact immutable owner wording; internal only unless separate presentation copy is approved. */
+  ownerSourceText?: string;
+  presentationText?: string;
+  presentationTextStatus?: "REVIEW_REQUIRED_COPY" | "APPROVED";
 }
 
 export interface MethodologyGoldenFixtureRecord extends OrganisationOwnedRecord {
@@ -1163,6 +1592,46 @@ export interface ReportApprovalEvidence {
   checkpoint?: "FOUNDER_REVIEWED" | "FOUNDER_APPROVED" | "RELEASED";
 }
 
+export const documentDeliveryStatuses = ["DRAFT", "READY", "DELIVERED", "ACKNOWLEDGED"] as const;
+export type DocumentDeliveryStatus = (typeof documentDeliveryStatuses)[number];
+export type DocumentDeliveryChannel = "CLIENT_PORTAL" | "MANUAL_HANDOFF";
+export type DocumentDeliveryFamily = "VASTU_REMEDY_REPORT";
+export type DocumentDeliveryEventType = "PREPARED" | "READINESS_FAILED" | "READY" | "DELIVERED" | "REDELIVERED" | "MANUAL_HANDOFF_RECORDED" | "VIEWED" | "DOWNLOADED" | "ACKNOWLEDGED";
+
+export interface DocumentDeliveryActorSnapshot {
+  actorUserId: string; actorDisplayName: string; actorRole: UserRole; occurredAt: string;
+}
+
+/**
+ * Distribution metadata only. The report artifact and protected PDF are
+ * immutable authorities; delivery never regenerates or rewrites either one.
+ */
+export interface DocumentDeliveryRecord extends OrganisationOwnedRecord {
+  id: string; documentFamily: DocumentDeliveryFamily;
+  projectId: string; caseId: string; floorId: string; reportId: string;
+  reportVersionLabel: string; reportTemplateVersion: "uchit-verdict/v5";
+  reportArtifactId: string; reportCanonicalHash: string;
+  protectedPdfArtifactId: string; protectedPdfChecksumSha256: string;
+  protectedPdfMimeType: "application/pdf"; protectedPdfSizeBytes: number;
+  documentTemplateSnapshotHash: string; brandProfileId?: string; documentTemplateId?: string;
+  recipientClientId: string; recipientDisplayName: string; recipientEmail: string;
+  status: DocumentDeliveryStatus; channel?: DocumentDeliveryChannel;
+  prepared: DocumentDeliveryActorSnapshot; ready?: DocumentDeliveryActorSnapshot;
+  finalApproval: DocumentDeliveryActorSnapshot; delivered?: DocumentDeliveryActorSnapshot;
+  acknowledged?: DocumentDeliveryActorSnapshot;
+  manualHandoffDescription?: string; supersedesDeliveryId?: string; replacementForDeliveryId?: string;
+  createdAt: string; updatedAt: string; idempotencyKey: string; requestHash: string;
+}
+
+export interface DocumentDeliveryEventRecord extends OrganisationOwnedRecord {
+  id: string; deliveryId: string; documentFamily: DocumentDeliveryFamily;
+  reportId: string; caseId: string; floorId: string; protectedPdfArtifactId: string;
+  protectedPdfChecksumSha256: string; eventType: DocumentDeliveryEventType;
+  channel?: DocumentDeliveryChannel; actorUserId: string; actorDisplayName: string; actorRole: UserRole;
+  recipientClientId: string; occurredAt: string; reason: string;
+  requestId: string; idempotencyKey: string;
+}
+
 export interface StageAFloorReviewSnapshotRecord extends OrganisationOwnedRecord {
   id: string; projectId: string; caseId: string; floorId: string; reportId: string;
   reportVersion: string; planVersionId: string; evidenceVersionIds: string[];
@@ -1193,13 +1662,16 @@ export interface ReportArtifactManifest {
   planVersionId?: string;
   orientationVersionId?: string;
   griddingEvidenceVersionIds?: string[];
+  entranceZoneVersionIds?: string[];
   handMarkedEvidenceVersionId?: string;
   manualUtilitySheetDocumentId?: string;
   siteAnalysisId?: string;
   postSiteFindingsId?: string;
   stageBRenderManifest?: StageBRenderManifest;
   sectionARenderManifest?: SectionARenderManifest;
+  sectionCRenderManifest?: SectionCRenderManifest;
   remediationReportIntegrity?: { runId: string; scopeHash: string; status: "PASS" };
+  documentTemplateSnapshot?: DocumentTemplateSnapshot;
   contentHash: string;
   immutable: true;
   downloadPath: string;

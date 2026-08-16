@@ -79,6 +79,7 @@ test("downloads stream privately with safe attachment headers", () => {
   const read = functionBody(storage, "readCaseFile");
   assert.match(read, /COALESCE\(floor_label, ''\) = \?/);
   assert.match(read, /4\[0-9a-f\]\{3\}.*\[89ab\]/);
+  assert.match(download, /const scopedOrganisationId = localFixture \? \(caseRecord\?\.organisationId \?\? organisationId\) : organisationId/);
 });
 
 test("collection responses are non-cacheable, nosniff, and downstream projections expose no protected refs", () => {

@@ -17,6 +17,7 @@ export const multiFloorIds = Object.freeze({
   officialReportId: "20000000-0000-4000-8000-000000000014",
   siteId: "20000000-0000-4000-8000-000000000015",
   postSiteId: "20000000-0000-4000-8000-000000000016"
+  ,entranceZoneId: "20000000-0000-4000-8000-000000000017"
 });
 
 function unique(base, changes) {
@@ -67,6 +68,13 @@ export function buildReleaseableMultiFloorFounderPilotFixture() {
   ];
   for (const [record, id, protectedFileRef, idempotencyKey] of evidenceCopies) state.spatialEvidenceVersions.push(unique(record, {
     id, floorId: multiFloorIds.floorId, planVersionId: multiFloorIds.planId, protectedFileRef, idempotencyKey
+  }));
+  state.entranceZoneVersions.push(unique(state.entranceZoneVersions[0], {
+    id: multiFloorIds.entranceZoneId, scope: "FLOOR_PRIMARY_ENTRANCE", floorId: multiFloorIds.floorId,
+    sourceFloorId: multiFloorIds.floorId, planVersionId: multiFloorIds.planId,
+    marked32DEvidenceVersionId: multiFloorIds.marked32Id, idempotencyKey: "pilot-first-floor-entrance-zone",
+    requestHash: deterministicContentHash({ scope: "FLOOR_PRIMARY_ENTRANCE", floorId: multiFloorIds.floorId, code: "N2" }),
+    zoneCode: "N2", zoneNameSnapshot: "BAD", classificationSnapshot: "BAD", ownerInterpretationHash: deterministicContentHash("TEST_ONLY internal interpretation for N2.")
   }));
 
   const firstFloorOpening = unique(state.openingMappings[0], {

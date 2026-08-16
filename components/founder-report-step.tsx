@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import type { AppState } from "@/lib/store";
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
+import { resolveEvaluationArchitecture } from "@/lib/evaluation-architecture";
+import { resolveV1FloorWorkflowReadiness } from "@/lib/founder-v1-readiness";
 
 type Bootstrap = AppState & { foundation?: { isFounderEdition?: boolean }; persistenceRevision?: number | null };
 type Focus = "stage-a" | "assembly" | "approval" | "pdf";
@@ -38,8 +40,18 @@ export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus:
   const floor = state?.floorWorkspaces.find((item) => item.id === floorId && item.caseId === caseRecord?.id);
   const preview = state?.reportVersions.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && item.isPreview);
   const report = state?.reportVersions.find((item) => item.caseId === caseRecord?.id && item.floorId === floor?.id && !item.isPreview);
+  const architecture = state && caseRecord && floor ? resolveEvaluationArchitecture({ state, caseId: caseRecord.id, floorId: floor.id }) : undefined;
+  const isV1 = architecture?.caseVersion === "V1" && architecture.floorVersion === "V1";
+  const v1Readiness = state && caseRecord && floor && isV1 ? resolveV1FloorWorkflowReadiness(state, caseRecord.id, floor.id) : undefined;
   const reviewed = Boolean(report?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_REVIEWED"));
   const approved = Boolean(report?.approvalEvidence?.some((item) => item.checkpoint === "FOUNDER_APPROVED"));
+  const legacyEvaluationReady = Boolean(
+    caseRecord && floor
+    && state?.evaluationSnapshots.some((item) => item.caseId === caseRecord.id && item.floorId === floor.id && item.planVersionId && item.orientationVersionId)
+    && state?.shaktiSnapshots.some((item) => item.caseId === caseRecord.id && item.floorId === floor.id && item.planVersionId && item.orientationVersionId)
+    && state?.utilityVerdicts?.some((item) => item.caseId === caseRecord.id && item.floorId === floor.id && item.status === "APPROVED")
+  );
+  const evaluationReady = isV1 ? Boolean(v1Readiness?.directionalEvaluationComplete && v1Readiness?.elementalComplete) : legacyEvaluationReady;
 
   async function runAction(action: "preview-report" | "stage-a-present" | "final-report-prepare" | "report-approve") {
     if (!state || state.persistenceRevision === null || state.persistenceRevision === undefined) return;
@@ -69,11 +81,12 @@ export function FounderReportStep({ focus, clientId, caseId, floorId }: { focus:
     finally { setBusy(false); }
   }
 
-  let title = "Stage A verdict"; let button = "Create watermarked preview"; let disabled = !caseRecord || !floor; let execute = () => runAction("preview-report");
-  if (focus === "stage-a" && preview) { title = "Stage A presentation"; button = floor?.stageAVerdictStatus === "PRESENTED" ? "Stage A presented" : "Record human verification & presentation"; disabled = floor?.stageAVerdictStatus === "PRESENTED"; execute = () => runAction("stage-a-present"); }
+  let title = isV1 ? "Directional Stage A" : "Stage A verdict"; let button = isV1 ? "Record V1 Stage-A presentation" : "Create watermarked preview"; let disabled = !caseRecord || !floor || !evaluationReady; let blockedReason = !caseRecord || !floor ? "Select the exact Case and floor first." : !evaluationReady ? isV1 ? "Complete the finalized V1 Directional and Elemental evaluations before Stage-A presentation." : "Complete and approve Utility and Shakti evaluation for this floor before creating the Stage A preview." : ""; let execute = () => runAction(isV1 ? "stage-a-present" : "preview-report");
+  if (focus === "stage-a" && (preview || isV1)) { title = isV1 ? "Directional Stage-A presentation" : "Stage A presentation"; button = isV1 ? v1Readiness?.directionalStageAPresented ? "Stage A presented" : "Record native V1 presentation" : floor?.stageAVerdictStatus === "PRESENTED" ? "Stage A presented" : "Record human verification & presentation"; disabled = isV1 ? Boolean(v1Readiness?.directionalStageAPresented) : floor?.stageAVerdictStatus === "PRESENTED"; execute = () => runAction("stage-a-present"); }
   if (focus === "assembly") { title = "One-floor report assembly"; button = report ? "Report assembled" : "Assemble exact floor report"; disabled = Boolean(report) || !caseRecord?.fullPaymentApproved; execute = () => runAction("final-report-prepare"); }
   if (focus === "approval") { title = approved ? "Founder approval complete" : reviewed ? "Founder approval" : "Founder review"; button = approved ? "Approved" : reviewed ? "Founder approve" : "Founder review"; disabled = Boolean(approved) || !report; execute = () => runAction("report-approve"); }
   if (focus === "pdf") { title = "Protected PDF"; button = !pdf ? "Generate protected PDF" : pdf.status === "GENERATED" ? "Verify PDF integrity" : pdf.status === "VERIFIED" ? "Release protected PDF" : "Protected PDF released"; disabled = pdf?.status === "RELEASED" || !report || !approved; execute = () => runPdf(!pdf ? "generate" : pdf.status === "GENERATED" ? "verify" : "release"); }
+  if (focus === "stage-a" && !preview && !isV1 && !evaluationReady) button = "Complete Utility and Shakti evaluation first";
 
   return <section className="focused-step-form founder-report-step" aria-label={title}><div className="focused-context-row"><span>{client?.displayName ?? "No client"}</span><span>{caseRecord?.caseNumber ?? "No case"}</span><span>{floor?.floorLabel ?? "No floor"}</span></div><div className="focused-form-body"><div className="focused-summary-card"><strong>{title}</strong><span>{focus === "stage-a" ? preview ? `${preview.versionLabel} · ${floor?.stageAVerdictStatus ?? "not presented"}` : "No preview yet" : focus === "assembly" ? report?.versionLabel ?? "Waiting for complete gates" : focus === "approval" ? `${reviewed ? "Reviewed" : "Review pending"} · ${approved ? "Approved" : "Approval pending"}` : pdf ? `${pdf.status} · ${pdf.pageCount} pages · ${pdf.securityProfile}` : "No PDF artifact"}</span></div>{(focus === "stage-a" && preview && floor?.stageAVerdictStatus !== "PRESENTED") || focus === "approval" ? <label className="field"><span>{focus === "stage-a" ? "Presentation and verification note" : "Approval reason"}</span><textarea value={note} onChange={(event) => setNote(event.target.value)} maxLength={500} /></label> : null}<button type="button" className="button" disabled={busy || disabled} onClick={() => void execute()}>{busy ? "Saving…" : button}</button>{focus === "pdf" && pdf?.status === "RELEASED" && report ? <details className="founder-technical-details"><summary>Released artifact actions</summary><div className="secondary-inline-actions"><a className="button-secondary" href={`/api/reports/${encodeURIComponent(report.id)}/pdf?mode=export`}>Export authorised PDF</a><a className="button-secondary" href={`/api/reports/${encodeURIComponent(report.id)}/pdf?mode=print`} target="_blank" rel="noreferrer">Print</a></div></details> : null}</div>{conflict ? <div className="conflict-recovery" role="alert"><strong>The report changed while you were working.</strong><p>Your note is preserved. Reload before retrying.</p><button type="button" className="button-secondary" onClick={() => void refresh()}>Reload latest</button></div> : null}<div className="footer-note" role={/could not|failed|missing|changed/i.test(message) ? "alert" : "status"} aria-live="polite">{message}</div></section>;
 }

@@ -4,11 +4,11 @@ import { SiteHeader } from "@/components/site-header";
 import { buildFounderScorecard } from "@/lib/founder-scorecard";
 import { getCurrentFounderFlowStep } from "@/lib/founder-flow";
 import { FounderFlowHome } from "@/components/founder-flow";
-import { requirePageAccess } from "@/lib/page-access";
+import { requireFounderPageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 
 export default async function FounderContinuePage({ searchParams }: { searchParams: Promise<{ caseId?: string; floorId?: string }> }) {
-  const access = await requirePageAccess("SETTER");
+  const access = await requireFounderPageAccess("SETTER");
   if (!access.allowed) {
     return <main className="page-shell"><SiteHeader title="Evaluation" subtitle="Continue the current floor" minimal /><AccessDeniedPanel area="Evaluation" requiredRole="SETTER" actorRole={access.actor.role} /></main>;
   }

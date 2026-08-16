@@ -12,6 +12,7 @@ export function ClientPortal() {
   const [portal, setPortal] = useState<ClientPortalView | null>(null);
   const [status, setStatus] = useState<"loading" | "ready" | "unlinked" | "error">("loading");
   const [message, setMessage] = useState("");
+  const [acknowledging, setAcknowledging] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     setStatus("loading");
@@ -34,6 +35,21 @@ export function ClientPortal() {
   }, []);
 
   useEffect(() => { void load(); }, [load]);
+
+  const acknowledge = useCallback(async (deliveryId: string, recordVersion: number) => {
+    if (!portal || portal.revision === null) { setMessage("Refresh the portal before acknowledging receipt."); return; }
+    setAcknowledging(deliveryId); setMessage("");
+    try {
+      const response = await fetch("/api/actions", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({
+        action: "document-delivery-acknowledge", deliveryId, expectedRecordVersion: recordVersion,
+        expectedRevision: portal.revision, idempotencyKey: `client-ack:${deliveryId}`
+      }) });
+      const payload = await response.json() as { ok?: boolean; error?: string };
+      if (!response.ok || !payload.ok) throw new Error(payload.error ?? "Receipt acknowledgement could not be saved.");
+      await load();
+    } catch (error) { setMessage(error instanceof Error ? error.message : "Receipt acknowledgement could not be saved."); }
+    finally { setAcknowledging(null); }
+  }, [load, portal]);
 
   if (status === "loading") return <section className="card client-state" role="status" aria-live="polite" aria-busy="true"><h1>Loading your Vastu journey…</h1><p className="subtle">We are safely finding your case.</p></section>;
   if (status === "unlinked") return <section className="card client-state" role="status"><div className="eyebrow">Account not linked</div><h1>We need to connect your account</h1><p className="lede">{message}</p><p className="subtle">Share the email you use to sign in. Do not share your password.</p></section>;
@@ -81,10 +97,25 @@ export function ClientPortal() {
 
       <section className="card">
         <div className="eyebrow">Reports</div><h2>Your Vastu reports</h2>
+        {message ? <p role="alert" className="subtle">{message}</p> : null}
         <div className="list">
-          {portal.reports.length ? portal.reports.map((item) => <div className="list-item" key={item.id}><strong>{item.label}</strong><span className="meta">{item.kind === "PREVIEW" ? "Watermarked preview" : "Final report"}</span>{item.available && item.downloadPath ? <a className="button" href={item.downloadPath} target="_blank" rel="noreferrer" aria-label={`${item.kind === "PREVIEW" ? "Open preview" : "Download final report"}: ${item.label}`}>{item.kind === "PREVIEW" ? "Open preview" : "Download final report"}</a> : <><span className="tag warn">Not ready yet</span><span className="meta">We will show the report here as soon as it is ready.</span></>}</div>) : <div className="list-item"><strong>No report yet</strong><span className="meta">Your report will appear here when it is ready.</span></div>}
+          {portal.reports.length ? portal.reports.map((item) => <div className="list-item" key={item.deliveryId}>
+            <strong>{item.label} · {item.floorLabel}</strong>
+            <span className="meta">Delivered {date.format(new Date(item.deliveredAt))} · exact protected PDF</span>
+            <span className={`tag ${item.status === "ACKNOWLEDGED" ? "good" : "neutral"}`}>{item.status === "ACKNOWLEDGED" ? "Receipt acknowledged" : "Delivered"}</span>
+            <div className="hero-actions"><a className="button-secondary" href={item.viewPath} target="_blank" rel="noreferrer" aria-label={`View delivered report: ${item.label}`}>View report</a>
+              <a className="button" href={item.downloadPath} aria-label={`Download delivered report: ${item.label}`}>Download protected PDF</a>
+              {item.status !== "ACKNOWLEDGED" ? <button type="button" className="button-secondary" disabled={acknowledging === item.deliveryId}
+                onClick={() => void acknowledge(item.deliveryId, item.recordVersion)}>{acknowledging === item.deliveryId ? "Saving…" : "Acknowledge receipt"}</button> : null}
+            </div>
+            {item.status !== "ACKNOWLEDGED" ? <span className="meta">Acknowledgement confirms receipt only; it is not a signature or implementation confirmation.</span> : null}
+          </div>) : <div className="list-item"><strong>No delivered report yet</strong><span className="meta">Only reports released to you through a delivery record appear here.</span></div>}
         </div>
       </section>
+
+      {portal.deliveryAccess.length ? <section className="card"><div className="eyebrow">Secure access history</div><h2>Your report activity</h2><div className="list">
+        {portal.deliveryAccess.slice(0, 8).map((item) => <div className="list-item" key={item.id}><strong>{item.eventType === "ACKNOWLEDGED" ? "Receipt acknowledged" : item.eventType === "VIEWED" ? "Report viewed" : "Protected PDF downloaded"}</strong><span className="meta">{date.format(new Date(item.occurredAt))}</span></div>)}
+      </div></section> : null}
 
       <section className="card">
         <div className="eyebrow">Updates</div><h2>What has happened</h2>

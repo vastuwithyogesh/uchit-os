@@ -67,12 +67,12 @@ test("Founder visual system preserves semantic tokens, focus, motion and touch t
   assert.doesNotMatch(css, /linear-gradient|radial-gradient/);
 });
 
-test("Founder route links remain native and delivery remains deferred", () => {
+test("Founder route links remain native and delivery uses the controlled protected-artifact gate", () => {
   for (const file of ["components/site-header.tsx", "components/founder-route-intro.tsx"]) {
     const text = read(file);
     assert.doesNotMatch(text, /next\/link|<Link\b|prefetch=/, file);
     assert.match(text, /href=/, file);
   }
-  assert.match(read("app/api/client/portal/route.ts"), /CLIENT_DELIVERY_DEFERRED/);
-  assert.match(read("app/api/client/reports/[reportId]/route.ts"), /disabled during Founder Edition/);
+  assert.match(read("app/api/client/portal/route.ts"), /buildClientPortalView/);
+  assert.match(read("app/api/client/reports/[reportId]/route.ts"), /readDeliveredProtectedPdf/);
 });

@@ -16,15 +16,26 @@ type EvidenceInput = {
   role?: "PLAN_AUTHENTICATION" | "MANUAL_UTILITY_SHEET";
 };
 
+export type ProtectedPdfBrandingImage = {
+  bytes: Uint8Array; mimeType: "image/png" | "image/jpeg"; checksumSha256: string;
+  title: string; assetVersionId: string;
+};
+
+export type ProtectedPdfBranding = {
+  snapshotHash: string; displayName: string; headerText: string; footerText: string; accentHex: string;
+  logo?: ProtectedPdfBrandingImage; prefixPages: ProtectedPdfBrandingImage[]; suffixPages: ProtectedPdfBrandingImage[];
+};
+
 type RenderInput = {
   reportVersionId: string;
   sourceSnapshotHash: string;
   html: string;
   evidence: EvidenceInput | readonly EvidenceInput[];
   ownerSecret: string;
+  branding?: ProtectedPdfBranding;
 };
 
-type PageSpec = { kind: "LAYOUT"; commands: string[] } | { kind: "VISIBLE_EVIDENCE"; evidenceIndex: number };
+type PageSpec = { kind: "LAYOUT"; commands: string[] } | { kind: "VISIBLE_EVIDENCE"; evidenceIndex: number } | { kind: "TEMPLATE_IMAGE"; templateIndex: number; placement: "PREFIX" | "SUFFIX" };
 
 const textEncoder = new TextEncoder();
 const latin1 = new TextDecoder("latin1");
@@ -233,7 +244,7 @@ async function preparePngImage(bytes: Uint8Array) {
   return { width, height, bytes: await streamTransform(rgb, "compress"), filter: "/FlateDecode" };
 }
 
-async function prepareVisibleImage(evidence: EvidenceInput) {
+export async function prepareVisibleImage(evidence: Pick<EvidenceInput, "bytes" | "mimeType">) {
   if (evidence.mimeType === "image/jpeg") {
     const dimensions = jpegDimensions(evidence.bytes);
     return { ...dimensions, bytes: evidence.bytes.slice(), filter: "/DCTDecode" };
@@ -244,6 +255,11 @@ async function prepareVisibleImage(evidence: EvidenceInput) {
 
 function pdfString(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/\(/g, "\\(").replace(/\)/g, "\\)").replace(/[\r\n]/g, " ");
+}
+
+function pdfRgb(hexColour?: string) {
+  const match = /^#([0-9a-f]{6})$/i.exec(hexColour ?? "#b08d57"); const value = Number.parseInt(match?.[1] ?? "b08d57", 16);
+  return [value >> 16, (value >> 8) & 255, value & 255].map((channel) => Math.round(channel / 255 * 1000) / 1000).join(" ");
 }
 
 async function sha256Bytes(bytes: Uint8Array) {
@@ -260,6 +276,9 @@ export async function renderProtectedPdf(input: RenderInput) {
   const security = securityMaterial(ownerPassword, fileId);
   const manualEvidenceIndex = evidenceList.findIndex((item) => item.role === "MANUAL_UTILITY_SHEET");
   const pages: PageSpec[] = [];
+  const prefixPages = input.branding?.prefixPages ?? []; const suffixPages = input.branding?.suffixPages ?? [];
+  const templateImages = [...prefixPages, ...suffixPages];
+  pages.push(...prefixPages.map((_, templateIndex) => ({ kind: "TEMPLATE_IMAGE" as const, templateIndex, placement: "PREFIX" as const })));
   if (manualEvidenceIndex >= 0) {
     let sectionEight = input.html.search(/<section><h2>8\. Utility mapping and zoning\b/i);
     if (sectionEight < 0) sectionEight = input.html.search(/8\. Utility mapping and zoning\b/i);
@@ -270,30 +289,38 @@ export async function renderProtectedPdf(input: RenderInput) {
   } else {
     pages.push(...layoutProtectedReportHtml(input.html).map((page) => ({ kind: "LAYOUT" as const, commands: page.commands })));
   }
-  if (!pages.length) pages.push({ kind: "LAYOUT", commands: ["BT /F2 12 Tf 50 775 Td (Uchit Vastu India protected report) Tj ET"] });
+  pages.push(...suffixPages.map((_, suffixIndex) => ({ kind: "TEMPLATE_IMAGE" as const, templateIndex: prefixPages.length + suffixIndex, placement: "SUFFIX" as const })));
+  if (!pages.length) pages.push({ kind: "LAYOUT", commands: [`BT /F2 12 Tf 50 775 Td (${pdfString(input.branding?.displayName ?? "Uchit Vastu India")} protected report) Tj ET`] });
   const pageCount = pages.length;
   const pageStart = 3; const fontObject = pageStart + pageCount; const boldFontObject = fontObject + 1; const contentStart = boldFontObject + 1;
   const embeddedStart = contentStart + pageCount; const fileSpecStart = embeddedStart + evidenceList.length;
   const namesObject = fileSpecStart + evidenceList.length;
   const visibleImageStart = namesObject + 1;
-  const visibleEvidencePages = pages.filter((page): page is Extract<PageSpec, { kind: "VISIBLE_EVIDENCE" }> => page.kind === "VISIBLE_EVIDENCE");
-  const encryptObject = visibleImageStart + visibleEvidencePages.length;
+  const visibleImagePages = pages.filter((page) => page.kind === "VISIBLE_EVIDENCE" || page.kind === "TEMPLATE_IMAGE");
+  const logoImageObject = input.branding?.logo ? visibleImageStart + visibleImagePages.length : undefined;
+  const encryptObject = visibleImageStart + visibleImagePages.length + (logoImageObject ? 1 : 0);
   const objects = new Map<number, Uint8Array>();
   const pageRefs = Array.from({ length: pageCount }, (_, index) => `${pageStart + index} 0 R`).join(" ");
   objects.set(1, ascii(`<< /Type /Catalog /Pages 2 0 R /Names << /EmbeddedFiles ${namesObject} 0 R >> >>`));
   objects.set(2, ascii(`<< /Type /Pages /Kids [${pageRefs}] /Count ${pageCount} >>`));
   objects.set(fontObject, ascii(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>`));
   objects.set(boldFontObject, ascii(`<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>`));
+  const preparedLogo = input.branding?.logo ? await prepareVisibleImage(input.branding.logo) : undefined;
+  if (logoImageObject && preparedLogo) {
+    const encryptedLogo = rc4(objectEncryptionKey(security.fileKey, logoImageObject), preparedLogo.bytes);
+    objects.set(logoImageObject, concat(ascii(`<< /Type /XObject /Subtype /Image /Width ${preparedLogo.width} /Height ${preparedLogo.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ${preparedLogo.filter} /Length ${encryptedLogo.length} >>\nstream\n`), encryptedLogo, ascii("\nendstream")));
+  }
   let visibleImageIndex = 0;
   for (const [index, page] of pages.entries()) {
     const pageObject = pageStart + index; const contentObject = contentStart + index;
-    const imageObject = page.kind === "VISIBLE_EVIDENCE" ? visibleImageStart + visibleImageIndex++ : undefined;
-    const xObject = imageObject ? ` /XObject << /Im1 ${imageObject} 0 R >>` : "";
+    const imageObject = page.kind === "VISIBLE_EVIDENCE" || page.kind === "TEMPLATE_IMAGE" ? visibleImageStart + visibleImageIndex++ : undefined;
+    const xObjectEntries = [imageObject ? `/Im1 ${imageObject} 0 R` : "", logoImageObject ? `/Logo ${logoImageObject} 0 R` : ""].filter(Boolean).join(" ");
+    const xObject = xObjectEntries ? ` /XObject << ${xObjectEntries} >>` : "";
     objects.set(pageObject, ascii(`<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 ${fontObject} 0 R /F2 ${boldFontObject} 0 R >>${xObject} >> /Contents ${contentObject} 0 R >>`));
     let body: string;
     if (page.kind === "LAYOUT") {
       body = page.commands.join(" ");
-    } else {
+    } else if (page.kind === "VISIBLE_EVIDENCE") {
       const evidence = evidenceList[page.evidenceIndex];
       const image = await prepareVisibleImage(evidence);
       const scale = Math.min(495 / image.width, 620 / image.height);
@@ -306,10 +333,19 @@ export async function renderProtectedPdf(input: RenderInput) {
         + `q ${drawWidth} 0 0 ${drawHeight} ${drawX} ${drawY} cm /Im1 Do Q`;
       const encryptedImage = rc4(objectEncryptionKey(security.fileKey, imageObject!), image.bytes);
       objects.set(imageObject!, concat(ascii(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ${image.filter} /Length ${encryptedImage.length} >>\nstream\n`), encryptedImage, ascii("\nendstream")));
+    } else {
+      const template = templateImages[page.templateIndex]; const image = await prepareVisibleImage(template);
+      const scale = Math.min(495 / image.width, 680 / image.height); const drawWidth = Math.round(image.width * scale * 100) / 100; const drawHeight = Math.round(image.height * scale * 100) / 100;
+      const drawX = Math.round((595 - drawWidth) * 50) / 100; const drawY = Math.round((760 - drawHeight) * 50) / 100;
+      body = `BT /F2 13 Tf 50 785 Td (${pdfString(template.title)}) Tj ET BT /F1 7 Tf 50 770 Td (${page.placement} / ${pdfString(template.assetVersionId)} / SHA-256 ${pdfString(template.checksumSha256)}) Tj ET q ${drawWidth} 0 0 ${drawHeight} ${drawX} ${drawY} cm /Im1 Do Q`;
+      const encryptedImage = rc4(objectEncryptionKey(security.fileKey, imageObject!), image.bytes);
+      objects.set(imageObject!, concat(ascii(`<< /Type /XObject /Subtype /Image /Width ${image.width} /Height ${image.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter ${image.filter} /Length ${encryptedImage.length} >>\nstream\n`), encryptedImage, ascii("\nendstream")));
     }
-    const commands = `${body} 0.69 0.55 0.34 RG 0.8 w 44 812 m 551 812 l S 0.88 0.86 0.82 RG 0.5 w 36 32 523 778 re S `
-      + `0 0 0 rg BT /F2 16 Tf 50 820 Td (UCHIT VASTU INDIA) Tj ET BT /F1 8 Tf 450 821 Td (FOUNDER EDITION) Tj ET `
-      + `0 0 0 rg BT /F1 8 Tf 50 20 Td (Immutable protected report - authorised access only) Tj ET `
+    const displayName = pdfString(input.branding?.displayName.toUpperCase() ?? "UCHIT VASTU INDIA"); const headerText = pdfString(input.branding?.headerText ?? "FOUNDER EDITION"); const footerText = pdfString(input.branding?.footerText ?? "Immutable protected report - authorised access only");
+    const logoCommand = logoImageObject && preparedLogo ? `q 36 0 0 36 50 805 cm /Logo Do Q ` : ""; const titleX = logoImageObject ? 94 : 50;
+    const commands = `${body} ${pdfRgb(input.branding?.accentHex)} RG 0.8 w 44 812 m 551 812 l S 0.88 0.86 0.82 RG 0.5 w 36 32 523 778 re S ${logoCommand}`
+      + `0 0 0 rg BT /F2 16 Tf ${titleX} 820 Td (${displayName}) Tj ET BT /F1 8 Tf 450 821 Td (${headerText}) Tj ET `
+      + `0 0 0 rg BT /F1 8 Tf 50 20 Td (${footerText}) Tj ET `
       + `BT /F1 8 Tf 505 20 Td (Page ${index + 1}/${pageCount}) Tj ET`;
     const encrypted = rc4(objectEncryptionKey(security.fileKey, contentObject), ascii(commands));
     objects.set(contentObject, concat(ascii(`<< /Length ${encrypted.length} >>\nstream\n`), encrypted, ascii("\nendstream")));

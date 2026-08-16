@@ -2,6 +2,8 @@ import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { SiteHeader } from "@/components/site-header";
 import { AdminConsole } from "@/components/admin-console";
 import { CommercialPolicyEditor } from "@/components/commercial-policy-editor";
+import { RepositoryAdminConsole } from "@/components/repository-admin-console";
+import { ImageUtilityConsole } from "@/components/image-utility-console";
 import { requirePageAccess } from "@/lib/page-access";
 
 export default async function AdminPage() {
@@ -40,6 +42,8 @@ export default async function AdminPage() {
         </div>
       </section>
 
+      <RepositoryAdminConsole />
+      <ImageUtilityConsole />
       <AdminConsole />
       <CommercialPolicyEditor />
     </main>

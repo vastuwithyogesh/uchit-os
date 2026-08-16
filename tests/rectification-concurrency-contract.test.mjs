@@ -91,11 +91,13 @@ test("rectification requires formal evidence and audit links identify the full r
   assert.match(approve, /successor \$\{successor\.id\}/);
 });
 
-test("client keeps historical released reports while only the successor is current", () => {
+test("client keeps exact historical deliveries while only the successor case is current", () => {
   const portal = source("lib/client-portal.ts");
   assert.match(portal, /const caseIds = new Set\(cases\.map/);
-  assert.match(portal, /filter\(\(item\) => caseIds\.has\(item\.caseId\)\)/);
-  assert.match(portal, /item\.status === "RELEASED"/);
+  assert.match(portal, /caseIds\.has\(item\.caseId\)/);
+  assert.match(portal, /item\.status === "DELIVERED"/);
+  assert.match(portal, /item\.status === "ACKNOWLEDGED"/);
+  assert.match(portal, /protectedPdfArtifactId|deliveryId/);
   assert.match(portal, /const currentCase = getActiveCaseForClient/);
   assert.match(portal, /status: "RECTIFICATION", label: "Revision opened"/);
 });

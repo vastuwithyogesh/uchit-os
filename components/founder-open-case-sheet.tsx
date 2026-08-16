@@ -59,10 +59,15 @@ export function FounderOpenCaseSheet({ client, user, revision, onClose, onCreate
     setServerError("");
     setValidationSummary("");
     try {
+      const latestBootstrap = await fetch("/api/bootstrap", { cache: "no-store" }).then(async (response) => {
+        if (!response.ok) throw new Error("The latest case and state versions could not be loaded. Refresh and try again.");
+        return response.json() as Promise<{ persistenceRevision?: number; clients?: Array<{ id: string; recordVersion?: number }> }>;
+      });
+      const latestClient = latestBootstrap.clients?.find((item) => item.id === client.id);
       const response = await fetch("/api/actions", {
         method: "POST",
         headers: buildActionHeaders(user.role),
-        body: JSON.stringify({ action: "founder-case-intent-create", clientId: client.id, serviceType, propertyType, displayName: name, propertyLocation: location, floorCount, importantNotes: notes || undefined, confirmPossibleDuplicate: confirmed, idempotencyKey: key.current, expectedRecordVersion: client.recordVersion, expectedRevision: revision ?? null })
+        body: JSON.stringify({ action: "founder-case-intent-create", clientId: client.id, serviceType, propertyType, displayName: name, propertyLocation: location, floorCount, importantNotes: notes || undefined, confirmPossibleDuplicate: confirmed, idempotencyKey: key.current, expectedRecordVersion: latestClient?.recordVersion ?? client.recordVersion ?? 0, expectedRevision: latestBootstrap.persistenceRevision ?? revision ?? null })
       });
       const result = await response.json();
       if (!response.ok || result.ok === false) {

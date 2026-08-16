@@ -10,7 +10,7 @@ export async function GET(_request: Request, { params }: { params: Promise<{ tok
     const { token } = await params; const snapshot = await loadStateSnapshotFromPersistence();
     const result = await resolveFounderProposalGrant(snapshot.state, token);
     await persistStateToDatabase(snapshot.state, snapshot.revision ?? undefined);
-    return NextResponse.json({ ok: true, proposal: result.projection, acceptanceDeclaration: result.acceptanceDeclaration }, { headers });
+    return NextResponse.json({ ok: true, proposal: result.projection, brandPresentation: result.brandPresentation, acceptanceDeclaration: result.acceptanceDeclaration }, { headers });
   } catch (error) { return errorResponse(error); }
 }
 

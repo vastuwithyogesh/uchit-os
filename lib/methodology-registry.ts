@@ -2,7 +2,7 @@ import { deterministicContentHash } from "@/lib/evaluation-provenance";
 import { methodologyDecisionStatuses, methodologyModules, type AppUser, type MethodologyDecisionStatus, type MethodologyModule } from "@/lib/domain";
 import { getAppState } from "@/lib/store";
 import { appendFloorInvalidations } from "@/lib/founder-regeneration";
-import { STAGE_B_AUTHORITY_HASH, STAGE_B_RESOLVER_VERSION } from "@/lib/stage-b-remediation";
+import { STAGE_B_AUTHORITY_HASH, STAGE_B_CANONICAL_REMEDY_MAPPINGS, STAGE_B_RESOLVER_VERSION } from "@/lib/stage-b-remediation";
 export { getActiveMethodologyVersion, getMethodologyReadiness } from "@/lib/methodology-readiness";
 
 export class MethodologyRegistryError extends Error {
@@ -108,6 +108,23 @@ export function upsertMethodologyFixture(input: { methodologyVersionId: unknown;
   version.recordVersion = (version.recordVersion ?? 0) + 1; return record;
 }
 
+export function bindStageBMethodologyAuthority(input: { methodologyVersionId: unknown; sourceAssetVersion: unknown; sourceAssetHash: unknown; executionAdapterVersion: unknown; idempotencyKey: unknown; expectedRecordVersion: unknown; actor: AppUser }) {
+  const { version } = draftContext(input.actor, input.methodologyVersionId);
+  if (version.module !== "STAGE_B_REMEDIAL") throw new MethodologyRegistryError("Only a Stage-B remedial draft can bind the Stage-B production authority.", 409);
+  const stableKey = key(input.idempotencyKey);
+  if (version.idempotencyKey === stableKey && version.sourceAssetHash === input.sourceAssetHash && version.executionAdapterVersion === input.executionAdapterVersion) return version;
+  assertExpected(version, input.expectedRecordVersion);
+  if (text(input.sourceAssetHash, "Source authority hash", 128) !== STAGE_B_AUTHORITY_HASH || text(input.executionAdapterVersion, "Execution adapter version", 160) !== STAGE_B_RESOLVER_VERSION) {
+    throw new MethodologyRegistryError("Stage-B authority binding must match the canonical production authority hash and resolver version.", 409);
+  }
+  version.sourceAssetVersion = text(input.sourceAssetVersion, "Source asset version", 160);
+  version.sourceAssetHash = STAGE_B_AUTHORITY_HASH;
+  version.executionAdapterVersion = STAGE_B_RESOLVER_VERSION;
+  version.idempotencyKey = stableKey;
+  version.recordVersion = (version.recordVersion ?? 0) + 1;
+  return version;
+}
+
 export function publishMethodologyVersion(input: { methodologyVersionId: unknown; reason: unknown; idempotencyKey: unknown; expectedRecordVersion: unknown; actor: AppUser }) {
   assertOwner(input.actor); const state = getAppState(); const organisationId = organisation(input.actor); const versionId = text(input.methodologyVersionId, "Methodology version ID", 160); const stableKey = key(input.idempotencyKey);
   const version = state.methodologyVersions.find((item) => item.id === versionId && item.organisationId === organisationId);
@@ -117,7 +134,15 @@ export function publishMethodologyVersion(input: { methodologyVersionId: unknown
   assertExpected(version, input.expectedRecordVersion);
   const rules = state.methodologyRules.filter((item) => item.organisationId === organisationId && item.methodologyVersionId === version.id);
   const fixtures = state.methodologyGoldenFixtures.filter((item) => item.organisationId === organisationId && item.methodologyVersionId === version.id);
-  if (version.module === "STAGE_B_REMEDIAL" && (version.sourceAssetHash !== STAGE_B_AUTHORITY_HASH || version.executionAdapterVersion !== STAGE_B_RESOLVER_VERSION || rules.length < 5 || fixtures.length < 6)) throw new MethodologyRegistryError("Stage B publication requires the canonical authority hash, resolver v1, five approved framing rules, and six approved golden fixtures.", 409);
+  if (version.module === "STAGE_B_REMEDIAL" && (version.sourceAssetHash !== STAGE_B_AUTHORITY_HASH || version.executionAdapterVersion !== STAGE_B_RESOLVER_VERSION || rules.length !== STAGE_B_CANONICAL_REMEDY_MAPPINGS.length || fixtures.length < 6)) throw new MethodologyRegistryError("Stage B publication requires the canonical authority hash, resolver v1, exactly five approved remedy-type rules, and six approved golden fixtures.", 409);
+  if (version.module === "STAGE_B_REMEDIAL") {
+    const mappingValid = STAGE_B_CANONICAL_REMEDY_MAPPINGS.every(({ action, remedialType }) => rules.some((rule) => (rule.conditionJson as { action?: string })?.action === action && (rule.outcomeJson as { remedialType?: string })?.remedialType === remedialType));
+    const noSpecificSelection = rules.every((rule) => {
+      const outcome = rule.outcomeJson as Record<string, unknown>;
+      return Object.keys(outcome).every((key) => key === "remedialType");
+    });
+    if (!mappingValid || !noSpecificSelection) throw new MethodologyRegistryError("Stage B rules must contain exactly the five locked action-to-remedy-type mappings and no specific remedy or placement selection.", 409);
+  }
   if (!rules.length || rules.some((item) => item.decisionStatus !== "APPROVED")) throw new MethodologyRegistryError("Every rule must be Approved before publication.", 409);
   if (!fixtures.length || fixtures.some((item) => item.decisionStatus !== "APPROVED")) throw new MethodologyRegistryError("At least one approved golden fixture is required and none may be unresolved.", 409);
   const content = { module: version.module, version: version.version, rules: rules.map(({ ruleKey, sourceReference, decisionStatus, conditionJson, outcomeJson, contentHash }) => ({ ruleKey, sourceReference, decisionStatus, conditionJson, outcomeJson, contentHash })).sort((a, b) => a.ruleKey.localeCompare(b.ruleKey)), fixtures: fixtures.map(({ fixtureKey, inputJson, expectedOutputJson, contentHash }) => ({ fixtureKey, inputJson, expectedOutputJson, contentHash })).sort((a, b) => a.fixtureKey.localeCompare(b.fixtureKey)) };

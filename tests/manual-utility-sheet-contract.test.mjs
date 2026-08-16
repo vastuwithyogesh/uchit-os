@@ -6,7 +6,10 @@ test("manual utility sheet is a required, Founder-approved, versioned document",
   const domain = source("lib/domain.ts"); const service = source("lib/service-framework.ts"); const workflow = source("lib/workflow-service.ts");
   assert.match(domain, /MANUAL_UTILITY_SHEET/); assert.match(domain, /founderApprovalStatus/); assert.match(domain, /ManualSheetApprovalRecord/);
   assert.match(service, /MANUAL_UTILITY_SHEET/); assert.match(service, /founderApprovalStatus === "APPROVED"/);
-  assert.match(workflow, /assetType === "MANUAL_UTILITY_SHEET"/); assert.match(workflow, /founderApprovalStatus: "PENDING"/);
+  assert.match(workflow, /assetType === "MANUAL_UTILITY_SHEET"/);
+  assert.match(workflow, /founderApprovalStatus: existing\?\.founderApprovalStatus \?\? "PENDING"/);
+  assert.match(workflow, /founderApprovedAt: existing\?\.founderApprovedAt/);
+  assert.match(workflow, /founderApprovedByActorUserId: existing\?\.founderApprovedByActorUserId/);
 });
 
 test("report composition places the approved manual sheet before evaluation and binds it to the artifact", () => {

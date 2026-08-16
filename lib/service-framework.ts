@@ -9,6 +9,7 @@ import type {
 import type { AppState } from "./store.ts";
 import { getMethodologyReadiness } from "./methodology-readiness.ts";
 import { getUtilityMasterMethodologyBinding } from "./utility-master.ts";
+import { getApprovedEntranceZoneCatalog } from "./entrance-zone-catalog.ts";
 
 export const DEFAULT_SERVICE_TEMPLATE_VERSION = "uchit-service/v2";
 export const DEFAULT_SCOPE_VERSION = "scope/v1";
@@ -182,10 +183,9 @@ export function getCaseEvaluationBlockers(state: AppState, caseId: string, floor
         && item.planVersionId === plan.id && item.kind === "HAND_MARKED_PLAN" && item.classification === "MARKED_16D_MAPPING_V1"
         && item.has16DirectionMapping === true && item.status === "CURRENT" && item.fullColour);
       if (!marked16DEvidence) blockers.push(`Add Founder-confirmed 16-direction marked mapping for ${floor.floorLabel}.`);
-      if (orientation && !state.openingMappings.some((item) => item.projectId === project.id && item.caseId === caseId && item.floorId === floor.id
-        && item.planVersionId === plan.id && item.orientationVersionId === orientation.id && item.kind === "MAIN_ENTRANCE" && item.verified)) {
-        blockers.push(`Verify the main entrance on ${floor.floorLabel}.`);
-      }
+      const propertyMainGate = (state.entranceZoneVersions ?? []).find((item) => item.projectId === project.id && item.caseId === caseId && item.scope === "PROPERTY_MAIN_GATE" && item.status === "CURRENT");
+      const floorGate = (state.entranceZoneVersions ?? []).find((item) => item.projectId === project.id && item.caseId === caseId && item.floorId === floor.id && item.scope === "FLOOR_PRIMARY_ENTRANCE" && item.status === "CURRENT");
+      if (!propertyMainGate && !floorGate) blockers.push(`Confirm at least one applicable property or floor entrance zone for ${floor.floorLabel}.`);
     }
   }
   if (state.dependencyInvalidations.some((item) => item.caseId === caseId && (!floorId || !item.floorId || item.floorId === floorId)
@@ -198,6 +198,7 @@ export function getCaseEvaluationBlockers(state: AppState, caseId: string, floor
     for (const module of ["DIRECTION_32", "DIRECTION_16", "SITE_ENVIRONMENT", "UTILITY", "SHAKTI_ELEMENT"] as const) {
       const methodology = module === "UTILITY"
         ? getUtilityMasterMethodologyBinding(state, caseRecord.organisationId)
+        : module === "DIRECTION_32" ? getApprovedEntranceZoneCatalog(state, caseRecord.organisationId)
         : getMethodologyReadiness(state, caseRecord.organisationId, module);
       if (!methodology.ready) blockers.push(`${module.replaceAll("_", " ")} is ${methodology.status.replaceAll("_", " ")}: ${methodology.reason}`);
     }

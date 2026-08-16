@@ -7,7 +7,9 @@ import type {
 import { deterministicContentHash } from "./evaluation-provenance.ts";
 import { getAppState, type AppState } from "./store.ts";
 import { completeRemediationReconciliation, liveReportPlacements, REPORT_WIDE_PLACEMENT_PAGES, reportWideMasterNumber, reportWidePlacementPages, resequenceReportPlacements, sortReportPlacements } from "./remediation-sequence.ts";
-import { buildStageBRenderManifest, StageBError } from "./stage-b-remediation.ts";
+import { buildStageBRenderManifest, StageBError, stageBReportLineageId } from "./stage-b-remediation.ts";
+import { stageBChildMatchesRemediation, stageBRecordLineageFields, resolveStageBReportLineage } from "./stage-b-lineage.ts";
+import { activeSectionCExtraPages, buildSectionCRenderManifest, SECTION_C_FIRST_ORDINAL } from "./section-c-extras.ts";
 
 export const SECTION_A_VISUAL_PAGES = [
   { pageType: "EXISTING_LAYOUT", ordinal: 1, label: "Existing Furniture Layout" },
@@ -46,7 +48,7 @@ function context(state: AppState, remediationIdValue: unknown, actor: AppUser) {
   const caseRecord = remediation ? state.vastuCases.find((item) => item.id === remediation.caseId && (!item.organisationId || item.organisationId === owner(actor))) : undefined;
   const project = caseRecord?.projectId ? state.projects.find((item) => item.id === caseRecord.projectId && item.activeCaseId === caseRecord.id) : undefined;
   const floor = project ? state.floorWorkspaces.find((item) => item.id === remediation?.floorId && item.caseId === caseRecord?.id && item.projectId === project.id) : undefined;
-  const report = floor ? state.reportVersions.find((item) => item.id === remediation?.reportId && item.caseId === caseRecord?.id && item.floorId === floor.id) : undefined;
+  const report = remediation?.reportSourceKind === "V1_COMBINED_EVALUATION_REPORT" ? state.combinedEvaluationReportSnapshots.find((item) => item.id === remediation.reportSourceId && item.caseId === caseRecord?.id && item.floorId === floor?.id && item.architectureVersion === "V1" && item.status === "FINALIZED") : floor ? state.reportVersions.find((item) => item.id === remediation?.reportId && item.caseId === caseRecord?.id && item.floorId === floor?.id) : undefined;
   if (!remediation || !caseRecord || !project || !floor || !report) throw new StageBError("Section A remediation, report, case, and floor scope do not match.", 404);
   const workspace = state.sectionAWorkspaces.find((item) => item.remediationId === remediation.id && item.organisationId === owner(actor));
   return { remediation, caseRecord, project, floor, report, workspace };
@@ -74,13 +76,13 @@ function sectionAPlacements(state: AppState, remediationId: string) {
 }
 function projectionForPlacement(state: AppState, remediation: StageBRemediationRecord, page: ReportPlacementPageRecord, placement: PhysicalPlacementRecord, actor: AppUser) {
   let row = state.placementImplementationRows.find((item) => item.remediationId === remediation.id && item.placementId === placement.id);
-  const rowValues = { reportId: remediation.reportId, pageId: page.id, masterNumber: placement.masterNumber!, imageAssetSnapshotId: placement.imageAssetSnapshotId,
+  const rowValues = { ...stageBRecordLineageFields(state, remediation), pageId: page.id, masterNumber: placement.masterNumber!, imageAssetSnapshotId: placement.imageAssetSnapshotId,
     itemNameSnapshot: placement.nameSnapshot, attributePurposeSnapshot: placement.attributePurposeSnapshot, ...(placement.locationReference ? { locationReference: placement.locationReference } : {}) };
   if (row) { Object.assign(row, rowValues); row.updatedByActorUserId = actor.id; row.recordVersion = (row.recordVersion ?? 0) + 1; }
   else { row = { id: id("implementation-row"), organisationId: remediation.organisationId, createdByActorUserId: actor.id, updatedByActorUserId: actor.id, recordVersion: 1,
     remediationId: remediation.id, placementId: placement.id, ...rowValues }; state.placementImplementationRows.unshift(row); }
   let appendix = state.masterAppendixRows.find((item) => item.remediationId === remediation.id && item.placementId === placement.id);
-  const appendixValues = { reportId: remediation.reportId, caseId: remediation.caseId, floorId: remediation.floorId, sourcePageId: page.id,
+  const appendixValues = { ...stageBRecordLineageFields(state, remediation), caseId: remediation.caseId, floorId: remediation.floorId, sourcePageId: page.id,
     baseLayoutVersionId: placement.baseLayoutVersionId, masterNumber: placement.masterNumber!, imageAssetSnapshotId: placement.imageAssetSnapshotId,
     itemNameSnapshot: placement.nameSnapshot, attributePurposeSnapshot: placement.attributePurposeSnapshot, ...(placement.locationReference ? { locationReference: placement.locationReference } : {}) };
   if (appendix) { Object.assign(appendix, appendixValues); appendix.updatedByActorUserId = actor.id; appendix.recordVersion = (appendix.recordVersion ?? 0) + 1; }
@@ -99,13 +101,13 @@ export function initialiseSectionA(input: { remediationId: unknown; expectedReco
   if (scoped.remediation.state === "PAGE_FINALISED") throw new StageBError("A frozen historical remedy report cannot be expanded with a new Section A workspace.", 409);
   expected(scoped.remediation, input.expectedRecordVersion, "remediation");
   const workspace: SectionAWorkspaceRecord = { id: id("section-a"), organisationId: owner(input.actor), createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1,
-    remediationId: scoped.remediation.id, projectId: scoped.project.id, caseId: scoped.caseRecord.id, floorId: scoped.floor.id, reportId: scoped.report.id,
+    remediationId: scoped.remediation.id, projectId: scoped.project.id, caseId: scoped.caseRecord.id, floorId: scoped.floor.id, ...stageBRecordLineageFields(state, scoped.remediation),
     state: "EDITING", idempotencyKey: key, requestHash, createdAt: now() };
   const visuals: SectionAVisualPageRecord[] = SECTION_A_VISUAL_PAGES.map((configuration) => ({ id: id("section-a-page"), organisationId: owner(input.actor), createdByActorUserId: input.actor.id,
-    updatedByActorUserId: input.actor.id, recordVersion: 1, workspaceId: workspace.id, remediationId: scoped.remediation.id, reportId: scoped.report.id,
+    updatedByActorUserId: input.actor.id, recordVersion: 1, workspaceId: workspace.id, remediationId: scoped.remediation.id, ...stageBRecordLineageFields(state, scoped.remediation),
     caseId: scoped.caseRecord.id, floorId: scoped.floor.id, pageType: configuration.pageType, ordinal: configuration.ordinal, state: "DRAFT" }));
   const placements: ReportPlacementPageRecord[] = SECTION_A_PLACEMENT_PAGES.map((configuration) => ({ id: id("placement-page"), organisationId: owner(input.actor), createdByActorUserId: input.actor.id,
-    updatedByActorUserId: input.actor.id, recordVersion: 1, remediationId: scoped.remediation.id, reportId: scoped.report.id, caseId: scoped.caseRecord.id,
+    updatedByActorUserId: input.actor.id, recordVersion: 1, remediationId: scoped.remediation.id, ...stageBRecordLineageFields(state, scoped.remediation), caseId: scoped.caseRecord.id,
     floorId: scoped.floor.id, section: "A", pageType: configuration.pageType, ordinal: configuration.ordinal, state: "DRAFT" }));
   state.sectionAWorkspaces.unshift(workspace); state.sectionAVisualPages.unshift(...visuals); state.reportPlacementPages.unshift(...placements);
   scoped.remediation.updatedByActorUserId = input.actor.id; scoped.remediation.recordVersion = (scoped.remediation.recordVersion ?? 0) + 1;
@@ -159,7 +161,7 @@ export function upsertExistingLayoutAnnotation(input: { remediationId: unknown; 
   const recordValues = { existingLayoutSnapshotId: scoped.remediation.existingLayoutSnapshotId, ...values, state: "ACTIVE" as const, idempotencyKey: key, requestHash, updatedByActorUserId: input.actor.id };
   if (annotation) { Object.assign(annotation, recordValues); annotation.recordVersion = (annotation.recordVersion ?? 0) + 1; }
   else { annotation = { id: id("existing-layout-annotation"), organisationId: owner(input.actor), createdByActorUserId: input.actor.id, recordVersion: 1,
-    workspaceId: scoped.workspace.id, remediationId: scoped.remediation.id, reportId: scoped.report.id, caseId: scoped.caseRecord.id, floorId: scoped.floor.id, pageId: page.id, ...recordValues }; state.existingLayoutAnnotations.unshift(annotation); }
+    workspaceId: scoped.workspace.id, remediationId: scoped.remediation.id, ...stageBRecordLineageFields(state, scoped.remediation), caseId: scoped.caseRecord.id, floorId: scoped.floor.id, pageId: page.id, ...recordValues }; state.existingLayoutAnnotations.unshift(annotation); }
   page.updatedByActorUserId = input.actor.id; page.recordVersion = (page.recordVersion ?? 0) + 1; scoped.remediation.updatedByActorUserId = input.actor.id; scoped.remediation.recordVersion = (scoped.remediation.recordVersion ?? 0) + 1; return annotation;
 }
 
@@ -210,7 +212,7 @@ export function upsertSectionAPlacement(input: { remediationId: unknown; pageId:
     dependencyReviewState: "CURRENT" as const, idempotencyKey: key, requestHash, updatedByActorUserId: input.actor.id };
   if (placement) { Object.assign(placement, values); placement.recordVersion = (placement.recordVersion ?? 0) + 1; }
   else { placement = { id: id("placement"), organisationId: owner(input.actor), createdByActorUserId: input.actor.id, recordVersion: 1, remediationId: scoped.remediation.id,
-    caseId: scoped.caseRecord.id, floorId: scoped.floor.id, reportId: scoped.report.id, pageId: page.id, placementType: type, masterNumber: Math.max(0, ...liveReportPlacements(state, scoped.remediation.id).map((item) => item.masterNumber ?? 0)) + 1, ...values };
+    caseId: scoped.caseRecord.id, floorId: scoped.floor.id, ...stageBRecordLineageFields(state, scoped.remediation), pageId: page.id, placementType: type, masterNumber: Math.max(0, ...liveReportPlacements(state, scoped.remediation.id).map((item) => item.masterNumber ?? 0)) + 1, ...values };
     state.physicalPlacements.unshift(placement); }
   page.baseLayoutVersionId = base.id; page.updatedByActorUserId = input.actor.id; page.recordVersion = (page.recordVersion ?? 0) + 1; scoped.remediation.state = "EDITING";
   scoped.remediation.updatedByActorUserId = input.actor.id; scoped.remediation.recordVersion = (scoped.remediation.recordVersion ?? 0) + 1; resequenceReportPlacements(state, scoped.remediation.id, input.actor); return placement;
@@ -257,7 +259,7 @@ export function upsertColourFrameComposition(input: { remediationId: unknown; pa
     ...values, state: values.locked ? "LOCKED" as const : "ACTIVE" as const, dependencyReviewState: "CURRENT" as const, idempotencyKey: key, requestHash, updatedByActorUserId: input.actor.id };
   if (composition) { Object.assign(composition, recordValues); composition.recordVersion = (composition.recordVersion ?? 0) + 1; }
   else { composition = { id: id("colour-frame"), organisationId: owner(input.actor), createdByActorUserId: input.actor.id, recordVersion: 1, workspaceId: scoped.workspace.id,
-    remediationId: scoped.remediation.id, reportId: scoped.report.id, caseId: scoped.caseRecord.id, floorId: scoped.floor.id, pageId: page.id, ...recordValues }; state.colourFrameCompositions.unshift(composition); }
+    remediationId: scoped.remediation.id, ...stageBRecordLineageFields(state, scoped.remediation), caseId: scoped.caseRecord.id, floorId: scoped.floor.id, pageId: page.id, ...recordValues }; state.colourFrameCompositions.unshift(composition); }
   page.baseLayoutVersionId = base.id; page.recordVersion = (page.recordVersion ?? 0) + 1; scoped.remediation.recordVersion = (scoped.remediation.recordVersion ?? 0) + 1; return composition;
 }
 
@@ -332,7 +334,7 @@ function sectionAIntegritySnapshot(state: AppState, scoped: ReturnType<typeof re
   const appendix = state.masterAppendixRows.filter((item) => item.remediationId === scoped.remediation.id && placementIds.has(item.placementId)).sort((a, b) => a.masterNumber - b.masterNumber || a.id.localeCompare(b.id));
   const annotations = liveAnnotations(state, scoped.workspace.id), compositions = liveCompositions(state, scoped.workspace.id), base = state.remediationBaseLayoutVersions.find((item) => item.id === scoped.remediation.baseLayoutVersionId);
   const remediationScope = { id: scoped.remediation.id, organisationId: scoped.remediation.organisationId, projectId: scoped.remediation.projectId,
-    caseId: scoped.remediation.caseId, floorId: scoped.remediation.floorId, reportId: scoped.remediation.reportId,
+    caseId: scoped.remediation.caseId, floorId: scoped.remediation.floorId, ...stageBRecordLineageFields(state, scoped.remediation),
     existingLayoutAssetId: scoped.remediation.existingLayoutAssetId, existingLayoutAssetVersionId: scoped.remediation.existingLayoutAssetVersionId,
     existingLayoutSnapshotId: scoped.remediation.existingLayoutSnapshotId, baseLayoutVersionId: scoped.remediation.baseLayoutVersionId };
   return { workspace: scoped.workspace, remediationScope, visuals, pages, placements, rows, appendix, annotations, compositions, base };
@@ -342,14 +344,14 @@ function sectionAIntegrity(state: AppState, scoped: ReturnType<typeof requireWor
   for (const configuration of SECTION_A_VISUAL_PAGES) if (visuals.filter((page) => page.pageType === configuration.pageType && page.ordinal === configuration.ordinal).length !== 1) issues.push({ code: "SECTION_A_VISUAL_PAGE_ORDER_INVALID", entityType: "PAGE", field: configuration.pageType });
   for (const configuration of SECTION_A_PLACEMENT_PAGES) if (pages.filter((page) => page.pageType === configuration.pageType && page.ordinal === configuration.ordinal && page.section === "A").length !== 1) issues.push({ code: "SECTION_A_PLACEMENT_PAGE_ORDER_INVALID", entityType: "PAGE", field: configuration.pageType });
   for (const page of [...visuals, ...pages]) {
-    if (page.reportId !== scoped.report.id || page.caseId !== scoped.caseRecord.id || page.floorId !== scoped.floor.id) issues.push({ code: "SECTION_A_PAGE_SCOPE_MISMATCH", entityType: "PAGE", entityId: page.id });
+    if (!stageBChildMatchesRemediation(state, scoped.remediation, page) || page.caseId !== scoped.caseRecord.id || page.floorId !== scoped.floor.id) issues.push({ code: "SECTION_A_PAGE_SCOPE_MISMATCH", entityType: "PAGE", entityId: page.id });
     if (page.state !== "FINALISED") issues.push({ code: "SECTION_A_PAGE_NOT_FINALISED", entityType: "PAGE", entityId: page.id });
     if (!page.finalisationHash || page.finalisationHash !== pageFinalisationHash(state, scoped, page)) issues.push({ code: "SECTION_A_FINALISATION_HASH_MISMATCH", entityType: "PAGE", entityId: page.id });
   }
   if (!base || base.state !== "LOCKED" || base.remediationId !== scoped.remediation.id || base.caseId !== scoped.caseRecord.id || base.floorId !== scoped.floor.id) issues.push({ code: "BASE_LAYOUT_NOT_LOCKED", entityType: "BASE_LAYOUT", entityId: base?.id });
   const existingPage = visuals.find((item) => item.pageType === "EXISTING_LAYOUT"), colourPage = visuals.find((item) => item.pageType === "COLOUR_FRAME");
   for (const annotation of annotations) {
-    if (!existingPage || annotation.pageId !== existingPage.id || annotation.existingLayoutSnapshotId !== scoped.remediation.existingLayoutSnapshotId || annotation.reportId !== scoped.report.id || annotation.caseId !== scoped.caseRecord.id || annotation.floorId !== scoped.floor.id) issues.push({ code: "ANNOTATION_SCOPE_MISMATCH", entityType: "ANNOTATION", entityId: annotation.id });
+    if (!existingPage || annotation.pageId !== existingPage.id || annotation.existingLayoutSnapshotId !== scoped.remediation.existingLayoutSnapshotId || !stageBChildMatchesRemediation(state, scoped.remediation, annotation) || annotation.caseId !== scoped.caseRecord.id || annotation.floorId !== scoped.floor.id) issues.push({ code: "ANNOTATION_SCOPE_MISMATCH", entityType: "ANNOTATION", entityId: annotation.id });
     if (!annotation.points.length || annotation.points.some((point) => point.x < 0 || point.x > 1 || point.y < 0 || point.y > 1)) issues.push({ code: "ANNOTATION_COORDINATE_INVALID", entityType: "ANNOTATION", entityId: annotation.id });
   }
   if (placements.map((item) => item.masterNumber).some((number, index) => number !== index + 1)) issues.push({ code: "SECTION_A_MASTER_SEQUENCE_INVALID", entityType: "PLACEMENT" });
@@ -357,7 +359,7 @@ function sectionAIntegrity(state: AppState, scoped: ReturnType<typeof requireWor
     const page = pages.find((item) => item.id === placement.pageId), asset = state.sectionAAssets.find((item) => item.workspaceId === scoped.workspace.id && item.assetType === placement.placementType && item.assetId === placement.imageAssetId && item.assetVersionId === placement.imageAssetVersionId && item.assetSnapshotId === placement.imageAssetSnapshotId && item.status === "APPROVED");
     if (!page || page.pageType !== placement.placementType || placement.eligibilityResolutionId || placement.remedyId) issues.push({ code: "SECTION_A_CATEGORY_MISMATCH", entityType: "PLACEMENT", entityId: placement.id });
     if (!asset) issues.push({ code: "SECTION_A_ASSET_SNAPSHOT_MISMATCH", entityType: "PLACEMENT", entityId: placement.id });
-    if (placement.reportId !== scoped.report.id || placement.caseId !== scoped.caseRecord.id || placement.floorId !== scoped.floor.id || placement.baseLayoutVersionId !== base?.id) issues.push({ code: "SECTION_A_PLACEMENT_SCOPE_MISMATCH", entityType: "PLACEMENT", entityId: placement.id });
+    if (!stageBChildMatchesRemediation(state, scoped.remediation, placement) || placement.caseId !== scoped.caseRecord.id || placement.floorId !== scoped.floor.id || placement.baseLayoutVersionId !== base?.id) issues.push({ code: "SECTION_A_PLACEMENT_SCOPE_MISMATCH", entityType: "PLACEMENT", entityId: placement.id });
     if (placement.state !== "LOCKED" || !placement.anchorLocked || placement.dependencyReviewState !== "CURRENT") issues.push({ code: "SECTION_A_PLACEMENT_NOT_LOCKED", entityType: "PLACEMENT", entityId: placement.id });
     if (placement.masterNumber !== reportWideMasterNumber(state, scoped.remediation.id, placement.id)) issues.push({ code: "SECTION_A_MASTER_SEQUENCE_INVALID", entityType: "PLACEMENT", entityId: placement.id });
     const placementRows = rows.filter((item) => item.placementId === placement.id), placementAppendix = appendix.filter((item) => item.placementId === placement.id);
@@ -366,7 +368,7 @@ function sectionAIntegrity(state: AppState, scoped: ReturnType<typeof requireWor
   }
   if (rows.length !== placements.length || appendix.length !== placements.length) issues.push({ code: "SECTION_A_PROJECTION_COUNT_MISMATCH", entityType: "PROJECTION" });
   for (const composition of compositions) {
-    if (!colourPage || composition.pageId !== colourPage.id || composition.reportId !== scoped.report.id || composition.caseId !== scoped.caseRecord.id || composition.floorId !== scoped.floor.id || composition.baseLayoutVersionId !== base?.id) issues.push({ code: "COLOUR_FRAME_SCOPE_MISMATCH", entityType: "COLOUR_FRAME", entityId: composition.id });
+    if (!colourPage || composition.pageId !== colourPage.id || !stageBChildMatchesRemediation(state, scoped.remediation, composition) || composition.caseId !== scoped.caseRecord.id || composition.floorId !== scoped.floor.id || composition.baseLayoutVersionId !== base?.id) issues.push({ code: "COLOUR_FRAME_SCOPE_MISMATCH", entityType: "COLOUR_FRAME", entityId: composition.id });
     if (composition.state !== "LOCKED" || !composition.locked || !composition.printFit || composition.dependencyReviewState !== "CURRENT" || composition.x < 0 || composition.y < 0 || composition.width <= 0 || composition.height <= 0 || composition.x + composition.width > 1 || composition.y + composition.height > 1) issues.push({ code: "COLOUR_FRAME_COMPOSITION_INVALID", entityType: "COLOUR_FRAME", entityId: composition.id });
   }
   if (colourPage && state.physicalPlacements.some((item) => item.pageId === colourPage.id && item.state !== "DELETED")) issues.push({ code: "COLOUR_FRAME_NUMBERING_LEAKAGE", entityType: "COLOUR_FRAME" });
@@ -374,7 +376,7 @@ function sectionAIntegrity(state: AppState, scoped: ReturnType<typeof requireWor
   const replay = state.sectionAIntegrityRuns.find((item) => item.workspaceId === scoped.workspace.id && item.scopeHash === scopeHash && item.status === status && deterministicContentHash(item.issues) === deterministicContentHash(issues));
   if (replay) return replay;
   const run: SectionAIntegrityRunRecord = { id: id("section-a-integrity"), organisationId: scoped.remediation.organisationId, createdByActorUserId: actor.id, updatedByActorUserId: actor.id, recordVersion: 1,
-    workspaceId: scoped.workspace.id, remediationId: scoped.remediation.id, reportId: scoped.report.id, scopeHash, status, issues, checkedAt: now(), checkedBy: actor.id };
+    workspaceId: scoped.workspace.id, remediationId: scoped.remediation.id, ...stageBRecordLineageFields(state, scoped.remediation), scopeHash, status, issues, checkedAt: now(), checkedBy: actor.id };
   state.sectionAIntegrityRuns.unshift(run); return run;
 }
 
@@ -389,7 +391,7 @@ export function buildSectionARenderManifest(state: AppState, workspaceId: string
   const snapshot = sectionAIntegritySnapshot(state, scoped), scopeHash = deterministicContentHash(snapshot), run = state.sectionAIntegrityRuns.find((item) => item.workspaceId === workspace.id && item.scopeHash === scopeHash && item.status === "PASS");
   if (workspace.state !== "FINALISED" || !run) throw new StageBError("Finalised Section A render evidence is incomplete.", 409);
   const existingPage = snapshot.visuals.find((item) => item.pageType === "EXISTING_LAYOUT")!, finalPage = snapshot.visuals.find((item) => item.pageType === "FINAL_REVISED_LAYOUT")!, colourPage = snapshot.visuals.find((item) => item.pageType === "COLOUR_FRAME")!;
-  return { schemaVersion: "section-a-render-manifest/v1", organisationId: remediation.organisationId!, caseId: remediation.caseId, floorId: remediation.floorId, reportId: remediation.reportId,
+  return { schemaVersion: "section-a-render-manifest/v1", organisationId: remediation.organisationId!, caseId: remediation.caseId, floorId: remediation.floorId, ...stageBRecordLineageFields(state, remediation),
     existingLayoutPage: { pageId: existingPage.id, ordinal: 1, finalisationHash: existingPage.finalisationHash!, assetId: remediation.existingLayoutAssetId, versionId: remediation.existingLayoutAssetVersionId,
       snapshotId: remediation.existingLayoutSnapshotId, annotations: structuredClone(snapshot.annotations.filter((item) => item.pageId === existingPage.id)) },
     finalRevisedLayoutPage: { pageId: finalPage.id, ordinal: 2, finalisationHash: finalPage.finalisationHash!, baseLayoutVersionId: snapshot.base!.id, snapshotId: snapshot.base!.snapshotId, contentHash: snapshot.base!.assetContentHash },
@@ -403,10 +405,12 @@ export function buildSectionARenderManifest(state: AppState, workspaceId: string
 
 function reportIntegritySnapshot(state: AppState, remediation: StageBRemediationRecord) {
   const workspace = state.sectionAWorkspaces.find((item) => item.remediationId === remediation.id), pages = reportWidePlacementPages(state, remediation.id), placements = sortReportPlacements(state, remediation.id);
+  const sectionCWorkspace = state.sectionCWorkspaces.find((item) => item.remediationId === remediation.id);
+  const sectionCExtraPages = activeSectionCExtraPages(state, remediation.id);
   const allLivePlacements = state.physicalPlacements.filter((item) => item.remediationId === remediation.id && item.state !== "DELETED");
   const rows = state.placementImplementationRows.filter((item) => item.remediationId === remediation.id).sort((a, b) => a.masterNumber - b.masterNumber || a.id.localeCompare(b.id));
   const appendix = state.masterAppendixRows.filter((item) => item.remediationId === remediation.id).sort((a, b) => a.masterNumber - b.masterNumber || a.id.localeCompare(b.id));
-  return { remediation, workspace, pages, placements, allLivePlacements, rows, appendix };
+  return { remediation, workspace, sectionCWorkspace, sectionCExtraPages, pages, placements, allLivePlacements, rows, appendix };
 }
 export function validateRemediationReportIntegrity(input: { remediationId: unknown; actor: AppUser }) {
   const state = getAppState(); const scoped = requireWorkspace(state, input.remediationId, input.actor), snapshot = reportIntegritySnapshot(state, scoped.remediation);
@@ -414,6 +418,16 @@ export function validateRemediationReportIntegrity(input: { remediationId: unkno
   if (scoped.workspace.state !== "FINALISED") issues.push({ code: "SECTION_A_NOT_FINALISED", entityType: "SECTION_A", entityId: scoped.workspace.id });
   try { buildSectionARenderManifest(state, scoped.workspace.id); } catch { issues.push({ code: "SECTION_A_MANIFEST_INVALID", entityType: "SECTION_A", entityId: scoped.workspace.id }); }
   try { buildStageBRenderManifest(state, scoped.remediation.id); } catch { issues.push({ code: "STAGE_B_MANIFEST_INVALID", entityType: "STAGE_B", entityId: scoped.remediation.id }); }
+  if (snapshot.sectionCWorkspace) {
+    if (snapshot.sectionCWorkspace.state !== "FINALISED") issues.push({ code: "SECTION_C_NOT_FINALISED", entityType: "SECTION_C", entityId: snapshot.sectionCWorkspace.id });
+    try { buildSectionCRenderManifest(state, snapshot.sectionCWorkspace.id); } catch { issues.push({ code: "SECTION_C_MANIFEST_INVALID", entityType: "SECTION_C", entityId: snapshot.sectionCWorkspace.id }); }
+    snapshot.sectionCExtraPages.forEach((extraPage, index) => {
+      const page = snapshot.pages.find((item) => item.id === extraPage.pageId);
+      if (!page || page.section !== "C" || page.pageType !== "EXTRA" || page.ordinal !== SECTION_C_FIRST_ORDINAL + index * 2 || extraPage.orderIndex !== index) {
+        issues.push({ code: "REPORT_PAGE_ORDER_INVALID", entityType: "PAGE", entityId: extraPage.pageId, field: "C:EXTRA" });
+      }
+    });
+  }
   for (const configuration of REPORT_WIDE_PLACEMENT_PAGES) {
     if (snapshot.pages.filter((page) => page.section === configuration.section && page.pageType === configuration.pageType && page.ordinal === configuration.ordinal).length !== 1) {
       issues.push({ code: "REPORT_PAGE_ORDER_INVALID", entityType: "PAGE", field: `${configuration.section}:${configuration.pageType}` });
@@ -424,8 +438,8 @@ export function validateRemediationReportIntegrity(input: { remediationId: unkno
   if (numbers.some((number, index) => number !== index + 1)) issues.push({ code: "REPORT_MASTER_SEQUENCE_GAP", entityType: "PLACEMENT" });
   const lockedBase = state.remediationBaseLayoutVersions.find((item) => item.id === scoped.remediation.baseLayoutVersionId && item.remediationId === scoped.remediation.id && item.state === "LOCKED");
   for (const placement of snapshot.allLivePlacements) {
-    const page = snapshot.pages.find((item) => item.id === placement.pageId), expectedType = page?.section === "A" ? page.pageType : "REMEDY";
-    if (!page || placement.placementType !== expectedType || placement.reportId !== scoped.report.id || placement.caseId !== scoped.caseRecord.id || placement.floorId !== scoped.floor.id
+    const page = snapshot.pages.find((item) => item.id === placement.pageId), expectedType = page?.section === "A" ? page.pageType : page?.section === "C" ? "EXTRA" : "REMEDY";
+    if (!page || placement.placementType !== expectedType || !stageBChildMatchesRemediation(state, scoped.remediation, placement) || placement.caseId !== scoped.caseRecord.id || placement.floorId !== scoped.floor.id
       || !lockedBase || placement.baseLayoutVersionId !== lockedBase.id) issues.push({ code: "REPORT_PLACEMENT_SCOPE_MISMATCH", entityType: "PLACEMENT", entityId: placement.id });
     if (snapshot.rows.filter((item) => item.placementId === placement.id).length !== 1) issues.push({ code: "REPORT_IMPLEMENTATION_ROW_MISMATCH", entityType: "IMPLEMENTATION_ROW", entityId: placement.id });
     if (snapshot.appendix.filter((item) => item.placementId === placement.id).length !== 1) issues.push({ code: "REPORT_APPENDIX_ROW_MISMATCH", entityType: "APPENDIX_ROW", entityId: placement.id });
@@ -437,6 +451,6 @@ export function validateRemediationReportIntegrity(input: { remediationId: unkno
   const replay = state.remediationReportIntegrityRuns.find((item) => item.remediationId === scoped.remediation.id && item.scopeHash === scopeHash && item.status === status && deterministicContentHash(item.issues) === deterministicContentHash(issues));
   if (replay) return replay;
   const run: RemediationReportIntegrityRunRecord = { id: id("remediation-report-integrity"), organisationId: scoped.remediation.organisationId, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1,
-    remediationId: scoped.remediation.id, reportId: scoped.report.id, scopeHash, status, issues, checkedAt: now(), checkedBy: input.actor.id };
+    remediationId: scoped.remediation.id, ...stageBRecordLineageFields(state, scoped.remediation), scopeHash, status, issues, checkedAt: now(), checkedBy: input.actor.id };
   state.remediationReportIntegrityRuns.unshift(run); return run;
 }

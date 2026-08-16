@@ -1,7 +1,9 @@
 import type { AppState } from "./store.ts";
+import { resolveDocumentTemplateSnapshot } from "./document-branding.ts";
 import type { AppUser, ClientSafeIntakeSnapshot, ReportArtifactManifest, ReportVersionRecord } from "./domain.ts";
 import { buildStageBRenderManifest } from "./stage-b-remediation.ts";
 import { buildSectionARenderManifest, validateRemediationReportIntegrity } from "./section-a-remediation.ts";
+import { buildSectionCRenderManifest } from "./section-c-extras.ts";
 import { getAouReadiness, selectAouSnapshotForVerdicts } from "./aou-methodology.ts";
 
 export const LEGACY_REPORT_TEMPLATE_VERSION = "uchit-verdict/v1";
@@ -228,6 +230,14 @@ export function buildFloorReportComposition(state: AppState, report: ReportVersi
     kind: item.kind, markerX: item.markerX, markerY: item.markerY, verified: item.verified,
     methodologyStatus: item.methodologyStatus, methodologyVersionId: item.methodologyVersionId ?? null, directionCode: item.directionCode ?? null
   })).sort((left, right) => left.kind.localeCompare(right.kind) || left.markerX - right.markerX || left.markerY - right.markerY);
+  const entranceZones = (report.artifact?.entranceZoneVersionIds?.length
+    ? report.artifact.entranceZoneVersionIds.map((id) => (state.entranceZoneVersions ?? []).find((item) => item.id === id && item.caseId === report.caseId && item.status === "CURRENT" && (item.scope === "PROPERTY_MAIN_GATE" || item.floorId === floor?.id)))
+    : (state.entranceZoneVersions ?? []).filter((item) => item.caseId === report.caseId && item.status === "CURRENT" && (item.scope === "PROPERTY_MAIN_GATE" || item.floorId === floor?.id)))
+    .filter((item): item is NonNullable<typeof item> => Boolean(item))
+    .map((item) => ({ id: item.id, scope: item.scope, zoneCode: item.zoneCode, classification: item.classificationSnapshot ?? item.zoneNameSnapshot,
+      catalogVersionId: item.catalogVersionId ?? item.methodologyVersionId, catalogContentHash: item.catalogContentHash ?? item.methodologyContentHash, ownerInterpretationHash: item.ownerInterpretationHash ?? null,
+      methodologyVersionId: item.methodologyVersionId, marked32EvidenceVersionId: item.marked32DEvidenceVersionId, planVersionId: item.planVersionId, sourceFloorId: item.sourceFloorId }))
+    .sort((left, right) => left.scope.localeCompare(right.scope));
   const spaces = state.spaceMappings.filter((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.planVersionId === plan?.id && item.orientationVersionId === orientation?.id).map((item) => ({
     spaceLabel: item.spaceLabel, polygon: item.polygon, verified: item.verified,
     methodologyStatus: item.methodologyStatus, methodologyVersionId: item.methodologyVersionId ?? null, directionCode: item.directionCode ?? null
@@ -257,7 +267,7 @@ export function buildFloorReportComposition(state: AppState, report: ReportVersi
     manualUtilitySheet: manualUtilitySheet ? { id: manualUtilitySheet.id, floorLabel: manualUtilitySheet.floorLabel ?? null, versionLabel: manualUtilitySheet.versionLabel, documentDate: manualUtilitySheet.documentDate ?? null, status: "FOUNDER_APPROVED" as const } : null,
     siteAnalysis: siteAnalysis ? { version: siteAnalysis.version, evidenceType: siteAnalysis.evidenceType, capturedAt: siteAnalysis.capturedAt, observations: siteAnalysis.observations, stageAVerdictVersion: siteAnalysis.stageAVerdictVersion } : null,
     postSiteFindings: postSiteFindings ? { version: postSiteFindings.version, differences: postSiteFindings.differences, corrections: postSiteFindings.corrections, newFindings: postSiteFindings.newFindings, additionalObservations: postSiteFindings.additionalObservations } : null,
-    openings, spaces, evaluation: evaluation ?? null, shakti: shakti ?? null, assessment,
+    entranceZones, openings, spaces, evaluation: evaluation ?? null, shakti: shakti ?? null, assessment,
     templateVersion: V3_REPORT_TEMPLATE_VERSION,
     watermark: report.isPreview ? PREVIEW_WATERMARK : null
   };
@@ -309,17 +319,19 @@ function legacyCanonicalReportPayload(state: AppState, report: ReportVersionReco
 export function canonicalReportPayload(state: AppState, report: ReportVersionRecord, intakeOverride?: ClientSafeIntakeSnapshot) {
   if (report.artifact?.templateVersion === LEGACY_REPORT_TEMPLATE_VERSION) return legacyCanonicalReportPayload(state, report);
   if (report.artifact?.templateVersion === V2_REPORT_TEMPLATE_VERSION || (!report.artifact && !report.floorId)) {
-    return canonicalize({ schemaVersion: "report-content/v2", ...buildReportComposition(state, report, intakeOverride) });
+    return canonicalize({ schemaVersion: "report-content/v2", ...buildReportComposition(state, report, intakeOverride), ...(report.artifact?.documentTemplateSnapshot ? { documentTemplateSnapshot: report.artifact.documentTemplateSnapshot } : {}) });
   }
   if (report.artifact?.templateVersion === V3_REPORT_TEMPLATE_VERSION) {
-    return canonicalize({ schemaVersion: "report-content/v3", ...buildFloorReportComposition(state, report, intakeOverride) });
+    return canonicalize({ schemaVersion: "report-content/v3", ...buildFloorReportComposition(state, report, intakeOverride), ...(report.artifact?.documentTemplateSnapshot ? { documentTemplateSnapshot: report.artifact.documentTemplateSnapshot } : {}) });
   }
   if (report.artifact?.templateVersion === V5_REPORT_TEMPLATE_VERSION) {
     return canonicalize({ schemaVersion: "report-content/v5", ...buildV4FloorReportComposition(state, report, intakeOverride), stageBRenderManifest: report.artifact.stageBRenderManifest,
       ...(report.artifact.sectionARenderManifest ? { sectionARenderManifest: report.artifact.sectionARenderManifest } : {}),
-      ...(report.artifact.remediationReportIntegrity ? { remediationReportIntegrity: report.artifact.remediationReportIntegrity } : {}) });
+      ...(report.artifact.sectionCRenderManifest ? { sectionCRenderManifest: report.artifact.sectionCRenderManifest } : {}),
+      ...(report.artifact.remediationReportIntegrity ? { remediationReportIntegrity: report.artifact.remediationReportIntegrity } : {}),
+      ...(report.artifact.documentTemplateSnapshot ? { documentTemplateSnapshot: report.artifact.documentTemplateSnapshot } : {}) });
   }
-  return canonicalize({ schemaVersion: "report-content/v4", ...buildV4FloorReportComposition(state, report, intakeOverride) });
+  return canonicalize({ schemaVersion: "report-content/v4", ...buildV4FloorReportComposition(state, report, intakeOverride), ...(report.artifact?.documentTemplateSnapshot ? { documentTemplateSnapshot: report.artifact.documentTemplateSnapshot } : {}) });
 }
 
 export async function sha256Hex(value: unknown) {
@@ -338,12 +350,15 @@ export async function createArtifactManifest(state: AppState, report: ReportVers
     const markedEvidence = state.spatialEvidenceVersions.find((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.planVersionId === plan?.id && isFounderConfirmed32DEvidence(item));
     const griddingEvidenceVersionIds = state.spatialEvidenceVersions.filter((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.planVersionId === plan?.id
       && item.status === "CURRENT" && Boolean(item.manualEvidencePurpose)).map((item) => item.id).sort();
+    const entranceZoneVersionIds = (state.entranceZoneVersions ?? []).filter((item) => item.caseId === report.caseId && item.status === "CURRENT" && (item.scope === "PROPERTY_MAIN_GATE" || item.floorId === floor?.id)).map((item) => item.id).sort();
     const evaluation = state.evaluationSnapshots.find((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.planVersionId === plan?.id && item.orientationVersionId === orientation?.id);
     const shakti = state.shaktiSnapshots.find((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.planVersionId === plan?.id && item.orientationVersionId === orientation?.id);
-    if (!floor || !plan || !orientation || !markedEvidence || !evaluation || !shakti) throw new Error("A floor report requires exact current plan, locked orientation, full-colour marked evidence, Utility evaluation, and Shakti evaluation lineage.");
+    const finalisedStageB = (state.stageBRemediations ?? []).find((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.state === "PAGE_FINALISED");
+    const nativeV1FinalReport = finalisedStageB?.architectureVersion === "V1";
+    if (!floor || !plan || (!nativeV1FinalReport && (!orientation || !markedEvidence || !entranceZoneVersionIds.length || !evaluation || !shakti))) throw new Error("A floor report requires exact current plan, locked orientation, full-colour marked evidence, at least one current entrance zone, Utility evaluation, and Shakti evaluation lineage.");
     const utilityVerdicts = (state.utilityVerdicts ?? []).filter((item) => item.caseId === report.caseId && item.floorId === floor?.id && item.planVersionId === plan?.id && item.orientationVersionId === orientation?.id && item.utilityEvaluationSnapshotId === evaluation?.id && item.status === "APPROVED");
     let aouReferenceSnapshot: ReportArtifactManifest["aouReferenceSnapshot"];
-    if (caseRecord?.organisationId) {
+    if (caseRecord?.organisationId && !nativeV1FinalReport) {
       const aouReadiness = getAouReadiness(state, caseRecord.organisationId);
       if (aouReadiness.ready && aouReadiness.version) {
         try {
@@ -356,27 +371,36 @@ export async function createArtifactManifest(state: AppState, report: ReportVers
     }
     const manualUtilitySheet = currentApprovedManualUtilitySheet(state, caseRecord, floor);
     const { analysis: siteAnalysis, findings: postSiteFindings } = latestApprovedSiteRecords(state, report, floor);
-    if (caseRecord?.organisationId && !utilityVerdicts.length) throw new Error("A Founder floor report requires at least one approved Utility bar-graph verdict bound to the exact Utility evaluation.");
-    if (caseRecord?.organisationId && !manualUtilitySheet) throw new Error("A floor report requires a Founder-approved original manual utility sheet for this floor.");
-    if (caseRecord?.organisationId && !report.isPreview && (!siteAnalysis || !postSiteFindings)) throw new Error("The official floor report requires approved Site Analysis and Post-Site Findings linked to the presented Stage A verdict.");
-    const finalisedStageB = (state.stageBRemediations ?? []).find((item) => item.caseId === report.caseId && item.floorId === floor.id && item.state === "PAGE_FINALISED");
+    if (caseRecord?.organisationId && !nativeV1FinalReport && !utilityVerdicts.length) throw new Error("A Founder floor report requires at least one approved Utility bar-graph verdict bound to the exact Utility evaluation.");
+    if (caseRecord?.organisationId && !nativeV1FinalReport && !manualUtilitySheet) throw new Error("A floor report requires a Founder-approved original manual utility sheet for this floor.");
+    if (caseRecord?.organisationId && !nativeV1FinalReport && !report.isPreview && (!siteAnalysis || !postSiteFindings)) throw new Error("The official floor report requires approved Site Analysis and Post-Site Findings linked to the presented Stage A verdict.");
     const stageBRenderManifest = finalisedStageB ? buildStageBRenderManifest(state, finalisedStageB.id) : undefined;
     const sectionAWorkspace = finalisedStageB ? state.sectionAWorkspaces.find((item) => item.remediationId === finalisedStageB.id) : undefined;
     const sectionARenderManifest = sectionAWorkspace ? buildSectionARenderManifest(state, sectionAWorkspace.id) : undefined;
+    const sectionCWorkspace = finalisedStageB ? state.sectionCWorkspaces.find((item) => item.remediationId === finalisedStageB.id) : undefined;
+    const sectionCRenderManifest = sectionCWorkspace ? buildSectionCRenderManifest(state, sectionCWorkspace.id) : undefined;
     const reportIntegrityRun = sectionAWorkspace && finalisedStageB ? validateRemediationReportIntegrity({ remediationId: finalisedStageB.id, actor }) : undefined;
     if (reportIntegrityRun && reportIntegrityRun.status !== "PASS") throw new Error(`Remediation report integrity failed: ${reportIntegrityRun.issues.map((item) => item.code).join(", ")}`);
+    const client = state.clients.find((item) => item.id === caseRecord?.clientId); const project = state.projects.find((item) => item.id === caseRecord?.projectId);
+    const resolvedDocumentTemplate = resolveDocumentTemplateSnapshot(state, { organisationId: caseRecord?.organisationId ?? actor.organisationId ?? "legacy",
+      family: stageBRenderManifest ? "VASTU_REMEDY_REPORT" : "FOUNDER_FLOOR_REPORT", documentFields: { "Client Name": client?.displayName ?? "", "Project Name": project?.propertyName ?? project?.id ?? "", "Floor": floor.floorLabel,
+        "Report Date": new Date().toISOString().slice(0, 10), "Version ID": report.versionLabel, "Consultant": actor.fullName } });
+    const documentTemplateSnapshot = resolvedDocumentTemplate.source === "CENTRAL" ? resolvedDocumentTemplate : undefined;
     const manifest: ReportArtifactManifest = {
       schemaVersion: "report-artifact/v1", mediaType: "text/html", createdAt: new Date().toISOString(),
       createdBy: { id: actor.id, name: actor.fullName, role: actor.role }, templateVersion: stageBRenderManifest ? V5_REPORT_TEMPLATE_VERSION : REPORT_TEMPLATE_VERSION,
-      evaluationSnapshotId: evaluation.id, utilityVerdictIds: utilityVerdicts.map((item) => item.id), shaktiSnapshotId: shakti.id, floorId: floor.id, planVersionId: plan.id,
-      orientationVersionId: orientation.id, handMarkedEvidenceVersionId: markedEvidence.id,
+      ...(evaluation ? { evaluationSnapshotId: evaluation.id } : {}), utilityVerdictIds: utilityVerdicts.map((item) => item.id), ...(shakti ? { shaktiSnapshotId: shakti.id } : {}), floorId: floor.id, planVersionId: plan.id,
+      ...(orientation ? { orientationVersionId: orientation.id } : {}), ...(markedEvidence ? { handMarkedEvidenceVersionId: markedEvidence.id } : {}),
       ...(griddingEvidenceVersionIds.length ? { griddingEvidenceVersionIds } : {}),
+      entranceZoneVersionIds,
       ...(manualUtilitySheet ? { manualUtilitySheetDocumentId: manualUtilitySheet.id } : {}),
       ...(siteAnalysis ? { siteAnalysisId: siteAnalysis.id } : {}), ...(postSiteFindings ? { postSiteFindingsId: postSiteFindings.id } : {}),
       ...(aouReferenceSnapshot ? { aouReferenceSnapshot } : {}),
       ...(stageBRenderManifest ? { stageBRenderManifest } : {}),
       ...(sectionARenderManifest ? { sectionARenderManifest } : {}),
+      ...(sectionCRenderManifest ? { sectionCRenderManifest } : {}),
       ...(reportIntegrityRun ? { remediationReportIntegrity: { runId: reportIntegrityRun.id, scopeHash: reportIntegrityRun.scopeHash, status: "PASS" as const } } : {}),
+      ...(documentTemplateSnapshot ? { documentTemplateSnapshot } : {}),
       contentHash: "", immutable: true,
       downloadPath: `/api/reports/${encodeURIComponent(report.id)}/print`, intakeSnapshot
     };
@@ -386,7 +410,10 @@ export async function createArtifactManifest(state: AppState, report: ReportVers
   }
   const evaluation = state.evaluationSnapshots.find((item) => item.caseId === report.caseId);
   const shakti = state.shaktiSnapshots.find((item) => item.caseId === report.caseId);
-  return {
+  const client = state.clients.find((item) => item.id === caseRecord?.clientId); const resolvedDocumentTemplate = resolveDocumentTemplateSnapshot(state, { organisationId: caseRecord?.organisationId ?? actor.organisationId ?? "legacy", family: "FOUNDER_FLOOR_REPORT",
+    documentFields: { "Client Name": client?.displayName ?? "", "Project Name": caseRecord?.projectId ?? "", "Report Date": new Date().toISOString().slice(0, 10), "Version ID": report.versionLabel, "Consultant": actor.fullName } });
+  const documentTemplateSnapshot = resolvedDocumentTemplate.source === "CENTRAL" ? resolvedDocumentTemplate : undefined;
+  const manifest: ReportArtifactManifest = {
     schemaVersion: "report-artifact/v1",
     mediaType: "text/html",
     createdAt: new Date().toISOString(),
@@ -394,11 +421,13 @@ export async function createArtifactManifest(state: AppState, report: ReportVers
     templateVersion: V2_REPORT_TEMPLATE_VERSION,
     evaluationSnapshotId: evaluation?.id,
     shaktiSnapshotId: shakti?.id,
-    contentHash: await sha256Hex(canonicalReportPayload(state, report, intakeSnapshot)),
+    ...(documentTemplateSnapshot ? { documentTemplateSnapshot } : {}),
+    contentHash: "",
     immutable: true,
     downloadPath: `/api/reports/${encodeURIComponent(report.id)}/print`,
     intakeSnapshot
   };
+  report.artifact = manifest; manifest.contentHash = await sha256Hex(canonicalReportPayload(state, report, intakeSnapshot)); return manifest;
 }
 
 export async function artifactStillMatches(state: AppState, report: ReportVersionRecord) {

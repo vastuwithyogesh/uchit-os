@@ -1,6 +1,6 @@
 import { migrateD1 } from "@/db/migrations";
 import { readCaseFileEvidenceForReport } from "@/lib/case-file-assets.server";
-import type { AppUser, ReportVersionRecord } from "@/lib/domain";
+import type { AppUser, BrandingMediaReference, DocumentDeliveryRecord, DocumentTemplateSnapshot, ReportVersionRecord } from "@/lib/domain";
 import type { FounderFoundationContext } from "@/lib/foundation";
 import { getStageAFloorReviewBlockers } from "@/lib/founder-regeneration";
 import { artifactStillMatches } from "@/lib/report-artifacts";
@@ -29,6 +29,13 @@ type Binding = {
   floor: AppState["floorWorkspaces"][number]; evidence: AppState["spatialEvidenceVersions"][number]; manualSheet?: AppState["caseDocuments"][number];
 };
 
+export type ProtectedPdfDeliveryDescriptor = {
+  artifactId: string; organisationId: string; reportId: string; reportVersionLabel: string;
+  caseId: string; projectId: string; floorId: string; reportTemplateVersion: string;
+  sourceSnapshotHash: string; artifactHashSha256: string; mimeType: "application/pdf";
+  sizeBytes: number; pageCount: number; status: FinalPdfStatus; verifiedAt?: string; releasedAt?: string;
+};
+
 export class FinalPdfError extends Error {
   constructor(readonly statusCode: 400 | 403 | 404 | 409 | 428 | 503, message: string) {
     super(message); this.name = "FinalPdfError";
@@ -51,7 +58,8 @@ function assertFounder(context: FounderFoundationContext, actor: AppUser) {
     || context.membership.role !== "SUPER_ADMIN" || context.membership.capability !== "organisation_owner") {
     throw new FinalPdfError(403, "Only the active Founder organisation owner may generate, verify, release, export, or print final PDFs.");
   }
-  if (context.workflowPolicy.policyJson.clientDeliveryEnabled === true) throw new FinalPdfError(409, "Client delivery must remain disabled during Founder Edition PDF validation.");
+  // Founder PDF operations remain owner-only. Client access is gated separately by
+  // an exact DELIVERED DocumentDeliveryRecord pinned to this protected artifact.
 }
 
 function binding(state: AppState, reportIdValue: unknown, organisationId: string): Binding {
@@ -68,6 +76,10 @@ function binding(state: AppState, reportIdValue: unknown, organisationId: string
   if (report.artifact.templateVersion === "uchit-verdict/v5" && report.artifact.sectionARenderManifest
     && (report.artifact.sectionARenderManifest.integrityStatus !== "PASS" || report.artifact.remediationReportIntegrity?.status !== "PASS")) {
     throw new FinalPdfError(409, "Protected final PDF requires Section A and report-wide integrity PASS.");
+  }
+  if (report.artifact.templateVersion === "uchit-verdict/v5" && report.artifact.sectionCRenderManifest
+    && report.artifact.sectionCRenderManifest.integrityStatus !== "PASS") {
+    throw new FinalPdfError(409, "Protected final PDF requires Section C Extras integrity PASS.");
   }
   const evidence = state.spatialEvidenceVersions.find((item) => item.id === report.artifact?.handMarkedEvidenceVersionId
     && item.organisationId === organisationId && item.projectId === project.id && item.caseId === caseRecord.id && item.floorId === floor.id
@@ -103,6 +115,26 @@ async function objectBytes(objectKey: string) {
   const bytes = new Uint8Array(size); let offset = 0;
   for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
   return bytes;
+}
+
+async function readTemplateImage(state: AppState, organisationId: string, ref: BrandingMediaReference, title: string) {
+  const version = state.mediaAssetVersions.find((item) => item.organisationId === organisationId && item.id === ref.assetVersionId && item.assetId === ref.assetId && item.checksumSha256 === ref.checksumSha256 && ["FOUNDER_APPROVED", "ACTIVE"].includes(item.status));
+  if (!version) throw new FinalPdfError(409, `The immutable template media for ${title} is missing or no longer valid.`);
+  if (version.mimeType !== "image/png" && version.mimeType !== "image/jpeg") throw new FinalPdfError(409, `${title} must use an approved PNG or JPEG derivative for the protected PDF renderer.`);
+  const object = await getRuntimeEnv().R2?.get(version.privateObjectKey); if (!object) throw new FinalPdfError(409, `The immutable template bytes for ${title} are unavailable.`);
+  const reader = object.body.getReader(); const chunks: Uint8Array[] = []; let size = 0; for (;;) { const result = await reader.read(); if (result.done) break; chunks.push(result.value); size += result.value.length; }
+  const bytes = new Uint8Array(size); let offset = 0; for (const chunk of chunks) { bytes.set(chunk, offset); offset += chunk.length; }
+  if (await sha256(bytes) !== ref.checksumSha256.toLowerCase()) throw new FinalPdfError(409, `The immutable template checksum for ${title} does not match its snapshot.`);
+  return { bytes, mimeType: version.mimeType, checksumSha256: ref.checksumSha256, title, assetVersionId: ref.assetVersionId };
+}
+
+async function protectedPdfBranding(state: AppState, organisationId: string, snapshot?: DocumentTemplateSnapshot) {
+  if (!snapshot || snapshot.source !== "CENTRAL") return undefined;
+  const logo = snapshot.logo.enabled && snapshot.logo.media ? await readTemplateImage(state, organisationId, snapshot.logo.media, "primary logo") : undefined;
+  const prefixPages = await Promise.all(snapshot.prefixPages.map((page) => readTemplateImage(state, organisationId, page.media, page.internalTitle)));
+  const suffixPages = await Promise.all(snapshot.suffixPages.map((page) => readTemplateImage(state, organisationId, page.media, page.internalTitle)));
+  return { snapshotHash: snapshot.snapshotHash, displayName: snapshot.brandDisplayName, headerText: snapshot.documentTemplate.name,
+    footerText: snapshot.standardText.confidentialityStatement || snapshot.standardText.contactInformation, accentHex: snapshot.colours.accent, logo, prefixPages, suffixPages };
 }
 
 function rowPublic(row: FinalPdfRow) {
@@ -150,6 +182,73 @@ async function verifyBytes(row: FinalPdfRow) {
     throw new FinalPdfError(409, "Protected PDF permissions, embedded evidence, or page structure failed verification.");
   }
   return { bytes, inspection };
+}
+
+function deliveryDescriptor(row: FinalPdfRow): ProtectedPdfDeliveryDescriptor {
+  return {
+    artifactId: row.artifact_id, organisationId: row.organisation_id, reportId: row.report_version_id,
+    reportVersionLabel: row.report_version_label, caseId: row.case_id, projectId: row.project_id,
+    floorId: row.floor_id, reportTemplateVersion: row.report_template_version,
+    sourceSnapshotHash: row.source_snapshot_hash, artifactHashSha256: row.artifact_hash_sha256,
+    mimeType: "application/pdf", sizeBytes: Number(row.size_bytes), pageCount: Number(row.page_count),
+    status: row.status, ...(row.verified_at ? { verifiedAt: row.verified_at } : {}),
+    ...(row.released_at ? { releasedAt: row.released_at } : {})
+  };
+}
+
+/**
+ * Delivery-specific read seam. Unlike Founder operations it does not require
+ * the case to remain the project's active revision, so an old delivered
+ * artifact remains resolvable after an authorised replacement.
+ */
+export async function inspectProtectedPdfForDelivery(input: {
+  state: AppState; organisationId: string; reportId: string; protectedPdfArtifactId?: string;
+}) {
+  const database = db(); await migrateD1(database);
+  const report = input.state.reportVersions.find((item) => item.id === input.reportId && item.organisationId === input.organisationId);
+  const caseRecord = report && input.state.vastuCases.find((item) => item.id === report.caseId && item.organisationId === input.organisationId);
+  const project = caseRecord?.projectId ? input.state.projects.find((item) => item.id === caseRecord.projectId && item.organisationId === input.organisationId) : undefined;
+  const floor = report?.floorId && input.state.floorWorkspaces.find((item) => item.id === report.floorId && item.caseId === caseRecord?.id && item.projectId === project?.id && item.organisationId === input.organisationId);
+  if (!report || !caseRecord || !project || !floor) throw new FinalPdfError(404, "The exact report, case, project, and floor delivery scope was not found.");
+  if (report.isPreview || report.artifact?.templateVersion !== "uchit-verdict/v5" || !report.artifact.immutable || report.artifact.floorId !== floor.id) {
+    throw new FinalPdfError(409, "Delivery supports only an immutable one-floor uchit-verdict/v5 artifact.");
+  }
+  const row = await findManifest(database, input.organisationId, report.id);
+  if (!row || (input.protectedPdfArtifactId && row.artifact_id !== input.protectedPdfArtifactId)) throw new FinalPdfError(409, "The exact protected PDF artifact is unavailable.");
+  if (row.case_id !== caseRecord.id || row.project_id !== project.id || row.floor_id !== floor.id
+    || row.report_template_version !== report.artifact.templateVersion || row.source_snapshot_hash !== report.artifact.contentHash) {
+    throw new FinalPdfError(409, "The protected PDF identity does not match the immutable report artifact.");
+  }
+  await verifyBytes(row);
+  return deliveryDescriptor(row);
+}
+
+export async function readDeliveredProtectedPdf(input: {
+  state: AppState; delivery: DocumentDeliveryRecord; actor: AppUser; mode: "view" | "download"; requestId: string;
+}) {
+  if (input.delivery.status !== "DELIVERED" && input.delivery.status !== "ACKNOWLEDGED") throw new FinalPdfError(403, "This report has not been delivered to the client.");
+  const descriptor = await inspectProtectedPdfForDelivery({ state: input.state, organisationId: input.delivery.organisationId!,
+    reportId: input.delivery.reportId, protectedPdfArtifactId: input.delivery.protectedPdfArtifactId });
+  if (descriptor.status !== "RELEASED" || descriptor.sourceSnapshotHash !== input.delivery.reportCanonicalHash
+    || descriptor.artifactHashSha256 !== input.delivery.protectedPdfChecksumSha256) {
+    throw new FinalPdfError(409, "The delivered protected PDF no longer matches its immutable delivery snapshot.");
+  }
+  const database = db(); const row = await findManifest(database, input.delivery.organisationId!, input.delivery.reportId);
+  if (!row) throw new FinalPdfError(409, "The delivered protected PDF is unavailable.");
+  const { bytes } = await verifyBytes(row);
+  try {
+    await database.prepare(`INSERT INTO final_pdf_artifact_events
+      (event_id,organisation_id,artifact_id,report_version_id,case_id,project_id,floor_id,event_type,actor_user_id,actor_display_name,artifact_hash_sha256,reason,request_id,idempotency_key,occurred_at)
+      VALUES (?,?,?,?,?,?,?,'EXPORTED',?,?,?,?,?,?,?)`)
+      .bind(crypto.randomUUID(), input.delivery.organisationId, row.artifact_id, row.report_version_id, row.case_id, row.project_id, row.floor_id,
+        input.actor.id, input.actor.fullName, row.artifact_hash_sha256, `Client-authorised ${input.mode} of exact delivery ${input.delivery.id}.`,
+        input.requestId, `delivery:${input.delivery.id}:${input.mode}:${input.requestId}`, new Date().toISOString()).run();
+  } catch { /* A replayed request ID remains safe; immutable bytes are unchanged. */ }
+  const caseNumber = input.state.vastuCases.find((item) => item.id === input.delivery.caseId)?.caseNumber ?? "case";
+  const floorLabel = input.state.floorWorkspaces.find((item) => item.id === input.delivery.floorId)?.floorLabel ?? "floor";
+  const safeCase = caseNumber.replace(/[^a-z0-9_-]+/gi, "-").slice(0, 80) || "case";
+  const safeFloor = floorLabel.replace(/[^a-z0-9_-]+/gi, "-").slice(0, 80) || "floor";
+  return { bytes, fileName: `uchit-${safeCase}-${safeFloor}-${input.delivery.reportVersionLabel.replace(/[^a-z0-9_-]+/gi, "-")}.pdf`, descriptor };
 }
 
 async function verifyEvidenceBinding(row: FinalPdfRow, scoped: Binding, organisationId: string) {
@@ -211,12 +310,13 @@ export async function generateFinalPdf(input: {
   const ownerSecret = getRuntimeEnv().PDF_OWNER_SECRET;
   if (!ownerSecret) throw new FinalPdfError(503, "Protected PDF encryption is not configured.");
   const artifactId = crypto.randomUUID(); const objectKey = `organisations/${input.context.organisation.id}/final-pdfs/${artifactId}.pdf`;
+  const branding = await protectedPdfBranding(input.state, input.context.organisation.id, scoped.report.artifact!.documentTemplateSnapshot);
   const rendered = await renderProtectedPdf({ reportVersionId: scoped.report.id, sourceSnapshotHash: scoped.report.artifact!.contentHash,
     html: renderPrintableReport(input.state, scoped.report),
     evidence: manualEvidence
       ? [{ ...evidence, role: "PLAN_AUTHENTICATION" }, { ...manualEvidence, role: "MANUAL_UTILITY_SHEET" }]
       : { ...evidence, role: "PLAN_AUTHENTICATION" },
-    ownerSecret });
+    ownerSecret, branding });
   const artifactHash = await sha256(rendered.bytes); const generatedAt = new Date().toISOString();
   await getRuntimeEnv().R2.put(objectKey, rendered.bytes, { httpMetadata: { contentType: "application/pdf" }, customMetadata: { checksumSha256: artifactHash, immutable: "true", reportVersionId: scoped.report.id } });
   try {
