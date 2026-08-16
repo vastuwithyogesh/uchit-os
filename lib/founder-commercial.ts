@@ -652,7 +652,7 @@ export function createFounderPaidCaseHandoff(input: { state: AppState; actor: Ap
   return nextCase;
 }
 
-export function createFounderProspectiveCase(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; serviceType: "EXISTING_SPACE" | "NEW_CONSTRUCTION"; propertyType: "Residential" | "Commercial" | "Factory" | "Shop" | "Hospital" | "Hotel" | "Temple"; displayName: string; propertyLocation: string; floorCount?: number; importantNotes?: string; confirmPossibleDuplicate?: boolean; idempotencyKey: string; expectedClientRecordVersion: number; allowLegacyUnownedLocalFixture?: boolean }) {
+export function createFounderProspectiveCase(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; serviceType: "EXISTING_SPACE" | "NEW_CONSTRUCTION"; propertyType: "Residential" | "Commercial" | "Factory" | "Shop" | "Hospital" | "Hotel" | "Temple"; displayName: string; propertyLocation: string; floorCount?: number; importantNotes?: string; confirmPossibleDuplicate?: boolean; idempotencyKey: string; expectedClientRecordVersion: number; allowLegacyUnownedLocalFixture?: boolean; preCaseReview?: boolean }) {
   owner(input); safeIdempotency(input.idempotencyKey);
   const client = input.state.clients.find((item) => item.id === input.clientId && (item.organisationId === input.organisationId || (input.allowLegacyUnownedLocalFixture === true && !item.organisationId)));
   if (!client) throw new Error("Client is unavailable in this organisation.");
@@ -666,16 +666,16 @@ export function createFounderProspectiveCase(input: { state: AppState; actor: Ap
   const notes = input.importantNotes?.trim(); if (notes && (notes.length > 1200 || /[\u0000-\u001f<>]/.test(notes))) throw new Error("Important notes must be safe text.");
   if (input.floorCount !== undefined && (!Number.isInteger(input.floorCount) || input.floorCount < 1 || input.floorCount > 200)) throw new Error("Number of floors must be between 1 and 200.");
   const retry = input.state.prospectiveProjects.find((item) => item.clientId === client.id && item.idempotencyKey === input.idempotencyKey);
-  if (retry) return { project: retry, duplicateWarning: false };
+  if (retry) return { project: retry, client, duplicateWarning: false };
   const duplicate = input.state.prospectiveProjects.some((item) => item.clientId === client.id && item.status !== "CONVERTED" && item.propertyLocation?.trim().toLowerCase() === propertyLocation.toLowerCase()) || input.state.projects.some((item) => item.clientId === client.id && item.propertyName.trim().toLowerCase() === displayName.toLowerCase());
   if (duplicate && !input.confirmPossibleDuplicate) fail(409, "A similar active project already exists. Review it, then explicitly continue if this is independent.");
   const kind: "RESIDENTIAL" | "COMMERCIAL" = input.propertyType === "Commercial" || input.propertyType === "Factory" || input.propertyType === "Shop" || input.propertyType === "Hospital" || input.propertyType === "Hotel" ? "COMMERCIAL" : "RESIDENTIAL";
-  const project = { id: uuid(), organisationId: input.organisationId, clientId: client.id, leadId: client.id, responseVersionId: `founder-case-intent:${input.idempotencyKey}`, kind, status: "COMMERCIAL_PENDING" as const, serviceType: input.serviceType, displayName, variation: `${input.serviceType === "EXISTING_SPACE" ? "Existing Space" : "New Construction"} · ${input.propertyType}`, propertyType: input.propertyType, propertyLocation, floorCount: input.floorCount, importantNotes: notes, createdAt: nowIso(), recordVersion: 1, idempotencyKey: input.idempotencyKey };
+  const project = { id: uuid(), organisationId: input.organisationId, clientId: client.id, leadId: client.id, ...(input.preCaseReview ? {} : { responseVersionId: `founder-case-intent:${input.idempotencyKey}` }), kind, status: input.preCaseReview ? "REVIEW_PENDING" as const : "COMMERCIAL_PENDING" as const, serviceType: input.serviceType, displayName, variation: `${input.serviceType === "EXISTING_SPACE" ? "Existing Space" : "New Construction"} · ${input.propertyType}`, propertyType: input.propertyType, propertyLocation, floorCount: input.floorCount, importantNotes: notes, createdAt: nowIso(), recordVersion: 1, idempotencyKey: input.idempotencyKey };
   input.state.prospectiveProjects.unshift(project);
   client.recordVersion = (client.recordVersion ?? 0) + 1;
   input.state.timelineEvents.unshift({ id: uuid(), organisationId: input.organisationId, clientId: client.id, category: "Case", headline: "Prospective case opened", details: `Founder opened ${project.variation}. Commercial clearance is required before a Case ID is created.`, happenedAt: nowIso(), actorRole: input.actor.role, actorId: input.actor.id, actorName: input.actor.fullName });
   appendAudit(input.state, { organisationId: input.organisationId, eventType: "PROSPECTIVE_CASE_OPENED", entityType: "PROSPECTIVE_PROJECT", entityId: project.id, actorUserId: input.actor.id, reason: notes || "Founder opened a prospective case.", prospectiveProjectId: project.id, afterHash: deterministicContentHash(project), idempotencyKey: `audit:${input.idempotencyKey}` });
-  return { project, duplicateWarning: duplicate };
+  return { project, client, duplicateWarning: duplicate };
 }
 
 export function classifyFounderProspectiveProjectService(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; prospectiveProjectId: string; serviceType: VastuServiceType; expectedRecordVersion?: number; idempotencyKey: string; clientId?: string; leadId?: string; responseVersionId?: string; now?: Date }) {

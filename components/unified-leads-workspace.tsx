@@ -10,6 +10,7 @@ import { useSession } from "@/components/session-provider";
 import { LeadImportSheet } from "@/components/lead-import-sheet";
 import { LeadCommunicationSheet, type CommunicationContext } from "@/components/lead-communication-sheet";
 import { FounderOpenCaseSheet } from "@/components/founder-open-case-sheet";
+import { FounderProjectScopeSheet } from "@/components/founder-project-scope-sheet";
 import type { FounderTemplateKey } from "@/lib/founder-communication-templates";
 
 type Bootstrap = AppState & { persistenceRevision?: number | null };
@@ -117,6 +118,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const [communication, setCommunication] = useState<{ key: FounderTemplateKey; serviceType?: "EXISTING_SPACE" | "NEW_CONSTRUCTION" }>();
   const [editing, setEditing] = useState(false);
   const [openCase, setOpenCase] = useState(false);
+  const [projectScopeOpen, setProjectScopeOpen] = useState(false);
   const [complimentaryProject, setComplimentaryProject] = useState<NonNullable<Bootstrap["prospectiveProjects"]>[number]>();
   const [proposalProject, setProposalProject] = useState<NonNullable<Bootstrap["prospectiveProjects"]>[number]>();
   const [classificationBusy, setClassificationBusy] = useState<string>();
@@ -213,7 +215,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   function openConvertedProposal(row: Row) {
     openLead(row);
     const project = row.clientId ? state?.prospectiveProjects.find((item) => item.clientId === row.clientId && !item.caseId && item.serviceType) : undefined;
-    if (project) openProposalDraft(project);
+    if (project) openProposalDraft(project); else setMessage("A converted lead needs a saved project scope before a proposal can be drafted.");
   }
   function proposeMove(row: Row, groupId: string) {
     setSelectedId(row.id); setMoveGroupId(groupId); setDrawerOpen(false);
@@ -225,7 +227,18 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
       setMessage("That skip is not allowed. The lead stayed in its current stage; choose an allowed next stage.");
       setMoveOpen(false); return;
     }
+    if (groupId === "REVIEW" && (row.stage === "CONTACTED" || row.stage === "PRE_CASE_FOLLOW_UP")) { setProjectScopeOpen(true); return; }
     setMoveOpen(true);
+  }
+
+  async function transitionAfterScope(result: { client?: { recordVersion?: number } }) {
+    setProjectScopeOpen(false); setBusy(true); setErrorKind("none");
+    try {
+      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action: "client-pipeline-transition", clientId: selectedClient?.id, pipelineStage: "PAID_REVIEW_PENDING", nextAction: "Complete Founder review", nextActionDueAt: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString(), idempotencyKey: crypto.randomUUID(), expectedRecordVersion: result.client?.recordVersion ?? selectedClient?.recordVersion ?? 0, expectedRevision: state?.persistenceRevision ?? null }) });
+      const payload = await response.json(); if (!response.ok || payload.ok === false) throw new Error(payload.error?.message ?? payload.error ?? "The Review transition could not be saved.");
+      setMessage("Project scope saved and the lead entered Review."); await refresh(selected?.id);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "The Review transition could not be saved."); }
+    finally { setBusy(false); }
   }
 
   async function saveTransition() {
@@ -460,5 +473,5 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!allowedTargets.includes(target) ? <><p className="blocked-note">This grouped move skips canonical stages and will be recorded as an audited administrative correction.</p><label>Correction reason (20–500 characters)<textarea value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} maxLength={500} /></label></> : null}{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onInput={(event) => setDueAt(event.currentTarget.value)} onChange={(event) => setDueAt(event.currentTarget.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
 
     <div className="lead-workspace-footer" role={errorKind === "conflict" ? "alert" : "status"} aria-live="polite"><span>{message}{errorKind === "conflict" ? " Your draft remains here; reload before retrying." : ""}</span><button type="button" className="button-secondary" disabled={busy} onClick={() => void refresh(selected?.id)}>{busy ? "Refreshing…" : "Reload"}</button></div>
-  </section>{openCase && selectedClient && state ? <FounderOpenCaseSheet client={selectedClient} user={activeUser} revision={state.persistenceRevision} onClose={() => setOpenCase(false)} onCreated={() => { setOpenCase(false); void refresh(selected?.id); }} /> : null}{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepareContext={prepareCommunicationContext} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;
+  </section>{projectScopeOpen && selectedClient && selected?.leadId && state ? <FounderProjectScopeSheet client={selectedClient} leadId={selected.leadId} user={activeUser} revision={state.persistenceRevision} onClose={() => setProjectScopeOpen(false)} onSaved={(result) => void transitionAfterScope(result)} /> : null}{openCase && selectedClient && state ? <FounderOpenCaseSheet client={selectedClient} user={activeUser} revision={state.persistenceRevision} onClose={() => setOpenCase(false)} onCreated={() => { setOpenCase(false); void refresh(selected?.id); }} /> : null}{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepareContext={prepareCommunicationContext} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;
 }

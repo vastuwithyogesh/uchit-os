@@ -52,6 +52,7 @@ test("every API route declares an authentication or ownership gate", () => {
     "app/api/optin-leads/events/route.ts": /OPTIN_WEBHOOK_SECRET.*verifyInboundSignature/s,
     "app/api/payment-proofs/route.ts": /requireRouteActor/,
     "app/api/payment-proofs/files/[fileName]/route.ts": /requireRouteActor/,
+    "app/api/pre-case-evidence/route.ts": /requireRouteActor/,
     "app/api/public/qualification/[token]/route.ts": /resolveQualificationInvitation.*private, no-store/s,
     "app/api/report-deliveries/route.ts": /resolveRequestActor.*hasOrganisationCapability.*"DELIVERY"/s,
     "app/api/public/booking/[token]/route.ts": /resolveSecureGrant.*private, no-store/s,

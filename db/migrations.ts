@@ -571,6 +571,20 @@ export const d1Migrations: readonly D1Migration[] = [
       "ALTER TABLE founder_statutory_policy_versions ADD COLUMN outside_india_billing_label TEXT NOT NULL DEFAULT 'Cash Sale' CHECK (outside_india_billing_label = 'Cash Sale')",
       "ALTER TABLE founder_statutory_policy_versions ADD COLUMN tax_treatment TEXT NOT NULL DEFAULT 'CGST_SGST_9_9_ALL_CLIENT_LOCATIONS' CHECK (tax_treatment = 'CGST_SGST_9_9_ALL_CLIENT_LOCATIONS')"
     ]
+  },
+  {
+    version: 17,
+    statements: [
+      `CREATE TABLE IF NOT EXISTS pre_case_evidence_assets (
+        id TEXT PRIMARY KEY, organisation_id TEXT NOT NULL, client_id TEXT NOT NULL, lead_id TEXT NOT NULL,
+        prospective_project_id TEXT NOT NULL, classification TEXT NOT NULL CHECK (classification = 'QUALIFICATION_QUESTIONNAIRE_SNAPSHOT'),
+        object_key TEXT NOT NULL UNIQUE, original_file_name TEXT NOT NULL, mime_type TEXT NOT NULL,
+        size_bytes INTEGER NOT NULL, checksum_sha256 TEXT NOT NULL, created_by_id TEXT NOT NULL,
+        created_by_name TEXT NOT NULL, created_at TEXT NOT NULL, record_version INTEGER NOT NULL DEFAULT 1,
+        status TEXT NOT NULL CHECK (status IN ('CURRENT','SUPERSEDED'))
+      )`,
+      "CREATE INDEX IF NOT EXISTS idx_pre_case_evidence_scope ON pre_case_evidence_assets(organisation_id,client_id,lead_id,prospective_project_id,created_at)"
+    ]
   }
 ];
 

@@ -40,7 +40,7 @@ class FakeD1 {
     if (/CREATE TABLE IF NOT EXISTS integration_outbox/i.test(sql)) this.tables.add("integration_outbox");
     if (/CREATE TABLE IF NOT EXISTS integration_conflicts/i.test(sql)) this.tables.add("integration_conflicts");
     if (/CREATE TABLE IF NOT EXISTS integration_cursors/i.test(sql)) this.tables.add("integration_cursors");
-    for (const table of ["lead_profile_versions", "media_assets", "media_asset_versions", "secure_access_grants", "communication_preparations", "qualification_form_definitions", "qualification_invitations", "qualification_response_versions", "prospective_projects", "founder_review_bookings", "zoom_meeting_bindings", "founder_reminder_tasks", "founder_commercial_policy_versions", "founder_commercial_legal_policies", "founder_proposal_template_versions", "founder_proposal_versions", "founder_proposal_approvals", "founder_proposal_artifacts", "founder_proposal_grants", "founder_proposal_responses", "founder_commercial_payment_confirmations", "founder_balance_deadlines", "founder_commercial_invoices", "founder_commercial_audit_events", "founder_statutory_policy_versions", "founder_billing_profile_versions", "founder_statutory_sequence_reservations", "founder_statutory_documents"]) {
+    for (const table of ["lead_profile_versions", "media_assets", "media_asset_versions", "secure_access_grants", "communication_preparations", "qualification_form_definitions", "qualification_invitations", "qualification_response_versions", "prospective_projects", "pre_case_evidence_assets", "founder_review_bookings", "zoom_meeting_bindings", "founder_reminder_tasks", "founder_commercial_policy_versions", "founder_commercial_legal_policies", "founder_proposal_template_versions", "founder_proposal_versions", "founder_proposal_approvals", "founder_proposal_artifacts", "founder_proposal_grants", "founder_proposal_responses", "founder_commercial_payment_confirmations", "founder_balance_deadlines", "founder_commercial_invoices", "founder_commercial_audit_events", "founder_statutory_policy_versions", "founder_billing_profile_versions", "founder_statutory_sequence_reservations", "founder_statutory_documents"]) {
       if (new RegExp(`CREATE TABLE IF NOT EXISTS ${table}`, "i").test(sql)) this.tables.add(table);
     }
     if (/ALTER TABLE case_file_assets ADD COLUMN organisation_id/i.test(sql)) this.columns.get("case_file_assets").add("organisation_id");
@@ -62,10 +62,10 @@ class FakeD1 {
   }
 }
 
-test("v1 through v16 migrate an empty database and repeat without drift", async () => {
+test("v1 through v17 migrate an empty database and repeat without drift", async () => {
   const db = new FakeD1();
   await migrateD1(db);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
   assert.ok(db.tables.has("app_state_snapshot"));
   assert.ok(db.tables.has("case_file_assets"));
   assert.ok(db.tables.has("staff_role_assignments"));
@@ -73,7 +73,7 @@ test("v1 through v16 migrate an empty database and repeat without drift", async 
   assert.ok(db.tables.has("optin_leads"));
   assert.ok(db.tables.has("inbound_optin_events"));
   for (const table of ["organisations", "organisation_memberships", "workflow_policies", "approval_policies", "audit_events", "user_access_requests", "ownership_transfer_requests", "final_pdf_artifacts", "final_pdf_artifact_events", "external_sources", "external_client_links", "integration_events", "integration_outbox", "integration_conflicts", "integration_cursors"]) assert.ok(db.tables.has(table));
-  for (const table of ["lead_profile_versions", "media_assets", "media_asset_versions", "secure_access_grants", "communication_preparations", "qualification_form_definitions", "qualification_invitations", "qualification_response_versions", "prospective_projects", "founder_review_bookings", "zoom_meeting_bindings", "founder_reminder_tasks", "founder_commercial_policy_versions", "founder_commercial_legal_policies", "founder_proposal_template_versions", "founder_proposal_versions", "founder_proposal_approvals", "founder_proposal_artifacts", "founder_proposal_grants", "founder_proposal_responses", "founder_commercial_payment_confirmations", "founder_balance_deadlines", "founder_commercial_invoices", "founder_commercial_audit_events", "founder_statutory_policy_versions", "founder_billing_profile_versions", "founder_statutory_sequence_reservations", "founder_statutory_documents"]) assert.ok(db.tables.has(table));
+  for (const table of ["lead_profile_versions", "media_assets", "media_asset_versions", "secure_access_grants", "communication_preparations", "qualification_form_definitions", "qualification_invitations", "qualification_response_versions", "prospective_projects", "pre_case_evidence_assets", "founder_review_bookings", "zoom_meeting_bindings", "founder_reminder_tasks", "founder_commercial_policy_versions", "founder_commercial_legal_policies", "founder_proposal_template_versions", "founder_proposal_versions", "founder_proposal_approvals", "founder_proposal_artifacts", "founder_proposal_grants", "founder_proposal_responses", "founder_commercial_payment_confirmations", "founder_balance_deadlines", "founder_commercial_invoices", "founder_commercial_audit_events", "founder_statutory_policy_versions", "founder_billing_profile_versions", "founder_statutory_sequence_reservations", "founder_statutory_documents"]) assert.ok(db.tables.has(table));
   assert.ok(db.columns.get("app_state_snapshot").has("revision"));
   assert.ok(db.columns.get("case_file_assets").has("organisation_id"));
   for (const column of ["organisation_id", "external_source_id", "source_record_type", "source_record_id", "external_client_code", "sync_status", "last_synced_at", "source_event_id", "record_version"]) assert.ok(db.columns.get("optin_leads").has(column));
@@ -94,12 +94,12 @@ test("production-like v2 schema adopts migration markers without changing revisi
   const db = new FakeD1({ revisionColumn: true, revision: 37, applied: [1] });
   await migrateD1(db);
   assert.equal(db.revision, 37);
-  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.deepEqual([...db.applied], [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
   assert.ok(db.tables.has("case_file_assets"));
 });
 
 test("migration list is deterministic and Sites packages the db directory", async () => {
-  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]);
+  assert.deepEqual(d1Migrations.map((item) => item.version), [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17]);
   const prepare = await import("node:fs/promises").then(({ readFile }) => readFile(new URL("../scripts/prepare-sites.mjs", import.meta.url), "utf8"));
   assert.match(prepare, /"db"/);
 });

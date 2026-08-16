@@ -125,6 +125,10 @@ export function transitionClientPipeline(input: Record<string, unknown> & { acto
   assertExpectedRecordVersion(client, input.expectedRecordVersion);
   const beforeStage = normalizeClientPipeline(client).stage;
   const afterStage = enumValue(input.pipelineStage, canonicalPipelineStages, "pipeline stage") as CanonicalPipelineStage;
+  if (afterStage === "PAID_REVIEW_PENDING" && (beforeStage === "CONTACTED" || beforeStage === "PRE_CASE_FOLLOW_UP")) {
+    const scopedProject = state.prospectiveProjects.find((item) => item.clientId === clientId && !item.caseId && item.status !== "CONVERTED" && item.serviceType && item.propertyType && item.displayName?.trim() && item.propertyLocation?.trim());
+    if (!scopedProject) throw new WorkflowConflictError("Project scope is required before moving this lead into Review. Save the structured project scope first.");
+  }
   const correction = input.correction === true;
   const correctionReason = input.correctionReason === undefined || input.correctionReason === "" ? undefined : boundedRequiredString(input.correctionReason, "Correction reason", 500);
   const isAdmin = input.actor.role === "ADMIN" || input.actor.role === "SUPER_ADMIN";
