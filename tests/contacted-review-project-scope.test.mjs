@@ -29,3 +29,13 @@ test("pre-case scope is REVIEW_PENDING and qualification remains optional at cap
   assert.match(commercial, /status: input\.preCaseReview \? "REVIEW_PENDING"/);
   assert.match(commercial, /input\.preCaseReview \? \{\} : \{ responseVersionId/);
 });
+
+test("scope save revalidates current client and persistence revisions before Review transition", () => {
+  const workspace = source("components/unified-leads-workspace.tsx");
+  assert.match(workspace, /async function transitionAfterScope\(\)/);
+  assert.match(workspace, /const latest = await fetchJson<Bootstrap>\("\/api\/bootstrap"\)/);
+  assert.match(workspace, /expectedRecordVersion: latestClient\.recordVersion/);
+  assert.match(workspace, /expectedRevision: latest\.persistenceRevision/);
+  assert.match(workspace, /onSaved=\{\(\) => void transitionAfterScope\(\)\}/);
+  assert.doesNotMatch(workspace, /expectedRevision: state\?\.persistenceRevision \?\? null \}\) \}\);\n      const payload/);
+});
