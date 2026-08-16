@@ -50,7 +50,7 @@ import { approveRepositoryImportRows, approveRepositoryRecord, archiveRepository
 import { assignReviewCall, cancelReviewCall, createFounderCommunicationContext, createQualificationInvitation, markCommunicationOpened, prepareManualCommunication, rescheduleReviewCall,
   registerMediaAssetVersion, transitionMediaAssetVersion, updateCanonicalLeadProfile, validateApprovedAssetDryRun } from "@/lib/founder-engagement";
 import { activateFounderLegalPolicy, activateFounderNoRefundPolicy, activateFounderProposalTemplate, applyFounderBalanceDeadlineException, approveFounderLegalPolicy, approveFounderProposal, autosaveFounderProposalStep,
-  confirmFounderCommercialPayment, createFounderCanonicalLegalPolicyVersion, createFounderComplimentaryCaseHandoff, createFounderProspectiveCase, createFounderLegalPolicy, createFounderProposalDraft, createFounderProposalSuccessor, createFounderProposalTemplate,
+  confirmFounderCommercialPayment, createFounderCanonicalLegalPolicyVersion, createFounderComplimentaryCaseHandoff, createFounderPaidCaseHandoff, createFounderProspectiveCase, createFounderLegalPolicy, createFounderProposalDraft, createFounderProposalSuccessor, createFounderProposalTemplate,
   classifyFounderProspectiveProjectService, generateFounderProposalArtifact, issueFounderAdvanceInvoice, publishFounderCommercialPolicy, recordFounderCommercialPolicyEvent, reviewFounderProposal, sendFounderProposal } from "@/lib/founder-commercial";
 import { founderCommercialArtifactStore } from "@/lib/founder-commercial.server";
 import { activateFounderStatutoryPolicy, createFounderStatutoryPolicyDraft, issueFounderStatutoryDocument, saveFounderBillingProfile } from "@/lib/founder-statutory-documents";
@@ -146,7 +146,7 @@ export async function POST(request: Request) {
   const brandingActions = new Set(["branding-legacy-bootstrap", "branding-profile-version-create", "branding-profile-draft-update", "branding-profile-activate", "branding-profile-archive", "document-template-version-create", "document-template-draft-update", "document-template-activate", "document-template-archive"]);
   for (const brandingAction of brandingActions) concurrencyActions.add(brandingAction);
   for (const deliveryAction of ["document-delivery-prepare", "document-delivery-mark-ready", "document-delivery-deliver", "document-delivery-acknowledge"]) concurrencyActions.add(deliveryAction);
-  for (const founderCommercialAction of ["founder-commercial-policy-publish", "founder-commercial-legal-create", "founder-commercial-legal-activate", "founder-no-refund-policy-activate", "founder-commercial-policy-event-record", "founder-proposal-template-create", "founder-proposal-template-activate", "founder-proposal-draft-create", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send", "founder-proposal-successor", "founder-commercial-payment-confirm", "founder-complimentary-case-handoff", "founder-case-intent-create", "founder-prospective-project-service-classify", "founder-balance-deadline-exception", "founder-invoice-issue", "founder-statutory-policy-create", "founder-statutory-policy-activate", "founder-billing-profile-save", "founder-statutory-document-issue"]) concurrencyActions.add(founderCommercialAction);
+  for (const founderCommercialAction of ["founder-commercial-policy-publish", "founder-commercial-legal-create", "founder-commercial-legal-activate", "founder-no-refund-policy-activate", "founder-commercial-policy-event-record", "founder-proposal-template-create", "founder-proposal-template-activate", "founder-proposal-draft-create", "founder-proposal-step-save", "founder-proposal-review", "founder-proposal-approve", "founder-proposal-artifact-generate", "founder-proposal-send", "founder-proposal-successor", "founder-commercial-payment-confirm", "founder-complimentary-case-handoff", "founder-paid-case-handoff", "founder-case-intent-create", "founder-prospective-project-service-classify", "founder-balance-deadline-exception", "founder-invoice-issue", "founder-statutory-policy-create", "founder-statutory-policy-activate", "founder-billing-profile-save", "founder-statutory-document-issue"]) concurrencyActions.add(founderCommercialAction);
   let expectedGlobalRevision: number | undefined;
   let rollbackState: AppState | undefined;
   let globalRevisionStale = false;
@@ -360,6 +360,7 @@ export async function POST(request: Request) {
       "founder-proposal-send": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-proposal-successor": ["action", "actorRole", "proposalVersionId", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-complimentary-case-handoff": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-paid-case-handoff": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-case-intent-create": ["action", "actorRole", "clientId", "serviceType", "propertyType", "displayName", "propertyLocation", "floorCount", "importantNotes", "confirmPossibleDuplicate", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-prospective-project-service-classify": ["action", "actorRole", "prospectiveProjectId", "serviceType", "clientId", "leadId", "responseVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-commercial-payment-confirm": ["action", "actorRole", "proposalVersionId", "paymentId", "type", "amountPaise", "idempotencyKey", "expectedProposalRecordVersion", "expectedRecordVersion", "expectedRevision"],
@@ -564,6 +565,11 @@ export async function POST(request: Request) {
       case "founder-complimentary-case-handoff": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!;
         response = { ok: true, caseRecord: createFounderComplimentaryCaseHandoff({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        break;
+      }
+      case "founder-paid-case-handoff": {
+        const organisationId = foundation?.organisation.id ?? actor.organisationId!;
+        response = { ok: true, caseRecord: createFounderPaidCaseHandoff({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, proposalVersionId: body.proposalVersionId, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
         break;
       }
       case "founder-prospective-project-service-classify": {

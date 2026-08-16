@@ -21,8 +21,8 @@ test("missing role input has no privileged fallback", () => {
 
 test("demo elevation requires development, explicit opt-in, and loopback", () => {
   const body = functionBody(auth, "isExplicitLocalDemo");
-  assert.match(body, /process\.env\.NODE_ENV !== "production"/);
-  assert.match(body, /process\.env\.UCHIT_VASTU_DEMO_MODE === "true"/);
+  assert.match(body, /(?:process\.env\.NODE_ENV|localAuthRuntimeValue\("NODE_ENV"\)) !== "production"/);
+  assert.match(body, /(?:process\.env\.UCHIT_VASTU_DEMO_MODE|localAuthRuntimeValue\("UCHIT_VASTU_DEMO_MODE"\)) === "true"/);
   assert.match(body, /isLocalRequest\(headers\)/);
   assert.match(functionBody(auth, "isLocalRequest"), /localhost\|127/);
 });

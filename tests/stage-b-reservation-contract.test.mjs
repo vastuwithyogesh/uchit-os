@@ -11,8 +11,8 @@ const printRoute = source("app/api/reports/[reportId]/print/route.ts");
 test("Stage B reservation begins after approved Post-Site Findings and balance, before release", () => {
   const stageB = source("lib/stage-b-remediation.ts");
   const reservation = functionBody(stageB, "ensureStageBReservation");
-  assert.match(reservation, /fullPaymentApproved/);
-  assert.match(reservation, /balanceApproved/);
+  assert.match(reservation, /resolveCommercialEntitlementForStageB/);
+  assert.match(reservation, /requireFounderContract/);
   assert.match(reservation, /FOUNDER_APPROVED/);
   assert.match(reservation, /item\.isPreview/);
   assert.doesNotMatch(functionBody(workflow, "releaseVerdict"), /remedialWorkflowReservations\.unshift/);
