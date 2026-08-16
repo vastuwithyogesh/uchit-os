@@ -27,7 +27,11 @@ test("Founder query security remains case/floor paired and uses floorWorkspaces"
 
 test("general page access remains separate from Founder tenant-scoped access", () => {
   const access = source("lib/page-access.tsx");
-  const general = access.slice(access.indexOf("export async function requirePageAccess"), access.indexOf("/**\n * Founder commercial"));
+  const generalStart = access.indexOf("export async function requirePageAccess");
+  const founderStart = access.indexOf("export async function requireFounderCommercialPageAccess");
+  const general = access.slice(generalStart, founderStart);
   assert.doesNotMatch(general, /resolveActiveOrganisationContext/);
   assert.match(general, /resolveRequestActor/);
+  assert.match(access, /requireFounderCommercialPageAccess/);
+  assert.match(access, /resolveActiveOrganisationContext\(/);
 });

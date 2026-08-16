@@ -97,7 +97,7 @@ test("critical journey gates remain connected without commercial or report bypas
 
 test("production demo elevation is disabled and health responses avoid PII and raw errors", () => {
   const auth = source("lib/auth.ts");
-  assert.match(auth, /process\.env\.NODE_ENV !== "production".*UCHIT_VASTU_DEMO_MODE === "true"/s);
+  assert.match(auth, /(?:process\.env\.NODE_ENV|localAuthRuntimeValue\("NODE_ENV"\)) !== "production"[\s\S]*?(?:process\.env\.UCHIT_VASTU_DEMO_MODE|localAuthRuntimeValue\("UCHIT_VASTU_DEMO_MODE"\)) === "true"/s);
   const diagnostics = source("app/api/diagnostics/route.ts");
   assert.doesNotMatch(diagnostics, /client\.email|client\.phone|databaseUrl|serviceRole/);
   const health = source("app/api/settings/test/route.ts");

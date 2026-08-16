@@ -7,6 +7,7 @@ import type { DependencyInvalidationRecord, ShaktiSnapshotRecord, UtilityRule } 
 import { buildActionHeaders } from "@/lib/request-helpers";
 import { useSession } from "@/components/session-provider";
 import { getCaseEvaluationBlockers, getServiceReadiness, normalizeCaseService, serviceTypeLabel } from "@/lib/service-framework";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type UtilityMasterResponse = {
   rules: UtilityRule[];
@@ -44,6 +45,7 @@ function TaskState({ recorded, ready }: { recorded: boolean; ready: boolean }) {
 
 export function EvaluationConsole({ clientId: initialClientId, caseId: requestedCaseId, floorId: initialFloorId }: { clientId?: string; caseId?: string; floorId?: string } = {}) {
   const { activeUser } = useSession();
+  const { notify } = useActionFeedback();
   const router = useRouter();
   const [rules, setRules] = useState<UtilityRule[]>([]);
   const [masterMeta, setMasterMeta] = useState<UtilityMasterResponse["counts"] | null>(null);
@@ -107,12 +109,13 @@ export function EvaluationConsole({ clientId: initialClientId, caseId: requested
     try {
       await postAction({ ...action, floorId: selectedFloor.id, expectedRecordVersion, expectedRevision: state.persistenceRevision, idempotencyKey: key.current }, activeUser.role);
       key.current = crypto.randomUUID();
+      notify("success", successMessage);
       await refresh(successMessage); router.refresh();
       return true;
     } catch (error) {
       if (error instanceof ActionError && error.status === 409) setMessage("The evaluation context changed. Reload the exact Case and floor, review the latest lineage, then try again.");
       else if (error instanceof ActionError && error.status === 428) setMessage("Reload the latest Case version before continuing.");
-      else setMessage(error instanceof Error ? error.message : "The evaluation action could not be completed.");
+      else { const safeMessage = error instanceof Error ? error.message : "The evaluation action could not be completed."; setMessage(safeMessage); notify("error", safeMessage); }
       return false;
     } finally { setBusyAction(null); }
   }

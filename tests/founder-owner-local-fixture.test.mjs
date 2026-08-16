@@ -6,7 +6,7 @@ const auth = fs.readFileSync(new URL("../lib/auth.ts", import.meta.url), "utf8")
 const commercial = fs.readFileSync(new URL("../lib/founder-commercial.ts", import.meta.url), "utf8");
 
 test("explicit local Founder owner fixture uses the existing owner-shaped identity", () => {
-  assert.match(auth, /UCHIT_VASTU_LOCAL_FOUNDER_OWNER_FIXTURE === "true"/);
+  assert.match(auth, /localAuthRuntimeValue\("UCHIT_VASTU_LOCAL_FOUNDER_OWNER_FIXTURE"\) === "true"/);
   assert.match(auth, /id: "local-founder-owner"/);
   assert.match(auth, /email: "iyogesh2020@gmail\.com"/);
   assert.match(auth, /role: "SUPER_ADMIN"/);
@@ -15,7 +15,7 @@ test("explicit local Founder owner fixture uses the existing owner-shaped identi
 });
 
 test("ordinary demo, cross-organisation and non-owner actors remain protected", () => {
-  assert.match(auth, /const role = requestedRole .* "SUPER_ADMIN"/s);
+  assert.match(auth, /const role = requestedRole && roles\.includes\(requestedRole as UserRole\) \? \(requestedRole as UserRole\) : "SUPER_ADMIN"/);
   assert.match(commercial, /input\.actor\.id !== input\.founderUserId/);
   assert.match(commercial, /input\.actor\.organisationId !== input\.organisationId/);
   assert.match(commercial, /input\.actor\.organisationCapability !== "organisation_owner"/);

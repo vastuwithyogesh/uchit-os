@@ -4,11 +4,13 @@ import { source } from "./helpers/source-contracts.mjs";
 
 test("proposal editor is a six-step exclusive route with one focused current form", () => {
   const page = source("app/commercial-proposals/[proposalId]/[step]/page.tsx");
-  assert.match(page, /requirePageAccess\("SUPER_ADMIN"\)/); assert.match(page, /FounderCommercialProposalEditor/);
+  assert.match(page, /requireFounderCommercialPageAccess\(\)/); assert.match(page, /FounderCommercialProposalEditor/);
   const editor = source("components/founder-commercial-proposal-editor.tsx");
   for (const title of ["Client & Project", "Requirements & Scope", "Deliverables & Interactions", "Timeline & Commercials", "Policies & Next Steps", "Preview, Review & Approve"]) assert.match(editor, new RegExp(title.replace(/[&]/g, "&")));
   assert.match(editor, /current === 1/); assert.match(editor, /current === 6/); assert.doesNotMatch(editor, /steps\.map\(/);
   assert.match(editor, /Save & Continue/); assert.match(editor, />Back</); assert.match(editor, /Technical details/);
+  assert.match(editor, /founder-commercial-payment-confirm/); assert.match(editor, /founder-paid-case-handoff/);
+  assert.match(editor, /founder-complimentary-case-handoff/);
 });
 
 test("UI exposes actionable blocking, conflict recovery and no hidden optimistic success", () => {

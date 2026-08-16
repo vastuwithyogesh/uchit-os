@@ -8,6 +8,7 @@ import { getActiveCaseForClient } from "@/lib/service-framework";
 import { canApproveReport, canEditFloorWorkspaces, canReleaseVerdict } from "@/lib/permissions";
 import { canReleaseOfficialVerdict, formatMoney, isPreviewWatermarked } from "@/lib/workflows";
 import { buildActionHeaders } from "@/lib/request-helpers";
+import { useActionFeedback } from "@/components/action-feedback";
 
 type FounderBootstrapState = AppState & { foundation?: { isFounderEdition?: boolean } };
 type ProtectedPdfArtifact = { artifactId: string; reportVersionId: string; status: "GENERATED" | "VERIFIED" | "RELEASED" | "SUPERSEDED"; recordVersion: number; artifactHashSha256: string; sizeBytes: number; pageCount: number; securityProfile: string };
@@ -44,8 +45,10 @@ async function fetchPdfStatus(reportId: string) {
 
 export function ReportConsole() {
   const { activeUser } = useSession();
+  const { notify } = useActionFeedback();
   const [state, setState] = useState<FounderBootstrapState | null>(null);
   const [busy, setBusy] = useState(false);
+  const [busyAction, setBusyAction] = useState("");
   const [message, setMessage] = useState("Choose “Load reports” to begin.");
   const [selectedClientId, setSelectedClientId] = useState("");
   const [selectedFloorId, setSelectedFloorId] = useState("");
@@ -139,7 +142,7 @@ export function ReportConsole() {
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Refresh failed");
     } finally {
-      setBusy(false);
+      setBusyAction(""); setBusy(false);
     }
   }
 
@@ -148,6 +151,7 @@ export function ReportConsole() {
     setBusy(true);
     try {
       const actionName = String(action.action ?? "");
+      setBusyAction(actionName);
       let payload = action;
       if (["preview-report", "final-report-prepare", "stage-a-present", "report-approve", "verdict-release"].includes(actionName)) {
         const protectedEntity = ["preview-report", "final-report-prepare", "stage-a-present"].includes(actionName) ? currentCase : finalReport;
@@ -158,16 +162,19 @@ export function ReportConsole() {
       await postAction(payload, activeUser.role);
       await refresh(selectedClient?.id);
       setMessage(successMessage);
+      notify("success", successMessage);
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "Action failed");
+      const safeMessage = error instanceof Error ? error.message : "Action failed";
+      setMessage(safeMessage); notify("error", safeMessage);
     } finally {
-      setBusy(false);
+      setBusyAction(""); setBusy(false);
     }
   }
 
   async function runPdf(action: "generate" | "verify" | "release", confirmation: string) {
     if (!window.confirm(confirmation) || !finalReport || state?.persistenceRevision === null || state?.persistenceRevision === undefined) return;
     setBusy(true);
+    setBusyAction(`pdf-${action}`);
     try {
       const response = await fetch(`/api/reports/${encodeURIComponent(finalReport.id)}/pdf`, {
         method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({ action,
@@ -178,9 +185,10 @@ export function ReportConsole() {
       const result = await response.json();
       if (!response.ok || result.ok === false) throw new Error(result.error ?? "Protected PDF action failed");
       setPdfArtifact(result.result.artifact); await refresh(selectedClient?.id);
-      setMessage(action === "generate" ? "Protected PDF generated" : action === "verify" ? "PDF integrity verified" : "Protected PDF released");
-    } catch (error) { setMessage(error instanceof Error ? error.message : "Protected PDF action failed"); }
-    finally { setBusy(false); }
+      const successMessage = action === "generate" ? "Protected PDF generated successfully." : action === "verify" ? "PDF integrity verified" : "Protected PDF released";
+      setMessage(successMessage); notify("success", successMessage);
+    } catch (error) { const safeMessage = error instanceof Error ? error.message : "Protected PDF action failed"; setMessage(safeMessage); notify("error", safeMessage); }
+    finally { setBusyAction(""); setBusy(false); }
   }
 
   return (
@@ -238,7 +246,7 @@ export function ReportConsole() {
               disabled={busy || !currentCase || !selectedFloor || !canEditFloorWorkspaces(activeUser)}
               onClick={() => run({ action: "preview-report", caseId: currentCase?.id, floorId: selectedFloor?.id }, "Stage-A floor preview generated")}
             >
-              Create preview
+              {busyAction === "preview-report" ? "Generating report…" : "Create preview"}
             </button>
             <button
               type="button"
@@ -246,7 +254,7 @@ export function ReportConsole() {
               disabled={busy || !currentCase || !selectedFloor || selectedFloor.stageAVerdictStatus !== "PRESENTED" || !canPrepareFinalReport || !canEditFloorWorkspaces(activeUser)}
               onClick={() => run({ action: "final-report-prepare", caseId: currentCase?.id, floorId: selectedFloor?.id }, "Final floor report prepared")}
             >
-              Prepare final report
+              {busyAction === "final-report-prepare" ? "Generating report…" : "Prepare final report"}
             </button>
             <button
               type="button"
@@ -262,11 +270,11 @@ export function ReportConsole() {
               disabled={busy || !canApproveCurrentReport}
               onClick={() => run({ action: "report-approve", reportId: finalReport?.id, comment: approvalComment }, isFounderEdition && !founderReviewDone ? "Founder review saved" : "Approval saved", "Approve this exact report version? This action is recorded in the permanent history.")}
             >
-              {isFounderEdition ? (founderReviewDone ? "Founder approve" : "Founder review") : "Approve final report"}
+              {busyAction === "report-approve" ? "Approving report…" : isFounderEdition ? (founderReviewDone ? "Founder approve" : "Founder review") : "Approve final report"}
             </button>
             <button type="button" className={founderApprovalDone && !pdfArtifact ? "button" : "button-secondary"}
               disabled={busy || !founderApprovalDone || Boolean(pdfArtifact)}
-              onClick={() => runPdf("generate", "Generate one immutable encrypted PDF from this exact approved floor report and full-colour evidence?")}>Generate protected PDF</button>
+              onClick={() => runPdf("generate", "Generate one immutable encrypted PDF from this exact approved floor report and full-colour evidence?")}>{busyAction === "pdf-generate" ? "Generating protected PDF…" : "Generate protected PDF"}</button>
             <button type="button" className={pdfArtifact?.status === "GENERATED" ? "button" : "button-secondary"}
               disabled={busy || pdfArtifact?.status !== "GENERATED"}
               onClick={() => runPdf("verify", "Verify the PDF hash, embedded evidence, and print-only permission profile?")}>Verify PDF</button>

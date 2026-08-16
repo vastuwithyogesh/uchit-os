@@ -618,6 +618,40 @@ export function createFounderComplimentaryCaseHandoff(input: {
   return nextCase;
 }
 
+export function createFounderPaidCaseHandoff(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
+  owner(input); safeIdempotency(input.idempotencyKey);
+  const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
+  if (!proposal) fail(404, "Proposal version not found.");
+  const existing = input.state.vastuCases.find((item) => item.organisationId === input.organisationId && item.proposalId === proposal.id && item.clientId === proposal.clientId);
+  if (existing) return existing;
+  if (proposal.status !== "ACCEPTED") fail(409, "Proposal must be accepted before opening a case.");
+  if (proposal.content.commercial.engagementClassification === "INTERNAL_COMPLIMENTARY") fail(409, "Use the governed complimentary handoff for an INTERNAL_COMPLIMENTARY proposal.");
+  assertExpected(proposal.recordVersion, input.expectedRecordVersion, "accepted proposal");
+  const terms = proposal.content.commercial;
+  if (terms.totalPayablePaise <= 0) fail(409, "A paid proposal must have total payable greater than ₹0.");
+  const payment = input.state.founderCommercialPaymentConfirmations.filter((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.type === "ADVANCE").sort((a, b) => b.confirmedAt.localeCompare(a.confirmedAt))[0];
+  if (!payment || payment.amountPaise <= 0) fail(409, "Confirm receipt of the advance before opening the case.");
+  if (payment.amountPaise > terms.totalPayablePaise) fail(409, "Advance cannot exceed the total payable.");
+  if (terms.engagementClassification === "STANDARD_PAID" && payment.amountPaise < terms.agreedAdvancePaise) fail(409, "Confirm receipt of the agreed advance before opening the case.");
+  const response = input.state.founderProposalResponses.find((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.clientId === proposal.clientId && item.prospectiveProjectId === proposal.prospectiveProjectId && item.response === "ACCEPTED" && item.proposalContentHash === proposal.contentHash);
+  if (!response) fail(409, "The accepted response is not bound to this exact proposal version.");
+  const artifact = input.state.founderProposalArtifacts.find((item) => item.organisationId === input.organisationId && item.proposalVersionId === proposal.id && item.proposalContentHash === proposal.contentHash && item.artifactHashSha256 === response.artifactHashSha256);
+  if (!artifact) fail(409, "The accepted proposal artifact hash is unavailable or does not match.");
+  const project = input.state.prospectiveProjects.find((item) => item.id === proposal.prospectiveProjectId && item.organisationId === input.organisationId && item.clientId === proposal.clientId);
+  const client = input.state.clients.find((item) => item.id === proposal.clientId && item.organisationId === input.organisationId);
+  if (!project || !client || project.serviceType !== proposal.serviceType || project.responseVersionId !== proposal.content.requirements.qualificationResponseVersionId) fail(409, "The paid proposal is not linked to an organisation-scoped client project.");
+  const now = nowIso(input.now); const caseId = uuid(); const projectId = uuid(); const floorId = uuid(); const caseNumber = `UV-${new Date(now).getUTCFullYear()}-${String(input.state.vastuCases.length + 1).padStart(3, "0")}`;
+  const nextCase: VastuCaseRecord = { id: caseId, organisationId: input.organisationId, caseNumber, clientId: proposal.clientId, proposalId: proposal.id, projectId, status: "CASE_CREATED", reportStatus: "DRAFT", orientationLocked: false, balanceApproved: false, fullPaymentApproved: false, serviceType: proposal.serviceType, canonicalStage: "UNDERSTAND", revisionNumber: 1, recordVersion: 1, evaluationArchitectureVersion: "V1" };
+  const nextProject: VastuProjectRecord = { id: projectId, organisationId: input.organisationId, clientId: proposal.clientId, activeCaseId: caseId, propertyName: project.displayName ?? "Property project", status: "IN_PROGRESS", createdAt: now };
+  const nextFloor: FloorWorkspaceRecord = { id: floorId, organisationId: input.organisationId, caseId, projectId, floorLabel: "Ground floor", status: "DRAFT", locked: false, evidenceUploads: [], idempotencyKey: `handoff-floor:${input.idempotencyKey}`, evaluationArchitectureVersion: "V1" };
+  input.state.vastuCases.unshift(nextCase); input.state.projects.unshift(nextProject); input.state.floorWorkspaces.unshift(nextFloor);
+  const propertyContext: CasePropertyContextRecord = { id: uuid(), organisationId: input.organisationId, clientId: proposal.clientId, caseId, projectId, propertyContext: { serviceInterest: proposal.serviceType, propertyType: project.propertyType ?? "Residential", propertyStatus: "Known", cityCountry: project.propertyLocation, constraints: project.importantNotes, floorCount: project.floorCount ?? 1 }, version: 1, idempotencyKey: `handoff-property-context:${input.idempotencyKey}`, createdAt: now, updatedAt: now, status: "CURRENT", createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
+  input.state.casePropertyContexts.unshift(propertyContext); project.caseId = caseId; project.status = "CONVERTED"; project.recordVersion = (project.recordVersion ?? 0) + 1; proposal.recordVersion = (proposal.recordVersion ?? 0) + 1;
+  input.state.timelineEvents.unshift({ id: uuid(), organisationId: input.organisationId, clientId: proposal.clientId, category: "Commercial", headline: "Paid case opened", details: `Case ${caseNumber} opened from proposal ${proposal.id} after confirmed advance ${payment.id}.`, happenedAt: now, actorRole: input.actor.role, actorId: input.actor.id, actorName: input.actor.fullName });
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "PAID_CASE_HANDOFF_CREATED", entityType: "VASTU_CASE", entityId: caseId, actorUserId: input.actor.id, reason: "Paid proposal handoff after canonical confirmed advance.", proposalVersionId: proposal.id, prospectiveProjectId: project.id, afterHash: deterministicContentHash({ caseId, proposalId: proposal.id, paymentId: payment.id }), idempotencyKey: `audit:${input.idempotencyKey}` });
+  return nextCase;
+}
+
 export function createFounderProspectiveCase(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; clientId: string; serviceType: "EXISTING_SPACE" | "NEW_CONSTRUCTION"; propertyType: "Residential" | "Commercial" | "Factory" | "Shop" | "Hospital" | "Hotel" | "Temple"; displayName: string; propertyLocation: string; floorCount?: number; importantNotes?: string; confirmPossibleDuplicate?: boolean; idempotencyKey: string; expectedClientRecordVersion: number; allowLegacyUnownedLocalFixture?: boolean }) {
   owner(input); safeIdempotency(input.idempotencyKey);
   const client = input.state.clients.find((item) => item.id === input.clientId && (item.organisationId === input.organisationId || (input.allowLegacyUnownedLocalFixture === true && !item.organisationId)));
@@ -684,6 +718,9 @@ export function confirmFounderCommercialPayment(input: { state: AppState; actor:
   if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for a different payment confirmation."); return replay; }
   if (input.state.founderCommercialPaymentConfirmations.some((item) => item.organisationId === input.organisationId && item.paymentId === input.paymentId)) fail(409, "This payment receipt is already bound to a commercial confirmation.");
   const terms = proposal.content.commercial;
+  if (terms.engagementClassification !== "INTERNAL_COMPLIMENTARY" && terms.totalPayablePaise <= 0) fail(409, "A paid proposal must have total payable greater than ₹0.");
+  if (input.type === "ADVANCE" && input.amountPaise <= 0) fail(409, "A paid case requires an advance greater than ₹0.");
+  if (input.type === "ADVANCE" && input.amountPaise > terms.totalPayablePaise) fail(409, "Advance cannot exceed the total payable.");
   if (input.type === "ADVANCE" && input.amountPaise < terms.agreedAdvancePaise && terms.engagementClassification === "STANDARD_PAID") fail(409, "Confirmed advance is below the approved agreed advance and has no authorised exception.");
   const confirmedAt = nowIso(input.now); const confirmation = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, clientId: proposal.clientId, prospectiveProjectId: proposal.prospectiveProjectId, paymentId: input.paymentId, type: input.type, amountPaise: input.amountPaise, confirmedAt, confirmedByActorUserId: input.actor.id, proposalContentHash: proposal.contentHash, idempotencyKey: input.idempotencyKey, requestHash, recordVersion: 1 };
   input.state.founderCommercialPaymentConfirmations.push(confirmation);

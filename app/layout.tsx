@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import { headers } from "next/headers";
 import "@/app/globals.css";
 import { SessionProvider } from "@/components/session-provider";
+import { ActionFeedbackProvider } from "@/components/action-feedback";
 
 async function resolveMetadataBase() {
   const headerStore = await headers();
@@ -42,7 +43,7 @@ export default function RootLayout({ children }: Readonly<{ children: ReactNode 
   return (
     <html lang="en">
       <body>
-        <SessionProvider>{children}</SessionProvider>
+        <ActionFeedbackProvider><SessionProvider>{children}</SessionProvider></ActionFeedbackProvider>
       </body>
     </html>
   );

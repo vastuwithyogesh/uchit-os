@@ -36,7 +36,8 @@ test("disposable role switching is server-visible only on the guarded local demo
   assert.match(auth, /isExplicitLocalDemo\(headers\)[\s\S]*uchit-vastu-demo-role/);
   assert.match(auth, /request\.headers\.get\("x-uchit-demo-role"\)/);
   assert.match(session, /document\.cookie = `uchit-vastu-demo-role=/);
-  assert.match(auth, /process\.env\.NODE_ENV !== "production"/);
+  assert.match(auth, /localAuthRuntimeValue\("NODE_ENV"\)/);
+  assert.match(auth, /getRuntimeEnv\(\)\[key\]/);
 });
 
 test("case selection and deep links both use the same server access rule", () => {

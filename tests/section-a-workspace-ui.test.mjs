@@ -11,7 +11,7 @@ const founder = read("components/founder-step-workspace.tsx");
 const css = read("app/globals.css");
 
 test("Founder step 13 opens one ordered remediation report workspace", () => {
-  assert.match(founder, /stepNumber === 13[^\n]+RemediationReportWorkspace/);
+  assert.match(founder, /stepNumber === 13[\s\S]*?RemediationReportWorkspace/);
   assert.equal((parent.match(/SectionARemediationWorkspace/g) ?? []).length >= 2, true);
   assert.equal((parent.match(/StageBRemedyWorkspace/g) ?? []).length >= 2, true);
 });

@@ -2014,6 +2014,13 @@ body { overflow-x: hidden; }
   overflow-x: hidden;
 }
 
+.action-feedback-region { position: fixed; z-index: 1000; right: 20px; bottom: 20px; display: grid; gap: 10px; width: min(380px, calc(100vw - 40px)); pointer-events: none; }
+.action-feedback-notice { display: flex; align-items: center; justify-content: space-between; gap: 14px; padding: 12px 14px; border: 1px solid var(--border); border-radius: 12px; background: var(--surface, #fff); box-shadow: 0 12px 28px rgba(34, 25, 18, .16); pointer-events: auto; }
+.action-feedback-notice button { border: 0; background: transparent; color: inherit; cursor: pointer; text-decoration: underline; }
+.action-feedback-success { border-color: #7aa786; }
+.action-feedback-error { border-color: #c66b63; }
+.action-feedback-warning { border-color: #c69b52; }
+
 .founder-command-center {
   display: grid;
   gap: 16px;

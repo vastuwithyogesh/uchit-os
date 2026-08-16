@@ -46,7 +46,7 @@ test("V1 Step 10 exposes only the native Site workspace for SITE_EVIDENCE_REQUIR
   const page = read("components/founder-flow.tsx");
   const workspace = read("components/founder-step-workspace.tsx");
   const siteWorkspace = read("components/v1-site-elemental-workspace.tsx");
-  assert.match(scorecard, /blockerCodes: !facts\.site && v1\.postSite === "BLOCKED" \? \["SITE_EVIDENCE_REQUIRED"\]/);
+  assert.match(scorecard, /blockerCodes: !siteEvidence && v1\.blockers\.includes\("SITE_EVIDENCE_REQUIRED"\)/);
   assert.match(flow, /module\.id === "site" && module\.status === "BLOCKED" && module\.blockerCodes\?\.length === 1 && module\.blockerCodes\[0\] === "SITE_EVIDENCE_REQUIRED"/);
   assert.match(page, /!isBlocked \|\| isRegeneration \|\| step\.selfRemediableOnCurrentStep/);
   assert.match(workspace, /stepNumber === 10.*V1SiteElementalWorkspace focus="site"/s);

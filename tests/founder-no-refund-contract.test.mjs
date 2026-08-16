@@ -19,6 +19,6 @@ test("v15 is additive and exposes no refund, credit, reversal or deletion action
 
 test("proposal policy UI and client projection use the exact active version while Media Library stays in the next package", async () => {
   const editor = await source("components/founder-commercial-proposal-editor.tsx"); const page = await source("app/commercial-proposals/[proposalId]/[step]/page.tsx"); const media = await source("app/media-library/page.tsx");
-  assert.match(editor, /No-refund policy/); assert.match(editor, /activeNoRefundPolicy\.exactText/); assert.match(page, /CANCELLATION_REFUND_DELAY/);
+  assert.match(editor, /activeNoRefundPolicy\.exactText/); assert.match(editor, /Active cancellation, refund and delay policy/); assert.match(page, /CANCELLATION_REFUND_DELAY/);
   assert.match(media, /MediaLibraryConsole/);
 });

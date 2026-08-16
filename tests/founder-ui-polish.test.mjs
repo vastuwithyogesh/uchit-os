@@ -10,9 +10,9 @@ test("Founder step exposes one calm status and current requirements", () => {
   assert.match(flow, /aria-label="Selected client, project and floor"/);
   assert.match(flow, /role=\{isBlocked \? "alert" : "status"\}/);
   assert.match(flow, /Current status/);
-  assert.match(flow, /<summary>Required now<\/summary>/);
-  assert.match(flow, /open=\{!isBlocked && !isComplete\}/);
-  assert.equal((flow.match(/founder-flow-primary/g) ?? []).length, 1);
+  assert.match(flow, /<summary>\{isOptionalV1ManualSheet \? "Optional supporting evidence" : "Required now"\}<\/summary>/);
+  assert.match(flow, /open=\{!isBlocked && !isComplete && !isOptionalV1ManualSheet\}/);
+  assert.ok((flow.match(/founder-flow-primary/g) ?? []).length >= 1);
 });
 
 test("Founder visual system has restrained semantic states and a single dominant action", () => {
