@@ -122,6 +122,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const [target, setTarget] = useState<CanonicalPipelineStage>("NEW");
   const [nextAction, setNextAction] = useState("");
   const [dueAt, setDueAt] = useState("");
+  const [correctionReason, setCorrectionReason] = useState("");
   const [busy, setBusy] = useState(true);
   const [message, setMessage] = useState("Loading leads…");
   const [errorKind, setErrorKind] = useState<"none" | "offline" | "conflict" | "load">("none");
@@ -159,18 +160,24 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const selectedClient = selected?.clientId ? state?.clients.find((client) => client.id === selected.clientId) : undefined;
   const pipeline = selectedClient ? normalizeClientPipeline(selectedClient) : undefined;
   const allowedTargets = pipeline ? getAllowedPipelineTransitions(pipeline.stage).filter((stage) => leadPipelineStages.includes(stage)) : [];
+  const canRecordCorrection = activeUser.role === "ADMIN" || activeUser.role === "SUPER_ADMIN";
   const events = useMemo<TimelineEvent[]>(() => selected?.clientId ? (state?.timelineEvents ?? []).filter((event) => event.clientId === selected.clientId).slice(0, 12) : [], [state, selected?.clientId]);
   const clientCases = useMemo(() => selectedClient ? (state?.vastuCases ?? []).filter((item) => item.clientId === selectedClient.id) : [], [state?.vastuCases, selectedClient?.id]);
   const clientProjects = useMemo(() => selectedClient ? (state?.prospectiveProjects ?? []).filter((item) => item.clientId === selectedClient.id && !item.caseId) : [], [state?.prospectiveProjects, selectedClient?.id]);
   const proposedTargets = useMemo(() => {
     const group = pipelineGroups.find((item) => item.id === moveGroupId);
-    return group ? allowedTargets.filter((stage) => groupContainsStage(group, stage)) : allowedTargets;
-  }, [allowedTargets, moveGroupId]);
+    if (!group) return allowedTargets;
+    const directTargets = allowedTargets.filter((stage) => groupContainsStage(group, stage));
+    return directTargets.length || !canRecordCorrection
+      ? directTargets
+      : group.stages.filter((stage) => stage !== pipeline?.stage);
+  }, [allowedTargets, canRecordCorrection, moveGroupId, pipeline?.stage]);
 
   useEffect(() => {
     if (!selected) return;
     const first = proposedTargets[0] ?? allowedTargets[0] ?? selected.stage;
     setTarget(first); setNextAction(selected.nextAction?.summary ?? ""); setDueAt(selected.nextAction?.dueAt?.slice(0, 16) ?? "");
+    setCorrectionReason("");
     key.current = crypto.randomUUID();
   }, [selected?.id, selected?.stage, selected?.nextAction?.dueAt, moveGroupId]);
 
@@ -186,7 +193,8 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     const client = row.clientId ? state?.clients.find((item) => item.id === row.clientId) : undefined;
     const permitted = client ? getAllowedPipelineTransitions(normalizeClientPipeline(client).stage) : [];
     const group = pipelineGroups.find((item) => item.id === groupId);
-    if (!group || !permitted.some((stage) => groupContainsStage(group, stage))) {
+    const directTargets = group ? permitted.filter((stage) => groupContainsStage(group, stage)) : [];
+    if (!group || (!directTargets.length && (!canRecordCorrection || !group.stages.length))) {
       setMessage("That skip is not allowed. The lead stayed in its current stage; choose an allowed next stage.");
       setMoveOpen(false); return;
     }
@@ -196,14 +204,20 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   async function saveTransition() {
     if (!selectedClient || !state || target === pipeline?.stage) return;
     const terminal = terminalStages.has(target);
+    const correction = !allowedTargets.includes(target);
+    if (correction && (!canRecordCorrection || correctionReason.trim().length < 20 || correctionReason.trim().length > 500)) {
+      setMessage("An out-of-sequence Founder correction requires a reason of 20–500 characters."); return;
+    }
     if (!terminal && (!nextAction.trim() || !dueAt || new Date(dueAt).getTime() <= Date.now())) {
       setMessage("Add a future next action and due date before moving this lead."); return;
     }
+    if (correction && !window.confirm("Record this administrative pipeline correction? The reason will remain in immutable history.")) return;
     setBusy(true); setErrorKind("none");
     try {
       const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
         action: "client-pipeline-transition", clientId: selectedClient.id, pipelineStage: target,
         nextAction: terminal ? undefined : nextAction, nextActionDueAt: terminal ? undefined : new Date(dueAt).toISOString(),
+        correction, correctionReason: correction ? correctionReason.trim() : undefined,
         idempotencyKey: key.current, expectedRecordVersion: selectedClient.recordVersion ?? 0, expectedRevision: state.persistenceRevision ?? null,
       }) });
       const result = await response.json();
@@ -354,7 +368,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
 
     {complimentaryProject ? <div className="lead-drawer-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setComplimentaryProject(undefined)} aria-label="Close complimentary proposal" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="complimentary-proposal-title"><span className="eyebrow">Founder-authorised exception</span><h2 id="complimentary-proposal-title">Create INTERNAL_COMPLIMENTARY proposal</h2><p>This uses the existing protected commercial workflow. It records zero fee, zero GST, zero advance and zero payable; it does not create payment or invoice records.</p><dl className="focused-summary"><div><dt>Project</dt><dd>{complimentaryProject.displayName}</dd></div><div><dt>Professional fee</dt><dd>₹0</dd></div><div><dt>GST</dt><dd>₹0</dd></div><div><dt>Total payable</dt><dd>₹0</dd></div><div><dt>Advance</dt><dd>₹0</dd></div></dl><label>Private Founder reason<textarea value={complimentaryReason} onChange={(event) => setComplimentaryReason(event.target.value)} required maxLength={1200} /></label><div className="lead-move-actions"><button type="button" className="button" disabled={complimentaryBusy || !complimentaryReason.trim()} onClick={() => void createComplimentaryProposal()}>{complimentaryBusy ? "Creating proposal…" : "Create complimentary proposal"}</button><button type="button" className="button-secondary" disabled={complimentaryBusy} onClick={() => setComplimentaryProject(undefined)}>Cancel</button></div></section></div> : null}
 
-    {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
+    {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!allowedTargets.includes(target) ? <><p className="blocked-note">This grouped move skips canonical stages and will be recorded as an audited administrative correction.</p><label>Correction reason (20–500 characters)<textarea value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} maxLength={500} /></label></> : null}{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
 
     <div className="lead-workspace-footer" role={errorKind === "conflict" ? "alert" : "status"} aria-live="polite"><span>{message}{errorKind === "conflict" ? " Your draft remains here; reload before retrying." : ""}</span><button type="button" className="button-secondary" disabled={busy} onClick={() => void refresh(selected?.id)}>{busy ? "Refreshing…" : "Reload"}</button></div>
   </section>{openCase && selectedClient && state ? <FounderOpenCaseSheet client={selectedClient} user={activeUser} revision={state.persistenceRevision} onClose={() => setOpenCase(false)} onCreated={() => { setOpenCase(false); void refresh(selected?.id); }} /> : null}{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepareContext={prepareCommunicationContext} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;
