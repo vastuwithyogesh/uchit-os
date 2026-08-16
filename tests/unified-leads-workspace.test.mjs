@@ -54,3 +54,14 @@ test("responsive drawer and keyboard-accessible move controls are present", () =
   assert.match(css, /min-height:\s*44px/);
   assert.match(css, /:where\(a, button, input, textarea, select, summary\):focus-visible/);
 });
+
+test("converted Founder leads surface the governed editable proposal handoff", () => {
+  const ui = source("components/unified-leads-workspace.tsx");
+  assert.match(ui, /selected\.stage === "WON"/);
+  assert.match(ui, /Create proposal/);
+  assert.match(ui, /action: "founder-proposal-draft-create"/);
+  for (const field of ["classification", "professionalFeePaise", "appliedGstBasisPoints", "agreedAdvancePaise", "expectedProjectVersion", "expectedRevision", "idempotencyKey"]) assert.match(ui, new RegExp(field));
+  assert.match(ui, /STANDARD_PAID/);
+  assert.match(ui, /INTERNAL_COMPLIMENTARY/);
+  assert.match(ui, /window\.location\.assign\(`\/commercial-proposals/);
+});

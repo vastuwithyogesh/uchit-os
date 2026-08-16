@@ -24,11 +24,12 @@ test("Leads opens as a full-width table and one shared right-side profile drawer
   assert.doesNotMatch(page, /FounderRouteIntro|hero/);
 });
 
-test("Lead Pipeline uses five visual groups with canonical server confirmation", () => {
+test("Lead Pipeline uses six pre-case visual groups with canonical server confirmation", () => {
   const page = source("app/lead-pipeline/page.tsx");
   const ui = source("components/unified-leads-workspace.tsx");
   assert.match(page, /mode="pipeline"/);
-  for (const label of ["New", "Contacted / Engaged", "Review / Qualified", "Converted", "Lost / Closed"]) assert.match(ui, new RegExp(label.replace("/", "\\/")));
+  for (const label of ["Lead", "Engaged", "Contacted", "Follow-up / Nurture", "Review", "Converted"]) assert.match(ui, new RegExp(label.replace("/", "\\/")));
+  assert.doesNotMatch(ui, /Lost \/ Closed/);
   assert.match(ui, /onDrop/);
   assert.match(ui, /Confirm canonical transition/);
   assert.match(ui, /getAllowedPipelineTransitions/);

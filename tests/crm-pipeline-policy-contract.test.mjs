@@ -16,7 +16,7 @@ const commercialConsole = source("components/commercial-console.tsx");
 const leadInboxConsole = source("components/lead-inbox-console.tsx");
 
 test("canonical CRM pipeline is additive and legacy stages remain intact", () => {
-  for (const stage of ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"]) assert.match(domain, new RegExp(`"${stage}"`));
+  for (const stage of ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "PRE_CASE_FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"]) assert.match(domain, new RegExp(`"${stage}"`));
   assert.match(domain, /stage: LeadStage/);
   assert.match(domain, /pipelineStage\?: CanonicalPipelineStage/);
   assert.match(functionBody(pipeline, "legacyPipelineStage"), /CONVERTED.*WON/s);
@@ -25,9 +25,11 @@ test("canonical CRM pipeline is additive and legacy stages remain intact", () =>
 
 test("pipeline transitions are sequential unless an administrator records a correction", () => {
   const transitions = pipeline.slice(pipeline.indexOf("const normalPipelineTransitions"), pipeline.indexOf("export function getAllowedPipelineTransitions"));
-  assert.match(transitions, /NEW: \["CONTACTED", "DISQUALIFIED"\]/);
-  assert.match(transitions, /PROPOSAL_SCOPE: \["WON", "DISQUALIFIED"\]/);
+  assert.match(transitions, /NEW: \["CONTACTED", "VSL_SENT", "DISQUALIFIED"\]/);
+  assert.match(transitions, /CONTACTED: \["VSL_SENT", "PAID_REVIEW_PENDING", "PRE_CASE_FOLLOW_UP", "DISQUALIFIED"\]/);
+  assert.match(transitions, /PROPOSAL_SCOPE: \["WON", "PRE_CASE_FOLLOW_UP", "DISQUALIFIED"\]/);
   assert.match(transitions, /FOLLOW_UP: \["CLOSED_REFERRAL"\]/);
+  assert.match(transitions, /PRE_CASE_FOLLOW_UP: \["CONTACTED", "PAID_REVIEW_PENDING", "DISQUALIFIED"\]/);
   assert.match(transitions, /CLOSED_REFERRAL: \[\]/);
   assert.match(transitions, /DISQUALIFIED: \[\]/);
   const body = functionBody(workflow, "transitionClientPipeline");

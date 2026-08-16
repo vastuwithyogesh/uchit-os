@@ -125,7 +125,7 @@ export interface IntegrationCursorRecord extends OrganisationOwnedRecord {
 
 export const leadStages = ["NEW", "QUALIFYING", "QUALIFIED", "DISQUALIFIED", "CONVERTED"] as const;
 export type LeadStage = (typeof leadStages)[number];
-export const canonicalPipelineStages = ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"] as const;
+export const canonicalPipelineStages = ["NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "ONBOARDING", "IN_DELIVERY", "FOLLOW_UP", "PRE_CASE_FOLLOW_UP", "CLOSED_REFERRAL", "DISQUALIFIED"] as const;
 export type CanonicalPipelineStage = (typeof canonicalPipelineStages)[number];
 
 export const inboundLeadStatuses = ["NEW", "FILTERED", "QUALIFIED", "DISQUALIFIED", "DUPLICATE"] as const;

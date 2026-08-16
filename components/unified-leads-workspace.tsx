@@ -26,16 +26,27 @@ type Row = {
 
 const leadPipelineStages: CanonicalPipelineStage[] = [
   "NEW", "CONTACTED", "VSL_SENT", "VSL_WATCHED", "PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED",
-  "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "DISQUALIFIED", "CLOSED_REFERRAL",
+  "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE", "WON", "PRE_CASE_FOLLOW_UP", "DISQUALIFIED", "CLOSED_REFERRAL",
 ];
 
 const pipelineGroups = [
-  { id: "NEW", label: "New", stages: ["NEW"] },
-  { id: "ENGAGED", label: "Contacted / Engaged", stages: ["CONTACTED", "VSL_SENT", "VSL_WATCHED"] },
-  { id: "REVIEW", label: "Review / Qualified", stages: ["PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE"] },
+  { id: "LEAD", label: "Lead", stages: ["NEW"] },
+  { id: "ENGAGED", label: "Engaged", stages: ["VSL_SENT", "VSL_WATCHED"] },
+  { id: "CONTACTED", label: "Contacted", stages: ["CONTACTED"] },
+  { id: "NURTURE", label: "Follow-up / Nurture", stages: ["PRE_CASE_FOLLOW_UP"] },
+  { id: "REVIEW", label: "Review", stages: ["PAID_REVIEW_PENDING", "PAID_REVIEW_BOOKED", "FORM_PENDING", "REVIEW_COMPLETED", "QUALIFIED", "PROPOSAL_SCOPE"] },
   { id: "CONVERTED", label: "Converted", stages: ["WON"] },
-  { id: "CLOSED", label: "Lost / Closed", stages: ["DISQUALIFIED", "CLOSED_REFERRAL"] },
 ] as const satisfies ReadonlyArray<{ id: string; label: string; stages: readonly CanonicalPipelineStage[] }>;
+
+type PipelineGroupId = (typeof pipelineGroups)[number]["id"];
+const operationalGroupTargets: Readonly<Record<PipelineGroupId, readonly PipelineGroupId[]>> = {
+  LEAD: ["ENGAGED"],
+  ENGAGED: ["CONTACTED"],
+  CONTACTED: ["REVIEW", "NURTURE"],
+  NURTURE: ["CONTACTED", "REVIEW"],
+  REVIEW: ["CONVERTED", "NURTURE"],
+  CONVERTED: [],
+};
 
 const terminalStages = new Set<CanonicalPipelineStage>(["DISQUALIFIED", "CLOSED_REFERRAL"]);
 const stageLabel = (stage: string) => stage.replaceAll("_", " ").toLowerCase().replace(/^./, (character) => character.toUpperCase());
@@ -107,9 +118,16 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   const [editing, setEditing] = useState(false);
   const [openCase, setOpenCase] = useState(false);
   const [complimentaryProject, setComplimentaryProject] = useState<NonNullable<Bootstrap["prospectiveProjects"]>[number]>();
+  const [proposalProject, setProposalProject] = useState<NonNullable<Bootstrap["prospectiveProjects"]>[number]>();
   const [classificationBusy, setClassificationBusy] = useState<string>();
   const [complimentaryReason, setComplimentaryReason] = useState("");
   const [complimentaryBusy, setComplimentaryBusy] = useState(false);
+  const [proposalBusy, setProposalBusy] = useState(false);
+  const [proposalClassification, setProposalClassification] = useState<"STANDARD_PAID" | "SPECIAL_DISCOUNTED" | "INTERNAL_COMPLIMENTARY">("STANDARD_PAID");
+  const [proposalFee, setProposalFee] = useState("");
+  const [proposalGst, setProposalGst] = useState("");
+  const [proposalAdvance, setProposalAdvance] = useState("");
+  const [proposalReason, setProposalReason] = useState("");
   const [profileDraft, setProfileDraft] = useState({ fullName: "", email: "", phone: "", city: "", country: "", timeZone: "", serviceInterest: "" });
   const [editReason, setEditReason] = useState("");
   const [moveGroupId, setMoveGroupId] = useState("");
@@ -192,6 +210,11 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   }, [selected?.id]);
 
   function openLead(row: Row) { setSelectedId(row.id); setDrawerOpen(true); setMoveOpen(false); setMoveGroupId(""); }
+  function openConvertedProposal(row: Row) {
+    openLead(row);
+    const project = row.clientId ? state?.prospectiveProjects.find((item) => item.clientId === row.clientId && !item.caseId && item.serviceType) : undefined;
+    if (project) openProposalDraft(project);
+  }
   function proposeMove(row: Row, groupId: string) {
     setSelectedId(row.id); setMoveGroupId(groupId); setDrawerOpen(false);
     const client = row.clientId ? state?.clients.find((item) => item.id === row.clientId) : undefined;
@@ -276,6 +299,60 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
     finally { setComplimentaryBusy(false); }
   }
 
+  function openProposalDraft(project: NonNullable<Bootstrap["prospectiveProjects"]>[number]) {
+    const policy = state?.founderCommercialPolicies?.find((item) => item.status === "ACTIVE");
+    setProposalProject(project);
+    setProposalClassification("STANDARD_PAID");
+    setProposalFee(String(Math.round((policy?.referenceFeePaise ?? 5_100_000) / 100)));
+    setProposalGst(String((policy?.defaultGstBasisPoints ?? 1_800) / 100));
+    setProposalAdvance(String(Math.round((policy?.referenceAdvancePaise ?? 1_100_000) / 100)));
+    setProposalReason("");
+  }
+
+  async function createEditableProposal() {
+    if (!proposalProject || !selectedClient || !state) return;
+    const policy = state.founderCommercialPolicies?.find((item) => item.status === "ACTIVE");
+    const professionalFeePaise = Math.round(Number(proposalFee) * 100);
+    const appliedGstBasisPoints = Math.round(Number(proposalGst) * 100);
+    const agreedAdvancePaise = Math.round(Number(proposalAdvance) * 100);
+    if (!Number.isSafeInteger(professionalFeePaise) || professionalFeePaise < 0 || !Number.isSafeInteger(appliedGstBasisPoints) || appliedGstBasisPoints < 0 || !Number.isSafeInteger(agreedAdvancePaise) || agreedAdvancePaise < 0) {
+      setMessage("Enter valid non-negative commercial amounts before creating the proposal."); return;
+    }
+    if (proposalClassification !== "INTERNAL_COMPLIMENTARY" && professionalFeePaise <= 0) {
+      setMessage("A paid proposal requires a professional fee greater than zero."); return;
+    }
+    const hasTermDeviation = professionalFeePaise !== (policy?.referenceFeePaise ?? 5_100_000) || appliedGstBasisPoints !== (policy?.defaultGstBasisPoints ?? 1_800) || agreedAdvancePaise !== (policy?.referenceAdvancePaise ?? 1_100_000);
+    if ((proposalClassification !== "STANDARD_PAID" || hasTermDeviation) && proposalReason.trim().length < 10) {
+      setMessage("Add a private Founder reason for a discounted or complimentary proposal."); return;
+    }
+    if (proposalClassification === "STANDARD_PAID" && agreedAdvancePaise < (policy?.referenceAdvancePaise ?? 1_100_000)) {
+      setMessage("A below-reference advance is a Founder exception; choose PAID (Founder exception) and record the reason."); return;
+    }
+    setProposalBusy(true); setErrorKind("none");
+    try {
+      const latestBootstrap = await fetchJson<Bootstrap>("/api/bootstrap");
+      const latestProject = latestBootstrap.prospectiveProjects?.find((item) => item.id === proposalProject.id);
+      if (!latestProject) throw new Error("The prospective project is no longer available. Refresh and try again.");
+      const response = await fetch("/api/actions", { method: "POST", headers: buildActionHeaders(activeUser.role), body: JSON.stringify({
+        action: "founder-proposal-draft-create", clientId: selectedClient.id, prospectiveProjectId: latestProject.id,
+        classification: proposalClassification, professionalFeePaise, appliedGstBasisPoints, agreedAdvancePaise,
+        classificationReason: proposalClassification === "STANDARD_PAID" ? undefined : proposalReason.trim(),
+        feeDeviationReason: hasTermDeviation ? proposalReason.trim() : undefined,
+        gstDeviationReason: hasTermDeviation ? proposalReason.trim() : undefined,
+        advanceExceptionReason: hasTermDeviation ? proposalReason.trim() : undefined,
+        idempotencyKey: `founder:proposal:${latestProject.id}:${crypto.randomUUID()}`,
+        expectedProjectVersion: latestProject.recordVersion ?? 0, expectedRecordVersion: latestProject.recordVersion ?? 0,
+        expectedRevision: latestBootstrap.persistenceRevision ?? state.persistenceRevision ?? null,
+      }) });
+      const result = await response.json();
+      if (!response.ok || result.ok === false) throw new Error(result.error?.message ?? result.error ?? "The proposal could not be created.");
+      const proposalId = result.proposal?.id;
+      if (!proposalId) throw new Error("The server did not return the new proposal version. Reload and retry.");
+      window.location.assign(`/commercial-proposals/${encodeURIComponent(proposalId)}/1`);
+    } catch (error) { setMessage(error instanceof Error ? error.message : "The proposal could not be created."); }
+    finally { setProposalBusy(false); }
+  }
+
   async function classifyExistingSpace(project: NonNullable<Bootstrap["prospectiveProjects"]>[number]) {
     if (!selectedClient || !selected || !state || project.serviceType) return;
     setClassificationBusy(project.id); setErrorKind("none");
@@ -328,6 +405,11 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
 
   const primaryLabel = selectedClient ? "Save & continue" : "Open client readiness";
   const selectedGroup = selected ? groupForStage(selected.stage) : undefined;
+  const activeCommercialPolicy = state?.founderCommercialPolicies?.find((item) => item.status === "ACTIVE");
+  const proposalNeedsReason = proposalClassification !== "STANDARD_PAID"
+    || proposalFee !== String(Math.round((activeCommercialPolicy?.referenceFeePaise ?? 5_100_000) / 100))
+    || proposalGst !== String((activeCommercialPolicy?.defaultGstBasisPoints ?? 1_800) / 100)
+    || proposalAdvance !== String(Math.round((activeCommercialPolicy?.referenceAdvancePaise ?? 1_100_000) / 100));
   const resetFilters = () => { setQuery(""); setSourceFilter("ALL"); setStageFilter("ALL"); setDateFrom(""); setDateTo(""); setShowArchived(false); };
 
   return <><section className={`lead-workspace ${isPipelinePage ? "lead-workspace-pipeline" : "lead-workspace-table"}`} aria-labelledby="unified-leads-title">
@@ -347,7 +429,8 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
           <header><h3>{group.label}</h3><span>{groupRows.length}</span></header>
           <div className="lead-kanban-cards">{groupRows.length ? groupRows.map((row) => <article className="lead-kanban-card" key={row.id} draggable={Boolean(row.clientId)} onDragStart={(event) => event.dataTransfer.setData("text/lead-id", row.id)}>
             <button type="button" className="lead-kanban-card-open" onClick={() => openLead(row)}><strong>{row.name}</strong><span>{row.clientId ?? "Client ID pending"}</span><span className={`status-pill status-${toneFor(row.stage)}`}>{stageLabel(row.stage)}</span><span>{row.nextAction?.summary ?? "Next action not set"}</span><small>{row.sourceSystem} · {readableDate(row.nextAction?.dueAt)}</small></button>
-            <details className="lead-card-move"><summary>Move</summary><div>{pipelineGroups.filter((candidate) => candidate.id !== group.id).map((candidate) => <button type="button" key={candidate.id} onClick={() => proposeMove(row, candidate.id)}>Move to {candidate.label}</button>)}</div></details>
+            {row.stage === "WON" && row.clientId ? <button type="button" className="table-row-action" onClick={(event) => { event.stopPropagation(); openConvertedProposal(row); }}>Create proposal</button> : null}
+            <details className="lead-card-move"><summary>Next actions</summary><div>{operationalGroupTargets[group.id].map((targetGroup) => { const candidate = pipelineGroups.find((item) => item.id === targetGroup)!; return <button type="button" key={candidate.id} onClick={() => proposeMove(row, candidate.id)}>Move to {candidate.label}</button>; })}{canRecordCorrection ? <details><summary>Administrative correction</summary><div>{pipelineGroups.filter((candidate) => candidate.id !== group.id && !operationalGroupTargets[group.id].includes(candidate.id)).map((candidate) => <button type="button" key={candidate.id} onClick={() => proposeMove(row, candidate.id)}>Correct to {candidate.label}</button>)}</div></details> : null}</div></details>
           </article>) : <p>No leads</p>}</div>
         </section>;
       })}</div> :
@@ -359,7 +442,7 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
         {selectedClient ? <div className="lead-drawer-section"><button type="button" className="button" onClick={() => setOpenCase(true)}>Open new case</button><p className="meta">Create an independent prospective project. A Case ID follows only canonical commercial clearance.</p></div> : null}
         <details className="lead-drawer-section" open><summary>Profile</summary>{editing ? <div className="lead-profile-edit-form"><label>Full name<input value={profileDraft.fullName} onChange={(event) => setProfileDraft({ ...profileDraft, fullName: event.target.value })} /></label><label>Email<input type="email" value={profileDraft.email} onChange={(event) => setProfileDraft({ ...profileDraft, email: event.target.value })} /></label><label>Phone / WhatsApp<input value={profileDraft.phone} onChange={(event) => setProfileDraft({ ...profileDraft, phone: event.target.value })} /></label><label>City<input value={profileDraft.city} onChange={(event) => setProfileDraft({ ...profileDraft, city: event.target.value })} /></label><label>Country<input value={profileDraft.country} onChange={(event) => setProfileDraft({ ...profileDraft, country: event.target.value })} /></label><label>IANA time zone<input value={profileDraft.timeZone} onChange={(event) => setProfileDraft({ ...profileDraft, timeZone: event.target.value })} placeholder="Asia/Kolkata" /></label><label>Primary service interest<select value={profileDraft.serviceInterest} onChange={(event) => setProfileDraft({ ...profileDraft, serviceInterest: event.target.value })}><option value="">Choose service</option><option value="EXISTING_SPACE">Existing Space</option><option value="NEW_CONSTRUCTION">New Construction</option></select></label><label>Private change reason<textarea value={editReason} onChange={(event) => setEditReason(event.target.value)} required /></label><div><button className="button" type="button" disabled={busy || !editReason.trim()} onClick={() => void saveProfile()}>{busy ? "Saving…" : "Save changes"}</button><button className="button-secondary" type="button" onClick={() => setEditing(false)}>Cancel</button></div></div> : <dl><div><dt>Contact</dt><dd>{maskEmail(selected.email)} · {maskPhone(selected.phone)}</dd></div><div><dt>City</dt><dd>{selected.city || "Not recorded"}</dd></div><div><dt>Country / time zone</dt><dd>{[selected.country, selected.timeZone].filter(Boolean).join(" · ") || "Not recorded"}</dd></div><div><dt>Service</dt><dd>{selected.serviceInterest ? stageLabel(selected.serviceInterest) : "Not recorded"}</dd></div></dl>}</details>
         <details className="lead-drawer-section"><summary>Requirement / Intake</summary><p>{selected.serviceInterest ? `${stageLabel(selected.serviceInterest)} interest recorded.` : "Complete the Founder intake to capture property and service requirements."}</p><a href="/founder/03" className="text-link">Open intake step</a></details>
-        <details className="lead-drawer-section"><summary>Cases &amp; projects</summary>{clientCases.length || clientProjects.length ? <ul className="lead-timeline">{clientCases.map((item) => <li key={item.id}><strong>{item.caseNumber}</strong><span>{item.serviceType} · {item.status} · <a href={`/founder/continue?caseId=${item.id}`}>Continue</a></span></li>)}{clientProjects.map((item) => <li key={item.id}><strong>{item.variation ?? item.displayName ?? "Prospective project"}</strong><span>{item.propertyLocation ?? "Location pending"} · {item.serviceType ? `service: ${item.serviceType}` : "service not classified"} · commercial clearance pending</span>{!item.serviceType ? <button type="button" className="button-secondary" disabled={Boolean(classificationBusy)} onClick={() => void classifyExistingSpace(item)}>{classificationBusy === item.id ? "Saving service…" : "Confirm Existing Space"}</button> : null}<button type="button" className="button-secondary" onClick={() => { setComplimentaryProject(item); setComplimentaryReason(""); }}>Create INTERNAL_COMPLIMENTARY proposal</button></li>)}</ul> : <p>No cases or projects yet.</p>}{selectedClient ? <button type="button" className="button-secondary" onClick={() => setOpenCase(true)}>Open another case</button> : null}</details>
+        <details className="lead-drawer-section"><summary>Cases &amp; projects</summary>{clientCases.length || clientProjects.length ? <ul className="lead-timeline">{clientCases.map((item) => <li key={item.id}><strong>{item.caseNumber}</strong><span>{item.serviceType} · {item.status} · <a href={`/founder/continue?caseId=${item.id}`}>Continue</a></span></li>)}{clientProjects.map((item) => <li key={item.id}><strong>{item.variation ?? item.displayName ?? "Prospective project"}</strong><span>{item.propertyLocation ?? "Location pending"} · {item.serviceType ? `service: ${item.serviceType}` : "service not classified"} · commercial clearance pending</span>{!item.serviceType ? <button type="button" className="button-secondary" disabled={Boolean(classificationBusy)} onClick={() => void classifyExistingSpace(item)}>{classificationBusy === item.id ? "Saving service…" : "Confirm Existing Space"}</button> : null}{selected.stage === "WON" && item.serviceType ? <button type="button" className="button" onClick={() => openProposalDraft(item)}>Create proposal</button> : null}<button type="button" className="button-secondary" onClick={() => { setComplimentaryProject(item); setComplimentaryReason(""); }}>Create INTERNAL_COMPLIMENTARY proposal</button></li>)}</ul> : <p>{selected.stage === "WON" ? "Converted lead: create the prospective project from the existing qualification before drafting the proposal." : "No cases or projects yet."}</p>}{selectedClient ? <button type="button" className="button-secondary" onClick={() => setOpenCase(true)}>Open another case</button> : null}</details>
         <details className="lead-drawer-section" open><summary>Guided next action</summary><div className="lead-guided-actions"><button type="button" onClick={() => setCommunication({ key: "VSL" })}>Send VSL</button><div role="group" aria-label="Send deliverable brochure"><span>Send deliverable brochure</span><button type="button" onClick={() => setCommunication({ key: "BROCHURE", serviceType: "EXISTING_SPACE" })}>Existing Space</button><button type="button" onClick={() => setCommunication({ key: "BROCHURE", serviceType: "NEW_CONSTRUCTION" })}>New Construction</button></div><button type="button" onClick={() => setCommunication({ key: "QUALIFICATION" })}>Send qualification form</button></div><p className="meta">Pipeline transitions remain on Lead Pipeline. Opening a message never advances the lead automatically.</p></details>
         <details className="lead-drawer-section"><summary>Timeline</summary>{events.length ? <ol className="lead-timeline">{events.map((event) => <li key={event.id}><strong>{event.headline}</strong><span>{readableDate(event.happenedAt)} · {event.actorName ?? "Uchit"}</span></li>)}</ol> : <p>No Uchit activity yet.</p>}<p className="meta">Source history is labelled separately and never becomes authoritative audit.</p></details>
         <details className="lead-drawer-section"><summary>Follow-ups</summary><p>{selected.nextAction?.summary ?? "No follow-up scheduled."}</p><p className="meta">{readableDate(selected.nextAction?.dueAt)}</p></details>
@@ -372,7 +455,9 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
 
     {complimentaryProject ? <div className="lead-drawer-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setComplimentaryProject(undefined)} aria-label="Close complimentary proposal" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="complimentary-proposal-title"><span className="eyebrow">Founder-authorised exception</span><h2 id="complimentary-proposal-title">Create INTERNAL_COMPLIMENTARY proposal</h2><p>This uses the existing protected commercial workflow. It records zero fee, zero GST, zero advance and zero payable; it does not create payment or invoice records.</p><dl className="focused-summary"><div><dt>Project</dt><dd>{complimentaryProject.displayName}</dd></div><div><dt>Professional fee</dt><dd>₹0</dd></div><div><dt>GST</dt><dd>₹0</dd></div><div><dt>Total payable</dt><dd>₹0</dd></div><div><dt>Advance</dt><dd>₹0</dd></div></dl><label>Private Founder reason<textarea value={complimentaryReason} onChange={(event) => setComplimentaryReason(event.target.value)} required maxLength={1200} /></label><div className="lead-move-actions"><button type="button" className="button" disabled={complimentaryBusy || !complimentaryReason.trim()} onClick={() => void createComplimentaryProposal()}>{complimentaryBusy ? "Creating proposal…" : "Create complimentary proposal"}</button><button type="button" className="button-secondary" disabled={complimentaryBusy} onClick={() => setComplimentaryProject(undefined)}>Cancel</button></div></section></div> : null}
 
-    {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!allowedTargets.includes(target) ? <><p className="blocked-note">This grouped move skips canonical stages and will be recorded as an audited administrative correction.</p><label>Correction reason (20–500 characters)<textarea value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} maxLength={500} /></label></> : null}{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onChange={(event) => setDueAt(event.target.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
+    {proposalProject ? <div className="lead-drawer-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setProposalProject(undefined)} aria-label="Close proposal draft" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="proposal-draft-title"><span className="eyebrow">Converted lead · Founder commercial</span><h2 id="proposal-draft-title">Create editable proposal</h2><p>Set the commercial terms now. The proposal remains a draft until the existing Founder review, approval, artifact and client-acceptance gates complete.</p><label>Commercial type<select value={proposalClassification} onChange={(event) => { const value = event.target.value as typeof proposalClassification; setProposalClassification(value); if (value === "INTERNAL_COMPLIMENTARY") { setProposalFee("0"); setProposalGst("0"); setProposalAdvance("0"); } }}><option value="STANDARD_PAID">PAID</option><option value="SPECIAL_DISCOUNTED">PAID (Founder exception)</option><option value="INTERNAL_COMPLIMENTARY">INTERNAL_COMPLIMENTARY</option></select></label><label>Professional fee (₹)<input inputMode="decimal" value={proposalFee} onChange={(event) => setProposalFee(event.target.value)} /></label><label>GST (%)<input inputMode="decimal" value={proposalGst} onChange={(event) => setProposalGst(event.target.value)} /></label><label>Advance required (₹)<input inputMode="decimal" value={proposalAdvance} onChange={(event) => setProposalAdvance(event.target.value)} /></label>{proposalNeedsReason ? <label>Private Founder reason<textarea value={proposalReason} onChange={(event) => setProposalReason(event.target.value)} required maxLength={1200} /></label> : null}<div className="lead-move-actions"><button type="button" className="button" disabled={proposalBusy} onClick={() => void createEditableProposal()}>{proposalBusy ? "Creating proposal…" : "Create editable proposal"}</button><button type="button" className="button-secondary" disabled={proposalBusy} onClick={() => setProposalProject(undefined)}>Cancel</button></div></section></div> : null}
+
+    {moveOpen && selected ? <div className="lead-move-layer"><button className="lead-drawer-backdrop" type="button" onClick={() => setMoveOpen(false)} aria-label="Cancel move" /><section className="lead-move-sheet" role="dialog" aria-modal="true" aria-labelledby="move-sheet-title"><span className="eyebrow">Confirm canonical transition</span><h2 id="move-sheet-title">Move {selected.name}</h2><p>The card will not move until the server accepts this exact next stage.</p><label>Allowed next stage<select value={target} onChange={(event) => setTarget(event.target.value as CanonicalPipelineStage)}>{proposedTargets.map((stage) => <option key={stage} value={stage}>{stageLabel(stage)}</option>)}</select></label>{!allowedTargets.includes(target) ? <><p className="blocked-note">This grouped move skips canonical stages and will be recorded as an audited administrative correction.</p><label>Correction reason (20–500 characters)<textarea value={correctionReason} onChange={(event) => setCorrectionReason(event.target.value)} maxLength={500} /></label></> : null}{!terminalStages.has(target) ? <><label>Next action<input value={nextAction} onChange={(event) => setNextAction(event.target.value)} maxLength={500} /></label><label>Future due date<input type="datetime-local" value={dueAt} onInput={(event) => setDueAt(event.currentTarget.value)} onChange={(event) => setDueAt(event.currentTarget.value)} /></label></> : <p className="blocked-note">This terminal transition clears the prior next action.</p>}<div className="lead-move-actions"><button type="button" className="button" disabled={busy || !proposedTargets.length} onClick={() => void saveTransition()}>{busy ? "Saving…" : "Confirm move"}</button><button type="button" className="button-secondary" onClick={() => setMoveOpen(false)} disabled={busy}>Cancel</button></div></section></div> : null}
 
     <div className="lead-workspace-footer" role={errorKind === "conflict" ? "alert" : "status"} aria-live="polite"><span>{message}{errorKind === "conflict" ? " Your draft remains here; reload before retrying." : ""}</span><button type="button" className="button-secondary" disabled={busy} onClick={() => void refresh(selected?.id)}>{busy ? "Refreshing…" : "Reload"}</button></div>
   </section>{openCase && selectedClient && state ? <FounderOpenCaseSheet client={selectedClient} user={activeUser} revision={state.persistenceRevision} onClose={() => setOpenCase(false)} onCreated={() => { setOpenCase(false); void refresh(selected?.id); }} /> : null}{communication && selected ? <LeadCommunicationSheet leadName={selected.name} email={selected.email} phone={selected.phone} templateKey={communication.key} serviceType={communication.serviceType} onClose={() => setCommunication(undefined)} onPrepareContext={prepareCommunicationContext} onPrepare={prepareCommunication} onOpened={markOpened} /> : null}</>;

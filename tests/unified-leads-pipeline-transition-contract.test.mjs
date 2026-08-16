@@ -18,6 +18,21 @@ test("grouped Founder pipeline moves use the governed correction contract when a
 
 test("grouped review and converted destinations remain canonical stage groups", () => {
   const ui = source("components/unified-leads-workspace.tsx");
+  for (const group of ["LEAD", "ENGAGED", "CONTACTED", "NURTURE", "REVIEW", "CONVERTED"]) assert.match(ui, new RegExp(`id: "${group}"`));
+  assert.match(ui, /label: "Follow-up \/ Nurture"/);
   assert.match(ui, /id: "REVIEW"[\s\S]*FORM_PENDING[\s\S]*QUALIFIED/);
   assert.match(ui, /id: "CONVERTED", label: "Converted", stages: \["WON"\]/);
+  assert.doesNotMatch(ui, /label: "Lost \/ Closed"/);
+  assert.match(ui, /Create proposal/);
+});
+
+test("operational Founder stage actions use the six-stage matrix", () => {
+  const ui = source("components/unified-leads-workspace.tsx");
+  assert.match(ui, /LEAD: \["ENGAGED"\]/);
+  assert.match(ui, /ENGAGED: \["CONTACTED"\]/);
+  assert.match(ui, /CONTACTED: \["REVIEW", "NURTURE"\]/);
+  assert.match(ui, /NURTURE: \["CONTACTED", "REVIEW"\]/);
+  assert.match(ui, /REVIEW: \["CONVERTED", "NURTURE"\]/);
+  assert.match(ui, /CONVERTED: \[\]/);
+  assert.match(ui, /Administrative correction/);
 });

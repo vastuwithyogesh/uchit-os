@@ -150,7 +150,7 @@ export function CrmPipelineBoard() {
             </div>
             <div className="field">
               <label htmlFor="pipeline-due">Due date and time</label>
-              <input id="pipeline-due" type="datetime-local" value={dueAt} onChange={(e) => setDueAt(e.target.value)} disabled={!client || busy} />
+              <input id="pipeline-due" type="datetime-local" value={dueAt} onInput={(e) => setDueAt(e.currentTarget.value)} onChange={(e) => setDueAt(e.currentTarget.value)} disabled={!client || busy} />
             </div>
           </> : <p className="founder-inline-note">This terminal stage clears the previous next action. Confirm only when the record should leave active follow-up.</p>}
         </div>
