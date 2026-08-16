@@ -2,11 +2,11 @@ import { AccessDeniedPanel } from "@/components/access-denied-panel";
 import { FounderFlowHome } from "@/components/founder-flow";
 import { SiteHeader } from "@/components/site-header";
 import { buildFounderScorecard } from "@/lib/founder-scorecard";
-import { requirePageAccess } from "@/lib/page-access";
+import { requireFounderPageAccess } from "@/lib/page-access";
 import { loadStateFromPersistence } from "@/lib/persistence";
 
 export default async function HomePage({ searchParams }: { searchParams?: Promise<{ caseId?: string; floorId?: string }> }) {
-  const access = await requirePageAccess("SETTER");
+  const access = await requireFounderPageAccess("SETTER");
   if (!access.allowed) {
     return (
       <main className="page-shell">

@@ -8,6 +8,7 @@ const read = (file) => readFileSync(resolve(process.cwd(), file), "utf8");
 test("Founder navigation hotfix exposes a persistent command-center shell", () => {
   const page = read("app/page.tsx");
   const header = read("components/site-header.tsx");
+  assert.match(page, /requireFounderPageAccess\("SETTER"\)/);
   assert.match(page, /Founder Command Center/);
   assert.doesNotMatch(page, /SiteHeader[^\n]+minimal/);
   for (const href of ["/crm", "/clients-cases", "/founder/continue", "/reports"]) assert.match(header, new RegExp(href.replace("/", "\\/")));
