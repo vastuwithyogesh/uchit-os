@@ -327,8 +327,8 @@ export async function POST(request: Request) {
       "founder-media-dry-run": ["action", "actorRole", "assetKey", "filename", "sizeBytes", "pageCount", "checksumSha256"],
       "founder-media-register": ["action", "actorRole", "assetKey", "privateObjectKey", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-media-transition": ["action", "actorRole", "versionId", "target", "reason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
-      "founder-qualification-invite": ["action", "actorRole", "leadId", "clientId", "kind", "selectedServices", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
-      "founder-communication-context": ["action", "actorRole", "leadId", "clientId", "templateKey", "serviceType", "qualificationKind", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-qualification-invite": ["action", "actorRole", "leadId", "clientId", "prospectiveProjectId", "kind", "selectedServices", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-communication-context": ["action", "actorRole", "leadId", "clientId", "prospectiveProjectId", "templateKey", "serviceType", "qualificationKind", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-communication-prepare": ["action", "actorRole", "leadId", "clientId", "prospectiveProjectIds", "templateKey", "values", "channel", "recipient", "assetVersionIds", "formDefinitionId", "bookingId", "grantIds", "renderedTimeZoneSnapshot", "manualNote", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-communication-opened": ["action", "actorRole", "preparationId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-booking-assign": ["action", "actorRole", "responseVersionId", "startsAt", "timeZone", "confirmationGrantId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
@@ -362,7 +362,7 @@ export async function POST(request: Request) {
       "founder-complimentary-case-handoff": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-paid-case-handoff": ["action", "actorRole", "proposalVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-case-intent-create": ["action", "actorRole", "clientId", "serviceType", "propertyType", "displayName", "propertyLocation", "floorCount", "importantNotes", "confirmPossibleDuplicate", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
-      "founder-project-scope-save": ["action", "actorRole", "clientId", "serviceType", "propertyType", "displayName", "propertyLocation", "floorCount", "importantNotes", "confirmPossibleDuplicate", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
+      "founder-project-scope-save": ["action", "actorRole", "clientId", "leadId", "serviceType", "propertyType", "displayName", "propertyLocation", "floorCount", "importantNotes", "confirmPossibleDuplicate", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-prospective-project-service-classify": ["action", "actorRole", "prospectiveProjectId", "serviceType", "clientId", "leadId", "responseVersionId", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "founder-commercial-payment-confirm": ["action", "actorRole", "proposalVersionId", "paymentId", "type", "amountPaise", "idempotencyKey", "expectedProposalRecordVersion", "expectedRecordVersion", "expectedRevision"],
       "founder-balance-deadline-exception": ["action", "actorRole", "proposalVersionId", "exceptionAction", "newDueAt", "reason", "engagementClassification", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
@@ -585,7 +585,7 @@ export async function POST(request: Request) {
       }
       case "founder-project-scope-save": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!;
-        response = { ok: true, result: createFounderProspectiveCase({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, clientId: body.clientId, serviceType: body.serviceType, propertyType: body.propertyType, displayName: body.displayName, propertyLocation: body.propertyLocation, floorCount: body.floorCount, importantNotes: body.importantNotes, confirmPossibleDuplicate: body.confirmPossibleDuplicate, idempotencyKey: body.idempotencyKey, expectedClientRecordVersion: body.expectedRecordVersion, preCaseReview: true, allowLegacyUnownedLocalFixture: isExplicitLocalDemo(request.headers) }) };
+        response = { ok: true, result: createFounderProspectiveCase({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, clientId: body.clientId, leadId: body.leadId, serviceType: body.serviceType, propertyType: body.propertyType, displayName: body.displayName, propertyLocation: body.propertyLocation, floorCount: body.floorCount, importantNotes: body.importantNotes, confirmPossibleDuplicate: body.confirmPossibleDuplicate, idempotencyKey: body.idempotencyKey, expectedClientRecordVersion: body.expectedRecordVersion, preCaseReview: true, allowLegacyUnownedLocalFixture: isExplicitLocalDemo(request.headers) }) };
         break;
       }
       case "founder-commercial-payment-confirm": {
@@ -630,7 +630,7 @@ export async function POST(request: Request) {
       }
       case "founder-qualification-invite": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!;
-        response = { ok: true, result: await createQualificationInvitation({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, clientId: body.clientId, kind: body.kind, selectedServices: body.selectedServices ?? [], idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        response = { ok: true, result: await createQualificationInvitation({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, clientId: body.clientId, prospectiveProjectId: body.prospectiveProjectId, kind: body.kind, selectedServices: body.selectedServices ?? [], idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
         break;
       }
       case "founder-communication-prepare": {
@@ -640,7 +640,7 @@ export async function POST(request: Request) {
       }
       case "founder-communication-context": {
         const organisationId = foundation?.organisation.id ?? actor.organisationId!;
-        response = { ok: true, result: await createFounderCommunicationContext({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, clientId: body.clientId, templateKey: body.templateKey, serviceType: body.serviceType, qualificationKind: body.qualificationKind, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
+        response = { ok: true, result: await createFounderCommunicationContext({ state: getAppState(), actor, founderUserId: foundation?.organisation.founderUserId ?? actor.id, organisationId, leadId: body.leadId, clientId: body.clientId, prospectiveProjectId: body.prospectiveProjectId, templateKey: body.templateKey, serviceType: body.serviceType, qualificationKind: body.qualificationKind, idempotencyKey: body.idempotencyKey, expectedRecordVersion: body.expectedRecordVersion }) };
         break;
       }
       case "founder-communication-opened": {

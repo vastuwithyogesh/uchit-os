@@ -9,7 +9,7 @@
     "build:sites": "vinext build",
     "start": "vinext start",
     "test": "node --test tests/*.test.mjs && node --experimental-strip-types --test tests/entrance-zone-catalog-v1.test.ts tests/entrance-zone-workflow.test.ts tests/evaluation-replacement-workflow.test.ts",
-    "test:ts": "tsx --test",
+    "test:ts": "node --experimental-loader ./scripts/alias-ts-loader.mjs --test",
     "test:stage-b": "node --experimental-strip-types --test tests/stage-b-vertical-slice.test.ts lib/stage-b-workspace-geometry.test.ts lib/stage-b-workspace-view.test.ts && node --test tests/stage-b-workspace-ui.test.mjs",
     "test:section-a": "node --experimental-strip-types --test tests/section-a-contract.test.ts lib/remediation-workspace-view.test.ts && node --test tests/section-a-workspace-ui.test.mjs",
     "test:section-a-ui": "node --experimental-strip-types --test lib/remediation-workspace-view.test.ts && node --test tests/section-a-workspace-ui.test.mjs",

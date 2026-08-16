@@ -128,7 +128,7 @@ export async function prepareManualCommunication(input: { state: AppState; actor
 /** Resolve the exact approved assets/forms and scoped secure links for a guided drawer action. */
 export async function createFounderCommunicationContext(input: {
   state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId?: string;
-  templateKey: FounderTemplateKey; serviceType?: VastuServiceType; qualificationKind?: QualificationKind;
+  templateKey: FounderTemplateKey; serviceType?: VastuServiceType; qualificationKind?: QualificationKind; prospectiveProjectId?: string;
   idempotencyKey: string; expectedRecordVersion?: number; now?: Date;
 }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId); safeIdempotency(input.idempotencyKey);
@@ -160,7 +160,7 @@ export async function createFounderCommunicationContext(input: {
     if (!input.qualificationKind) fail(400, "Choose Residential, Commercial or Hybrid; the qualification type cannot be guessed.");
     if (!input.clientId) fail(409, "A permanent Client ID is required before sending a qualification form.");
     const selectedServices = input.qualificationKind === "HYBRID" ? ["RESIDENTIAL", "COMMERCIAL"] as const : [input.qualificationKind] as const;
-    const invitation = await createQualificationInvitation({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, kind: input.qualificationKind, selectedServices: [...selectedServices], idempotencyKey: `invite-${input.idempotencyKey}`, expectedRecordVersion: input.expectedRecordVersion, requireUsableToken: true, now });
+    const invitation = await createQualificationInvitation({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, prospectiveProjectId: input.prospectiveProjectId, kind: input.qualificationKind, selectedServices: [...selectedServices], idempotencyKey: `invite-${input.idempotencyKey}`, expectedRecordVersion: input.expectedRecordVersion, requireUsableToken: true, now });
     if (!invitation.token) fail(409, "The qualification link could not be recovered. Retry with a new review action.");
     const definition = APPROVED_QUALIFICATION_DEFINITIONS[input.qualificationKind];
     const manifest = APPROVED_FOUNDER_ASSETS.find((item) => item.key === definition.sourceAssetVersionId)!;
@@ -188,14 +188,21 @@ export function markCommunicationOpened(input: { state: AppState; actor: AppUser
   record.state = "OPENED"; record.openedAt = nowIso(); record.recordVersion = (record.recordVersion ?? 0) + 1; return record;
 }
 
-export async function createQualificationInvitation(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId: string; kind: QualificationKind; selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; idempotencyKey: string; expectedRecordVersion?: number; requireUsableToken?: boolean; now?: Date }) {
+export async function createQualificationInvitation(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; leadId: string; clientId: string; prospectiveProjectId?: string; kind: QualificationKind; selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; idempotencyKey: string; expectedRecordVersion?: number; requireUsableToken?: boolean; now?: Date }) {
   assertConfiguredFounder(input.actor, input.founderUserId, input.organisationId); safeIdempotency(input.idempotencyKey);
-  const requestHash = deterministicContentHash({ leadId: input.leadId, clientId: input.clientId, kind: input.kind, selectedServices: input.selectedServices });
+  const requestHash = deterministicContentHash({ leadId: input.leadId, clientId: input.clientId, prospectiveProjectId: input.prospectiveProjectId, kind: input.kind, selectedServices: input.selectedServices });
   const replay = input.state.qualificationInvitations.find((item) => item.organisationId === input.organisationId && item.id === `qualification-invite:${input.idempotencyKey}`);
   if (replay) { if (replay.requestHash !== requestHash) fail(409, "This idempotency key was already used for a different qualification invitation."); return { invitation: replay, token: undefined, replayed: true }; }
   const lead = input.state.optInLeads.find((item) => item.id === input.leadId && item.organisationId === input.organisationId);
   const client = input.state.clients.find((item) => item.id === input.clientId && (!item.organisationId || item.organisationId === input.organisationId));
   if (!lead || !client || ![lead.convertedClientId, lead.uniqueClientId].includes(client.id)) fail(404, "The lead and permanent Client ID do not share this organisation scope.");
+  const eligibleProjects = input.state.prospectiveProjects.filter((item) => item.organisationId === input.organisationId && item.clientId === input.clientId && item.leadId === input.leadId && !item.caseId && item.kind === (input.kind === "HYBRID" ? item.kind : input.kind));
+  if (input.prospectiveProjectId) {
+    const project = input.state.prospectiveProjects.find((item) => item.id === input.prospectiveProjectId && item.organisationId === input.organisationId && item.clientId === input.clientId && (item.leadId === input.leadId || item.leadId === client.id) && !item.caseId && input.selectedServices.includes(item.kind));
+    if (!project) fail(404, "The selected prospective project is not available for this qualification scope.");
+    if (project.leadId !== input.leadId) { project.leadId = input.leadId; project.recordVersion = (project.recordVersion ?? 0) + 1; }
+  } else if (eligibleProjects.length > 1) fail(409, "Choose the exact prospective project before preparing the qualification form.");
+  const boundProjectId = input.prospectiveProjectId ?? eligibleProjects[0]?.id;
   client.organisationId ??= input.organisationId;
   if (input.expectedRecordVersion === undefined) fail(428, "The latest lead version is required.");
   if ((lead.recordVersion ?? 0) !== input.expectedRecordVersion) fail(409, "The lead changed. Reload before preparing the qualification form.");
@@ -211,7 +218,7 @@ export async function createQualificationInvitation(input: { state: AppState; ac
   if (definition.status !== "ACTIVE") fail(409, "Only the active Founder-approved qualification definition can be sent.");
   const now = input.now ?? new Date();
   const grantResult = await createSecureGrant({ state: input.state, actor: input.actor, founderUserId: input.founderUserId, organisationId: input.organisationId, purpose: "QUALIFICATION_FORM", leadId: input.leadId, clientId: input.clientId, formDefinitionId: definition.id, days: 14, requireUsableToken: input.requireUsableToken, now });
-  const invitation = { id: `qualification-invite:${input.idempotencyKey}`, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, formDefinitionId: definition.id, grantId: grantResult.grant.id, status: "OPEN" as const, selectedServices: [...input.selectedServices], createdAt: now.toISOString(), expiresAt: grantResult.grant.expiresAt, requestHash, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
+  const invitation = { id: `qualification-invite:${input.idempotencyKey}`, organisationId: input.organisationId, leadId: input.leadId, clientId: input.clientId, prospectiveProjectId: boundProjectId, formDefinitionId: definition.id, grantId: grantResult.grant.id, status: "OPEN" as const, selectedServices: [...input.selectedServices], createdAt: now.toISOString(), expiresAt: grantResult.grant.expiresAt, requestHash, createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 };
   input.state.qualificationInvitations.push(invitation);
   return { invitation, token: grantResult.token, replayed: false };
 }
@@ -243,11 +250,20 @@ export function saveQualificationResponse(input: { state: AppState; invitationId
   if (!input.selectedServices.includes(invitation.selectedServices[0])) fail(409, "The primary service selected for this invitation cannot be removed.");
   const prior = input.state.qualificationResponseVersions.filter((item) => item.invitationId === invitation.id).sort((a,b) => b.version-a.version)[0];
   if (prior?.status === "SUBMITTED") fail(409, "Submitted responses are immutable; create a correction version.");
-  const response = prior ?? { id: uuid(), organisationId: invitation.organisationId, invitationId: invitation.id, clientId: invitation.clientId, formDefinitionId: invitation.formDefinitionId, version: 1, status: "DRAFT" as const, answers: {}, answersHash: "", selectedServices: [], secondaryInterestSelected: false, sourceQuestionIds: [], savedAt: nowIso(input.now), recordVersion: 0 };
+  const response = prior ?? { id: uuid(), organisationId: invitation.organisationId, invitationId: invitation.id, clientId: invitation.clientId, prospectiveProjectId: invitation.prospectiveProjectId, formDefinitionId: invitation.formDefinitionId, version: 1, status: "DRAFT" as const, answers: {}, answersHash: "", selectedServices: [], secondaryInterestSelected: false, sourceQuestionIds: [], savedAt: nowIso(input.now), recordVersion: 0 };
   Object.assign(response, { answers: structuredClone(input.answers), answersHash: deterministicContentHash(input.answers), selectedServices: [...input.selectedServices], secondaryInterestSelected: input.selectedServices.length === 2, sourceQuestionIds: Object.keys(input.answers), savedAt: nowIso(input.now), status: input.submit ? "SUBMITTED" : "DRAFT", submittedAt: input.submit ? nowIso(input.now) : undefined, recordVersion: response.recordVersion + 1 });
   if (!prior) input.state.qualificationResponseVersions.push(response);
   invitation.recordVersion += 1;
-  if (input.submit) { invitation.status = "SUBMITTED"; invitation.submittedAt = nowIso(input.now); for (const kind of input.selectedServices) { if (!input.state.prospectiveProjects.some((item) => item.responseVersionId === response.id && item.kind === kind)) input.state.prospectiveProjects.push({ id: uuid(), organisationId: invitation.organisationId, clientId: invitation.clientId, leadId: invitation.leadId, responseVersionId: response.id, kind, status: "QUALIFICATION_SUBMITTED", createdAt: nowIso(input.now), recordVersion: 1 }); } }
+  if (input.submit) {
+    invitation.status = "SUBMITTED"; invitation.submittedAt = nowIso(input.now);
+    if (invitation.prospectiveProjectId) {
+      const project = input.state.prospectiveProjects.find((item) => item.id === invitation.prospectiveProjectId && item.organisationId === invitation.organisationId && item.clientId === invitation.clientId && item.leadId === invitation.leadId && !item.caseId && input.selectedServices.includes(item.kind));
+      if (!project) fail(409, "The selected prospective project is no longer available for this qualification.");
+      project.responseVersionId = response.id; project.status = "QUALIFICATION_SUBMITTED"; project.recordVersion = (project.recordVersion ?? 0) + 1;
+    } else {
+      for (const kind of input.selectedServices) if (!input.state.prospectiveProjects.some((item) => item.responseVersionId === response.id && item.kind === kind)) input.state.prospectiveProjects.push({ id: uuid(), organisationId: invitation.organisationId, clientId: invitation.clientId, leadId: invitation.leadId, responseVersionId: response.id, kind, status: "QUALIFICATION_SUBMITTED", createdAt: nowIso(input.now), recordVersion: 1 });
+    }
+  }
   return response;
 }
 

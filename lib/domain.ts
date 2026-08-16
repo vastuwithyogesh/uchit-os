@@ -522,12 +522,12 @@ export interface QualificationFormDefinitionRecord extends OrganisationOwnedReco
 }
 
 export interface QualificationInvitationRecord extends OrganisationOwnedRecord {
-  id: string; leadId: string; clientId: string; formDefinitionId: string; grantId: string; status: "OPEN" | "SUBMITTED" | "EXPIRED" | "REPLACED";
+  id: string; leadId: string; clientId: string; prospectiveProjectId?: string; formDefinitionId: string; grantId: string; status: "OPEN" | "SUBMITTED" | "EXPIRED" | "REPLACED";
   selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; createdAt: string; expiresAt: string; submittedAt?: string; requestHash: string; recordVersion: number;
 }
 
 export interface QualificationResponseVersionRecord extends OrganisationOwnedRecord {
-  id: string; invitationId: string; clientId: string; formDefinitionId: string; version: number; status: "DRAFT" | "SUBMITTED" | "SUPERSEDED";
+  id: string; invitationId: string; clientId: string; prospectiveProjectId?: string; formDefinitionId: string; version: number; status: "DRAFT" | "SUBMITTED" | "SUPERSEDED";
   answers: Record<string, unknown>; answersHash: string; selectedServices: Array<"RESIDENTIAL" | "COMMERCIAL">; secondaryInterestSelected: boolean;
   sourceQuestionIds: string[]; predecessorResponseId?: string; savedAt: string; submittedAt?: string; recordVersion: number;
 }
