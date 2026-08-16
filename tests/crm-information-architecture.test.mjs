@@ -41,7 +41,7 @@ test("Clients & Cases is one card per case with independent floor progress", () 
   const page = source("app/clients-cases/page.tsx");
   const ui = source("components/client-case-pipeline.tsx");
   for (const token of ["ClientCasePipeline", "Setup", "Evidence / Mapping", "Evaluation", "Verdict / Balance", "Report / Delivery", "Continue case", "case-floor-chips", "one independent report per floor"]) assert.match(`${page}\n${ui}`, new RegExp(token, "i"));
-  assert.match(ui, /state\.vastuCases\.map/);
+  assert.match(ui, /state\.vastuCases\.filter\(\(caseRecord\) => canAccessFounderCase\(state, actor, caseRecord\)\)/);
   assert.match(ui, /caseRecord\.clientId/);
   assert.match(ui, /buildFounderScorecard\(state, \{ role: actorRole \}, card\.client\?\.id, card\.caseRecord\.id, floor\.id\)/);
 });

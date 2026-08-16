@@ -1,7 +1,8 @@
 import type { AppState } from "@/lib/store";
-import type { UserRole } from "@/lib/domain";
+import type { AppUser } from "@/lib/domain";
 import { buildFounderScorecard } from "@/lib/founder-scorecard";
 import { getCurrentFounderFlowStep } from "@/lib/founder-flow";
+import { canAccessFounderCase } from "@/lib/founder-case-access";
 
 const caseGroups = [
   { id: "SETUP", label: "Setup", range: [1, 3] },
@@ -25,14 +26,15 @@ function reportState(state: AppState, caseId: string) {
   return "Report not started";
 }
 
-export function ClientCasePipeline({ state, actorRole }: { state: AppState; actorRole: UserRole }) {
+export function ClientCasePipeline({ state, actor }: { state: AppState; actor: Pick<AppUser, "role"> & Partial<Pick<AppUser, "id" | "organisationId">> }) {
+  const actorRole = actor.role;
   const clients = new Map(state.clients.map((client) => [client.id, client]));
   const projects = new Map(state.projects.map((project) => [project.id, project]));
-  const cards = state.vastuCases.map((caseRecord) => {
+  const cards = state.vastuCases.filter((caseRecord) => canAccessFounderCase(state, actor, caseRecord)).map((caseRecord) => {
     const client = clients.get(caseRecord.clientId);
     const floors = state.floorWorkspaces.filter((floor) => floor.caseId === caseRecord.id);
     const activeFloor = floors.find((floor) => floor.reportStatus !== "RELEASED" || !floor.deliveredAt) ?? floors[0];
-    const scorecard = buildFounderScorecard(state, { role: actorRole }, client?.id, caseRecord.id, activeFloor?.id);
+    const scorecard = buildFounderScorecard(state, actor, client?.id, caseRecord.id, activeFloor?.id);
     const current = getCurrentFounderFlowStep(scorecard);
     const group = caseGroups.find((item) => current && current.number >= item.range[0] && current.number <= item.range[1]) ?? caseGroups[0];
     const releasedFloors = floors.filter((floor) => floor.reportStatus === "RELEASED").length;

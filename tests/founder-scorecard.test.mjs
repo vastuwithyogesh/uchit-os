@@ -59,7 +59,7 @@ test("Step 06 includes the confirmed entrance-zone gate and Step 08 shares engin
 
 test("case cards resolve Continue from the exact case and floor projection", () => {
   const component = read("components/client-case-pipeline.tsx");
-  assert.match(component, /state\.vastuCases\.map/);
+  assert.match(component, /state\.vastuCases\.filter\(\(caseRecord\) => canAccessFounderCase\(state, actor, caseRecord\)\)/);
   assert.match(component, /buildFounderScorecard\(state, \{ role: actorRole \}, card\.client\?\.id, card\.caseRecord\.id, floor\.id\)/);
   assert.match(component, /getCurrentFounderFlowStep/);
   assert.match(component, /Continue case/);
