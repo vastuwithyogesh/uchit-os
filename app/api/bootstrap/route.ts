@@ -3,9 +3,13 @@ import { isExplicitLocalDemo, isInitialOrganisationOwnerEmail, requireRouteActor
 import { loadStateFromPersistence, loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
 import { FoundationAccessError, resolveActiveOrganisationContext } from "@/lib/foundation.server";
 import { projectOrganisationState } from "@/lib/foundation";
+import { createServerTiming, withServerTiming } from "@/lib/server-timing";
 
 export async function GET(request: Request) {
+  const timing = createServerTiming();
+  const authStartedAt = timing.start();
   const access = await requireRouteActor(request, "SETTER");
+  timing.end("auth", authStartedAt);
   if (!access.ok) {
     return access.response;
   }
@@ -14,22 +18,27 @@ export async function GET(request: Request) {
     // organisation membership. Allow its synthetic SUPER_ADMIN to bootstrap a
     // local Founder organisation only; hosted requests still require the
     // configured initial-owner email or an active membership.
+    const foundationStartedAt = timing.start();
     const allowBootstrap = isInitialOrganisationOwnerEmail(access.actor.email) || isExplicitLocalDemo(request.headers);
     const context = await resolveActiveOrganisationContext(access.actor, allowBootstrap);
-    const snapshot = await loadStateSnapshotFromPersistence();
+    timing.end("foundation", foundationStartedAt);
+    const snapshot = await loadStateSnapshotFromPersistence((name, durationMs) => timing.record(`persistence-${name}`, durationMs));
+    const projectionStartedAt = timing.start();
     const scopedState = projectOrganisationState(snapshot.state, context.organisation.id);
     const optInLeads = access.actor.role === "SUPER_ADMIN" ? scopedState.optInLeads : scopedState.optInLeads.map((lead) => {
       const { dob: _dob, landingPage: _landingPage, referrer: _referrer, assignedTo: _assignedTo, deletedAt: _deletedAt,
         sourceRecordId: _sourceRecordId, externalClientCode: _externalClientCode, sourceProfile: _sourceProfile, ...safe } = lead;
       return safe;
     });
-    return NextResponse.json({ ...scopedState, persistenceRevision: snapshot.revision, optInLeads, foundation: {
+    timing.end("organisation-projection", projectionStartedAt);
+    const response = NextResponse.json({ ...scopedState, persistenceRevision: snapshot.revision, optInLeads, foundation: {
       organisation: context.organisation,
       membership: context.membership,
       workflowPolicyVersion: context.workflowPolicy.version,
       approvalPolicyVersion: context.approvalPolicy.version,
       isFounderEdition: context.isFounderEdition
     } }, { headers: { "Cache-Control": "private, no-store", Vary: "oai-authenticated-user-id, oai-authenticated-user-email" } });
+    return withServerTiming(response, timing);
   } catch (error) {
     if (error instanceof FoundationAccessError) return NextResponse.json({ ok: false, error: error.message }, { status: error.statusCode, headers: { "Cache-Control": "private, no-store" } });
     throw error;

@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { createContext, useContext, useEffect, useMemo, useState } from "react";
 import { AppUser, UserRole, roles } from "@/lib/domain";
+import { clearClientReadCache, installClientReadCoordinator } from "@/lib/client-read-coordinator";
 
 type SessionPayload = {
   version: 1;
@@ -108,6 +109,8 @@ export function SessionProvider({ children }: { children: ReactNode }) {
   const [retryCount, setRetryCount] = useState(0);
 
   useEffect(() => {
+    const restoreReadCoordinator = installClientReadCoordinator();
+    clearClientReadCache();
     let cancelled = false;
 
     async function hydrateSession() {
@@ -150,6 +153,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
     void hydrateSession();
     return () => {
       cancelled = true;
+      restoreReadCoordinator();
     };
   }, [retryCount]);
 
@@ -163,6 +167,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         const nextUser = availableUsers.find((user) => user.role === role);
         if (!nextUser) return;
+        clearClientReadCache();
         setActiveUserState(nextUser);
         window.localStorage.setItem("uchit-vastu-role", role);
         window.localStorage.setItem("uchit-vastu-user-id", nextUser.id);
@@ -175,6 +180,7 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
         const nextUser = availableUsers.find((user) => user.id === userId);
         if (!nextUser) return;
+        clearClientReadCache();
         setActiveUserState(nextUser);
         window.localStorage.setItem("uchit-vastu-role", nextUser.role);
         window.localStorage.setItem("uchit-vastu-user-id", nextUser.id);
@@ -191,15 +197,24 @@ export function SessionProvider({ children }: { children: ReactNode }) {
 
   return (
     <SessionContext.Provider value={value}>
-      {sessionStatus === "ready" ? children : (
-        <main className="session-gate" aria-busy={sessionStatus === "loading"}>
+      {sessionStatus === "ready" ? children : sessionStatus === "loading" ? (
+        <main className="session-shell" aria-busy="true">
+          <header className="session-shell-header">
+            <div className="brand-lockup" aria-label="Uchit Vastu India"><span className="brand-name">UCHIT</span><span className="brand-descriptor">VASTU INDIA</span></div>
+            <div className="pill" role="status">Verifying your secure session…</div>
+          </header>
+          <div className="session-shell-body">
+            <aside className="session-shell-nav" aria-hidden="true"><span /><span /><span /><span /><span /></aside>
+            <section className="session-shell-content"><div className="loading-line loading-line-wide" /><div className="loading-line" /><div className="session-shell-card"><div className="loading-line" /><div className="loading-line loading-line-wide" /><div className="loading-line" /></div></section>
+          </div>
+        </main>
+      ) : (
+        <main className="session-gate" aria-busy="false">
           <section className="card" role={sessionStatus === "error" ? "alert" : "status"}>
             <div className="eyebrow">Secure workspace</div>
-            <h1>{sessionStatus === "loading" ? "Verifying your session…" : "We could not verify your session"}</h1>
+            <h1>We could not verify your session</h1>
             <p className="subtle">
-              {sessionStatus === "loading"
-                ? "The workspace will open after your identity and role are confirmed."
-                : `${sessionError ?? "The session service is unavailable."} No workspace data or privileged navigation has been shown.`}
+              {`${sessionError ?? "The session service is unavailable."} No workspace data or privileged navigation has been shown.`}
             </p>
             {sessionStatus === "error" ? (
               <div className="hero-actions">

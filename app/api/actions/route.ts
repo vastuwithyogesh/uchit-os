@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { AuthenticationError, authErrorResponse, isExplicitLocalDemo, isInitialOrganisationOwnerEmail, resolveRequestActor } from "@/lib/auth";
 import { loadStateSnapshotFromPersistence, persistStateToDatabase } from "@/lib/persistence";
+import { createServerTiming, withServerTiming } from "@/lib/server-timing";
 import { getAppState, setAppState, type AppState } from "@/lib/store";
 import { appendImmutableAuditEvent, FoundationAccessError, resolveActiveOrganisationContext } from "@/lib/foundation.server";
 import { hasOrganisationCapability } from "@/lib/foundation";
@@ -115,7 +116,10 @@ import {
 } from "@/lib/workflow-service";
 
 export async function POST(request: Request) {
+  const timing = createServerTiming();
+  const parseStartedAt = timing.start();
   const body = await request.json().catch(() => ({}));
+  timing.end("request-parse", parseStartedAt);
   const action = body.action as string;
   let actor: Awaited<ReturnType<typeof resolveRequestActor>>;
   let foundation: Awaited<ReturnType<typeof resolveActiveOrganisationContext>> | null = null;
@@ -154,13 +158,17 @@ export async function POST(request: Request) {
   }
 
   try {
+    const authStartedAt = timing.start();
     actor = await resolveRequestActor(request.headers, body.actorRole);
+    timing.end("auth", authStartedAt);
     // Explicit loopback demo runs use the same server-derived Founder
     // organisation context as hosted requests. This gives the disposable
     // synthetic owner a real capability binding for local rehearsal actions;
     // non-local requests still require the configured owner or membership.
+    const foundationStartedAt = timing.start();
     foundation = await resolveActiveOrganisationContext(actor,
       isInitialOrganisationOwnerEmail(actor.email) || isExplicitLocalDemo(request.headers));
+    timing.end("foundation", foundationStartedAt);
     if (foundation) {
       if (foundation.membership.role === "SPECIALIST") {
         return NextResponse.json({ ok: false, error: "Specialist access remains deferred until Team Edition." }, { status: 403 });
@@ -177,7 +185,7 @@ export async function POST(request: Request) {
       if (!hasEntityVersion || !("expectedRevision" in body)) {
         return NextResponse.json({ ok: false, error: "The latest case and state versions are required. Refresh and try again." }, { status: 428 });
       }
-      const latest = await loadStateSnapshotFromPersistence();
+      const latest = await loadStateSnapshotFromPersistence((name, durationMs) => timing.record(`persistence-${name}`, durationMs));
       rollbackState = structuredClone(latest.state);
       globalRevisionStale = body.expectedRevision !== latest.revision;
       expectedGlobalRevision = latest.revision ?? undefined;
@@ -187,6 +195,7 @@ export async function POST(request: Request) {
       }
     }
 
+    const domainStartedAt = timing.start();
     const crmAllowedFields: Record<string, string[]> = {
       "client-pipeline-transition": ["action", "actorRole", "clientId", "pipelineStage", "nextAction", "nextActionDueAt", "correction", "correctionReason", "idempotencyKey", "expectedRecordVersion", "expectedRevision"],
       "commercial-policy-update": ["action", "actorRole", "defaultProposalAmountInr", "minimumAdvanceInr", "qualificationCallTargetMinutes", "nextActionDueSoonHours", "defaultReviewCallMinutes", "reason", "idempotencyKey", "expectedPolicyVersion", "expectedRevision"]
@@ -1514,6 +1523,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ ok: false, error: `Unknown action: ${action}` }, { status: 400 });
     }
 
+    timing.end("domain-action", domainStartedAt);
     if (globalRevisionStale) {
       const changed = JSON.stringify(getAppState()) !== JSON.stringify(rollbackState);
       if (changed) {
@@ -1525,7 +1535,9 @@ export async function POST(request: Request) {
     if (foundation && organisationStateBefore) {
       stampOrganisationOwnership(getAppState(), organisationStateBefore, foundation.organisation.id, actor.id);
     }
+    const persistenceStartedAt = timing.start();
     await persistStateToDatabase(undefined, expectedGlobalRevision);
+    timing.end("persistence-total", persistenceStartedAt);
     appStatePersisted = true;
     if (foundation && organisationStateBefore) {
       const beforeHash = deterministicContentHash(organisationStateBefore);
@@ -1541,7 +1553,10 @@ export async function POST(request: Request) {
           ...(typeof body.floorId === "string" ? { floorId: body.floorId } : {}) });
       }
     }
-    return NextResponse.json(response);
+    const responseStartedAt = timing.start();
+    const finalResponse = NextResponse.json(response);
+    timing.end("response-serialization", responseStartedAt);
+    return withServerTiming(finalResponse, timing);
   } catch (error) {
     if (!appStatePersisted && createdImageObjectKeys.length) {
       await Promise.all(createdImageObjectKeys.map((key) => getRuntimeEnv().R2?.delete(key).catch(() => undefined)));

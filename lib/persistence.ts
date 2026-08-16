@@ -18,6 +18,12 @@ type PersistedStateSnapshot = {
   revision: number;
 };
 
+export type PersistenceTiming = (name: string, durationMs: number) => void;
+
+function measure(timing: PersistenceTiming | undefined, name: string, startedAt: number) {
+  timing?.(name, Math.max(0, performance.now() - startedAt));
+}
+
 declare global {
   // eslint-disable-next-line no-var
   var uchitLocalWalkthroughSnapshot: PersistedStateSnapshot | undefined;
@@ -38,34 +44,50 @@ export function activateLocalWalkthroughState(state: AppState) {
   return snapshot;
 }
 
-async function readStateFromD1(): Promise<PersistedStateSnapshot | null> {
+async function readStateFromD1(timing?: PersistenceTiming): Promise<PersistedStateSnapshot | null> {
+  const environmentStartedAt = performance.now();
   const env = getRuntimeEnv();
+  measure(timing, "runtime-env", environmentStartedAt);
   if (!env.DB) {
     return null;
   }
 
+  const migrationStartedAt = performance.now();
   await migrateD1(env.DB);
+  measure(timing, "d1-migration", migrationStartedAt);
+  const readStartedAt = performance.now();
   const row = await env.DB.prepare("SELECT payload, revision FROM app_state_snapshot WHERE id = ?").bind("current").first<{
     payload: string;
     revision: number;
   }>();
+  measure(timing, "d1-read", readStartedAt);
   if (!row?.payload) {
     return null;
   }
 
-  return { state: JSON.parse(row.payload) as AppState, revision: row.revision };
+  const parseStartedAt = performance.now();
+  const state = JSON.parse(row.payload) as AppState;
+  measure(timing, "json-parse", parseStartedAt);
+  return { state, revision: row.revision };
 }
 
-async function writeStateToD1(state: AppState, expectedRevision?: number) {
+async function writeStateToD1(state: AppState, expectedRevision?: number, timing?: PersistenceTiming) {
+  const environmentStartedAt = performance.now();
   const env = getRuntimeEnv();
+  measure(timing, "runtime-env-write", environmentStartedAt);
   if (!env.DB) {
     return null;
   }
 
+  const migrationStartedAt = performance.now();
   await migrateD1(env.DB);
+  measure(timing, "d1-migration-write", migrationStartedAt);
+  const stringifyStartedAt = performance.now();
   const payload = JSON.stringify(state);
+  measure(timing, "json-stringify", stringifyStartedAt);
   const updatedAt = new Date().toISOString();
 
+  const writeStartedAt = performance.now();
   if (expectedRevision !== undefined) {
     const result = await env.DB.prepare(
       "UPDATE app_state_snapshot SET payload = ?, updated_at = ?, revision = revision + 1 WHERE id = ? AND revision = ?"
@@ -78,14 +100,15 @@ async function writeStateToD1(state: AppState, expectedRevision?: number) {
        revision = app_state_snapshot.revision + 1`
     ).bind("current", payload, updatedAt).run();
   }
+  measure(timing, "d1-write", writeStartedAt);
   return state;
 }
 
-export async function loadStateFromPersistence(): Promise<AppState> {
-  return (await loadStateSnapshotFromPersistence()).state;
+export async function loadStateFromPersistence(timing?: PersistenceTiming): Promise<AppState> {
+  return (await loadStateSnapshotFromPersistence(timing)).state;
 }
 
-export async function loadStateSnapshotFromPersistence(): Promise<{ state: AppState; revision: number | null }> {
+export async function loadStateSnapshotFromPersistence(timing?: PersistenceTiming): Promise<{ state: AppState; revision: number | null }> {
   if (localWalkthroughEnabled() && globalThis.uchitLocalWalkthroughSnapshot) {
     const snapshot = globalThis.uchitLocalWalkthroughSnapshot;
     const state = structuredClone(snapshot.state);
@@ -93,9 +116,11 @@ export async function loadStateSnapshotFromPersistence(): Promise<{ state: AppSt
     return { state, revision: snapshot.revision };
   }
   const base = getAppState();
-  const fromDb = await readStateFromD1();
+  const fromDb = await readStateFromD1(timing);
   if (fromDb) {
+    const mergeStartedAt = performance.now();
     const merged = mergeAppState(base, fromDb.state);
+    measure(timing, "state-merge", mergeStartedAt);
     setAppState(merged);
     return { state: merged, revision: fromDb.revision };
   }
@@ -107,8 +132,10 @@ export async function loadStateSnapshotFromPersistence(): Promise<{ state: AppSt
   return { state, revision: null };
 }
 
-export async function persistStateToDatabase(state: AppState = getAppState(), expectedRevision?: number) {
+export async function persistStateToDatabase(state: AppState = getAppState(), expectedRevision?: number, timing?: PersistenceTiming) {
+  const cloneStartedAt = performance.now();
   const nextState = structuredClone(state);
+  measure(timing, "state-clone", cloneStartedAt);
   if (localWalkthroughEnabled() && globalThis.uchitLocalWalkthroughSnapshot) {
     const current = globalThis.uchitLocalWalkthroughSnapshot;
     if (expectedRevision !== undefined && expectedRevision !== current.revision) throw new PersistenceConflictError();
@@ -116,12 +143,14 @@ export async function persistStateToDatabase(state: AppState = getAppState(), ex
     setAppState(structuredClone(nextState));
     return nextState;
   }
-  await writeStateToD1(nextState, expectedRevision);
+  await writeStateToD1(nextState, expectedRevision, timing);
+  const sideStoresStartedAt = performance.now();
   await Promise.all([
     writeOptInLeadRecords(nextState.optInLeads),
     writeReviewCallBookingRecords(nextState.reviewCallBookings),
     writeAdvanceVerificationRecords(nextState.advanceVerifications)
   ]);
+  measure(timing, "side-stores-write", sideStoresStartedAt);
   setAppState(nextState);
   return nextState;
 }
