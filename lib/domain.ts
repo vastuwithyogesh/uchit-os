@@ -557,7 +557,7 @@ export interface FounderReminderTaskRecord extends OrganisationOwnedRecord {
 }
 
 export type FounderEngagementClassification = "STANDARD_PAID" | "SPECIAL_DISCOUNTED" | "INTERNAL_COMPLIMENTARY";
-export type FounderProposalStatus = "DRAFT" | "SUPER_ADMIN_REVIEWED" | "SUPER_ADMIN_APPROVED" | "SENT" | "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED" | "EXPIRED" | "SUPERSEDED";
+export type FounderProposalStatus = "DRAFT" | "FOUNDER_AGREED" | "SUPER_ADMIN_REVIEWED" | "SUPER_ADMIN_APPROVED" | "SENT" | "ACCEPTED" | "CHANGES_REQUESTED" | "DECLINED" | "EXPIRED" | "SUPERSEDED";
 export type FounderLegalPolicyKind = "PROFESSIONAL_BOUNDARIES" | "ACCEPTANCE_DECLARATION" | "CANCELLATION_REFUND_DELAY" | "INVOICE_STATUTORY_CONFIG";
 export type FounderLegalPolicyStatus = "DRAFT" | "FOUNDER_APPROVED" | "ACTIVE" | "SUPERSEDED" | "ARCHIVED";
 export type FounderBalanceDeadlineStatus = "NOT_DUE" | "DUE" | "PAID" | "OVERDUE" | "EXTENDED" | "WAIVED";
@@ -598,14 +598,14 @@ export interface FounderCommercialTermsSnapshot {
 
 export interface FounderProposalContentSnapshot {
   clientProject: { clientName: string; clientId: string; prospectiveProjectId: string; projectKind: "RESIDENTIAL" | "COMMERCIAL"; serviceType: VastuServiceType; propertyType?: string; propertyLocation?: string; knownFloorCount?: number; primaryRequirement?: string; proposalDate: string };
-  requirements: { qualificationResponseVersionId: string; qualificationResponseHash: string; exactAnswerSnapshotHash: string; refinedSummary?: string; refinedByActorUserId?: string; refinedAt?: string };
+  requirements: { qualificationResponseVersionId?: string; qualificationResponseHash?: string; exactAnswerSnapshotHash?: string; refinedSummary?: string; refinedByActorUserId?: string; refinedAt?: string };
   scopeItems: FounderProposalScopeItem[]; deliverables: FounderProposalDeliverable[];
   interactions: { includedReviewRounds: number; includedPresentationCalls: number; clarificationPeriodDays: number; expectedResponseTime: string; additionalInteractionTreatment: string };
   timeline: { expectedCommencement: string; estimatedDateRange: string; milestones: string[]; prerequisites: string[]; clientDependencies: string[]; pauseOrExtensionConditions: string[]; isEstimate: true };
   commercial: FounderCommercialTermsSnapshot;
   projectExclusions: string[];
   policyBindings: { professionalBoundariesPolicyId?: string; acceptanceDeclarationPolicyId?: string; cancellationPolicyId?: string; cancellationPolicyVersion?: number; cancellationPolicyContentHash?: string; commercialPolicyId: string; templateVersionId?: string; brochureAssetVersionId?: string; brochureAssetKey?: string; brochureChecksumSha256?: string };
-  nextSteps: { advanceRequired: boolean; balanceAfterAdvanceDeadline: true; paymentProofRequiresConfirmation: true; reportGatesRemainServerEnforced: true };
+  nextSteps: { advanceRequired: boolean; balanceAfterAdvanceDeadline: true; paymentProofRequiresConfirmation: boolean; reportGatesRemainServerEnforced: true };
 }
 
 export interface FounderProposalVersionRecord extends OrganisationOwnedRecord {
@@ -637,7 +637,7 @@ export interface FounderProposalResponseRecord extends OrganisationOwnedRecord {
 
 export interface FounderCommercialPaymentConfirmationRecord extends OrganisationOwnedRecord {
   id: string; proposalVersionId: string; clientId: string; prospectiveProjectId: string; paymentId: string; type: "ADVANCE" | "BALANCE";
-  amountPaise: number; confirmedAt: string; confirmedByActorUserId: string; proposalContentHash: string; idempotencyKey: string; requestHash: string; recordVersion: number;
+  amountPaise: number; confirmedAt: string; confirmedByActorUserId: string; proposalContentHash: string; paymentMode?: string; idempotencyKey: string; requestHash: string; recordVersion: number;
 }
 
 export interface FounderBalanceDeadlineRecord extends OrganisationOwnedRecord {

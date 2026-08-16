@@ -4,6 +4,7 @@ import type {
   FloorWorkspaceRecord,
   FounderCommercialLegalPolicyRecord,
   FounderCommercialPolicyVersionRecord,
+  FounderBalanceDeadlineRecord,
   FounderCommercialPolicyEventType,
   FounderEngagementClassification,
   FounderProposalContentSnapshot,
@@ -353,6 +354,91 @@ export function createFounderProposalDraft(input: { state: AppState; actor: AppU
   return proposal;
 }
 
+/**
+ * Inbound Founder onboarding is deliberately a separate contract from the
+ * client-acceptance proposal lifecycle. Review is the commercial decision
+ * point; this action records the agreed terms, optional internal advance, and
+ * creates the native case hierarchy exactly once.
+ */
+export function createFounderInboundOnboarding(input: {
+  state: AppState; actor: AppUser; founderUserId: string; organisationId: string;
+  clientId: string; prospectiveProjectId: string; classification: FounderEngagementClassification;
+  professionalFeePaise: number; appliedGstBasisPoints: number; agreedAdvancePaise: number;
+  advanceReceivedPaise: number; paymentId?: string; paymentMode?: string;
+  feeDeviationReason?: string; classificationReason?: string; gstDeviationReason?: string; advanceExceptionReason?: string;
+  idempotencyKey: string; expectedProjectVersion?: number; expectedRevision?: number; now?: Date;
+}) {
+  owner(input); safeIdempotency(input.idempotencyKey); safePaise(input.advanceReceivedPaise, "Advance received");
+  const requestHash = deterministicContentHash({ clientId: input.clientId, prospectiveProjectId: input.prospectiveProjectId, classification: input.classification, professionalFeePaise: input.professionalFeePaise, appliedGstBasisPoints: input.appliedGstBasisPoints, agreedAdvancePaise: input.agreedAdvancePaise, advanceReceivedPaise: input.advanceReceivedPaise, paymentId: input.paymentId, paymentMode: input.paymentMode, feeDeviationReason: input.feeDeviationReason, classificationReason: input.classificationReason, gstDeviationReason: input.gstDeviationReason, advanceExceptionReason: input.advanceExceptionReason });
+  const auditKey = `audit:founder-inbound-onboarding:${input.idempotencyKey}`;
+  const replay = input.state.founderCommercialAuditEvents.find((event) => event.organisationId === input.organisationId && event.idempotencyKey === auditKey);
+  if (replay) {
+    if (replay.requestHash !== requestHash) fail(409, "This idempotency key was used for different onboarding content.");
+    const proposal = input.state.founderProposalVersions.find((item) => item.id === replay.proposalVersionId && item.organisationId === input.organisationId);
+    const caseRecord = input.state.vastuCases.find((item) => item.id === replay.entityId && item.organisationId === input.organisationId);
+    if (!proposal || !caseRecord) fail(409, "The prior onboarding result is unavailable; reload before retrying.");
+    const advance = input.state.founderCommercialPaymentConfirmations.find((item) => item.proposalVersionId === proposal.id && item.idempotencyKey === input.idempotencyKey);
+    const project = input.state.projects.find((item) => item.id === caseRecord.projectId && item.organisationId === input.organisationId);
+    const floor = input.state.floorWorkspaces.find((item) => item.projectId === caseRecord.projectId && item.organisationId === input.organisationId);
+    return { proposal, advance, caseRecord, project, floor, replayed: true };
+  }
+  const client = input.state.clients.find((item) => item.id === input.clientId && item.organisationId === input.organisationId);
+  const project = input.state.prospectiveProjects.find((item) => item.id === input.prospectiveProjectId && item.organisationId === input.organisationId && item.clientId === input.clientId);
+  if (!client || !project) fail(404, "Client and prospective project must share this organisation scope.");
+  if (!client.pipelineStage || !["WON", "ONBOARDING"].includes(client.pipelineStage)) fail(409, "The lead must be Converted/WON before commercial onboarding.");
+  if (!project.displayName?.trim() || !project.propertyLocation?.trim() || !project.propertyType || !project.serviceType) fail(409, "Complete the structured project scope before onboarding.");
+  if (project.caseId || input.state.vastuCases.some((item) => item.organisationId === input.organisationId && item.clientId === client.id && item.proposalId && item.projectId)) fail(409, "This project already has a Case; refresh before retrying.");
+  assertExpected(project.recordVersion, input.expectedProjectVersion, "prospective project");
+  const serviceType = project.serviceType;
+  const template = input.state.founderProposalTemplates.find((item) => item.organisationId === input.organisationId && item.serviceType === serviceType && item.kind === "DEFAULT" && item.status === "ACTIVE");
+  const brochureKey = serviceType === "EXISTING_SPACE" ? "BROCHURE_EXISTING_SPACE_V2" : "BROCHURE_NEW_CONSTRUCTION_V2";
+  const brochureManifest = APPROVED_FOUNDER_ASSETS.find((item) => item.key === brochureKey)!;
+  const brochureAsset = input.state.mediaAssets.find((item) => item.id === `media:${brochureKey.toLowerCase()}` && item.organisationId === input.organisationId);
+  const brochureVersion = input.state.mediaAssetVersions.find((item) => item.id === brochureAsset?.activeVersionId && item.organisationId === input.organisationId && item.status === "ACTIVE" && item.clientSendable && item.checksumSha256 === brochureManifest.checksumSha256);
+  if (!template && !brochureVersion) fail(409, "Activate the exact approved brochure before onboarding; no scope is inferred from brochure text.");
+  const policy = ensureFounderCommercialPolicy(input);
+  const terms = commercialTerms({ classification: input.classification, professionalFeePaise: input.professionalFeePaise, appliedGstBasisPoints: input.appliedGstBasisPoints, agreedAdvancePaise: input.agreedAdvancePaise, policy, feeDeviationReason: input.feeDeviationReason, classificationReason: input.classificationReason, gstDeviationReason: input.gstDeviationReason, advanceExceptionReason: input.advanceExceptionReason });
+  if (input.classification === "INTERNAL_COMPLIMENTARY") {
+    if (input.advanceReceivedPaise !== 0 || input.paymentId || input.paymentMode) fail(400, "Internal complimentary onboarding cannot create a payment or advance record.");
+  } else {
+    if (input.advanceReceivedPaise <= 0 || input.advanceReceivedPaise < terms.agreedAdvancePaise) fail(409, "Record receipt of the agreed advance before starting a paid Case.");
+    if (input.advanceReceivedPaise > terms.totalPayablePaise) fail(409, "Advance received cannot exceed the total payable.");
+    if (!input.paymentId?.trim()) fail(400, "A private internal payment reference is required when recording an advance.");
+  }
+  if (input.paymentId && input.state.founderCommercialPaymentConfirmations.some((item) => item.organisationId === input.organisationId && item.paymentId === input.paymentId)) fail(409, "This payment reference is already bound to a commercial confirmation.");
+  const intake = input.state.clientIntakeProfiles.filter((item) => item.clientId === client.id && (!item.organisationId || item.organisationId === input.organisationId)).sort((a, b) => b.version - a.version)[0];
+  const proposalDate = nowIso(input.now);
+  const content: FounderProposalContentSnapshot = {
+    clientProject: { clientName: client.displayName, clientId: client.id, prospectiveProjectId: project.id, projectKind: project.kind, serviceType, propertyType: project.propertyType, propertyLocation: project.propertyLocation, knownFloorCount: project.floorCount, primaryRequirement: intake?.needs?.mainChallenge, proposalDate },
+    requirements: { refinedSummary: "Structured project scope captured during Founder review; qualification questionnaire remains optional supporting evidence." },
+    scopeItems: template?.scopeItems.map((item) => ({ ...structuredClone(item), prospectiveProjectId: project.id })) ?? [],
+    deliverables: template?.deliverables.map((item) => ({ ...structuredClone(item), prospectiveProjectId: project.id })) ?? [],
+    interactions: { includedReviewRounds: 0, includedPresentationCalls: 0, clarificationPeriodDays: 0, expectedResponseTime: "", additionalInteractionTreatment: "" },
+    timeline: { expectedCommencement: "", estimatedDateRange: "", milestones: [], prerequisites: [], clientDependencies: [], pauseOrExtensionConditions: [], isEstimate: true },
+    commercial: { ...terms, paymentMilestones: terms.paymentMilestones.map((milestone) => milestone.id === "advance" ? { ...milestone, trigger: "Recorded during the Founder review/onboarding call before Case creation." } : milestone) },
+    projectExclusions: [], policyBindings: { commercialPolicyId: policy.id, templateVersionId: template?.id, brochureAssetVersionId: brochureVersion?.id, brochureAssetKey: brochureVersion ? brochureKey : undefined, brochureChecksumSha256: brochureVersion?.checksumSha256 },
+    nextSteps: { advanceRequired: input.classification !== "INTERNAL_COMPLIMENTARY", balanceAfterAdvanceDeadline: true, paymentProofRequiresConfirmation: false, reportGatesRemainServerEnforced: true }
+  };
+  const proposal: FounderProposalVersionRecord = { id: uuid(), proposalId: uuid(), version: 1, organisationId: input.organisationId, clientId: client.id, prospectiveProjectId: project.id, serviceType, status: "FOUNDER_AGREED", currentStep: 1, content, contentHash: deterministicContentHash(content), createdAt: proposalDate, createdByActorUserId: input.actor.id, recordVersion: 1, idempotencyKey: input.idempotencyKey, requestHash };
+  const deadline: FounderBalanceDeadlineRecord = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, clientId: client.id, prospectiveProjectId: project.id, status: terms.totalPayablePaise === 0 ? "WAIVED" : "NOT_DUE", remainingAmountPaise: terms.totalPayablePaise, commercialPolicyId: policy.id, commercialPolicyVersion: policy.version, engagementClassification: input.classification, recordVersion: 1 };
+  input.state.founderProposalVersions.push(proposal); input.state.founderBalanceDeadlines.push(deadline);
+  let advance: AppState["founderCommercialPaymentConfirmations"][number] | undefined;
+  if (input.classification !== "INTERNAL_COMPLIMENTARY") {
+    advance = { id: uuid(), organisationId: input.organisationId, proposalVersionId: proposal.id, clientId: client.id, prospectiveProjectId: project.id, paymentId: input.paymentId!.trim(), type: "ADVANCE", amountPaise: input.advanceReceivedPaise, confirmedAt: proposalDate, confirmedByActorUserId: input.actor.id, proposalContentHash: proposal.contentHash, paymentMode: input.paymentMode?.trim() || undefined, idempotencyKey: input.idempotencyKey, requestHash: deterministicContentHash({ proposalId: proposal.id, paymentId: input.paymentId, amountPaise: input.advanceReceivedPaise, paymentMode: input.paymentMode }), recordVersion: 1 };
+    input.state.founderCommercialPaymentConfirmations.push(advance); deadline.advancePaymentConfirmationId = advance.id; deadline.advanceConfirmedAt = proposalDate; deadline.status = advance.amountPaise === terms.totalPayablePaise ? "PAID" : "DUE"; deadline.remainingAmountPaise = Math.max(0, terms.totalPayablePaise - advance.amountPaise); deadline.dueAt = addDays(new Date(proposalDate), policy.balanceDeadlineDays).toISOString(); deadline.recordVersion += 1;
+  }
+  const now = proposalDate; const caseId = uuid(); const nativeProjectId = uuid(); const floorId = uuid(); const caseNumber = `UV-${new Date(now).getUTCFullYear()}-${String(input.state.vastuCases.length + 1).padStart(3, "0")}`;
+  const caseRecord: VastuCaseRecord = { id: caseId, organisationId: input.organisationId, caseNumber, clientId: client.id, proposalId: proposal.id, projectId: nativeProjectId, status: "CASE_CREATED", reportStatus: "DRAFT", orientationLocked: false, balanceApproved: false, fullPaymentApproved: false, serviceType, canonicalStage: "UNDERSTAND", revisionNumber: 1, recordVersion: 1, evaluationArchitectureVersion: "V1" };
+  const nativeProject: VastuProjectRecord = { id: nativeProjectId, organisationId: input.organisationId, clientId: client.id, activeCaseId: caseId, propertyName: project.displayName, status: "IN_PROGRESS", createdAt: now };
+  const floor: FloorWorkspaceRecord = { id: floorId, organisationId: input.organisationId, caseId, projectId: nativeProjectId, floorLabel: "Ground floor", status: "DRAFT", locked: false, evidenceUploads: [], idempotencyKey: `inbound-floor:${input.idempotencyKey}`, evaluationArchitectureVersion: "V1" };
+  input.state.vastuCases.unshift(caseRecord); input.state.projects.unshift(nativeProject); input.state.floorWorkspaces.unshift(floor);
+  input.state.casePropertyContexts.unshift({ id: uuid(), organisationId: input.organisationId, clientId: client.id, caseId, projectId: nativeProjectId, propertyContext: { serviceInterest: serviceType, propertyType: project.propertyType, propertyStatus: "Known", cityCountry: project.propertyLocation, constraints: project.importantNotes, floorCount: project.floorCount ?? 1 }, version: 1, idempotencyKey: `inbound-property-context:${input.idempotencyKey}`, createdAt: now, updatedAt: now, status: "CURRENT", createdByActorUserId: input.actor.id, updatedByActorUserId: input.actor.id, recordVersion: 1 });
+  project.caseId = caseId; project.status = "CONVERTED"; project.recordVersion = (project.recordVersion ?? 0) + 1; client.pipelineStage = "ONBOARDING"; client.recordVersion = (client.recordVersion ?? 0) + 1; proposal.recordVersion += 1;
+  input.state.timelineEvents.unshift({ id: uuid(), organisationId: input.organisationId, clientId: client.id, category: "Commercial", headline: "Founder inbound onboarding completed", details: `Case ${caseNumber} opened from mutually agreed Founder commercial terms.`, happenedAt: now, actorRole: input.actor.role, actorId: input.actor.id, actorName: input.actor.fullName });
+  appendAudit(input.state, { organisationId: input.organisationId, eventType: "FOUNDER_INBOUND_ONBOARDING_COMPLETED", entityType: "VASTU_CASE", entityId: caseId, actorUserId: input.actor.id, reason: input.classification === "INTERNAL_COMPLIMENTARY" ? "Founder agreed an internal complimentary engagement during review." : "Founder agreed commercial terms and recorded the advance during review.", proposalVersionId: proposal.id, prospectiveProjectId: project.id, afterHash: requestHash, idempotencyKey: auditKey, requestHash });
+  return { proposal, advance, caseRecord, project: nativeProject, floor, replayed: false };
+}
+
 export function autosaveFounderProposalStep(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; step: FounderProposalStep; expectedRecordVersion?: number; idempotencyKey: string; patch: Record<string, unknown>; now?: Date }) {
   owner(input); safeIdempotency(input.idempotencyKey);
   const proposal = input.state.founderProposalVersions.find((item) => item.id === input.proposalVersionId && item.organisationId === input.organisationId);
@@ -446,7 +532,7 @@ export function projectFounderProposalForClient(state: AppState, proposal: Found
   if ((proposal.content.policyBindings.cancellationPolicyVersion !== undefined && proposal.content.policyBindings.cancellationPolicyVersion !== p14.version) || (proposal.content.policyBindings.cancellationPolicyContentHash && proposal.content.policyBindings.cancellationPolicyContentHash !== p14.contentHash)) fail(409, "The proposal no-refund policy snapshot does not match its immutable version binding.");
   const commercial = proposal.content.commercial;
   const brochureReference = proposal.content.policyBindings.brochureAssetVersionId && proposal.content.policyBindings.brochureAssetKey && proposal.content.policyBindings.brochureChecksumSha256 ? { title: proposal.serviceType === "EXISTING_SPACE" ? "Existing Space Vastu Audit & Optimisation" : "New Construction Vastu Planning & Design Coordination", assetKey: proposal.content.policyBindings.brochureAssetKey, checksumSha256: proposal.content.policyBindings.brochureChecksumSha256 } : undefined;
-  return { proposalVersion: proposal.version, proposalHash: proposal.contentHash, client: { name: proposal.content.clientProject.clientName, permanentClientId: proposal.clientId }, project: { kind: proposal.content.clientProject.projectKind, serviceType: proposal.serviceType, propertyType: proposal.content.clientProject.propertyType, propertyLocation: proposal.content.clientProject.propertyLocation, knownFloorCount: proposal.content.clientProject.knownFloorCount, primaryRequirement: proposal.content.clientProject.primaryRequirement }, requirements: { exactQualificationVersion: proposal.content.requirements.qualificationResponseVersionId, refinedSummary: proposal.content.requirements.refinedSummary }, scopeItems: proposal.content.scopeItems.map(({ order, title, status, floorIds, note }) => ({ order, title, status, floorIds, note })), deliverables: proposal.content.deliverables.map(({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency }) => ({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency })), brochureReference, interactions: structuredClone(proposal.content.interactions), timeline: structuredClone(proposal.content.timeline), commercial: { professionalFeePaise: commercial.professionalFeePaise, gstAppliedBasisPoints: commercial.gstAppliedBasisPoints, gstAmountPaise: commercial.gstAmountPaise, totalPayablePaise: commercial.totalPayablePaise, agreedAdvancePaise: commercial.agreedAdvancePaise, remainingBalancePaise: commercial.remainingBalancePaise, paymentMilestones: structuredClone(commercial.paymentMilestones) }, professionalBoundaries: p5.exactText, projectExclusions: [...proposal.content.projectExclusions], cancellationRefundDelayPolicy: p14.exactText, validityEndsAt: proposal.validityEndsAt!, postAcceptanceSequence: ["Uchit acknowledges acceptance.", "Payment instructions are issued where applicable.", "The agreed advance or approved exception is confirmed.", "A Case ID and workspace are created only after commercial clearance.", "Project intake and evidence collection begin."] };
+  return { proposalVersion: proposal.version, proposalHash: proposal.contentHash, client: { name: proposal.content.clientProject.clientName, permanentClientId: proposal.clientId }, project: { kind: proposal.content.clientProject.projectKind, serviceType: proposal.serviceType, propertyType: proposal.content.clientProject.propertyType, propertyLocation: proposal.content.clientProject.propertyLocation, knownFloorCount: proposal.content.clientProject.knownFloorCount, primaryRequirement: proposal.content.clientProject.primaryRequirement }, requirements: { exactQualificationVersion: proposal.content.requirements.qualificationResponseVersionId ?? "NOT_SUBMITTED_SCOPE_ONLY", refinedSummary: proposal.content.requirements.refinedSummary }, scopeItems: proposal.content.scopeItems.map(({ order, title, status, floorIds, note }) => ({ order, title, status, floorIds, note })), deliverables: proposal.content.deliverables.map(({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency }) => ({ order, name, status, floorIds, deliveryFormat, expectedStage, description, clientDependency })), brochureReference, interactions: structuredClone(proposal.content.interactions), timeline: structuredClone(proposal.content.timeline), commercial: { professionalFeePaise: commercial.professionalFeePaise, gstAppliedBasisPoints: commercial.gstAppliedBasisPoints, gstAmountPaise: commercial.gstAmountPaise, totalPayablePaise: commercial.totalPayablePaise, agreedAdvancePaise: commercial.agreedAdvancePaise, remainingBalancePaise: commercial.remainingBalancePaise, paymentMilestones: structuredClone(commercial.paymentMilestones) }, professionalBoundaries: p5.exactText, projectExclusions: [...proposal.content.projectExclusions], cancellationRefundDelayPolicy: p14.exactText, validityEndsAt: proposal.validityEndsAt!, postAcceptanceSequence: ["Uchit acknowledges acceptance.", "Payment instructions are issued where applicable.", "The agreed advance or approved exception is confirmed.", "A Case ID and workspace are created only after commercial clearance.", "Project intake and evidence collection begin."] };
 }
 
 export async function generateFounderProposalArtifact(input: { state: AppState; actor: AppUser; founderUserId: string; organisationId: string; proposalVersionId: string; store: CommercialArtifactStore; idempotencyKey: string; expectedRecordVersion?: number; now?: Date }) {
