@@ -176,7 +176,11 @@ export function UnifiedLeadsWorkspace({ mode = "all" }: { mode?: UnifiedLeadsWor
   useEffect(() => {
     if (!selected) return;
     const first = proposedTargets[0] ?? allowedTargets[0] ?? selected.stage;
-    setTarget(first); setNextAction(selected.nextAction?.summary ?? ""); setDueAt(selected.nextAction?.dueAt?.slice(0, 16) ?? "");
+    const hasDirectTarget = proposedTargets.some((stage) => allowedTargets.includes(stage));
+    const groupedCorrectionDueAt = !hasDirectTarget && moveGroupId
+      ? new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)
+      : "";
+    setTarget(first); setNextAction(selected.nextAction?.summary ?? ""); setDueAt(selected.nextAction?.dueAt?.slice(0, 16) ?? groupedCorrectionDueAt);
     setCorrectionReason("");
     key.current = crypto.randomUUID();
   }, [selected?.id, selected?.stage, selected?.nextAction?.dueAt, moveGroupId]);

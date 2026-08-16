@@ -11,6 +11,8 @@ test("grouped Founder pipeline moves use the governed correction contract when a
   assert.match(ui, /expectedRevision: state\.persistenceRevision/);
   assert.match(ui, /window\.confirm\("Record this administrative pipeline correction/);
   assert.match(ui, /Correction reason \(20–500 characters\)/);
+  assert.match(ui, /groupedCorrectionDueAt/);
+  assert.match(ui, /24 \* 60 \* 60 \* 1000/);
   assert.doesNotMatch(ui, /pipelineStage:\s*"(REVIEW|CONVERTED)"/);
 });
 
