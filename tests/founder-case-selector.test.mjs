@@ -42,7 +42,9 @@ test("disposable role switching is server-visible only on the guarded local demo
 test("case selection and deep links both use the same server access rule", () => {
   const api = source("app/api/founder/cases/route.ts");
   const scorecard = source("lib/founder-scorecard.ts");
-  assert.match(api, /canAccessFounderCase\(state, access\.actor, item\)/);
+  assert.match(api, /resolveActiveOrganisationContext\(access\.actor/);
+  assert.match(api, /organisationId: foundation\.organisation\.id/);
+  assert.match(api, /canAccessFounderCase\(state, actor, item\)/);
   assert.match(scorecard, /canAccessFounderCase\(state, actor, candidateCase\)/);
 });
 
