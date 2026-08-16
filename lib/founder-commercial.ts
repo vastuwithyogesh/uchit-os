@@ -667,6 +667,13 @@ export function createFounderProspectiveCase(input: { state: AppState; actor: Ap
   if (input.floorCount !== undefined && (!Number.isInteger(input.floorCount) || input.floorCount < 1 || input.floorCount > 200)) throw new Error("Number of floors must be between 1 and 200.");
   const retry = input.state.prospectiveProjects.find((item) => item.clientId === client.id && item.idempotencyKey === input.idempotencyKey);
   if (retry) return { project: retry, client, duplicateWarning: false };
+  const existingPreCase = input.preCaseReview ? input.state.prospectiveProjects.find((item) => item.clientId === client.id && !item.caseId && item.status !== "CONVERTED") : undefined;
+  if (existingPreCase) {
+    const kind: "RESIDENTIAL" | "COMMERCIAL" = input.propertyType === "Commercial" || input.propertyType === "Factory" || input.propertyType === "Shop" || input.propertyType === "Hospital" || input.propertyType === "Hotel" ? "COMMERCIAL" : "RESIDENTIAL";
+    Object.assign(existingPreCase, { kind, status: "REVIEW_PENDING", serviceType: input.serviceType, displayName, variation: `${input.serviceType === "EXISTING_SPACE" ? "Existing Space" : "New Construction"} · ${input.propertyType}`, propertyType: input.propertyType, propertyLocation, floorCount: input.floorCount, importantNotes: notes, recordVersion: (existingPreCase.recordVersion ?? 0) + 1, idempotencyKey: input.idempotencyKey });
+    client.recordVersion = (client.recordVersion ?? 0) + 1;
+    return { project: existingPreCase, client, duplicateWarning: false };
+  }
   const duplicate = input.state.prospectiveProjects.some((item) => item.clientId === client.id && item.status !== "CONVERTED" && item.propertyLocation?.trim().toLowerCase() === propertyLocation.toLowerCase()) || input.state.projects.some((item) => item.clientId === client.id && item.propertyName.trim().toLowerCase() === displayName.toLowerCase());
   if (duplicate && !input.confirmPossibleDuplicate) fail(409, "A similar active project already exists. Review it, then explicitly continue if this is independent.");
   const kind: "RESIDENTIAL" | "COMMERCIAL" = input.propertyType === "Commercial" || input.propertyType === "Factory" || input.propertyType === "Shop" || input.propertyType === "Hospital" || input.propertyType === "Hotel" ? "COMMERCIAL" : "RESIDENTIAL";

@@ -14,6 +14,7 @@ test("Review requires the existing prospective-project scope and does not create
   assert.match(sheet, /Qualification Questionnaire Snapshot \(optional\)/);
   assert.match(route, /founder-project-scope-save/);
   assert.match(workflow, /Project scope is required before moving this lead into Review/);
+  assert.match(source("lib/founder-commercial.ts"), /existingPreCase/);
   assert.doesNotMatch(workspace, /founder-case-intent-create.*projectScope/);
 });
 
