@@ -10,7 +10,8 @@ test("Step 04 exposes a V1-only native D8 resume control", () => {
   const ui = read("components/spatial-workspace.tsx");
   assert.match(ui, /run\("d8-orientation-finalize-v1"/);
   assert.match(ui, /orientationVersionId: orientation\.id/);
-  assert.match(ui, /isV1Spatial \? nativeD8Ready/);
+  assert.match(ui, /isV1Spatial \? \(orientation \? nativeD8Ready : Boolean\(currentDegreeError\) \|\| Boolean\(currentReasonError\)\)/);
+  assert.match(ui, /orientation \? "Finalize native V1 D8" : "Lock exact orientation"/);
   assert.match(ui, /orientation-version-lock/);
 });
 
