@@ -246,7 +246,7 @@ export function SpatialWorkspace({ focus = "all", caseId: requestedCaseId, floor
   const currentDegreeError = degreeValidation(degree);
   const currentReasonError = reasonValidation(orientationReason);
   const orientationUnchanged = Boolean(orientation && googleEvidence?.id === orientation.googleEarthEvidenceVersionId && Number(degree) === orientation.exactDegree && orientationReason.trim() === (orientation.lockReason ?? "").trim());
-  const nativeD8Ready = Boolean(isV1Spatial && v1D8?.sourceOrientationVersionId === orientation?.id);
+  const nativeD8Ready = Boolean(isV1Spatial && orientation && v1D8?.sourceOrientationVersionId === orientation.id);
 
   function validateOrientation() {
     const errors: Record<string, string> = {};

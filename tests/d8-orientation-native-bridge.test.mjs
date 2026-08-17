@@ -12,6 +12,7 @@ test("Step 04 exposes a V1-only native D8 resume control", () => {
   assert.match(ui, /orientationVersionId: orientation\.id/);
   assert.match(ui, /isV1Spatial \? \(orientation \? nativeD8Ready : Boolean\(currentDegreeError\) \|\| Boolean\(currentReasonError\)\)/);
   assert.match(ui, /orientation \? "Finalize native V1 D8" : "Lock exact orientation"/);
+  assert.match(ui, /isV1Spatial && orientation && v1D8\?\.sourceOrientationVersionId === orientation\.id/);
   assert.match(ui, /orientation-version-lock/);
 });
 
