@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "executionEnabled": false,
+  "providerConfigured": false,
+  "reviewIdentityConfigured": false,
+  "mustBeDistinctFromImplementer": true,
+  "githubCheckName": "Independent review",
+  "requiredInputs": [
+    "ticketId",
+    "taskPacketId",
+    "claimId",
+    "pullRequest",
+    "implementerIdentity",
+    "reviewerIdentity",
+    "riskClass",
+    "baseSha",
+    "headSha",
+    "changedPaths",
+    "diffSummary",
+    "acceptanceCriteria",
+    "requiredTests",
+    "testResults",
+    "policyGateResult",
+    "protectedDomains",
+    "governanceSnapshot"
+  ],
+  "allowedDecisions": [
+    "APPROVE",
+    "REQUEST_CHANGES",
+    "ESCALATE_RISK",
+    "PRODUCT_AMBIGUITY"
+  ],
+  "approvalRequirements": [
+    "acceptance criteria satisfied",
+    "scope discipline satisfied",
+    "no unapproved protected write",
+    "actual diff risk does not exceed permitted risk",
+    "required tests are adequate and passed",
+    "security and authorization boundaries preserved",
+    "methodology truth unchanged unless explicitly approved",
+    "financial and commercial truth unchanged unless explicitly approved"
+  ],
+  "requestChangesWhen": [
+    "acceptance is incomplete",
+    "tests are missing or weak",
+    "scope expanded",
+    "architecture invariant regressed",
+    "security boundary regressed",
+    "claim/provenance mismatch exists"
+  ],
+  "escalateRiskWhen": [
+    "diff touches protected domain not declared in ticket",
+    "runtime behavior affects auth, payments, methodology, database, secrets, deployment or AI permissions",
+    "risk classification appears understated"
+  ],
+  "productAmbiguityWhen": [
+    "multiple valid product behaviors exist",
+    "legacy and V1 authority conflict cannot be resolved from approved sources",
+    "methodology value is missing or contradictory"
+  ],
+  "forbidden": [
+    "reviewer equals implementer",
+    "reviewer modifies implementation during review",
+    "reviewer downgrades risk",
+    "reviewer weakens tests to approve",
+    "reviewer invents product or methodology truth",
+    "reviewer approves own work"
+  ]
+}
