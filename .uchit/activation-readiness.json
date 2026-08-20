@@ -14,17 +14,17 @@
     "branchDeletionBlocked": true
   },
   "requiredStatusChecks": [
-    "Release gate",
-    "Policy gate",
-    "Repository readiness",
-    "Reviewer dispatcher gate",
-    "Rollback contract gate",
-    "Staging smoke contract gate",
-    "Orchestration contract gate",
-    "Claim isolation provenance gate",
-    "Dispatch review execution gate",
-    "Repair quarantine continuation gate",
-    "Merge ledger completion gate"
+    { "workflow": "Release gate", "context": "verify" },
+    { "workflow": "Policy gate", "context": "policy" },
+    { "workflow": "Repository readiness", "context": "readiness" },
+    { "workflow": "Reviewer dispatcher gate", "context": "contracts" },
+    { "workflow": "Rollback contract gate", "context": "rollback-contract" },
+    { "workflow": "Staging smoke contract gate", "context": "staging-contract" },
+    { "workflow": "Orchestration contract gate", "context": "orchestration-contract" },
+    { "workflow": "Claim isolation provenance gate", "context": "claim-isolation-provenance" },
+    { "workflow": "Dispatch review execution gate", "context": "dispatch-review-contract" },
+    { "workflow": "Repair quarantine continuation gate", "context": "repair-quarantine-continuation" },
+    { "workflow": "Merge ledger completion gate", "context": "merge-ledger-completion" }
   ],
   "requiredControlPlaneContracts": [
     ".uchit/autonomy.json",
