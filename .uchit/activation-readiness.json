@@ -24,7 +24,8 @@
     { "workflow": "Claim isolation provenance gate", "context": "claim-isolation-provenance" },
     { "workflow": "Dispatch review execution gate", "context": "dispatch-review-contract" },
     { "workflow": "Repair quarantine continuation gate", "context": "repair-quarantine-continuation" },
-    { "workflow": "Merge ledger completion gate", "context": "merge-ledger-completion" }
+    { "workflow": "Merge ledger completion gate", "context": "merge-ledger-completion" },
+    { "workflow": "M0 activation certification gate", "context": "m0-certification" }
   ],
   "requiredControlPlaneContracts": [
     ".uchit/autonomy.json",
