@@ -35,7 +35,7 @@ export default async function FounderStepPage({ params, searchParams }: { params
       }
     }
     const scorecard = buildFounderScorecard(state, access.actor, undefined, context.caseId, context.floorId);
-    const fastFlow = isFounderFastFlowRequest(requestHeaders.get("host"), access.actor.role === "SUPER_ADMIN" && Boolean(access.actor.organisationId));
+    const fastFlow = isFounderFastFlowRequest(requestHeaders.get("host"), access.actor.role === "SUPER_ADMIN");
     return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle={fastFlow ? "Fast staging flow" : "One governed step at a time"} /><FounderFlowPage scorecard={scorecard} stepNumber={stepNumber} walkthrough={walkthrough} fastFlow={fastFlow} /></main>;
   } catch {
     return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One governed step at a time" /><section className="workspace-state" role="alert"><h1>We could not load this step</h1><p>Nothing has changed. Refresh to retry or return to the command center.</p><a className="button-secondary" href="/">Back to command center</a></section></main>;
