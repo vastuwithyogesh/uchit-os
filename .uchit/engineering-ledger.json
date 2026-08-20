@@ -1,0 +1,70 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "writeExecutionEnabled": false,
+  "persistenceAuthority": "GITHUB",
+  "appendOnly": true,
+  "correctionsRequireSupersedingEntry": true,
+  "requiredIdentityFields": [
+    "ticketId",
+    "taskPacketId",
+    "riskClass",
+    "implementerIdentity",
+    "reviewerIdentity"
+  ],
+  "requiredLifecycleFields": [
+    "state",
+    "branch",
+    "baseSha",
+    "headSha",
+    "pullRequest",
+    "startedAt",
+    "updatedAt"
+  ],
+  "requiredVerificationFields": [
+    "changedPaths",
+    "testsSelected",
+    "testsExecuted",
+    "testResults",
+    "policyGateResult",
+    "reviewDecision",
+    "stagingResult",
+    "releaseResult"
+  ],
+  "requiredOutcomeFields": [
+    "mergeSha",
+    "deploymentReleaseId",
+    "postDeploySmokeResult",
+    "rollbackReleaseId",
+    "productionOutcome"
+  ],
+  "eventTypes": [
+    "TASK_READY",
+    "TASK_CLAIMED",
+    "BUILD_STARTED",
+    "BUILD_COMPLETED",
+    "PR_OPENED",
+    "REVIEW_APPROVED",
+    "REVIEW_CHANGES_REQUESTED",
+    "RISK_ESCALATED",
+    "VERIFY_STARTED",
+    "VERIFY_PASSED",
+    "VERIFY_FAILED",
+    "STAGING_PASSED",
+    "STAGING_FAILED",
+    "APPROVAL_REQUIRED",
+    "MERGED",
+    "DEPLOY_VERIFIED",
+    "ROLLBACK_EXECUTED",
+    "QUARANTINED",
+    "DONE"
+  ],
+  "invariants": {
+    "implementerCannotBeSoleReviewer": true,
+    "riskCannotDowngradeWithinTask": true,
+    "doneRequiresVerifiedOutcome": true,
+    "failedChecksCannotBeOmitted": true,
+    "protectedApprovalMustBeRecorded": true,
+    "secretsMustNeverBeRecorded": true
+  }
+}
