@@ -8,7 +8,8 @@ const scorecard = () => read("lib/founder-scorecard.ts");
 test("V1 evaluation progression is directional-complete, not elemental-complete", () => {
   const source = scorecard();
   assert.match(source, /const evaluationReady = isV1 \? Boolean\(v1\?\.directionalEvaluationComplete\)/);
-  assert.match(source, /status: status\(\{ complete: v1\.directionalEvaluationComplete,[\s\S]*blocked: !v1\.directionalEvaluationComplete \}\)/);
+  assert.match(source, /const directionalInputReady = v1\.spatial === "COMPLETE"/);
+  assert.match(source, /status: status\(\{ complete: v1\.directionalEvaluationComplete,[\s\S]*ready: directionalInputReady && !v1\.directionalEvaluationComplete, blocked: !directionalInputReady \}\)/);
 });
 
 test("V1 Stage-A starts after Directional Evaluation and remains incomplete until presented", () => {
