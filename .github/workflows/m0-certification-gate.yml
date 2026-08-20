@@ -1,0 +1,23 @@
+name: M0 activation certification gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  m0-certification:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Evaluate activation readiness and Buttery-Smooth certification
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: node .uchit/m0-certification-gate.mjs
