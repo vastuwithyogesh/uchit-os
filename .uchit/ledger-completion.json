@@ -1,0 +1,60 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "completionExecutionEnabled": false,
+  "ledgerAuthority": ".uchit/engineering-ledger.json",
+  "completionEvent": "DONE",
+  "requiredCompletionEvidence": [
+    "ticketId",
+    "taskPacketId",
+    "riskClass",
+    "implementerIdentity",
+    "reviewerIdentity",
+    "branch",
+    "baseSha",
+    "headSha",
+    "pullRequest",
+    "changedPaths",
+    "testsSelected",
+    "testsExecuted",
+    "testResults",
+    "policyGateResult",
+    "reviewDecision",
+    "mergeSha",
+    "stagingResult",
+    "releaseResult",
+    "postDeploySmokeResult",
+    "productionOutcome"
+  ],
+  "conditionalEvidence": {
+    "deployingChange": [
+      "deploymentReleaseId",
+      "postDeploySmokeResult",
+      "productionOutcome"
+    ],
+    "rolledBackChange": [
+      "rollbackReleaseId",
+      "productionOutcome"
+    ],
+    "r2Change": [
+      "ownerApprovalReference"
+    ]
+  },
+  "allowedProductionOutcomes": [
+    "NO_PRODUCTION_IMPACT",
+    "VERIFIED_HEALTHY",
+    "ROLLED_BACK_VERIFIED",
+    "QUARANTINED_AFTER_FAILURE"
+  ],
+  "invariants": {
+    "doneRequiresVerifiedOutcome": true,
+    "mergeShaCannotBeMissing": true,
+    "failedChecksCannotBeOmitted": true,
+    "reviewerCannotEqualImplementer": true,
+    "riskCannotBeLowerThanTaskRisk": true,
+    "secretsCannotAppearInLedger": true,
+    "correctionRequiresSupersedingEntry": true,
+    "doneIsAppendOnlyEvent": true,
+    "doneCannotBeBackdatedToHideFailure": true
+  }
+}
