@@ -1,0 +1,46 @@
+{
+  "version": 1,
+  "baseline": ["pnpm test:release"],
+  "domains": [
+    {
+      "name": "auth-security",
+      "pathPrefixes": ["lib/auth", "lib/access-policy", "app/api/"],
+      "commands": ["pnpm test:security", "pnpm test:release"]
+    },
+    {
+      "name": "commercial-payment",
+      "pathPrefixes": ["lib/founder-commercial", "lib/payment", "lib/statutory"],
+      "commands": ["pnpm test:founder-no-refund", "pnpm test:founder-complimentary-case", "pnpm test:founder-statutory", "pnpm test:release"]
+    },
+    {
+      "name": "founder-flow",
+      "pathPrefixes": ["lib/founder-flow", "lib/founder-scorecard", "components/founder", "app/founder/"],
+      "commands": ["pnpm test:founder-flow", "pnpm test:founder-scorecard", "pnpm test:reference-parity", "pnpm test:release"]
+    },
+    {
+      "name": "evaluation-methodology",
+      "pathPrefixes": ["lib/directional", "lib/elemental", "lib/aou-methodology", "lib/methodology", "lib/evaluation"],
+      "commands": ["pnpm test:evaluation", "pnpm test:founder-pilot", "pnpm test:founder-multifloor", "pnpm test:release"]
+    },
+    {
+      "name": "stage-b-remedy",
+      "pathPrefixes": ["lib/stage-b", "components/stage-b", "lib/remediation", "components/remediation"],
+      "commands": ["pnpm test:stage-b", "pnpm test:section-a", "pnpm test:founder-pre-remedy", "pnpm test:release"]
+    },
+    {
+      "name": "report-delivery",
+      "pathPrefixes": ["lib/report", "lib/document-delivery", "lib/final-pdf", "app/api/report", "app/api/delivery"],
+      "commands": ["pnpm test:delivery", "pnpm test:security", "pnpm test:founder-pilot", "pnpm test:release"]
+    },
+    {
+      "name": "database-persistence",
+      "pathPrefixes": ["db/", "prisma/", "lib/persistence"],
+      "commands": ["pnpm test:persistence", "pnpm test:payment-migration", "pnpm test:deployment-readiness", "pnpm test:release"]
+    },
+    {
+      "name": "crm-leads",
+      "pathPrefixes": ["app/crm", "components/crm", "lib/crm", "components/unified-leads"],
+      "commands": ["pnpm test:unified-leads", "pnpm test:crm-ia", "pnpm test:lead-import", "pnpm test:release"]
+    }
+  ]
+}

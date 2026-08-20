@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "milestone": "M-1 governance baseline",
+  "certifiedMainSha": "62a6c61ed4523ff142b0e1baad599caf1326e4bb",
+  "certificationEvidence": [
+    "PR #2 repaired the pre-existing Step 06 release-gate assertions with test-only changes",
+    "PR #2 full Release gate passed before merge",
+    "PR #1 was refreshed onto repaired main",
+    "PR #1 full Release gate passed before merge",
+    "PR #1 merged the repository-native governance baseline"
+  ],
+  "autonomousDispatchCertified": false,
+  "notes": "This SHA certifies the pre-controller governance foundation only. It does not authorize autonomous coding, merging, deployment, or repair loops."
+}

@@ -1,0 +1,40 @@
+{
+  "version": 1,
+  "requiredFields": [
+    "problem",
+    "outcome",
+    "scope",
+    "acceptanceCriteria",
+    "risk",
+    "domains",
+    "dependencies",
+    "requiredTests"
+  ],
+  "allowedRisk": ["R0", "R1", "R2", "R3"],
+  "allowedStates": [
+    "BACKLOG",
+    "NEEDS_DEFINITION",
+    "READY",
+    "CLAIMED",
+    "BUILDING",
+    "REVIEW",
+    "REPAIRING",
+    "VERIFYING",
+    "STAGING",
+    "MERGE_READY",
+    "APPROVAL_REQUIRED",
+    "BLOCKED",
+    "QUARANTINED",
+    "MERGED",
+    "DEPLOY_VERIFY",
+    "DONE"
+  ],
+  "rules": {
+    "readyRequiresNoProductAmbiguity": true,
+    "implementerCannotSelfApprove": true,
+    "riskMayEscalateButNotAutoDowngrade": true,
+    "r2RequiresOwnerApproval": true,
+    "r3CannotEnterReady": true,
+    "unrelatedCleanupForbidden": true
+  }
+}

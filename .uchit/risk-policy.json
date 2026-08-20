@@ -1,0 +1,68 @@
+{
+  "version": 1,
+  "defaultRisk": "R1",
+  "riskOrder": ["R0", "R1", "R2", "R3"],
+  "r0Prefixes": [
+    "docs/",
+    ".github/ISSUE_TEMPLATE/"
+  ],
+  "r2Exact": [
+    "AGENTS.md",
+    "PRODUCT_CONSTITUTION.md",
+    "ARCHITECTURE_RULES.md",
+    "AUTONOMY_POLICY.md",
+    "SECURITY_POLICY.md",
+    "TESTING_POLICY.md",
+    "RELEASE_POLICY.md",
+    ".env.example"
+  ],
+  "r2Prefixes": [
+    ".uchit/",
+    ".github/workflows/",
+    ".openai/",
+    "db/",
+    "prisma/",
+    "app/api/actions/",
+    "lib/auth",
+    "lib/access-policy",
+    "lib/founder-commercial",
+    "lib/payment",
+    "lib/statutory",
+    "lib/methodology",
+    "lib/aou-methodology",
+    "lib/stage-b",
+    "lib/directional",
+    "lib/elemental",
+    "lib/report",
+    "lib/document-delivery",
+    "lib/final-pdf",
+    "lib/protected"
+  ],
+  "r3Exact": [
+    ".env",
+    "id_rsa",
+    "id_ed25519"
+  ],
+  "r3Prefixes": [
+    "secrets/",
+    ".secrets/"
+  ],
+  "r3Suffixes": [
+    ".pem",
+    ".p12",
+    ".pfx"
+  ],
+  "protectedGovernanceFiles": [
+    "AGENTS.md",
+    "PRODUCT_CONSTITUTION.md",
+    "ARCHITECTURE_RULES.md",
+    "AUTONOMY_POLICY.md",
+    "SECURITY_POLICY.md",
+    "TESTING_POLICY.md",
+    "RELEASE_POLICY.md",
+    ".uchit/risk-policy.json",
+    ".uchit/autonomy.json",
+    ".uchit/test-matrix.json",
+    ".uchit/ticket-schema.json"
+  ]
+}

@@ -1,0 +1,90 @@
+name: Uchit engineering task
+description: Governed work item for Uchit OS engineering
+title: "UCHIT: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A ticket may enter READY only when product intent, scope, acceptance, risk, dependencies and verification are explicit. R3 work cannot enter READY.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What is wrong, missing, slow, confusing, unsafe, or unnecessarily complex?
+    validations:
+      required: true
+  - type: textarea
+    id: outcome
+    attributes:
+      label: Intended outcome
+      description: Describe the smallest correct result, not an implementation preference.
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Allowed scope
+      description: Areas/files/domains that may change and anything explicitly out of scope.
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Acceptance criteria
+      description: Testable completion criteria, one per line.
+    validations:
+      required: true
+  - type: dropdown
+    id: risk
+    attributes:
+      label: Initial risk
+      options:
+        - R0 — routine
+        - R1 — reviewed engineering
+        - R2 — protected
+        - R3 — prohibited autonomously
+    validations:
+      required: true
+  - type: input
+    id: domains
+    attributes:
+      label: Domains / conflict areas
+      description: Comma-separated, e.g. founder-flow, evaluation, auth, commercial, reporting.
+    validations:
+      required: true
+  - type: textarea
+    id: dependencies
+    attributes:
+      label: Dependencies / blockers
+      description: Ticket IDs or NONE. Include unresolved product/methodology authority if any.
+      value: "NONE"
+    validations:
+      required: true
+  - type: textarea
+    id: tests
+    attributes:
+      label: Required verification
+      description: Relevant focused tests plus release/security/golden-flow expectations.
+    validations:
+      required: true
+  - type: textarea
+    id: protected
+    attributes:
+      label: Protected areas potentially affected
+      description: Auth, permissions, finance, methodology, migrations, secrets, production data, architecture, AI autonomy, or NONE.
+      value: "NONE"
+    validations:
+      required: true
+  - type: checkboxes
+    id: readiness
+    attributes:
+      label: READY gate
+      options:
+        - label: Product authority is clear; Codex is not being asked to guess business or methodology truth.
+          required: true
+        - label: Acceptance criteria are testable.
+          required: true
+        - label: Dependencies are resolved or explicitly listed.
+          required: true
+        - label: This ticket does not contain unrelated cleanup work.
+          required: true
