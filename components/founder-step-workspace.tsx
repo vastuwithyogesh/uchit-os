@@ -15,7 +15,7 @@ import { V1SiteElementalWorkspace } from "@/components/v1-site-elemental-workspa
 import { V1FullBalanceClearance } from "@/components/v1-full-balance-clearance";
 import { V1RemedyTypeHandoffWorkspace } from "@/components/v1-remedy-type-handoff-workspace";
 
-export function FounderStepWorkspace({ scorecard, stepNumber, walkthrough = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean }) {
+export function FounderStepWorkspace({ scorecard, stepNumber, walkthrough = false, fastFlow = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean; fastFlow?: boolean }) {
   if (walkthrough) return <FounderWalkthroughWorkspace stepNumber={stepNumber} />;
   const common = { clientId: scorecard.client?.id, caseId: scorecard.caseRecord?.id, floorId: scorecard.selectedFloorId };
   if (stepNumber === 1) return <FounderCaseSetupStep focus="case" {...common} />;
@@ -23,7 +23,7 @@ export function FounderStepWorkspace({ scorecard, stepNumber, walkthrough = fals
   if (stepNumber === 3) return <ClientIntakeForm clientId={common.clientId} caseId={common.caseId} projectId={scorecard.project?.id} />;
   if (stepNumber === 4) return <SpatialWorkspace focus="orientation" {...common} />;
   if (stepNumber === 5) return <SpatialWorkspace focus="plan" {...common} />;
-  if (stepNumber === 6) return <SpatialWorkspace focus="gridding" {...common} />;
+  if (stepNumber === 6) return <SpatialWorkspace focus="gridding" fastFlow={fastFlow} {...common} />;
   if (stepNumber === 7) return <FilesDrawingsConsole focus="manual-sheet" {...common} />;
   if (stepNumber === 8) return scorecard.caseRecord?.evaluationArchitectureVersion === "V1" ? <DirectionalEvaluationConsoleV1 {...common} projectId={scorecard.project?.id} /> : <EvaluationConsole {...common} />;
   if (stepNumber === 9) return scorecard.caseRecord?.evaluationArchitectureVersion === "V1" ? <DirectionalReportCardV1 {...common} projectId={scorecard.project?.id} /> : <FounderReportStep focus="stage-a" {...common} />;
