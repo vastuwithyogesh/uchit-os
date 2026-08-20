@@ -4075,3 +4075,8 @@ button:disabled,
   background: rgba(255, 247, 230, 0.9);
   color: #6b461c;
 }
+
+/* Step 06 now uses only the two entrance-zone inputs. */
+.spatial-workspace [aria-labelledby="task-entrance-title"] {
+  display: none;
+}
