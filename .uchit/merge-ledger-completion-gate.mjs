@@ -30,6 +30,10 @@ assert.equal(completion.invariants.doneRequiresVerifiedOutcome, true);
 assert.equal(ledger.invariants.doneRequiresVerifiedOutcome, true);
 assert.equal(provenance.invariants.implementerCannotMergeOwnPr, true);
 
+function hasEvidence(value) {
+  return value === true || (typeof value === "string" && value.length > 0);
+}
+
 function mergeReady(evidence) {
   const required = merge.requiredEvidence;
   if (!required.every((key) => evidence[key] === true)) return false;
@@ -42,18 +46,13 @@ function mergeReady(evidence) {
 
 function doneReady(record) {
   if (!completion.allowedProductionOutcomes.includes(record.productionOutcome)) return false;
-  if (record.mergeSha == null || record.mergeSha === "") return false;
+  if (!hasEvidence(record.mergeSha)) return false;
   if (record.implementerIdentity === record.reviewerIdentity) return false;
-  if (record.deployingChange === true) {
-    for (const key of postMerge.deployingChangeCompletionRequires) {
-      if (record[key] !== true && (record[key] == null || record[key] === "")) return false;
-    }
-  } else {
-    for (const key of postMerge.nonDeployingChangeCompletionRequires) {
-      if (record[key] !== true && (record[key] == null || record[key] === "")) return false;
-    }
-  }
-  if (record.riskClass === "R2" && !record.ownerApprovalReference) return false;
+  const required = record.deployingChange === true
+    ? postMerge.deployingChangeCompletionRequires
+    : postMerge.nonDeployingChangeCompletionRequires;
+  if (!required.every((key) => hasEvidence(record[key]))) return false;
+  if (record.riskClass === "R2" && !hasEvidence(record.ownerApprovalReference)) return false;
   return true;
 }
 
