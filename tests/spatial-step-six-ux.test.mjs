@@ -12,7 +12,7 @@ function stepSixProjection() {
 
 test("Step 06 exposes exactly three operator tasks and one universal navigation path", () => {
   const step = stepSixProjection();
-  for (const label of ["Task 1 of 3", "Task 2 of 3", "Task 3 of 3", "Confirm 32-sector marked evidence", "Confirm 16-direction marked evidence", "Classify applicable entrance zones"]) assert.match(step, new RegExp(label));
+  for (const label of ["Task 1 of 3", "Task 2 of 3", "Task 3 of 3", "Confirm 32-sector marked evidence", "Confirm 16-direction marked evidence", "Enter the main entrance and floor entrance"]) assert.match(step, new RegExp(label));
   assert.doesNotMatch(step, /Step [2345](?:\s|·)/);
   assert.doesNotMatch(step, /Continue to evaluation readiness|href="\/founder\/continue"/);
   assert.match(step, /Details · deferred computed mapping/);
@@ -47,9 +47,9 @@ test("same-file dual use is explicit, durable and server-enforced", () => {
 
 test("entrance task uses two canonical zone selectors and keeps legacy markers read-only", () => {
   const step = stepSixProjection();
-  for (const value of ["Property main gate zone", "Floor gate / primary floor entrance zone", "property-main-gate-zone", "floor-gate-zone", "Confirm entrance zones"]) assert.match(step, new RegExp(value.replace(/[\/]/g, "\\/")));
+  for (const value of ["Main entrance zone", "Floor entrance zone", "property-main-gate-zone", "floor-gate-zone", "Confirm entrance zones"]) assert.match(step, new RegExp(value.replace(/[\/]/g, "\\/")));
   assert.match(source("components/spatial-workspace.tsx"), /getApprovedEntranceZoneCatalog/);
-  assert.match(source("components/spatial-workspace.tsx"), /Choose a property main gate or floor entrance zone/);
+  assert.match(source("components/spatial-workspace.tsx"), /Choose at least one applicable zone, then confirm/);
   assert.match(step, /Legacy percentage marker evidence/);
   assert.match(step, /not interpreted as entrance zones/);
   assert.match(step, /griddingComplete/);
