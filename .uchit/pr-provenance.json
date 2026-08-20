@@ -1,0 +1,47 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "provenanceWritingEnabled": false,
+  "requiredPrFields": [
+    "ticketId",
+    "taskPacketId",
+    "claimId",
+    "implementerIdentity",
+    "riskClass",
+    "baseSha",
+    "headSha",
+    "branch",
+    "changedPaths",
+    "acceptanceCriteria",
+    "testsSelected",
+    "testsExecuted",
+    "protectedDomainsTouched",
+    "unresolvedQuestions"
+  ],
+  "requiredBeforeReview": [
+    "taskPacketQualityGatePassed",
+    "scopeStayedWithinWriteSet",
+    "noForbiddenPathTouched",
+    "riskRecalculatedFromDiff",
+    "implementerStoppedAtPr"
+  ],
+  "requiredBeforeMerge": [
+    "independentReviewDecision",
+    "policyGateResult",
+    "releaseGateResult",
+    "requiredDomainTestsResult",
+    "stagingResultWhenRequired",
+    "ownerApprovalWhenR2"
+  ],
+  "invariants": {
+    "implementerCannotApproveOwnPr": true,
+    "implementerCannotMergeOwnPr": true,
+    "baseShaMustMatchTaskClaim": true,
+    "headShaMustMatchReviewedCommit": true,
+    "changedPathsCannotBeOmitted": true,
+    "failedChecksCannotBeOmitted": true,
+    "riskEscalationMustBeRecorded": true,
+    "protectedApprovalMustBeTraceable": true,
+    "secretsNeverRecorded": true
+  }
+}
