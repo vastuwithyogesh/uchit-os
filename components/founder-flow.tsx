@@ -31,8 +31,8 @@ function ProgressControl({ scorecard, currentNumber }: { scorecard: FounderScore
         {steps.map((step) => {
           const available = canOpenFounderFlowStep(scorecard, step.number);
           const active = step.number === currentNumber;
-          return available ? <a key={step.id} className={`founder-flow-stepper-item${active ? " active" : ""}`} href={step.flowPath} aria-current={active ? "step" : undefined}>
-            <span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong><small>{statusLabel(step.status)}</small>
+          return available ? <a key={step.id} className={`founder-flow-stepper-item${active ? " active" : ""}`} href={step.flowPath} aria-current={active ? "step" : undefined} data-current-stage={active ? "true" : undefined}>
+            <span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong><small>{active ? "Current stage · " : ""}{statusLabel(step.status)}</small>
           </a> : <span key={step.id} className="founder-flow-stepper-item locked" aria-disabled="true" title={step.explanation}>
             <span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong><small>Locked · {step.explanation}</small>
           </span>;
