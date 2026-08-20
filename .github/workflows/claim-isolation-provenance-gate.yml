@@ -1,0 +1,21 @@
+name: Claim isolation provenance gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  claim-isolation-provenance:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate claim lease, isolation and PR provenance contracts
+        run: node .uchit/claim-isolation-provenance-gate.mjs

@@ -1,0 +1,45 @@
+{
+  "version": 1,
+  "mode": "DRY_RUN_ONLY",
+  "claimExecutionEnabled": false,
+  "leaseMutationEnabled": false,
+  "eligibleState": "READY",
+  "claimedState": "CLAIMED",
+  "leaseAuthority": "GITHUB_TASK_STATE",
+  "leaseMinutesSource": ".uchit/dispatcher.json#claimLeaseMinutes",
+  "requiredClaimInputs": [
+    "ticketId",
+    "taskPacketId",
+    "expectedTicketVersion",
+    "expectedState",
+    "baseSha",
+    "claimantIdentity",
+    "claimedAt"
+  ],
+  "requiredClaimOutputs": [
+    "claimId",
+    "leaseExpiresAt",
+    "claimedState",
+    "ticketVersionAfterClaim"
+  ],
+  "eligibility": {
+    "stateMustBeReady": true,
+    "taskPacketQualityGateMustPass": true,
+    "dependenciesMustBeDone": true,
+    "riskMustBeAutonomouslyAllowed": true,
+    "conflictDomainsMustBeFree": true,
+    "noActiveClaim": true,
+    "repositoryReadinessMustBeGoWhenExecutionEnabled": true
+  },
+  "invariants": {
+    "claimUsesCompareAndSwap": true,
+    "claimCannotChangeRisk": true,
+    "claimCannotExpandScope": true,
+    "claimCannotOverrideDependency": true,
+    "claimCannotOverrideConflictLock": true,
+    "claimCannotCreateSecondActiveLease": true,
+    "expiredLeaseIsNotValidOwnership": true,
+    "leaseRenewalCannotChangeTaskPacket": true,
+    "claimCannotWriteMain": true
+  }
+}
