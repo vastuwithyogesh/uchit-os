@@ -1,0 +1,55 @@
+{
+  "version": 1,
+  "mode": "EVIDENCE_REQUIRED",
+  "certificationExecutionEnabled": false,
+  "certificationState": "NOT_STARTED",
+  "requiredCompletedPilotTickets": 10,
+  "pilotRiskClasses": ["R0", "R1"],
+  "pilotMustUseRealUchitTickets": true,
+  "pilotMayUseSyntheticProductionData": false,
+  "requiredPerTicketEvidence": [
+    "READY Task Packet",
+    "fresh claim",
+    "isolated branch/worktree",
+    "Codex implementation provenance",
+    "independent review",
+    "required CI and domain tests",
+    "staging verification when required",
+    "merge readiness",
+    "merge SHA",
+    "post-merge outcome verification",
+    "complete Engineering Ledger entry",
+    "DONE only after verified outcome"
+  ],
+  "zeroToleranceMetrics": {
+    "promptCopyingByOwner": 0,
+    "manualTaskAssignmentByOwner": 0,
+    "manualTestExecutionByOwner": 0,
+    "directMainChanges": 0,
+    "unreviewedMerges": 0,
+    "skippedRequiredFailures": 0,
+    "governanceBypasses": 0,
+    "silentRiskDowngrades": 0,
+    "autonomousR2Transitions": 0,
+    "autonomousR3Execution": 0,
+    "productionRegressionsAttributableToAutonomousMerge": 0
+  },
+  "requiredSystemBehaviors": {
+    "blockedTicketDoesNotStallUnrelatedWork": true,
+    "repairBudgetIsBounded": true,
+    "exhaustedRepairQuarantines": true,
+    "quarantinePreservesEvidence": true,
+    "idleIsHealthyWhenNoEligibleWork": true,
+    "rollbackAvailableForDeployingChange": true,
+    "fullLedgerTraceability": true
+  },
+  "certificationRules": {
+    "allTenTicketsMustFinishCorrectly": true,
+    "allRequiredChecksMustPass": true,
+    "noGovernanceBypassAllowed": true,
+    "noManualIntegrationLayerAllowed": true,
+    "mergeAloneNeverCountsAsDone": true,
+    "certificationCannotBeSelfDeclaredByImplementer": true,
+    "ownerApprovalRequiredForFinalCertification": true
+  }
+}
