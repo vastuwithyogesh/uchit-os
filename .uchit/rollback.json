@@ -1,0 +1,27 @@
+{
+  "version": 1,
+  "executionEnabled": false,
+  "automaticRollbackEnabled": false,
+  "knownGoodReleaseRequired": true,
+  "postDeploySmokeRequired": true,
+  "failedReleaseQuarantineRequired": true,
+  "incidentTicketRequired": true,
+  "diagnoseAfterRollbackWhenSafe": true,
+  "productionMutationAllowed": false,
+  "providerAdapterRequired": true,
+  "activationPrerequisites": [
+    "repository readiness GO",
+    "main protected",
+    "required checks enforced",
+    "independent reviewer active",
+    "deployment adapter identified",
+    "known-good release identifier captured",
+    "post-deploy smoke contract active",
+    "rollback rehearsal passes"
+  ],
+  "failurePolicy": {
+    "severeReleaseFailure": "ROLLBACK_THEN_INCIDENT",
+    "failedReleaseState": "QUARANTINED",
+    "unrelatedSafeWorkMayContinue": true
+  }
+}
