@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "branchCreationExecutionEnabled": false,
+  "worktreeCreationExecutionEnabled": false,
+  "branchPattern": "agent/UCHIT-<ticket-number>-<short-slug>",
+  "baseRef": "main",
+  "baseMustEqualLatestVerifiedMainAtClaim": true,
+  "oneTaskPerBranch": true,
+  "oneTaskPerWorktree": true,
+  "branchReuseForbidden": true,
+  "worktreeReuseAcrossActiveTasksForbidden": true,
+  "directMainCheckoutForImplementationForbidden": true,
+  "requiredIsolationIdentity": [
+    "ticketId",
+    "taskPacketId",
+    "claimId",
+    "branch",
+    "worktreeId",
+    "baseSha"
+  ],
+  "conflictDomainLocks": [
+    "auth",
+    "commercial",
+    "founder-flow",
+    "evaluation",
+    "stage-b",
+    "reporting",
+    "pdf",
+    "database",
+    "deployment"
+  ],
+  "invariants": {
+    "branchMustBelongToClaimedTicket": true,
+    "branchMustStartFromClaimBaseSha": true,
+    "branchCannotTargetProtectedMainWrites": true,
+    "worktreeCannotShareUncommittedState": true,
+    "conflictingActiveDomainsCannotRunInParallel": true,
+    "abandonedBranchCannotBeSilentlyReassigned": true
+  }
+}
