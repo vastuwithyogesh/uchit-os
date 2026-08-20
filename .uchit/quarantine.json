@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "quarantineExecutionEnabled": false,
+  "quarantineState": "QUARANTINED",
+  "quarantineTriggers": [
+    "REPAIR_BUDGET_EXHAUSTED",
+    "REPEATED_SAME_FAILURE",
+    "RISK_ESCALATION_REQUIRES_OWNER",
+    "PRODUCT_OR_METHODOLOGY_AMBIGUITY",
+    "SECURITY_UNCERTAINTY",
+    "NON_DETERMINISTIC_VERIFICATION",
+    "INVALID_OR_STALE_PROVENANCE"
+  ],
+  "requiredQuarantineRecord": [
+    "ticketId",
+    "taskPacketId",
+    "claimId",
+    "branch",
+    "headSha",
+    "riskClass",
+    "reason",
+    "repairAttemptsUsed",
+    "failureEvidence",
+    "quarantinedAt",
+    "nextRequiredDecision"
+  ],
+  "resourceRelease": {
+    "releaseActiveBuildSlot": true,
+    "releaseExpiredClaimLease": true,
+    "releaseConflictDomainLockWhenNoExecutionContinues": true,
+    "preserveBranchAndEvidence": true,
+    "preserveLedgerHistory": true
+  },
+  "invariants": {
+    "quarantineCannotDeleteBranchEvidence": true,
+    "quarantineCannotEraseFailedChecks": true,
+    "quarantineCannotResetRisk": true,
+    "quarantineCannotReturnToReadyWithoutNewDecision": true,
+    "quarantineCannotBlockUnrelatedEligibleWork": true,
+    "quarantinedWorkCannotMerge": true,
+    "quarantinedWorkCannotDeploy": true
+  }
+}

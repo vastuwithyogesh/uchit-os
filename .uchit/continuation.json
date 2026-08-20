@@ -1,0 +1,44 @@
+{
+  "version": 1,
+  "mode": "DRY_RUN_ONLY",
+  "continuationExecutionEnabled": false,
+  "queueContinuesAfter": [
+    "BLOCKED",
+    "FAILED",
+    "APPROVAL_REQUIRED",
+    "QUARANTINED",
+    "PRODUCT_REVIEW"
+  ],
+  "globalStopConditions": [
+    "SEV0_SECURITY_EVENT",
+    "GLOBAL_INTEGRITY_FAILURE",
+    "REPOSITORY_GOVERNANCE_FAILURE",
+    "REQUIRED_CHECKS_UNAVAILABLE_OR_BYPASSED",
+    "AUTONOMY_KILL_SWITCH"
+  ],
+  "continuationRules": {
+    "oneBlockedTicketDoesNotFreezeQueue": true,
+    "quarantinedTicketDoesNotConsumeBuildSlot": true,
+    "unrelatedConflictDomainsMayContinue": true,
+    "sameConflictDomainCannotRunWhileExecutionIsStillActive": true,
+    "noEligibleWorkMeansIdle": true,
+    "globalStopConditionMeansNoNewClaims": true,
+    "existingProtectedDecisionWaitDoesNotBlockR0R1Elsewhere": true
+  },
+  "requiredContinuationEvidence": [
+    "blockedTicketId",
+    "blockedTicketState",
+    "releasedResources",
+    "globalStopConditionAbsent",
+    "nextSelectionResult",
+    "decisionTimestamp"
+  ],
+  "invariants": {
+    "continuationCannotSkipRiskGate": true,
+    "continuationCannotOverrideDependencies": true,
+    "continuationCannotOverrideConflictLocks": true,
+    "continuationCannotPromoteBacklogToReady": true,
+    "continuationCannotReviveQuarantinedTicket": true,
+    "continuationMustLeaveSystemIdleWhenNoEligibleWork": true
+  }
+}

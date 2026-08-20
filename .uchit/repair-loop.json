@@ -1,0 +1,51 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "repairExecutionEnabled": false,
+  "maxRepairAttemptsSource": ".uchit/dispatcher.json#maxRepairAttempts",
+  "repairableTriggers": [
+    "REQUEST_CHANGES",
+    "VERIFY_FAILED",
+    "STAGING_FAILED",
+    "NON_PROTECTED_TEST_FAILURE"
+  ],
+  "nonRepairableTriggers": [
+    "ESCALATE_RISK_TO_R2_OR_R3",
+    "PRODUCT_AMBIGUITY",
+    "METHODOLOGY_AMBIGUITY",
+    "SECURITY_UNCERTAINTY",
+    "FORBIDDEN_SCOPE_TOUCHED",
+    "PROTECTED_WRITE_REQUIRED",
+    "STALE_OR_INVALID_CLAIM"
+  ],
+  "requiredRepairInputs": [
+    "ticketId",
+    "taskPacketId",
+    "claimId",
+    "branch",
+    "currentHeadSha",
+    "repairAttempt",
+    "failureEvidence",
+    "reviewOrVerificationDecision"
+  ],
+  "requiredRepairOutputs": [
+    "newHeadSha",
+    "changedPaths",
+    "testsRerun",
+    "repairEvidence",
+    "nextState"
+  ],
+  "invariants": {
+    "repairUsesSameTicket": true,
+    "repairUsesSameTaskPacket": true,
+    "repairUsesSameBranchUnlessExplicitlyReclaimed": true,
+    "repairCannotDowngradeRisk": true,
+    "repairCannotExpandScope": true,
+    "repairCannotWeakenTests": true,
+    "repairCannotChangeAcceptanceCriteria": true,
+    "repairCannotBypassIndependentReview": true,
+    "repairCannotResetAttemptCounter": true,
+    "repairMustStopAtMaxAttempts": true,
+    "protectedOrAmbiguousFailureCannotAutoRepair": true
+  }
+}
