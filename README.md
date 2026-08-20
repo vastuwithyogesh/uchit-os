@@ -1,54 +1,35 @@
-<<<<<<< HEAD
 # Uchit Vastu Client CRM + Evaluation Engine
 
-This repository scaffolds the v0.2 product surface for the Uchit Vastu workflow as of Saturday, August 8, 2026.
+This repository scaffolds the Uchit Vastu workflow and now serves as the canonical GitHub source for Uchit OS engineering governance and production development.
 
 Included workflow coverage:
 
 - ScoreApp-style conversational lead intake
-- setter dashboard and 2-minute qualification call support
-- commercial approval workflow with a ₹51,000 default package
-- minimum ₹11,000 advance rule
-- payment gates for case creation and verdict release
+- setter dashboard and qualification-call support
+- governed commercial approval workflow
+- advance/payment gates for case creation and verdict release
 - floor workspace locking and regeneration flags
-- utility-evaluation generation seeded from the residential tab CSV
-- Shakti engine with 16-value ranking and tie-break handling
-- Stage-A preview watermarking and full verdict release after approvals
-- WhatsApp template library
-- permanent client timeline
+- utility-evaluation generation
+- Shakti / directional evaluation foundations
+- Stage-A preview and governed report release
+- communication preparation
+- permanent client timeline and audit history
 
 ## Setup
 
 1. Copy `.env.example` to `.env`.
-2. Fill in your database and Supabase values.
+2. Fill in the required environment values for the target environment.
 3. Run `pnpm install`.
 4. Run `pnpm dev`.
-5. Open the app at `http://localhost:3003`.
 
-## Environment
+## Deployment environment
 
-The local template expects:
+For Sites deployment, `.openai/hosting.json` declares the hosted bindings used by the application, including D1 and R2 where configured.
 
-- `DATABASE_URL`
-- `DIRECT_URL`
-- `NEXT_PUBLIC_SUPABASE_URL`
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `NEXT_PUBLIC_APP_URL`
+## Engineering governance
 
-For Sites deployment, `.openai/hosting.json` declares:
+All agents and contributors must read `PRODUCT_CONSTITUTION.md`, `AGENTS.md`, `ARCHITECTURE_RULES.md`, `AUTONOMY_POLICY.md`, `SECURITY_POLICY.md`, `TESTING_POLICY.md`, and `RELEASE_POLICY.md` before modifying protected behavior.
 
-- D1 binding: `DB`
-- R2 binding: `R2`
+## Release verification
 
-## Data model
-
-The Prisma schema lives in `prisma/schema.prisma` and includes the main domain objects requested in the PRD.
-
-## Seed data
-
-`pnpm seed` reads `data/residential-tab.csv` and seeds the utility rule table when a database URL is available.
-=======
-# uchit-os
-internal operation system to manage the workflow.
->>>>>>> github/main
+`pnpm test:release` is the canonical broad release gate and is executed by the GitHub Actions release workflow for pull requests and pushes to `main`.
