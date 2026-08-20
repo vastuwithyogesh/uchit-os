@@ -13,7 +13,8 @@ const packet = readJson(".uchit/task-packet.json");
 const selector = readJson(".uchit/ready-selector.json");
 
 assert.equal(autonomy.dispatchEnabled, false, "autonomous dispatch must remain disabled during M0 contract bootstrap");
-assert.equal(dispatcher.executionEnabled, false, "dispatcher execution must remain disabled");
+assert.equal(dispatcher.enabled, false, "dispatcher execution must remain disabled");
+assert.equal(dispatcher.mode, "dormant", "dispatcher must remain dormant");
 assert.equal(ledger.writeExecutionEnabled, false, "Engineering Ledger writer must remain contract-only");
 assert.equal(packet.generationEnabled, false, "Task Packet generation must remain contract-only");
 assert.equal(selector.claimExecutionEnabled, false, "READY selector cannot claim work yet");
@@ -27,6 +28,11 @@ assert.equal(selector.invariants.selectorCannotPromoteBacklogToReady, true);
 assert.equal(selector.invariants.selectorCannotChangeTicketRisk, true);
 assert.equal(selector.invariants.selectorCannotClaimWhileDispatchDisabled, true);
 assert.deepEqual(selector.allowedAutonomousRisk, ["R0", "R1"]);
+assert.equal(
+  selector.concurrency.maxActiveBuildsWhenActivated,
+  dispatcher.maxConcurrentBuilds,
+  "READY selector concurrency must match the canonical dispatcher contract"
+);
 
 const tickets = [
   {
