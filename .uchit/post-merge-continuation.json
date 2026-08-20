@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "executionEnabled": false,
+  "sourceState": "MERGED",
+  "terminalState": "DONE",
+  "postMergeStates": [
+    "MERGED",
+    "DEPLOY_PENDING",
+    "DEPLOYED",
+    "POST_DEPLOY_VERIFYING",
+    "DONE",
+    "ROLLBACK_REQUIRED",
+    "QUARANTINED"
+  ],
+  "nonDeployingChangeCompletionRequires": [
+    "mergeShaRecorded",
+    "requiredChecksRecorded",
+    "independentReviewRecorded",
+    "productionImpactClassifiedNone"
+  ],
+  "deployingChangeCompletionRequires": [
+    "mergeShaRecorded",
+    "deploymentReleaseIdRecorded",
+    "deployedShaMatchesMergeSha",
+    "postDeploySmokePassed",
+    "healthCheckPassed",
+    "authBoundaryCheckPassed",
+    "founderBootstrapCheckPassed",
+    "integrityCheckPassed",
+    "productionOutcomeRecorded"
+  ],
+  "failureBehavior": {
+    "postDeployFailureBlocksDone": true,
+    "saferRollbackTakesPriorityOverDiagnosis": true,
+    "failedReleaseShaMustBeQuarantined": true,
+    "rollbackOutcomeMustBeRecorded": true,
+    "unrelatedReadyWorkMayContinueUnlessGlobalStop": true
+  },
+  "invariants": {
+    "mergedCannotBecomeDoneWithoutOutcomeEvidence": true,
+    "deploymentFailureCannotBeHidden": true,
+    "postDeploySmokeCannotBeSkippedWhenRequired": true,
+    "rollbackCannotEraseFailedReleaseEvidence": true,
+    "doneCannotBeSetFromPrMergeEventAlone": true,
+    "continuationCannotInventNewWork": true
+  }
+}
