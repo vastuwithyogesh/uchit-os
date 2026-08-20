@@ -3,6 +3,7 @@ import { canOpenFounderFlowStep, getCurrentFounderFlowStep, getFounderFlowSteps,
 import { FounderStepWorkspace } from "@/components/founder-step-workspace";
 import { FounderCaseSelector } from "@/components/founder-case-selector";
 import { FounderProgressAutoScroll } from "@/components/founder-progress-auto-scroll";
+import { FounderReviewStepLink } from "@/components/founder-review-step-link";
 
 function statusTone(status: FounderFlowStep["status"]) {
   if (status === "BLOCKED" || status === "NEEDS_REGENERATION") return status === "NEEDS_REGENERATION" ? "needs-regeneration" : "blocked";
@@ -112,10 +113,10 @@ export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: 
         </div>
         <details className="founder-flow-inputs" open={!isBlocked && !isComplete && !isOptionalV1ManualSheet}><summary>{isOptionalV1ManualSheet ? "Optional supporting evidence" : "Required now"}</summary><ul>{step.requiredInputs.map((input) => <li key={input}>{input}</li>)}</ul></details>
         {step.status === "COMPLETE" && !isFuture ? <div className="founder-flow-success" role="status">This step is complete. Continue when you are ready for the next server-derived step.</div> : null}
-        {walkthrough ? <div id="founder-step-workspace" className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} walkthrough /></div> : !isBlocked || isRegeneration || step.selfRemediableOnCurrentStep ? <div id="founder-step-workspace" className="founder-current-workspace"><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
+        {walkthrough ? <div id="founder-step-workspace" className="founder-current-workspace" tabIndex={-1}><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} walkthrough /></div> : !isBlocked || isRegeneration || step.selfRemediableOnCurrentStep ? <div id="founder-step-workspace" className="founder-current-workspace" tabIndex={-1}><FounderStepWorkspace scorecard={scorecard} stepNumber={stepNumber} /></div> : null}
         <div className="founder-flow-action-bar" aria-label="Step navigation">
           {previous ? <a className="button-secondary" href={previous.flowPath}>Previous</a> : <a className="button-secondary" href="/">Back to scorecard</a>}
-          {(isBlocked || isComplete) && action ? <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}
+          {(isBlocked || isComplete) && action ? isComplete ? <FounderReviewStepLink href={action.href} label={action.label} /> : <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}
           {!isBlocked && !isComplete && !isOptionalV1ManualSheet ? <span className="founder-flow-current-action">Complete the current action above</span> : null}
           {next ? (isComplete || isOptionalV1ManualSheet) ? <a className="button founder-flow-next" href={next.flowPath}>Next step</a> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Next step</button> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Delivery remains disabled</button>}
           <p id="founder-flow-next-reason" className="founder-flow-next-reason">{nextReason}</p>

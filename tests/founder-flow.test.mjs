@@ -135,6 +135,17 @@ test("Founder stage scroller clearly marks the route's current stage", () => {
   assert.match(autoScroll, /scrollIntoView\(\{ block: "nearest", inline: "center" \}\)/);
 });
 
+test("Review current step actively focuses the rendered workspace even when its hash is already present", () => {
+  const component = read("components/founder-flow.tsx");
+  const reviewLink = read("components/founder-review-step-link.tsx");
+  assert.match(component, /FounderReviewStepLink/);
+  assert.match(component, /tabIndex=\{-1\}/);
+  assert.match(reviewLink, /document\.getElementById\("founder-step-workspace"\)/);
+  assert.match(reviewLink, /target\.scrollIntoView\(\{ behavior: "smooth", block: "start" \}\)/);
+  assert.match(reviewLink, /target\.focus\(\{ preventScroll: true \}\)/);
+  assert.match(reviewLink, /window\.history\.replaceState/);
+});
+
 test("active module renders its real editing surface without the legacy ops console", () => {
   const workspace = read("components/founder-step-workspace.tsx");
   const flow = read("components/founder-flow.tsx");
