@@ -3,6 +3,7 @@
   "mode": "EVIDENCE_REQUIRED",
   "certificationExecutionEnabled": false,
   "certificationState": "NOT_STARTED",
+  "certificationEvidencePath": ".uchit/evidence/m0-pilot-certification.json",
   "requiredCompletedPilotTickets": 10,
   "pilotRiskClasses": ["R0", "R1"],
   "pilotMustUseRealUchitTickets": true,
@@ -50,6 +51,7 @@
     "noManualIntegrationLayerAllowed": true,
     "mergeAloneNeverCountsAsDone": true,
     "certificationCannotBeSelfDeclaredByImplementer": true,
+    "certificationRequiresMachineReadableEvidence": true,
     "ownerApprovalRequiredForFinalCertification": true
   }
 }
