@@ -82,7 +82,9 @@ test("required-input copy matches the approved complimentary and consent-free in
 
 test("Step 06 exposes the verified entrance recovery required by evaluation", () => {
   assert.match(read("lib/founder-flow.ts"), /At least one confirmed property or floor entrance zone/);
-  assert.match(read("app/globals.css"), /spatial-focus-gridding[^\n]+nth-child\(6\)/);
+  const css = read("app/globals.css");
+  assert.doesNotMatch(css, /spatial-focus-gridding[^\n]*nth-child\(6\)/);
+  assert.doesNotMatch(css, /spatial-step-six article[^\n]*task-entrance-title[^\n]*display:\s*none/);
 });
 
 test("future gates stay closed while previous steps and exact recovery remain accessible", () => {

@@ -1486,14 +1486,11 @@ body { overflow-x: hidden; }
 
 /* Focus the existing protected-action components on one scorecard module. */
 .spatial-focus-plan > :not(:nth-child(1)):not(:nth-child(2)),
-.spatial-focus-orientation > :not(:nth-child(1)):not(:nth-child(5)),
-.spatial-focus-gridding > :not(:nth-child(1)):not(:nth-child(3)):not(:nth-child(4)):not(:nth-child(6)):not(:nth-child(7)):not(:nth-child(8)) { display: none !important; }
+.spatial-focus-orientation > :not(:nth-child(1)):not(:nth-child(5)) { display: none !important; }
 .spatial-workspace > .spatial-focused-message { display: block !important; grid-column: 1 / -1; }
 .spatial-step-six .founder-flow-status { align-items: flex-start; flex-direction: column; }
-.spatial-step-six article:has(#task-entrance-title) { display: none; }
 .spatial-workspace > .card:has(#opening-kind) { display: none; }
 .entrance-zone-task .panel { box-shadow: none; }
-.spatial-step-six article[aria-labelledby="task-entrance-title"] { display: none; }
 .spatial-marker-layout { display: grid; grid-template-columns: minmax(320px, 1.4fr) minmax(260px, .8fr); gap: 18px; align-items: start; }
 .spatial-plan-preview-shell { width: 100%; min-height: 380px; aspect-ratio: 1.414 / 1; cursor: default; }
 .spatial-plan-click-target { position: absolute; inset: 0; z-index: 5; width: 100%; min-height: 100%; padding: 0; border: 0; border-radius: 0; background: transparent; cursor: crosshair; }

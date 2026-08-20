@@ -58,8 +58,14 @@ test("entrance task uses two canonical zone selectors and keeps legacy markers r
   assert.match(step, /zone\.code} — {zone\.name/);
 });
 
-test("the superseded percentage-marker task is not rendered in focused Step 06", () => {
-  assert.match(source("app/globals.css"), /spatial-step-six article\[aria-labelledby="task-entrance-title"\][^{]*\{[^}]*display:\s*none/);
+test("focused Step 06 renders the main-entrance marker and canonical entrance-zone task", () => {
+  const css = source("app/globals.css");
+  const step = stepSixProjection();
+  assert.match(step, /id="task-entrance-title"/);
+  assert.match(step, /spatial-plan-click-target/);
+  assert.match(step, /id="property-main-gate-zone"/);
+  assert.match(step, /id="floor-gate-zone"/);
+  assert.doesNotMatch(css, /spatial-step-six article[^\n]*task-entrance-title[^\n]*display:\s*none/);
 });
 
 test("the legacy percentage-marker API is fail-closed", () => {
