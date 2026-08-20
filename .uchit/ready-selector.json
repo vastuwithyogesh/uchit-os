@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "mode": "DRY_RUN_ONLY",
+  "selectionEnabled": true,
+  "claimExecutionEnabled": false,
+  "dispatchExecutionEnabled": false,
+  "eligibleStatuses": ["READY"],
+  "blockedStatuses": [
+    "BLOCKED",
+    "FAILED",
+    "APPROVAL_REQUIRED",
+    "QUARANTINED",
+    "PRODUCT_REVIEW"
+  ],
+  "allowedAutonomousRisk": ["R0", "R1"],
+  "protectedRisk": ["R2"],
+  "prohibitedRisk": ["R3"],
+  "priorityOrder": ["P0", "P1", "P2", "P3"],
+  "tieBreakOrder": ["priority", "severityScore", "dependencyUnlockScore", "createdAt", "ticketId"],
+  "eligibility": {
+    "dependenciesDone": true,
+    "taskPacketQualityGatePassed": true,
+    "noActiveConflictDomain": true,
+    "riskWithinAutonomy": true,
+    "notQuarantined": true,
+    "notAwaitingOwnerDecision": true
+  },
+  "concurrency": {
+    "maxActiveBuildsWhenActivated": 2,
+    "maxActiveR2": 1,
+    "maxActiveArchitectureReconciliation": 1
+  },
+  "invariants": {
+    "selectorCannotChangeTicketRisk": true,
+    "selectorCannotPromoteBacklogToReady": true,
+    "selectorCannotOverrideDependencies": true,
+    "selectorCannotOverrideConflictLocks": true,
+    "selectorCannotClaimWhileDispatchDisabled": true,
+    "idleIsValidWhenNoEligibleWork": true
+  }
+}
