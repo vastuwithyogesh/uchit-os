@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "repositoryVisibility": "private",
+  "defaultBranch": "main",
+  "mainProtectionRequired": true,
+  "requiredChecks": [
+    "Policy gate",
+    "Release gate"
+  ],
+  "requirePullRequestBeforeMerge": true,
+  "allowForcePushes": false,
+  "allowDeletions": false,
+  "autonomyActivationBlockedUntilCompliant": true
+}
