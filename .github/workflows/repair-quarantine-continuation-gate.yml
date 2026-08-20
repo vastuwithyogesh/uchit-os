@@ -1,0 +1,21 @@
+name: Repair quarantine continuation gate
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  repair-quarantine-continuation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Validate repair, quarantine and continuation contracts
+        run: node .uchit/repair-quarantine-continuation-gate.mjs
