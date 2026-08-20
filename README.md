@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 # Uchit Vastu Client CRM + Evaluation Engine
 
 This repository scaffolds the v0.2 product surface for the Uchit Vastu workflow as of Saturday, August 8, 2026.
@@ -47,3 +48,7 @@ The Prisma schema lives in `prisma/schema.prisma` and includes the main domain o
 ## Seed data
 
 `pnpm seed` reads `data/residential-tab.csv` and seeds the utility rule table when a database URL is available.
+=======
+# uchit-os
+internal operation system to manage the workflow.
+>>>>>>> github/main
