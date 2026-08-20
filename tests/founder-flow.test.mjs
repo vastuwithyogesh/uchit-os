@@ -123,12 +123,16 @@ test("completed steps keep their real workspace available for review", () => {
 
 test("Founder stage scroller clearly marks the route's current stage", () => {
   const component = read("components/founder-flow.tsx");
+  const autoScroll = read("components/founder-progress-auto-scroll.tsx");
   const css = read("app/globals.css");
   assert.match(component, /data-current-stage=\{active \? "true" : undefined\}/);
   assert.match(component, /active \? "Current stage · " : ""/);
   assert.match(component, /aria-current=\{active \? "step" : undefined\}/);
   assert.match(css, /\.founder-flow-stepper-item\.active[\s\S]*background: var\(--accent-2\)/);
   assert.match(css, /\.founder-flow-stepper-item\.active > span[\s\S]*background: #fff/);
+  assert.match(component, /FounderProgressAutoScroll/);
+  assert.match(autoScroll, /data-current-stage="true"/);
+  assert.match(autoScroll, /scrollIntoView\(\{ block: "nearest", inline: "center" \}\)/);
 });
 
 test("active module renders its real editing surface without the legacy ops console", () => {

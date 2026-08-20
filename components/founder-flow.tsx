@@ -2,6 +2,7 @@ import type { FounderScorecard } from "@/lib/founder-scorecard";
 import { canOpenFounderFlowStep, getCurrentFounderFlowStep, getFounderFlowSteps, getNextFounderFlowStep, getPreviousFounderFlowStep, type FounderFlowStep } from "@/lib/founder-flow";
 import { FounderStepWorkspace } from "@/components/founder-step-workspace";
 import { FounderCaseSelector } from "@/components/founder-case-selector";
+import { FounderProgressAutoScroll } from "@/components/founder-progress-auto-scroll";
 
 function statusTone(status: FounderFlowStep["status"]) {
   if (status === "BLOCKED" || status === "NEEDS_REGENERATION") return status === "NEEDS_REGENERATION" ? "needs-regeneration" : "blocked";
@@ -38,6 +39,7 @@ function ProgressControl({ scorecard, currentNumber }: { scorecard: FounderScore
           </span>;
         })}
       </div>
+      <FounderProgressAutoScroll />
       {previous.length ? <details className="founder-flow-progress-previous-menu"><summary>Previous steps</summary><div>{previous.map((step) => <a key={step.id} href={step.flowPath} className="founder-flow-progress-item founder-flow-progress-previous"><span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong></a>)}</div></details> : null}
     </nav>
   );
