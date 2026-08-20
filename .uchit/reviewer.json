@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "active": false,
+  "mode": "contract-only",
+  "independentFromImplementer": true,
+  "allowedDecisions": ["APPROVE", "REQUEST_CHANGES", "ESCALATE_RISK", "PRODUCT_AMBIGUITY"],
+  "mustRead": [
+    "PRODUCT_CONSTITUTION.md",
+    "ARCHITECTURE_RULES.md",
+    "AUTONOMY_POLICY.md",
+    "SECURITY_POLICY.md",
+    "TESTING_POLICY.md",
+    "AGENTS.md"
+  ],
+  "requiredChecks": [
+    "ticket acceptance criteria",
+    "scope discipline",
+    "architecture invariants",
+    "authorization and organisation isolation",
+    "case and floor isolation",
+    "methodology drift",
+    "financial/commercial drift",
+    "idempotency and concurrency",
+    "regression risk",
+    "test adequacy",
+    "actual diff risk"
+  ],
+  "activationPrerequisites": [
+    "repository readiness GO",
+    "review execution identity is distinct from implementer",
+    "review result is exposed as a required GitHub check"
+  ]
+}

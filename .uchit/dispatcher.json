@@ -1,0 +1,25 @@
+{
+  "version": 1,
+  "enabled": false,
+  "mode": "dormant",
+  "maxConcurrentBuilds": 2,
+  "claimLeaseMinutes": 30,
+  "maxRepairAttempts": 3,
+  "selectionOrder": ["priority", "dependencyUnlockValue", "oldestReady"],
+  "eligibleStates": ["READY"],
+  "blockedStates": ["PRODUCT_REVIEW", "APPROVAL_REQUIRED", "BLOCKED", "QUARANTINED", "FAILED"],
+  "activationPrerequisites": [
+    "repository readiness GO",
+    "independent reviewer active",
+    "rollback path verified",
+    "required checks enforced on main",
+    "autonomy policy permits dispatch"
+  ],
+  "forbidden": [
+    "direct push to main",
+    "self-approval",
+    "risk downgrade",
+    "scope expansion",
+    "work invention when no READY ticket exists"
+  ]
+}
