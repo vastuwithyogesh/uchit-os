@@ -1,0 +1,64 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "generationEnabled": false,
+  "requiredFields": [
+    "ticketId",
+    "title",
+    "problem",
+    "desiredOutcome",
+    "whyNow",
+    "riskClass",
+    "priority",
+    "dependencies",
+    "conflictDomains",
+    "authorityReferences",
+    "readScope",
+    "writeScope",
+    "protectedWriteScope",
+    "forbiddenScope",
+    "acceptanceCriteria",
+    "requiredTests",
+    "definitionOfDone"
+  ],
+  "scopeDimensions": [
+    "READ_SCOPE",
+    "WRITE_SCOPE",
+    "PROTECTED_WRITE_SCOPE",
+    "FORBIDDEN_SCOPE"
+  ],
+  "riskClasses": ["R0", "R1", "R2", "R3"],
+  "conflictDomains": [
+    "auth",
+    "commercial",
+    "founder-flow",
+    "evaluation",
+    "stage-b",
+    "reporting",
+    "pdf",
+    "database",
+    "deployment",
+    "governance"
+  ],
+  "qualityGate": {
+    "problemMustBeConcrete": true,
+    "outcomeMustBeTestable": true,
+    "acceptanceCannotBeEmpty": true,
+    "dependenciesMustBeExplicit": true,
+    "riskMustBeAssigned": true,
+    "writeScopeMustBeBounded": true,
+    "forbiddenScopeMustBePresent": true,
+    "authorityAmbiguityBlocksReady": true,
+    "methodologyAmbiguityBlocksReady": true,
+    "productExpansionRequiresProductReview": true
+  },
+  "definitionOfDoneRequires": [
+    "acceptanceVerified",
+    "requiredTestsPassed",
+    "independentReviewSatisfied",
+    "riskGateSatisfied",
+    "stagingSatisfiedWhenRequired",
+    "mergeRecordedWhenApplicable",
+    "postDeployOutcomeRecordedWhenApplicable"
+  ]
+}
