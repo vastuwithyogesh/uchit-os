@@ -1,0 +1,48 @@
+{
+  "version": 1,
+  "provider": "OpenAI Sites",
+  "productionProjectId": "appgprj_6a79b7bd456481918a36e2d7211e7758",
+  "executionEnabled": false,
+  "previewDeploymentEnabled": false,
+  "postDeploySmokeEnabled": false,
+  "productionMutationAllowed": false,
+  "requireIsolatedPreviewPerPr": true,
+  "requireNonProductionBindings": true,
+  "allowProductionDataInPreview": false,
+  "allowProductionSecretsInPreview": false,
+  "seededSyntheticDataOnly": true,
+  "requiredPreDeployGates": [
+    "Policy gate",
+    "Release gate",
+    "Repository readiness",
+    "Reviewer dispatcher gate",
+    "Rollback contract gate"
+  ],
+  "requiredStagingVerification": [
+    "application boots successfully",
+    "authentication boundary behaves correctly",
+    "authorised Founder session resolves",
+    "bootstrap and persisted state load",
+    "organisation and case isolation remain intact",
+    "single-floor Golden Flow smoke passes",
+    "multi-floor Golden Flow smoke passes",
+    "INTERNAL_COMPLIMENTARY Golden Flow smoke passes",
+    "negative security smoke passes"
+  ],
+  "postDeploySmokeContract": [
+    "release SHA is recorded",
+    "application health is reachable",
+    "protected routes fail closed for unauthorised access",
+    "authorised Founder bootstrap succeeds",
+    "no severe integrity or persistence regression is detected"
+  ],
+  "activationPrerequisites": [
+    "repository readiness GO",
+    "main protection active",
+    "independent reviewer execution active",
+    "rollback execution path verified",
+    "isolated preview environment mechanism implemented",
+    "non-production bindings verified",
+    "Golden Flow staging harness implemented"
+  ]
+}
