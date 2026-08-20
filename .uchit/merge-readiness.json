@@ -1,0 +1,41 @@
+{
+  "version": 1,
+  "mode": "CONTRACT_ONLY",
+  "mergeExecutionEnabled": false,
+  "autoMergeEnabled": false,
+  "eligibleState": "MERGE_READY",
+  "allowedRiskForFutureAutoMerge": ["R0", "R1"],
+  "protectedRisk": ["R2"],
+  "prohibitedRisk": ["R3"],
+  "requiredEvidence": [
+    "taskPacketQualityGatePassed",
+    "claimIdentityCurrent",
+    "branchIsolationValid",
+    "prProvenanceComplete",
+    "diffRiskRecalculated",
+    "independentReviewApproved",
+    "policyGatePassed",
+    "releaseGatePassed",
+    "requiredDomainTestsPassed",
+    "stagingPassedWhenRequired",
+    "allReviewThreadsResolved",
+    "noFailedRequiredCheck",
+    "headShaMatchesReviewedCommit",
+    "baseIsCurrentEnoughForPolicy"
+  ],
+  "r2AdditionalEvidence": [
+    "ownerApprovalRecorded",
+    "protectedDecisionReferenceRecorded"
+  ],
+  "invariants": {
+    "mergeCannotPrecedeIndependentReview": true,
+    "mergeCannotPrecedeRequiredChecks": true,
+    "mergeCannotIgnoreFailedCheck": true,
+    "mergeCannotUseStaleReviewedSha": true,
+    "mergeCannotDowngradeRisk": true,
+    "mergeCannotBypassOwnerApprovalForR2": true,
+    "implementerCannotMergeOwnPr": true,
+    "r3CannotMergeAutonomously": true,
+    "mergeDoesNotEqualDone": true
+  }
+}
