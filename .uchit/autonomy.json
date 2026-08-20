@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "dispatchEnabled": false,
+  "autoMergeEnabled": false,
+  "autoDeployEnabled": false,
+  "independentReviewRequired": true,
+  "repairLoopEnabled": false,
+  "maxRepairAttempts": 3,
+  "maxConcurrentBuildsWhenActivated": 2,
+  "r2RequiresOwnerApproval": true,
+  "r3AutonomousExecutionAllowed": false,
+  "idleWhenNoReadyWork": true,
+  "activationPrerequisites": [
+    "main branch protected",
+    "Release gate required",
+    "Policy gate required",
+    "independent reviewer gate active",
+    "rollback path verified",
+    "certified baseline recorded"
+  ]
+}
