@@ -56,16 +56,17 @@ import { founderCommercialArtifactStore } from "@/lib/founder-commercial.server"
 import { activateFounderStatutoryPolicy, createFounderStatutoryPolicyDraft, issueFounderStatutoryDocument, saveFounderBillingProfile } from "@/lib/founder-statutory-documents";
 import { approveManualUtilitySheet, checkpointPostSiteFindings, checkpointSiteAnalysis, upsertPostSiteFindings, upsertSiteAnalysis } from "@/lib/site-workflow";
 import {
-  canApproveCommercialProposal,
-  canApproveReport,
-  canEditFloorWorkspaces,
-  canEvaluateCases,
-  canManageTemplates,
-  canReadClientSnapshots,
-  canReleaseVerdict,
-  canTriggerDeliverables,
-  canVerifyPayments
+  canApproveCommercialProposal as baseCanApproveCommercialProposal,
+  canApproveReport as baseCanApproveReport,
+  canEditFloorWorkspaces as baseCanEditFloorWorkspaces,
+  canEvaluateCases as baseCanEvaluateCases,
+  canManageTemplates as baseCanManageTemplates,
+  canReadClientSnapshots as baseCanReadClientSnapshots,
+  canReleaseVerdict as baseCanReleaseVerdict,
+  canTriggerDeliverables as baseCanTriggerDeliverables,
+  canVerifyPayments as baseCanVerifyPayments
 } from "@/lib/permissions";
+import { isFounderFastFlowRequest } from "@/lib/founder-fast-flow";
 import {
   addFloorEvidence,
   addFloorWorkspace,
@@ -125,6 +126,16 @@ export async function POST(request: Request) {
   let foundation: Awaited<ReturnType<typeof resolveActiveOrganisationContext>> | null = null;
   let organisationStateBefore: AppState | undefined;
   const requestId = request.headers.get("x-request-id") || crypto.randomUUID();
+  let fastFlow = false;
+  const canApproveCommercialProposal = (candidate: Parameters<typeof baseCanApproveCommercialProposal>[0]) => fastFlow || baseCanApproveCommercialProposal(candidate);
+  const canApproveReport = (candidate: Parameters<typeof baseCanApproveReport>[0]) => fastFlow || baseCanApproveReport(candidate);
+  const canEditFloorWorkspaces = (candidate: Parameters<typeof baseCanEditFloorWorkspaces>[0]) => fastFlow || baseCanEditFloorWorkspaces(candidate);
+  const canEvaluateCases = (candidate: Parameters<typeof baseCanEvaluateCases>[0]) => fastFlow || baseCanEvaluateCases(candidate);
+  const canManageTemplates = (candidate: Parameters<typeof baseCanManageTemplates>[0]) => fastFlow || baseCanManageTemplates(candidate);
+  const canReadClientSnapshots = (candidate: Parameters<typeof baseCanReadClientSnapshots>[0]) => fastFlow || baseCanReadClientSnapshots(candidate);
+  const canReleaseVerdict = (candidate: Parameters<typeof baseCanReleaseVerdict>[0]) => fastFlow || baseCanReleaseVerdict(candidate);
+  const canTriggerDeliverables = (candidate: Parameters<typeof baseCanTriggerDeliverables>[0]) => fastFlow || baseCanTriggerDeliverables(candidate);
+  const canVerifyPayments = (candidate: Parameters<typeof baseCanVerifyPayments>[0]) => fastFlow || baseCanVerifyPayments(candidate);
       const concurrencyActions = new Set(["founder-legal-policy-version-create-from-canonical", "founder-legal-policy-approve", "founder-legal-policy-activate", "founder-lead-profile-update", "founder-media-register", "founder-media-transition", "founder-qualification-invite", "founder-communication-context", "founder-communication-prepare", "founder-communication-opened", "founder-booking-assign", "founder-booking-reschedule", "founder-booking-cancel", "founder-project-scope-save", "case-service-configure", "case-rectification-request", "case-rectification-approve", "assessment-observation-upsert", "assessment-recommendation-upsert", "assessment-implementation-upsert", "case-document-upsert", "case-document-issue-resolve", "delivery-milestone-upsert", "site-analysis-upsert", "site-analysis-checkpoint", "post-site-findings-upsert", "post-site-findings-checkpoint", "manual-sheet-approve", "client-pipeline-transition", "commercial-policy-update", "client-intake-upsert", "proposal-create", "proposal-approve", "case-create", "advance-proof-verify", "preview-report", "stage-a-present", "balance-proof-verify", "final-report-prepare", "report-approve", "verdict-release", "utility-evaluate", "utility-verdict", "shakti-rank", "evaluation-replacement-request", "floor-create", "plan-version-create", "spatial-evidence-create", "orientation-version-lock", "opening-mapping-create", "space-mapping-create", "regeneration-transition", "methodology-version-create", "methodology-version-authority-bind", "methodology-rule-upsert", "methodology-fixture-upsert", "methodology-version-publish", "aou-source-initialize", "aou-display-draft", "aou-display-approve"]);
   concurrencyActions.add("case-create-v1");
   concurrencyActions.add("case-property-context-upsert-v1");
@@ -175,6 +186,7 @@ export async function POST(request: Request) {
       }
       actor = { ...actor, role: foundation.membership.role, organisationId: foundation.organisation.id,
         organisationCapability: foundation.membership.capability };
+      fastFlow = isFounderFastFlowRequest(request.headers.get("host"), foundation.membership.role === "SUPER_ADMIN" && foundation.membership.capability === "organisation_owner");
       assertOrganisationRequestScope(getAppState(), body, foundation.organisation.id);
       organisationStateBefore = structuredClone(getAppState());
     }

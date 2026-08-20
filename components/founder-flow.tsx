@@ -22,7 +22,7 @@ function contextLine(scorecard: FounderScorecard) {
   return `${scorecard.client?.displayName ?? "No client selected"} · ${scorecard.project?.propertyName ?? scorecard.caseRecord?.caseNumber ?? "Case setup pending"} · ${floor?.label ?? "Floor setup pending"}`;
 }
 
-function ProgressControl({ scorecard, currentNumber }: { scorecard: FounderScorecard; currentNumber: number }) {
+function ProgressControl({ scorecard, currentNumber, fastFlow }: { scorecard: FounderScorecard; currentNumber: number; fastFlow: boolean }) {
   const steps = getFounderFlowSteps(scorecard);
   const current = steps.find((step) => step.number === currentNumber) ?? steps[0];
   const previous = steps.filter((step) => step.number < currentNumber);
@@ -31,7 +31,7 @@ function ProgressControl({ scorecard, currentNumber }: { scorecard: FounderScore
       <span className="founder-flow-progress-current" aria-current="step">Step {current?.number.toString().padStart(2, "0")} of {steps.length} / {current?.title}</span>
       <div className="founder-flow-stepper" aria-label="Available Founder steps">
         {steps.map((step) => {
-          const available = canOpenFounderFlowStep(scorecard, step.number);
+          const available = canOpenFounderFlowStep(scorecard, step.number, fastFlow);
           const active = step.number === currentNumber;
           return available ? <a key={step.id} className={`founder-flow-stepper-item${active ? " active" : ""}`} href={step.flowPath} aria-current={active ? "step" : undefined} data-current-stage={active ? "true" : undefined}>
             <span>{step.number.toString().padStart(2, "0")}</span><strong>{step.title}</strong><small>{active ? "Current stage · " : ""}{statusLabel(step.status)}</small>
@@ -82,26 +82,27 @@ export function FounderFlowHome({ scorecard }: { scorecard: FounderScorecard }) 
   );
 }
 
-export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean }) {
+export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false, fastFlow = false }: { scorecard: FounderScorecard; stepNumber: number; walkthrough?: boolean; fastFlow?: boolean }) {
   const step = getFounderFlowSteps(scorecard).find((item) => item.number === stepNumber);
   const current = getCurrentFounderFlowStep(scorecard);
   const previous = getPreviousFounderFlowStep(scorecard, stepNumber);
   const next = getNextFounderFlowStep(scorecard, stepNumber);
   if (!step || !current) return <p className="subtle">This Founder step is not available.</p>;
-  const isFuture = !canOpenFounderFlowStep(scorecard, stepNumber);
+  const isFuture = !canOpenFounderFlowStep(scorecard, stepNumber, fastFlow);
   const isV1 = scorecard.caseRecord?.evaluationArchitectureVersion === "V1" && scorecard.selectedFloor?.evaluationArchitectureVersion === "V1";
   const isOptionalV1ManualSheet = isV1 && step.id === "manual-sheet";
   const displayStatus = isFuture ? "BLOCKED" : step.status;
   const tone = statusTone(displayStatus);
   const isRegeneration = step.status === "NEEDS_REGENERATION" && !isFuture;
-  const isBlocked = step.status === "BLOCKED" || step.status === "NEEDS_REGENERATION" || isFuture;
+  const isBlocked = !fastFlow && (step.status === "BLOCKED" || step.status === "NEEDS_REGENERATION" || isFuture);
   const isComplete = step.status === "COMPLETE" && !isFuture;
   const action = isComplete ? { href: "#founder-step-workspace", label: "Review current step" } : isRegeneration ? { href: "#founder-step-workspace", label: "Resolve regeneration" } : isFuture ? { href: current.flowPath, label: `Go to step ${current.number.toString().padStart(2, "0")}` } : isBlocked && !step.selfRemediableOnCurrentStep ? (step.recoveryAction ?? { href: current.flowPath, label: "Go to required step" }) : !isBlocked ? step.primaryAction : undefined;
   const nextReason = isOptionalV1ManualSheet ? "Optional V1 supporting evidence. Continue skips this legacy-only surface." : isComplete ? "This step is complete. Continue to the next server-derived step." : isFuture ? `Complete step ${current.number.toString().padStart(2, "0")} to unlock the next step.` : step.explanation;
   return (
     <section className="founder-flow-page" aria-labelledby="founder-flow-title">
       <FounderCaseSelector caseId={scorecard.caseRecord?.id} floorId={scorecard.selectedFloorId} caseLabel={scorecard.caseRecord?.caseNumber} />
-      <ProgressControl scorecard={scorecard} currentNumber={stepNumber} />
+      <ProgressControl scorecard={scorecard} currentNumber={stepNumber} fastFlow={fastFlow} />
+      {fastFlow ? <div className="founder-flow-fast-mode" role="status"><strong>Fast flow · staging</strong><span>Steps remain editable and navigation is open. Authentication, organisation scope, validation and audit history still apply.</span></div> : null}
       <section className="founder-flow-surface" data-tone={tone}>
         <div className="founder-flow-context" aria-label="Selected client, project and floor">{contextLine(scorecard)}</div>
         <div className="founder-flow-step-number">Step {step.number.toString().padStart(2, "0")} · {statusLabel(displayStatus)}</div>
@@ -118,7 +119,7 @@ export function FounderFlowPage({ scorecard, stepNumber, walkthrough = false }: 
           {previous ? <a className="button-secondary" href={previous.flowPath}>Previous</a> : <a className="button-secondary" href="/">Back to scorecard</a>}
           {(isBlocked || isComplete) && action ? isComplete ? <FounderReviewStepLink href={action.href} label={action.label} /> : <a className="button founder-flow-primary" href={action.href}>{action.label}</a> : null}
           {!isBlocked && !isComplete && !isOptionalV1ManualSheet ? <span className="founder-flow-current-action">Complete the current action above</span> : null}
-          {next ? (isComplete || isOptionalV1ManualSheet) ? <a className="button founder-flow-next" href={next.flowPath}>Next step</a> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Next step</button> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Delivery remains disabled</button>}
+          {next ? (fastFlow || isComplete || isOptionalV1ManualSheet) ? <a className="button founder-flow-next" href={next.flowPath}>Next step</a> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Next step</button> : <button className="button founder-flow-next" type="button" disabled aria-describedby="founder-flow-next-reason">Delivery remains disabled</button>}
           <p id="founder-flow-next-reason" className="founder-flow-next-reason">{nextReason}</p>
         </div>
         <p className="founder-flow-save-guidance">Save and Save &amp; Continue controls stay inside the active workspace so each action uses its exact server-side validation and concurrency contract.</p>

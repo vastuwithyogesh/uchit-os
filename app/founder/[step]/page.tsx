@@ -8,6 +8,7 @@ import { headers } from "next/headers";
 import { isExplicitLocalDemo } from "@/lib/auth";
 import { buildLocalFounderWalkthroughState } from "@/lib/founder-walkthrough.server";
 import { canAccessFounderCase } from "@/lib/founder-case-access";
+import { isFounderFastFlowRequest } from "@/lib/founder-fast-flow";
 
 export default async function FounderStepPage({ params, searchParams }: { params: Promise<{ step: string }>; searchParams: Promise<{ caseId?: string; floorId?: string; walkthrough?: string }> }) {
   const access = await requireFounderPageAccess("SETTER");
@@ -34,7 +35,8 @@ export default async function FounderStepPage({ params, searchParams }: { params
       }
     }
     const scorecard = buildFounderScorecard(state, access.actor, undefined, context.caseId, context.floorId);
-    return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One governed step at a time" /><FounderFlowPage scorecard={scorecard} stepNumber={stepNumber} walkthrough={walkthrough} /></main>;
+    const fastFlow = isFounderFastFlowRequest(requestHeaders.get("host"), access.actor.role === "SUPER_ADMIN" && Boolean(access.actor.organisationId));
+    return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle={fastFlow ? "Fast staging flow" : "One governed step at a time"} /><FounderFlowPage scorecard={scorecard} stepNumber={stepNumber} walkthrough={walkthrough} fastFlow={fastFlow} /></main>;
   } catch {
     return <main className="page-shell"><SiteHeader title="Founder workflow" subtitle="One governed step at a time" /><section className="workspace-state" role="alert"><h1>We could not load this step</h1><p>Nothing has changed. Refresh to retry or return to the command center.</p><a className="button-secondary" href="/">Back to command center</a></section></main>;
   }

@@ -4064,3 +4064,14 @@ button:disabled,
     animation-duration: .01ms !important;
   }
 }
+.founder-flow-fast-mode {
+  display: flex;
+  gap: 0.75rem;
+  align-items: baseline;
+  margin: 0.75rem 0 1rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid rgba(174, 112, 36, 0.35);
+  border-radius: 0.75rem;
+  background: rgba(255, 247, 230, 0.9);
+  color: #6b461c;
+}

@@ -51,6 +51,10 @@ export function getCurrentFounderFlowStep(scorecard: FounderScorecard) {
   return progressionSteps.find((step) => step.status !== "COMPLETE") ?? progressionSteps[progressionSteps.length - 1];
 }
 export function getFounderFlowStep(scorecard: FounderScorecard, number: number) { return getFounderFlowSteps(scorecard).find((step) => step.number === number); }
-export function canOpenFounderFlowStep(scorecard: FounderScorecard, number: number) { const current = getCurrentFounderFlowStep(scorecard); return Boolean(current && number <= current.number); }
+export function canOpenFounderFlowStep(scorecard: FounderScorecard, number: number, fastFlow = false) {
+  if (fastFlow) return Boolean(getFounderFlowStep(scorecard, number));
+  const current = getCurrentFounderFlowStep(scorecard);
+  return Boolean(current && number <= current.number);
+}
 export function getPreviousFounderFlowStep(scorecard: FounderScorecard, number: number) { return getFounderFlowSteps(scorecard).find((step) => step.number === number - 1); }
 export function getNextFounderFlowStep(scorecard: FounderScorecard, number: number) { return getFounderFlowSteps(scorecard).find((step) => step.number === number + 1); }
